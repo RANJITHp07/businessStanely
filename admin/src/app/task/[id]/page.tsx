@@ -343,20 +343,11 @@ export default function TaskDetails() {
             {/* Header */}
             <div className="mb-8">
                 <div className="flex items-center gap-4 mb-4">
-                    <Button variant="outline" size="sm">
-                        <ArrowLeft className="h-4 w-4 mr-2" />
-                        Back to Tasks
-                    </Button>
                     <div className="flex-1">
                         <h1 className="text-3xl font-bold">Task Details</h1>
                         <p className="text-muted-foreground mt-2">Comprehensive view of task progress and activity</p>
                     </div>
                     <div className="flex items-center gap-2">
-                        <Button variant="outline" onClick={toggleTimer} className="flex items-center gap-2 bg-transparent">
-                            {isTimerRunning ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-                            {isTimerRunning ? "Pause Timer" : "Start Timer"}
-                            <span className="font-mono text-sm">{currentTimer}</span>
-                        </Button>
                         <Button className="flex items-center gap-2">
                             <Edit className="h-4 w-4" />
                             Edit Task
@@ -372,22 +363,9 @@ export default function TaskDetails() {
                                 <div className="flex-1">
                                     <div className="flex items-center gap-3 mb-2">
                                         <h2 className="text-2xl font-bold">{taskData.taskName}</h2>
-                                        {getPriorityBadge(taskData.priority)}
                                         {getStatusBadge(taskData.status)}
                                     </div>
                                     <p className="text-muted-foreground mb-4">{taskData.description}</p>
-                                    <div className="flex flex-wrap gap-2">
-                                        {taskData.tags.map((tag) => (
-                                            <Badge key={tag} variant="outline" className="text-xs">
-                                                {tag}
-                                            </Badge>
-                                        ))}
-                                    </div>
-                                </div>
-                                <div className="text-right space-y-2">
-                                    <div className="text-sm text-muted-foreground">Progress</div>
-                                    <div className="text-3xl font-bold text-blue-600">{taskData.percentageCompleted}%</div>
-                                    <Progress value={taskData.percentageCompleted} className="w-32" />
                                 </div>
                             </div>
 
@@ -420,79 +398,6 @@ export default function TaskDetails() {
                                 </div>
                             </div>
 
-                            <Separator />
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                                <div className="space-y-2">
-                                    <div className="text-sm font-medium text-muted-foreground">Client</div>
-                                    <div className="flex items-center gap-2">
-                                        <Building2 className="h-4 w-4 text-muted-foreground" />
-                                        <div>
-                                            <div className="font-medium">{taskData.clientName}</div>
-                                            <div className="text-sm text-muted-foreground">{taskData.contactPerson}</div>
-                                        </div>
-                                    </div>
-                                    <div className="space-y-1">
-                                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                            <Phone className="h-3 w-3" />
-                                            <span>{taskData.clientPhone}</span>
-                                        </div>
-                                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                            <Mail className="h-3 w-3" />
-                                            <span>{taskData.clientEmail}</span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="space-y-2">
-                                    <div className="text-sm font-medium text-muted-foreground">Assigned To</div>
-                                    <div className="flex items-center gap-2">
-                                        <Avatar className="h-8 w-8">
-                                            <AvatarImage src={taskData.assignedAgent.avatar || ""} />
-                                            <AvatarFallback className="text-xs">
-                                                {taskData.assignedAgent.name
-                                                    .split(" ")
-                                                    .map((n) => n[0])
-                                                    .join("")}
-                                            </AvatarFallback>
-                                        </Avatar>
-                                        <div>
-                                            <div className="font-medium">{taskData.assignedAgent.name}</div>
-                                            <div className="text-sm text-muted-foreground">{taskData.assignedAgent.type}</div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="space-y-2">
-                                    <div className="text-sm font-medium text-muted-foreground">Timeline</div>
-                                    <div className="space-y-1">
-                                        <div className="flex items-center gap-2 text-sm">
-                                            <Calendar className="h-3 w-3 text-muted-foreground" />
-                                            <span>Created: {formatDate(taskData.createdDate)}</span>
-                                        </div>
-                                        <div className="flex items-center gap-2 text-sm">
-                                            <Calendar className="h-3 w-3 text-muted-foreground" />
-                                            <span>Due: {formatDate(taskData.dueDate)}</span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="space-y-2">
-                                    <div className="text-sm font-medium text-muted-foreground">Time & Billing</div>
-                                    <div className="space-y-1">
-                                        <div className="flex items-center gap-2 text-sm">
-                                            <Timer className="h-3 w-3 text-muted-foreground" />
-                                            <span>
-                                                {taskData.actualHours}h / {taskData.estimatedHours}h
-                                            </span>
-                                        </div>
-                                        <div className="text-sm">
-                                            <span className="font-medium">${totalBillableAmount.toLocaleString()}</span>
-                                            <span className="text-muted-foreground"> billed</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
                         </div>
                     </CardContent>
                 </Card>
@@ -592,21 +497,6 @@ export default function TaskDetails() {
                                             <span className="text-sm font-bold">{taskData.percentageCompleted}%</span>
                                         </div>
                                         <Progress value={taskData.percentageCompleted} className="h-3" />
-                                    </div>
-                                    <Separator />
-                                    <div className="space-y-3">
-                                        <div className="flex justify-between items-center">
-                                            <span className="text-sm font-medium">Estimated Hours</span>
-                                            <span className="text-sm font-bold">{taskData.estimatedHours}h</span>
-                                        </div>
-                                        <div className="flex justify-between items-center">
-                                            <span className="text-sm font-medium">Actual Hours</span>
-                                            <span className="text-sm font-bold">{taskData.actualHours}h</span>
-                                        </div>
-                                        <div className="flex justify-between items-center">
-                                            <span className="text-sm font-medium">Billable Rate</span>
-                                            <span className="text-sm font-bold">${taskData.billableRate}/hr</span>
-                                        </div>
                                     </div>
                                 </CardContent>
                             </Card>
@@ -721,88 +611,9 @@ export default function TaskDetails() {
                         <CardHeader>
                             <CardTitle className="flex items-center justify-between">
                                 <span>Time Log</span>
-                                <Dialog open={showTimeLogDialog} onOpenChange={setShowTimeLogDialog}>
-                                    <DialogTrigger asChild>
-                                        <Button size="sm" className="flex items-center gap-2">
-                                            <Plus className="h-4 w-4" />
-                                            Add Time Entry
-                                        </Button>
-                                    </DialogTrigger>
-                                    <DialogContent>
-                                        <DialogHeader>
-                                            <DialogTitle>Add Time Entry</DialogTitle>
-                                            <DialogDescription>Record time spent on this task</DialogDescription>
-                                        </DialogHeader>
-                                        <div className="space-y-4">
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <div className="space-y-2">
-                                                    <Label htmlFor="date">Date</Label>
-                                                    <Input
-                                                        id="date"
-                                                        type="date"
-                                                        value={newTimeLog.date}
-                                                        onChange={(e) => setNewTimeLog({ ...newTimeLog, date: e.target.value })}
-                                                    />
-                                                </div>
-                                                <div className="space-y-2">
-                                                    <Label>Billable</Label>
-                                                    <Select
-                                                        value={newTimeLog.billable.toString()}
-                                                        onValueChange={(value) => setNewTimeLog({ ...newTimeLog, billable: value === "true" })}
-                                                    >
-                                                        <SelectTrigger>
-                                                            <SelectValue />
-                                                        </SelectTrigger>
-                                                        <SelectContent>
-                                                            <SelectItem value="true">Billable</SelectItem>
-                                                            <SelectItem value="false">Non-billable</SelectItem>
-                                                        </SelectContent>
-                                                    </Select>
-                                                </div>
-                                            </div>
-                                            <div className="grid grid-cols-2 gap-4">
-                                                <div className="space-y-2">
-                                                    <Label htmlFor="start-time">Start Time</Label>
-                                                    <Input
-                                                        id="start-time"
-                                                        type="time"
-                                                        value={newTimeLog.startTime}
-                                                        onChange={(e) => setNewTimeLog({ ...newTimeLog, startTime: e.target.value })}
-                                                    />
-                                                </div>
-                                                <div className="space-y-2">
-                                                    <Label htmlFor="end-time">End Time</Label>
-                                                    <Input
-                                                        id="end-time"
-                                                        type="time"
-                                                        value={newTimeLog.endTime}
-                                                        onChange={(e) => setNewTimeLog({ ...newTimeLog, endTime: e.target.value })}
-                                                    />
-                                                </div>
-                                            </div>
-                                            <div className="space-y-2">
-                                                <Label htmlFor="description">Description</Label>
-                                                <Textarea
-                                                    id="description"
-                                                    placeholder="Describe the work performed..."
-                                                    value={newTimeLog.description}
-                                                    onChange={(e) => setNewTimeLog({ ...newTimeLog, description: e.target.value })}
-                                                    rows={3}
-                                                />
-                                            </div>
-                                        </div>
-                                        <DialogFooter>
-                                            <Button variant="outline" onClick={() => setShowTimeLogDialog(false)}>
-                                                Cancel
-                                            </Button>
-                                            <Button onClick={handleAddTimeLog}>Add Entry</Button>
-                                        </DialogFooter>
-                                    </DialogContent>
-                                </Dialog>
                             </CardTitle>
                             <CardDescription>
-                                Track time spent on this task. Total: {taskData.actualHours} hours • Billable: $
-                                {totalBillableAmount.toLocaleString()}
+                                Track time spent on this task. Total: {taskData.actualHours} hours
                             </CardDescription>
                         </CardHeader>
                         <CardContent>
@@ -817,22 +628,11 @@ export default function TaskDetails() {
                                                 </div>
                                             </div>
                                             <div className="flex-1">
-                                                <p className="text-sm font-medium">{entry.description}</p>
-                                                <div className="flex items-center gap-2 mt-1">
-                                                    <Badge variant={entry.billable ? "default" : "secondary"} className="text-xs">
-                                                        {entry.billable ? "Billable" : "Non-billable"}
-                                                    </Badge>
-                                                    <span className="text-xs text-muted-foreground">
-                                                        {entry.duration}h @ ${entry.rate}/hr
-                                                    </span>
-                                                </div>
+                                                <p className="text-sm font-medium text-muted-foreground">{entry.description}</p>
                                             </div>
                                         </div>
                                         <div className="text-right">
                                             <div className="text-lg font-bold">{entry.duration}h</div>
-                                            <div className="text-sm text-muted-foreground">
-                                                ${(entry.duration * entry.rate).toLocaleString()}
-                                            </div>
                                         </div>
                                     </div>
                                 ))}
@@ -840,18 +640,10 @@ export default function TaskDetails() {
 
                             {/* Summary */}
                             <div className="mt-6 p-4 bg-muted/50 rounded-lg">
-                                <div className="grid grid-cols-3 gap-4 text-center">
+                                <div className="grid grid-cols-1 gap-4 text-center">
                                     <div>
                                         <div className="text-2xl font-bold">{taskData.actualHours}h</div>
                                         <div className="text-sm text-muted-foreground">Total Hours</div>
-                                    </div>
-                                    <div>
-                                        <div className="text-2xl font-bold">${taskData.billableRate}</div>
-                                        <div className="text-sm text-muted-foreground">Hourly Rate</div>
-                                    </div>
-                                    <div>
-                                        <div className="text-2xl font-bold">${totalBillableAmount.toLocaleString()}</div>
-                                        <div className="text-sm text-muted-foreground">Total Billable</div>
                                     </div>
                                 </div>
                             </div>

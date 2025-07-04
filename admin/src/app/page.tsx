@@ -1,103 +1,432 @@
-import Image from "next/image";
+"use client"
 
-export default function Home() {
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  LineChart,
+  Line,
+  AreaChart,
+  Area,
+} from "recharts"
+import {
+  Users,
+  UserCheck,
+  FileText,
+  CheckCircle,
+  AlertTriangle,
+  TrendingUp,
+  TrendingDown,
+  Calendar,
+  Building2,
+  User,
+} from "lucide-react"
+
+// Mock data for dashboard
+const dashboardStats = {
+  agents: {
+    total: 25,
+    active: 23,
+    inactive: 2,
+    growth: 8.5,
+  },
+  clients: {
+    total: 156,
+    individual: 98,
+    organization: 58,
+    growth: 12.3,
+  },
+  tasks: {
+    total: 342,
+    pending: 45,
+    inProgress: 128,
+    completed: 169,
+    overdue: 12,
+    growth: -2.1,
+  },
+}
+
+// Chart data
+const taskStatusData = [
+  { name: "Completed", value: 169, color: "#22c55e" },
+  { name: "In Progress", value: 128, color: "#3b82f6" },
+  { name: "Pending", value: 45, color: "#f59e0b" },
+  { name: "Overdue", value: 12, color: "#ef4444" },
+]
+
+const monthlyTasksData = [
+  { month: "Jan", completed: 45, created: 52 },
+  { month: "Feb", completed: 52, created: 48 },
+  { month: "Mar", completed: 48, created: 61 },
+  { month: "Apr", completed: 61, created: 55 },
+  { month: "May", completed: 55, created: 67 },
+  { month: "Jun", completed: 67, created: 59 },
+]
+
+const agentPerformanceData = [
+  { name: "John Smith", tasks: 28, completed: 25 },
+  { name: "Sarah Johnson", tasks: 24, completed: 22 },
+  { name: "Michael Brown", tasks: 19, completed: 16 },
+  { name: "Emily Davis", tasks: 15, completed: 14 },
+  { name: "Robert Wilson", tasks: 12, completed: 10 },
+]
+
+const clientGrowthData = [
+  { month: "Jan", individual: 85, organization: 45 },
+  { month: "Feb", individual: 88, organization: 47 },
+  { month: "Mar", individual: 92, organization: 50 },
+  { month: "Apr", individual: 95, organization: 53 },
+  { month: "May", individual: 96, organization: 56 },
+  { month: "Jun", individual: 98, organization: 58 },
+]
+
+const recentActivities = [
+  {
+    id: 1,
+    type: "task_completed",
+    description: "Contract Review completed by John Smith",
+    time: "2 hours ago",
+    icon: CheckCircle,
+    color: "text-green-600",
+  },
+  {
+    id: 2,
+    type: "client_added",
+    description: "New client 'TechCorp Inc.' added to system",
+    time: "4 hours ago",
+    icon: UserCheck,
+    color: "text-blue-600",
+  },
+  {
+    id: 3,
+    type: "task_overdue",
+    description: "Legal Research task is now overdue",
+    time: "6 hours ago",
+    icon: AlertTriangle,
+    color: "text-red-600",
+  },
+  {
+    id: 4,
+    type: "agent_assigned",
+    description: "Emily Davis assigned to new case",
+    time: "8 hours ago",
+    icon: Users,
+    color: "text-purple-600",
+  },
+]
+
+export default function Dashboard() {
+  const chartConfig = {
+    completed: {
+      label: "Completed",
+      color: "hsl(var(--chart-1))",
+    },
+    created: {
+      label: "Created",
+      color: "hsl(var(--chart-2))",
+    },
+    individual: {
+      label: "Individual",
+      color: "hsl(var(--chart-3))",
+    },
+    organization: {
+      label: "Organization",
+      color: "hsl(var(--chart-4))",
+    },
+  }
+
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+    <div className="container mx-auto p-6 max-w-7xl space-y-8">
+      {/* Header */}
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold">Dashboard</h1>
+        <p className="text-muted-foreground mt-2">
+          Overview of your legal management system performance and key metrics
+        </p>
+      </div>
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* Agents Card */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Agents</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{dashboardStats.agents.total}</div>
+            <div className="flex items-center space-x-2 text-xs text-muted-foreground mt-2">
+              <Badge variant="outline" className="text-green-600 border-green-200">
+                {dashboardStats.agents.active} Active
+              </Badge>
+              <Badge variant="outline" className="text-gray-600 border-gray-200">
+                {dashboardStats.agents.inactive} Inactive
+              </Badge>
+            </div>
+            <div className="flex items-center mt-2">
+              <TrendingUp className="h-3 w-3 text-green-600 mr-1" />
+              <span className="text-xs text-green-600">+{dashboardStats.agents.growth}% from last month</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Clients Card */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Clients</CardTitle>
+            <UserCheck className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{dashboardStats.clients.total}</div>
+            <div className="flex items-center space-x-2 text-xs text-muted-foreground mt-2">
+              <Badge variant="outline" className="text-blue-600 border-blue-200">
+                <User className="h-3 w-3 mr-1" />
+                {dashboardStats.clients.individual} Individual
+              </Badge>
+              <Badge variant="outline" className="text-purple-600 border-purple-200">
+                <Building2 className="h-3 w-3 mr-1" />
+                {dashboardStats.clients.organization} Org
+              </Badge>
+            </div>
+            <div className="flex items-center mt-2">
+              <TrendingUp className="h-3 w-3 text-green-600 mr-1" />
+              <span className="text-xs text-green-600">+{dashboardStats.clients.growth}% from last month</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Tasks Card */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Tasks</CardTitle>
+            <FileText className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{dashboardStats.tasks.total}</div>
+            <div className="flex items-center space-x-1 text-xs text-muted-foreground mt-2">
+              <Badge variant="outline" className="text-green-600 border-green-200">
+                {dashboardStats.tasks.completed} Done
+              </Badge>
+              <Badge variant="outline" className="text-blue-600 border-blue-200">
+                {dashboardStats.tasks.inProgress} Active
+              </Badge>
+              <Badge variant="outline" className="text-red-600 border-red-200">
+                {dashboardStats.tasks.overdue} Overdue
+              </Badge>
+            </div>
+            <div className="flex items-center mt-2">
+              <TrendingDown className="h-3 w-3 text-red-600 mr-1" />
+              <span className="text-xs text-red-600">{Math.abs(dashboardStats.tasks.growth)}% from last month</span>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Charts Row 1 */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Task Status Distribution */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Task Status Distribution</CardTitle>
+            <CardDescription>Current status breakdown of all tasks</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ChartContainer config={chartConfig} className="h-[300px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={taskStatusData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={100}
+                    paddingAngle={5}
+                    dataKey="value"
+                  >
+                    {taskStatusData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <ChartTooltip content={<ChartTooltipContent />} />
+                </PieChart>
+              </ResponsiveContainer>
+            </ChartContainer>
+            <div className="grid grid-cols-2 gap-2 mt-4">
+              {taskStatusData.map((item) => (
+                <div key={item.name} className="flex items-center space-x-2">
+                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
+                  <span className="text-sm">
+                    {item.name}: {item.value}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Monthly Tasks Trend */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Monthly Tasks Trend</CardTitle>
+            <CardDescription>Tasks created vs completed over time</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ChartContainer config={chartConfig} className="h-[300px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={monthlyTasksData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="month" />
+                  <YAxis />
+                  <ChartTooltip content={<ChartTooltipContent />} />
+                  <Line
+                    type="monotone"
+                    dataKey="completed"
+                    stroke="var(--color-completed)"
+                    strokeWidth={3}
+                    dot={{ fill: "var(--color-completed)", strokeWidth: 2, r: 4 }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="created"
+                    stroke="var(--color-created)"
+                    strokeWidth={3}
+                    dot={{ fill: "var(--color-created)", strokeWidth: 2, r: 4 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </ChartContainer>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Charts Row 2 */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Agent Performance */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Top Agent Performance</CardTitle>
+            <CardDescription>Task completion rates by agent</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ChartContainer config={chartConfig} className="h-[300px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={agentPerformanceData} layout="horizontal">
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis type="number" />
+                  <YAxis dataKey="name" type="category" width={100} />
+                  <ChartTooltip content={<ChartTooltipContent />} />
+                  <Bar dataKey="completed" fill="#22c55e" name="Completed" />
+                  <Bar dataKey="tasks" fill="#e5e7eb" name="Total Tasks" />
+                </BarChart>
+              </ResponsiveContainer>
+            </ChartContainer>
+          </CardContent>
+        </Card>
+
+        {/* Client Growth */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Client Growth Trend</CardTitle>
+            <CardDescription>Individual vs Organization client growth</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ChartContainer config={chartConfig} className="h-[300px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={clientGrowthData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="month" />
+                  <YAxis />
+                  <ChartTooltip content={<ChartTooltipContent />} />
+                  <Area
+                    type="monotone"
+                    dataKey="individual"
+                    stackId="1"
+                    stroke="var(--color-individual)"
+                    fill="var(--color-individual)"
+                    fillOpacity={0.6}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="organization"
+                    stackId="1"
+                    stroke="var(--color-organization)"
+                    fill="var(--color-organization)"
+                    fillOpacity={0.6}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </ChartContainer>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Recent Activity */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Calendar className="h-5 w-5" />
+            Recent Activity
+          </CardTitle>
+          <CardDescription>Latest updates and activities in your system</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {recentActivities.map((activity) => (
+              <div key={activity.id} className="flex items-center space-x-4 p-3 rounded-lg bg-muted/50">
+                <div className={`p-2 rounded-full bg-background ${activity.color}`}>
+                  <activity.icon className="h-4 w-4" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-medium">{activity.description}</p>
+                  <p className="text-xs text-muted-foreground">{activity.time}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Quick Actions */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card className="cursor-pointer hover:shadow-md transition-shadow">
+          <CardContent className="flex items-center justify-center p-6">
+            <div className="text-center">
+              <Users className="h-8 w-8 mx-auto mb-2 text-blue-600" />
+              <h3 className="font-semibold">Create Agent</h3>
+              <p className="text-sm text-muted-foreground">Add new team member</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="cursor-pointer hover:shadow-md transition-shadow">
+          <CardContent className="flex items-center justify-center p-6">
+            <div className="text-center">
+              <UserCheck className="h-8 w-8 mx-auto mb-2 text-green-600" />
+              <h3 className="font-semibold">Create Client</h3>
+              <p className="text-sm text-muted-foreground">Add new client</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="cursor-pointer hover:shadow-md transition-shadow">
+          <CardContent className="flex items-center justify-center p-6">
+            <div className="text-center">
+              <FileText className="h-8 w-8 mx-auto mb-2 text-purple-600" />
+              <h3 className="font-semibold">Create Task</h3>
+              <p className="text-sm text-muted-foreground">Assign new task</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
-  );
+  )
 }

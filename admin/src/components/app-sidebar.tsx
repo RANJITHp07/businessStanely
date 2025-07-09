@@ -42,14 +42,15 @@ const items = [
 
 export function AppSidebar() {
     return (
-        <Sidebar>
+        
+        <Sidebar >
             <SidebarContent>
                 <SidebarGroup>
-                    <SidebarGroupLabel className="text-xl mb-5">BusinessStanely</SidebarGroupLabel>
+                    <SidebarGroupLabel className="text-xl mb-5 text-white Camelcase">Business Stanely</SidebarGroupLabel>
                     <SidebarGroupContent>
                         <SidebarMenu>
                             {items.map((item) => (
-                                <SidebarMenuItem key={item.title}>
+                                <SidebarMenuItem  key={item.title}>
                                     <SidebarMenuButton asChild>
                                         <a href={item.url}>
                                             <item.icon />

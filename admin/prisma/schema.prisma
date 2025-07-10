@@ -1,0 +1,59 @@
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Client {
+  id                       String   @id @default(auto()) @map("_id") @db.ObjectId
+  clientType               String
+  email                    String   @unique
+  phoneNumber              String
+  secondaryPhoneNumber     String?
+  address                  String?
+  preferredCommunication   String?
+  notes                    String?
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  // Individual Fields
+  firstName       String?
+  lastName        String?
+  gender          String?
+  dateOfBirth     DateTime?
+  idProofType     String?
+  idProofNumber   String?
+
+  // Organization Fields
+  organizationName     String?
+  registrationNumber   String?
+  entityType           String?
+  incorporationDate    DateTime?
+  gstNumber            String?
+  authorizedPersonName String?
+  designation          String?
+  contactEmail         String?
+}
+
+model Agent {
+  id                    String   @id @default(auto()) @map("_id") @db.ObjectId
+  name                  String
+  email                 String   @unique
+  phoneNumber           String
+  secondaryPhoneNumber  String?
+  agentType             String
+  barAssociationId      String
+  jurisdiction          String
+  specializations       String[]
+  photo                 String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  // Team Management
+  superiorId   String?  @db.ObjectId
+  superior     Agent?   @relation("AgentHierarchy", fields: [superiorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  subordinates Agent[]  @relation("AgentHierarchy")
+}

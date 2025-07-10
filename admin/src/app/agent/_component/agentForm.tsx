@@ -3,14 +3,14 @@
 import type React from "react"
 
 import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Upload, X, User, FileText, Users } from "lucide-react"
 
 const agentTypes = ["Senior Partner", "Partner", "Associate", "Junior Associate", "Paralegal", "Legal Assistant"]
@@ -53,18 +53,24 @@ const existingAgents = [
     { id: "4", name: "Emily Davis", type: "Associate" },
 ]
 
-export default function CreateAgent() {
-    const [selectedSpecializations, setSelectedSpecializations] = useState<string[]>([])
+import { Agent } from "@/types";
+
+interface AgentFormProps {
+    agent?: Agent;
+}
+
+export default function AgentForm({ agent }: AgentFormProps) {
+    const [selectedSpecializations, setSelectedSpecializations] = useState<string[]>(agent?.specializations || [])
     const [selectedSubordinates, setSelectedSubordinates] = useState<string[]>([])
-    const [photoPreview, setPhotoPreview] = useState<string | null>(null)
+    const [photoPreview, setPhotoPreview] = useState<string | null>(agent?.photo || null)
     const [formData, setFormData] = useState({
-        name: "",
-        email: "",
-        phoneNumber: "",
-        secondaryPhoneNumber: "",
-        agentType: "",
-        barAssociationId: "",
-        jurisdiction: "",
+        name: agent?.name || "",
+        email: agent?.email || "",
+        phoneNumber: agent?.phoneNumber || "",
+        secondaryPhoneNumber: agent?.secondaryPhoneNumber || "",
+        agentType: agent?.agentType || "",
+        barAssociationId: agent?.barAssociationId || "",
+        jurisdiction: agent?.jurisdiction || "",
     })
 
     const [agentSearch, setAgentSearch] = useState("")
@@ -110,23 +116,43 @@ export default function CreateAgent() {
         setFormData((prev) => ({ ...prev, [field]: value }))
     }
 
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault()
-        console.log("Form submitted:", {
-            ...formData,
-            specializations: selectedSpecializations,
-            subordinates: selectedSubordinates,
-            photo: photoPreview,
-        })
-        // Handle form submission here
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        const url = agent ? `/api/agents/${agent.id}` : "/api/agents";
+        const method = agent ? "PUT" : "POST";
+
+        try {
+            const response = await fetch(url, {
+                method: method,
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    ...formData,
+                    specializations: selectedSpecializations,
+                    subordinates: selectedSubordinates,
+                    photo: photoPreview,
+                }),
+            });
+
+            if (response.ok) {
+                alert(`Agent ${agent ? 'updated' : 'created'} successfully!`);
+            } else {
+                const errorData = await response.json();
+                alert(`Failed to ${agent ? 'update' : 'create'} agent: ${errorData.error}`);
+            }
+        } catch (error) {
+            console.error("Error submitting form:", error);
+            alert("An unexpected error occurred. Please try again.");
+        }
     }
 
     return (
         <div className="mx-auto p-6 max-w-10xl">
             <div className="mb-8">
-                <h1 className="text-3xl font-bold">Create New Agent</h1>
+                <h1 className="text-3xl font-bold">{agent ? "Edit Agent" : "Create New Agent"}</h1>
                 <p className="text-muted-foreground mt-2">
-                    Add a new agent to your organization with their details and assignments.
+                    {agent ? "Update the agent's details and assignments." : "Add a new agent to your organization with their details and assignments."}
                 </p>
             </div>
 
@@ -442,9 +468,10 @@ export default function CreateAgent() {
                     <Button type="button" variant="outline">
                         Cancel
                     </Button>
-                    <Button type="submit">Create Agent</Button>
+                    <Button type="submit">{agent ? "Update Agent" : "Create Agent"}</Button>
                 </div>
             </form>
         </div>
     )
 }
+

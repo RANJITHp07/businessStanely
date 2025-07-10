@@ -1,10 +1,10 @@
 import React from 'react'
-import CreateClient from './_component/clientForm'
+import ClientForm from '../_component/clientForm'
 
 function page() {
     return (
         <div>
-            <CreateClient />
+            <ClientForm />
         </div>
     )
 }

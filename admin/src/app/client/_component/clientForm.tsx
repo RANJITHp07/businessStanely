@@ -52,46 +52,75 @@ const communicationPreferences = [
     { value: "in-person", label: "In-Person Meeting" },
 ]
 
-export default function CreateClient() {
+import { Client } from "@/types";
+
+interface ClientFormProps {
+    client?: Client;
+}
+
+export default function ClientForm({ client }: ClientFormProps) {
     const [formData, setFormData] = useState({
-        clientType: "",
-        email: "",
-        phoneNumber: "",
-        secondaryPhoneNumber: "",
-        address: "",
-        preferredCommunication: "",
-        notes: "",
+        clientType: client?.clientType || "",
+        email: client?.email || "",
+        phoneNumber: client?.phoneNumber || "",
+        secondaryPhoneNumber: client?.secondaryPhoneNumber || "",
+        address: client?.address || "",
+        preferredCommunication: client?.preferredCommunication || "",
+        notes: client?.notes || "",
         // Individual fields
-        firstName: "",
-        lastName: "",
-        gender: "",
-        idProofType: "",
-        idProofNumber: "",
+        firstName: client?.firstName || "",
+        lastName: client?.lastName || "",
+        gender: client?.gender || "",
+        idProofType: client?.idProofType || "",
+        idProofNumber: client?.idProofNumber || "",
         // Organization fields
-        organizationName: "",
-        registrationNumber: "",
-        entityType: "",
-        authorizedPersonName: "",
-        designation: "",
-        contactEmail: "",
-        gstNumber: "",
+        organizationName: client?.organizationName || "",
+        registrationNumber: client?.registrationNumber || "",
+        entityType: client?.entityType || "",
+        authorizedPersonName: client?.authorizedPersonName || "",
+        designation: client?.designation || "",
+        contactEmail: client?.contactEmail || "",
+        gstNumber: client?.gstNumber || "",
     })
 
-    const [dateOfBirth, setDateOfBirth] = useState<Date>()
-    const [incorporationDate, setIncorporationDate] = useState<Date>()
+    const [dateOfBirth, setDateOfBirth] = useState<Date | undefined>(client?.dateOfBirth ? new Date(client.dateOfBirth) : undefined)
+    const [incorporationDate, setIncorporationDate] = useState<Date | undefined>(client?.incorporationDate ? new Date(client.incorporationDate) : undefined)
 
     const handleInputChange = (field: string, value: string) => {
         setFormData((prev) => ({ ...prev, [field]: value }))
     }
 
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault()
-        console.log("Client submitted:", {
-            ...formData,
-            dateOfBirth,
-            incorporationDate,
-        })
-        alert("Client created successfully!")
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        const url = client ? `/api/clients/${client.id}` : "/api/clients";
+        const method = client ? "PUT" : "POST";
+
+        try {
+            const response = await fetch(url, {
+                method: method,
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    ...formData,
+                    dateOfBirth,
+                    incorporationDate,
+                }),
+            });
+
+            if (response.ok) {
+                alert(`Client ${client ? 'updated' : 'created'} successfully!`);
+                if (!client) {
+                    resetForm();
+                }
+            } else {
+                const errorData = await response.json();
+                alert(`Failed to ${client ? 'update' : 'create'} client: ${errorData.error}`);
+            }
+        } catch (error) {
+            console.error("Error submitting form:", error);
+            alert("An unexpected error occurred. Please try again.");
+        }
     }
 
     const resetForm = () => {
@@ -123,9 +152,9 @@ export default function CreateClient() {
     return (
         <div className="mx-auto p-6 max-w-10xl">
             <div className="mb-8">
-                <h1 className="text-3xl font-bold">Create New Client</h1>
+                <h1 className="text-3xl font-bold">{client ? "Edit Client" : "Create New Client"}</h1>
                 <p className="text-muted-foreground mt-2">
-                    Add a new client to your system with complete contact and legal information.
+                    {client ? "Update the client's details." : "Add a new client to your system with complete contact and legal information."}
                 </p>
             </div>
 
@@ -516,7 +545,7 @@ export default function CreateClient() {
                             Reset Form
                         </Button>
                         <Button type="submit" className="bg-primary hover:bg-primary/90">
-                            Create Client
+                            {client ? "Update Client" : "Create Client"}
                         </Button>
                     </div>
                 )}

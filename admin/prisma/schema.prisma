@@ -18,6 +18,7 @@ model Client {
   notes                    String?
   createdAt                DateTime @default(now())
   updatedAt                DateTime @updatedAt
+  tasks                    Task[]
 
   // Individual Fields
   firstName       String?
@@ -56,4 +57,26 @@ model Agent {
   superiorId   String?  @db.ObjectId
   superior     Agent?   @relation("AgentHierarchy", fields: [superiorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   subordinates Agent[]  @relation("AgentHierarchy")
+  createdTasks Task[]     @relation("CreatedTasks")
+  assignedTasks Task[]    @relation("AssignedTasks")
+}
+
+model Task {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  title       String
+  description String?
+  status      String   @default("To Do") // e.g., To Do, In Progress, Done
+  priority    String   @default("Medium") // e.g., Low, Medium, High
+  dueDate     DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  clientId String? @db.ObjectId
+  client   Client? @relation(fields: [clientId], references: [id])
+
+  createdById String?  @db.ObjectId
+  createdBy   Agent?   @relation("CreatedTasks", fields: [createdById], references: [id])
+
+  assignedToId String? @db.ObjectId
+  assignedTo   Agent?  @relation("AssignedTasks", fields: [assignedToId], references: [id])
 }

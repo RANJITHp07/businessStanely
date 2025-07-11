@@ -33,7 +33,6 @@ import {
     Building2,
     Phone,
     Mail,
-    Calendar,
     MapPin,
 } from "lucide-react"
 import Link from "next/link"
@@ -139,19 +138,6 @@ export default function ClientsTable() {
         }
     }
 
-    const clearFilters = () => {
-        setSearchTerm("")
-        setSelectedType("All Types")
-        setSelectedStatus("All Status")
-        setSelectedCommunication("All Communication")
-        setSelectedEntityType("All Entity Types")
-        setCurrentPage(1)
-    }
-
-    const getStatusBadge = (status: string) => {
-        return <Badge variant={status === "Active" ? "default" : "secondary"}>{status}</Badge>
-    }
-
     const getClientTypeBadge = (type: string) => {
         const colors = {
             individual: "bg-blue-100 text-blue-800 border-blue-200",
@@ -185,14 +171,6 @@ export default function ClientsTable() {
                 {communication.charAt(0).toUpperCase() + communication.slice(1).replace("-", " ")}
             </Badge>
         )
-    }
-
-    const formatDate = (dateString: string) => {
-        return new Date(dateString).toLocaleDateString("en-US", {
-            month: "short",
-            day: "numeric",
-            year: "numeric",
-        })
     }
 
     const getClientDisplayName = (client: Client) => {
@@ -442,6 +420,18 @@ export default function ClientsTable() {
                                 Page {currentPage} of {totalPages}
                             </div>
                             <div className="flex items-center space-x-2">
+                                <Select value={itemsPerPage.toString()} onValueChange={handleItemsPerPageChange}>
+                                    <SelectTrigger className="w-24">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {[5, 10, 20, 50].map((value) => (
+                                            <SelectItem key={value} value={value.toString()}>
+                                                {value} / page
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                                 <Button variant="outline" size="sm" onClick={() => handlePageChange(1)} disabled={currentPage === 1}>
                                     <ChevronsLeft className="h-4 w-4" />
                                 </Button>

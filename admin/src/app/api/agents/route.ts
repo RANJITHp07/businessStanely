@@ -5,12 +5,14 @@ import prisma from '@/lib/prisma';
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { specializations, subordinates, superior, ...agentData } = body;
+    const { specializations, ...agentData } = body;
 
     const newAgent = await prisma.agent.create({
       data: {
         ...agentData,
-        specializations: specializations,
+        specializations: {
+          set: specializations,
+        },
       },
     });
 

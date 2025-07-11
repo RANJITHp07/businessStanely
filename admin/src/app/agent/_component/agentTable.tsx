@@ -118,6 +118,10 @@ export default function AgentsTable() {
         setCurrentPage(page)
     }
 
+    const handleItemsPerPageChange = (value: string) => {
+        setItemsPerPage(Number.parseInt(value))
+        setCurrentPage(1)
+    }
 
     const handleDelete = async () => {
         if (!agentToDelete) return
@@ -344,6 +348,18 @@ export default function AgentsTable() {
                                 Page {currentPage} of {totalPages}
                             </div>
                             <div className="flex items-center space-x-2">
+                                <Select value={itemsPerPage.toString()} onValueChange={handleItemsPerPageChange}>
+                                    <SelectTrigger className="w-24">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {[5, 10, 20, 50].map((value) => (
+                                            <SelectItem key={value} value={value.toString()}>
+                                                {value} / page
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                                 <Button variant="outline" size="sm" onClick={() => handlePageChange(1)} disabled={currentPage === 1}>
                                     <ChevronsLeft className="h-4 w-4" />
                                 </Button>

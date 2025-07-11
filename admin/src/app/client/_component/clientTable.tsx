@@ -1,5 +1,5 @@
 "use client"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -33,217 +33,30 @@ import {
     Building2,
     Phone,
     Mail,
-    Calendar,
     MapPin,
 } from "lucide-react"
 import Link from "next/link"
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
-// Mock data for clients
-const mockClients = [
-    {
-        id: "1",
-        clientType: "individual",
-        firstName: "John",
-        lastName: "Anderson",
-        organizationName: "",
-        email: "john.anderson@email.com",
-        phoneNumber: "+1 (555) 123-4567",
-        secondaryPhoneNumber: "+1 (555) 123-4568",
-        address: "123 Main St, New York, NY 10001",
-        preferredCommunication: "email",
-        gender: "male",
-        dateOfBirth: "1985-03-15",
-        idProofType: "passport",
-        idProofNumber: "P123456789",
-        registrationNumber: "",
-        entityType: "",
-        gstNumber: "",
-        status: "Active",
-        createdDate: "2024-01-15",
-        totalCases: 3,
-        lastContact: "2024-01-20",
-    },
-    {
-        id: "2",
-        clientType: "organization",
-        firstName: "",
-        lastName: "",
-        organizationName: "Acme Corporation",
-        email: "contact@acme.com",
-        phoneNumber: "+1 (555) 234-5678",
-        secondaryPhoneNumber: "",
-        address: "456 Business Ave, Los Angeles, CA 90210",
-        preferredCommunication: "phone",
-        gender: "",
-        dateOfBirth: "",
-        idProofType: "",
-        idProofNumber: "",
-        registrationNumber: "REG123456",
-        entityType: "corporation",
-        gstNumber: "GST123456789",
-        authorizedPersonName: "Sarah Johnson",
-        designation: "CEO",
-        incorporationDate: "2020-05-10",
-        status: "Active",
-        createdDate: "2024-01-10",
-        totalCases: 8,
-        lastContact: "2024-01-22",
-    },
-    {
-        id: "3",
-        clientType: "individual",
-        firstName: "Emily",
-        lastName: "Davis",
-        organizationName: "",
-        email: "emily.davis@email.com",
-        phoneNumber: "+1 (555) 345-6789",
-        secondaryPhoneNumber: "",
-        address: "789 Oak Street, Chicago, IL 60601",
-        preferredCommunication: "sms",
-        gender: "female",
-        dateOfBirth: "1990-07-22",
-        idProofType: "drivers-license",
-        idProofNumber: "DL987654321",
-        registrationNumber: "",
-        entityType: "",
-        gstNumber: "",
-        status: "Active",
-        createdDate: "2024-01-18",
-        totalCases: 1,
-        lastContact: "2024-01-19",
-    },
-    {
-        id: "4",
-        clientType: "organization",
-        firstName: "",
-        lastName: "",
-        organizationName: "TechStart Inc.",
-        email: "info@techstart.com",
-        phoneNumber: "+1 (555) 456-7890",
-        secondaryPhoneNumber: "+1 (555) 456-7891",
-        address: "321 Innovation Drive, San Francisco, CA 94105",
-        preferredCommunication: "email",
-        gender: "",
-        dateOfBirth: "",
-        idProofType: "",
-        idProofNumber: "",
-        registrationNumber: "REG789012",
-        entityType: "llc",
-        gstNumber: "GST987654321",
-        authorizedPersonName: "Michael Chen",
-        designation: "CTO",
-        incorporationDate: "2022-03-18",
-        status: "Active",
-        createdDate: "2024-01-12",
-        totalCases: 5,
-        lastContact: "2024-01-21",
-    },
-    {
-        id: "5",
-        clientType: "individual",
-        firstName: "Robert",
-        lastName: "Williams",
-        organizationName: "",
-        email: "robert.williams@email.com",
-        phoneNumber: "+1 (555) 567-8901",
-        secondaryPhoneNumber: "",
-        address: "654 Pine Avenue, Miami, FL 33101",
-        preferredCommunication: "phone",
-        gender: "male",
-        dateOfBirth: "1978-11-05",
-        idProofType: "national-id",
-        idProofNumber: "NID456789123",
-        registrationNumber: "",
-        entityType: "",
-        gstNumber: "",
-        status: "Inactive",
-        createdDate: "2023-12-20",
-        totalCases: 2,
-        lastContact: "2023-12-25",
-    },
-    {
-        id: "6",
-        clientType: "organization",
-        firstName: "",
-        lastName: "",
-        organizationName: "Global Enterprises",
-        email: "contact@global.com",
-        phoneNumber: "+1 (555) 678-9012",
-        secondaryPhoneNumber: "+1 (555) 678-9013",
-        address: "987 Corporate Blvd, Houston, TX 77001",
-        preferredCommunication: "email",
-        gender: "",
-        dateOfBirth: "",
-        idProofType: "",
-        idProofNumber: "",
-        registrationNumber: "REG345678",
-        entityType: "corporation",
-        gstNumber: "GST456789012",
-        authorizedPersonName: "Lisa Thompson",
-        designation: "President",
-        incorporationDate: "2018-09-12",
-        status: "Active",
-        createdDate: "2024-01-08",
-        totalCases: 12,
-        lastContact: "2024-01-23",
-    },
-    {
-        id: "7",
-        clientType: "individual",
-        firstName: "Jennifer",
-        lastName: "Martinez",
-        organizationName: "",
-        email: "jennifer.martinez@email.com",
-        phoneNumber: "+1 (555) 789-0123",
-        secondaryPhoneNumber: "",
-        address: "147 Elm Street, Boston, MA 02101",
-        preferredCommunication: "in-person",
-        gender: "female",
-        dateOfBirth: "1992-04-18",
-        idProofType: "passport",
-        idProofNumber: "P987654321",
-        registrationNumber: "",
-        entityType: "",
-        gstNumber: "",
-        status: "Active",
-        createdDate: "2024-01-25",
-        totalCases: 1,
-        lastContact: "2024-01-26",
-    },
-    {
-        id: "8",
-        clientType: "organization",
-        firstName: "",
-        lastName: "",
-        organizationName: "MedCare Solutions",
-        email: "admin@medcare.com",
-        phoneNumber: "+1 (555) 890-1234",
-        secondaryPhoneNumber: "",
-        address: "258 Health Plaza, Seattle, WA 98101",
-        preferredCommunication: "phone",
-        gender: "",
-        dateOfBirth: "",
-        idProofType: "",
-        idProofNumber: "",
-        registrationNumber: "REG901234",
-        entityType: "llc",
-        gstNumber: "GST123789456",
-        authorizedPersonName: "David Wilson",
-        designation: "Managing Director",
-        incorporationDate: "2021-11-30",
-        status: "Active",
-        createdDate: "2024-01-14",
-        totalCases: 4,
-        lastContact: "2024-01-24",
-    },
-]
 
 const clientTypes = ["All Types", "Individual", "Organization"]
 const statusOptions = ["All Status", "Active", "Inactive"]
 const communicationPreferences = ["All Communication", "Email", "Phone", "SMS", "Mail", "In-Person"]
 const entityTypes = ["All Entity Types", "Corporation", "LLC", "Partnership", "Sole Proprietorship", "Non-Profit"]
 
+import { Client } from "@/types";
+
 export default function ClientsTable() {
+    const [clients, setClients] = useState<Client[]>([]);
     const [searchTerm, setSearchTerm] = useState("")
     const [selectedType, setSelectedType] = useState("All Types")
     const [selectedStatus, setSelectedStatus] = useState("All Status")
@@ -251,31 +64,44 @@ export default function ClientsTable() {
     const [selectedEntityType, setSelectedEntityType] = useState("All Entity Types")
     const [currentPage, setCurrentPage] = useState(1)
     const [itemsPerPage, setItemsPerPage] = useState(5)
+    const [clientToDelete, setClientToDelete] = useState<Client | null>(null)
+
+    useEffect(() => {
+        const fetchClients = async () => {
+            try {
+                const response = await fetch('/api/clients');
+                if (response.ok) {
+                    const data = await response.json();
+                    setClients(data);
+                } else {
+                    console.error("Failed to fetch clients");
+                }
+            } catch (error) {
+                console.error("Error fetching clients:", error);
+            }
+        };
+
+        fetchClients();
+    }, []);
 
     // Filter clients based on search and filters
-    const filteredClients = mockClients.filter((client) => {
+    const filteredClients = clients.filter((client) => {
         const clientName =
             client.clientType === "individual" ? `${client.firstName} ${client.lastName}` : client.organizationName
 
         const matchesSearch =
-            clientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            client.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            client.phoneNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            client.address.toLowerCase().includes(searchTerm.toLowerCase())
+            (clientName && clientName.toLowerCase().includes(searchTerm.toLowerCase())) ||
+            (client.email && client.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
+            (client.phoneNumber && client.phoneNumber.toLowerCase().includes(searchTerm.toLowerCase())) ||
+            (client.address && client.address.toLowerCase().includes(searchTerm.toLowerCase()))
 
         const matchesType = selectedType === "All Types" || client.clientType === selectedType.toLowerCase()
 
-        const matchesStatus = selectedStatus === "All Status" || client.status === selectedStatus
-
         const matchesCommunication =
             selectedCommunication === "All Communication" ||
-            client.preferredCommunication === selectedCommunication.toLowerCase()
+            (client.preferredCommunication && client.preferredCommunication.toLowerCase() === selectedCommunication.toLowerCase())
 
-        const matchesEntityType =
-            selectedEntityType === "All Entity Types" ||
-            client.entityType === selectedEntityType.toLowerCase().replace(/\s+/g, "-")
-
-        return matchesSearch && matchesType && matchesStatus && matchesCommunication && matchesEntityType
+        return matchesSearch && matchesType && matchesCommunication
     })
 
     // Pagination logic
@@ -293,17 +119,23 @@ export default function ClientsTable() {
         setCurrentPage(1)
     }
 
-    const clearFilters = () => {
-        setSearchTerm("")
-        setSelectedType("All Types")
-        setSelectedStatus("All Status")
-        setSelectedCommunication("All Communication")
-        setSelectedEntityType("All Entity Types")
-        setCurrentPage(1)
-    }
+    const handleDelete = async () => {
+        if (!clientToDelete) return
 
-    const getStatusBadge = (status: string) => {
-        return <Badge variant={status === "Active" ? "default" : "secondary"}>{status}</Badge>
+        try {
+            const response = await fetch(`/api/clients/${clientToDelete.id}`, {
+                method: 'DELETE',
+            });
+
+            if (response.ok) {
+                setClients(clients.filter((client) => client.id !== clientToDelete.id));
+                setClientToDelete(null);
+            } else {
+                console.error("Failed to delete client");
+            }
+        } catch (error) {
+            console.error("Error deleting client:", error);
+        }
     }
 
     const getClientTypeBadge = (type: string) => {
@@ -341,15 +173,7 @@ export default function ClientsTable() {
         )
     }
 
-    const formatDate = (dateString: string) => {
-        return new Date(dateString).toLocaleDateString("en-US", {
-            month: "short",
-            day: "numeric",
-            year: "numeric",
-        })
-    }
-
-    const getClientDisplayName = (client: (typeof mockClients)[0]) => {
+    const getClientDisplayName = (client: Client) => {
         return client.clientType === "individual" ? `${client.firstName} ${client.lastName}` : client.organizationName
     }
 
@@ -490,16 +314,13 @@ export default function ClientsTable() {
                                     <TableHead>Type</TableHead>
                                     <TableHead>Contact Info</TableHead>
                                     <TableHead>Communication</TableHead>
-                                    <TableHead>Cases</TableHead>
-                                    <TableHead>Status</TableHead>
-                                    <TableHead>Last Contact</TableHead>
                                     <TableHead className="text-right">Actions</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {currentClients.length === 0 ? (
                                     <TableRow>
-                                        <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                                        <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
                                             No clients found matching your criteria.
                                         </TableCell>
                                     </TableRow>
@@ -511,9 +332,9 @@ export default function ClientsTable() {
                                                     <Avatar className="h-10 w-10">
                                                         <AvatarFallback>
                                                             {client.clientType === "individual"
-                                                                ? `${client.firstName[0]}${client.lastName[0]}`
+                                                                ? `${client.firstName?.[0] ?? ''}${client.lastName?.[0] ?? ''}`
                                                                 : client.organizationName
-                                                                    .split(" ")
+                                                                    ?.split(" ")
                                                                     .map((n) => n[0])
                                                                     .join("")
                                                                     .slice(0, 2)}
@@ -551,20 +372,7 @@ export default function ClientsTable() {
                                                     )}
                                                 </div>
                                             </TableCell>
-                                            <TableCell>{getCommunicationBadge(client.preferredCommunication)}</TableCell>
-                                            <TableCell>
-                                                <div className="flex items-center gap-1">
-                                                    <span className="font-medium">{client.totalCases}</span>
-                                                    <span className="text-sm text-muted-foreground">cases</span>
-                                                </div>
-                                            </TableCell>
-                                            <TableCell>{getStatusBadge(client.status)}</TableCell>
-                                            <TableCell>
-                                                <div className="flex items-center gap-1">
-                                                    <Calendar className="h-4 w-4 text-muted-foreground" />
-                                                    <span className="text-sm">{formatDate(client.lastContact)}</span>
-                                                </div>
-                                            </TableCell>
+                                            <TableCell>{getCommunicationBadge(client.preferredCommunication || "")}</TableCell>
                                             <TableCell className="text-right">
                                                 <DropdownMenu>
                                                     <DropdownMenuTrigger asChild>
@@ -575,16 +383,23 @@ export default function ClientsTable() {
                                                     </DropdownMenuTrigger>
                                                     <DropdownMenuContent align="end">
                                                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                                        <DropdownMenuItem>
-                                                            <Eye className="mr-2 h-4 w-4" />
-                                                            View Details
+                                                        <DropdownMenuItem asChild>
+                                                            <Link href={`/client/${client.id}`}>
+                                                                <Eye className="mr-2 h-4 w-4" />
+                                                                View Details
+                                                            </Link>
                                                         </DropdownMenuItem>
-                                                        <DropdownMenuItem>
-                                                            <Edit className="mr-2 h-4 w-4" />
-                                                            Edit Client
+                                                        <DropdownMenuItem asChild>
+                                                            <Link href={`/client/${client.id}/edit`}>
+                                                                <Edit className="mr-2 h-4 w-4" />
+                                                                Edit Client
+                                                            </Link>
                                                         </DropdownMenuItem>
                                                         <DropdownMenuSeparator />
-                                                        <DropdownMenuItem className="text-destructive">
+                                                        <DropdownMenuItem
+                                                            className="text-destructive"
+                                                            onClick={() => setClientToDelete(client)}
+                                                        >
                                                             <Trash2 className="mr-2 h-4 w-4" />
                                                             Delete Client
                                                         </DropdownMenuItem>
@@ -605,6 +420,18 @@ export default function ClientsTable() {
                                 Page {currentPage} of {totalPages}
                             </div>
                             <div className="flex items-center space-x-2">
+                                <Select value={itemsPerPage.toString()} onValueChange={handleItemsPerPageChange}>
+                                    <SelectTrigger className="w-24">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {[5, 10, 20, 50].map((value) => (
+                                            <SelectItem key={value} value={value.toString()}>
+                                                {value} / page
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                                 <Button variant="outline" size="sm" onClick={() => handlePageChange(1)} disabled={currentPage === 1}>
                                     <ChevronsLeft className="h-4 w-4" />
                                 </Button>
@@ -656,6 +483,20 @@ export default function ClientsTable() {
                     )}
                 </CardContent>
             </Card>
+            <AlertDialog open={!!clientToDelete} onOpenChange={() => setClientToDelete(null)}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            This action cannot be undone. This will permanently delete the client and remove their data from our servers.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleDelete}>Delete</AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     )
 }

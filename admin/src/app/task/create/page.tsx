@@ -1,12 +1,12 @@
 import React from 'react'
-import CreateTask from './_components/taskForm'
+import TaskForm from './_components/taskForm'
 
-function TaskForm() {
+function CreateTaskPage() {
     return (
         <div>
-            <CreateTask />
+            <TaskForm />
         </div>
     )
 }
 
-export default TaskForm
+export default CreateTaskPage

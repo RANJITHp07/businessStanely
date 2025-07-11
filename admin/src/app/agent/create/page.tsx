@@ -1,11 +1,10 @@
 import React from 'react'
-import CreateAgent from './_component/agentForm'
-import Navigator from '@/components/navigator'
+import AgentForm from '@/app/agent/_component/agentForm'
 
 function AgentCreate() {
     return (
         <div>
-            <CreateAgent />
+            <AgentForm />
         </div>
     )
 }

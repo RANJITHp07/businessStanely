@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { notFound, useParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -21,52 +22,18 @@ import {
     Mail,
     Phone,
     Calendar,
-    Building2,
     Users,
     FileText,
     MoreHorizontal,
     Edit,
     Eye,
-    ArrowLeft,
     CheckCircle,
     Clock,
     AlertTriangle,
-    Star,
-    Award,
     TrendingUp,
-    UserPlus,
     UserMinus,
 } from "lucide-react"
-
-// Mock agent data
-const agentData = {
-    id: "1",
-    name: "John Smith",
-    email: "john.smith@lawfirm.com",
-    phone: "+1 (555) 123-4567",
-    agentType: "Senior Partner",
-    specializations: ["Corporate Law", "Tax Law", "Mergers & Acquisitions"],
-    jurisdiction: "New York",
-    barAssociationId: "NY12345",
-    address: "123 Legal Street, New York, NY 10001",
-    joinDate: "2020-01-15",
-    status: "Active",
-    avatar: null,
-    bio: "Experienced senior partner with over 15 years in corporate law. Specializes in complex mergers and acquisitions, tax planning, and corporate governance.",
-    education: [
-        { degree: "J.D.", institution: "Harvard Law School", year: "2008" },
-        { degree: "B.A. Economics", institution: "Yale University", year: "2005" },
-    ],
-    certifications: ["New York State Bar", "Corporate Law Specialist", "Tax Law Certification"],
-    stats: {
-        totalTasks: 45,
-        completedTasks: 38,
-        pendingTasks: 7,
-        completionRate: 84,
-        avgTaskTime: "5.2 days",
-        clientSatisfaction: 4.8,
-    },
-}
+import { Agent } from "@/types"
 
 // Mock tasks data for the agent
 const agentTasks = [
@@ -157,7 +124,33 @@ const agentTeam = [
 ]
 
 export default function AgentDetails() {
+    const params = useParams()
+    const id = params.id as string
+    const [agent, setAgent] = useState<Agent | null>(null)
+    const [loading, setLoading] = useState(true)
     const [activeTab, setActiveTab] = useState("details")
+
+    useEffect(() => {
+        if (!id) return
+        const fetchAgent = async () => {
+            try {
+                const response = await fetch(`/api/agents/${id}`)
+                if (response.ok) {
+                    const data = await response.json()
+                    setAgent(data)
+                } else {
+                    notFound()
+                }
+            } catch (error) {
+                console.error("Error fetching agent:", error)
+                notFound()
+            } finally {
+                setLoading(false)
+            }
+        }
+
+        fetchAgent()
+    }, [id])
 
     const getPriorityBadge = (priority: string) => {
         const colors = {
@@ -216,6 +209,14 @@ export default function AgentDetails() {
         })
     }
 
+    if (loading) {
+        return <div>Loading...</div>
+    }
+
+    if (!agent) {
+        return notFound()
+    }
+
     return (
         <div className="container mx-auto p-6 max-w-7xl">
             {/* Header */}
@@ -236,9 +237,9 @@ export default function AgentDetails() {
                     <CardContent className="p-6">
                         <div className="flex items-start gap-6">
                             <Avatar className="h-20 w-20">
-                                <AvatarImage src={agentData.avatar || ""} />
+                                <AvatarImage src={agent.photo || ""} />
                                 <AvatarFallback className="text-lg">
-                                    {agentData.name
+                                    {agent.name
                                         .split(" ")
                                         .map((n) => n[0])
                                         .join("")}
@@ -246,29 +247,28 @@ export default function AgentDetails() {
                             </Avatar>
                             <div className="flex-1">
                                 <div className="flex items-center gap-3 mb-2">
-                                    <h2 className="text-2xl font-bold">{agentData.name}</h2>
-                                    {getAgentTypeBadge(agentData.agentType)}
-                                    <Badge variant={agentData.status === "Active" ? "default" : "secondary"}>{agentData.status}</Badge>
+                                    <h2 className="text-2xl font-bold">{agent.name}</h2>
+                                    {getAgentTypeBadge(agent.agentType)}
                                 </div>
                                 <div className="text-sm text-muted-foreground">
                                     <div className="flex items-center gap-2">
                                         <Mail className="h-4 w-4" />
-                                        <span>{agentData.email}</span>
+                                        <span>{agent.email}</span>
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <Phone className="h-4 w-4" />
-                                        <span>{agentData.phone}</span>
+                                        <span>{agent.phoneNumber}</span>
                                     </div>
                                 </div>
                             </div>
                             <div className="text-right">
                                 <div className="grid grid-cols-2 gap-4 text-center">
                                     <div>
-                                        <div className="text-2xl font-bold text-blue-600">{agentData.stats.completedTasks}</div>
+                                        <div className="text-2xl font-bold text-blue-600">{0}</div>
                                         <div className="text-xs text-muted-foreground">Completed</div>
                                     </div>
                                     <div>
-                                        <div className="text-2xl font-bold text-green-600">{agentData.stats.completionRate}%</div>
+                                        <div className="text-2xl font-bold text-green-600">{0}%</div>
                                         <div className="text-xs text-muted-foreground">Success Rate</div>
                                     </div>
                                 </div>
@@ -308,27 +308,27 @@ export default function AgentDetails() {
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div>
                                             <label className="text-sm font-medium text-muted-foreground">Full Name</label>
-                                            <p className="font-medium">{agentData.name}</p>
+                                            <p className="font-medium">{agent.name}</p>
                                         </div>
                                         <div>
                                             <label className="text-sm font-medium text-muted-foreground">Agent Type</label>
-                                            <div className="mt-1">{getAgentTypeBadge(agentData.agentType)}</div>
+                                            <div className="mt-1">{getAgentTypeBadge(agent.agentType)}</div>
                                         </div>
                                         <div>
                                             <label className="text-sm font-medium text-muted-foreground">Email</label>
-                                            <p className="font-medium">{agentData.email}</p>
+                                            <p className="font-medium">{agent.email}</p>
                                         </div>
                                         <div>
                                             <label className="text-sm font-medium text-muted-foreground">Phone</label>
-                                            <p className="font-medium">{agentData.phone}</p>
+                                            <p className="font-medium">{agent.phoneNumber}</p>
                                         </div>
                                         <div>
                                             <label className="text-sm font-medium text-muted-foreground">Jurisdiction</label>
-                                            <p className="font-medium">{agentData.jurisdiction}</p>
+                                            <p className="font-medium">{agent.jurisdiction}</p>
                                         </div>
                                         <div>
                                             <label className="text-sm font-medium text-muted-foreground">Bar Association ID</label>
-                                            <p className="font-medium">{agentData.barAssociationId}</p>
+                                            <p className="font-medium">{agent.barAssociationId}</p>
                                         </div>
                                     </div>
                                 </CardContent>
@@ -341,7 +341,7 @@ export default function AgentDetails() {
                                 </CardHeader>
                                 <CardContent>
                                     <div className="flex flex-wrap gap-2">
-                                        {agentData.specializations.map((spec) => (
+                                        {agent.specializations.map((spec) => (
                                             <Badge key={spec} variant="outline" className="text-sm">
                                                 {spec}
                                             </Badge>
@@ -365,23 +365,23 @@ export default function AgentDetails() {
                                     <div className="space-y-3">
                                         <div className="flex justify-between items-center">
                                             <span className="text-sm font-medium">Total Tasks</span>
-                                            <span className="text-lg font-bold">{agentData.stats.totalTasks}</span>
+                                            <span className="text-lg font-bold">{0}</span>
                                         </div>
                                         <div className="flex justify-between items-center">
                                             <span className="text-sm font-medium">Completed</span>
-                                            <span className="text-lg font-bold text-green-600">{agentData.stats.completedTasks}</span>
+                                            <span className="text-lg font-bold text-green-600">{0}</span>
                                         </div>
                                         <div className="flex justify-between items-center">
                                             <span className="text-sm font-medium">Pending</span>
-                                            <span className="text-lg font-bold text-orange-600">{agentData.stats.pendingTasks}</span>
+                                            <span className="text-lg font-bold text-orange-600">{0}</span>
                                         </div>
                                     </div>
                                     <div className="space-y-2">
                                         <div className="flex justify-between items-center">
                                             <span className="text-sm font-medium">Completion Rate</span>
-                                            <span className="text-sm font-bold">{agentData.stats.completionRate}%</span>
+                                            <span className="text-sm font-bold">{0}%</span>
                                         </div>
-                                        <Progress value={agentData.stats.completionRate} className="h-2" />
+                                        <Progress value={0} className="h-2" />
                                     </div>
                                 </CardContent>
                             </Card>
@@ -394,7 +394,7 @@ export default function AgentDetails() {
                     <Card>
                         <CardHeader>
                             <CardTitle>Assigned Tasks</CardTitle>
-                            <CardDescription>All tasks currently assigned to {agentData.name}</CardDescription>
+                            <CardDescription>All tasks currently assigned to {agent.name}</CardDescription>
                         </CardHeader>
                         <CardContent>
                             <div className="rounded-md border">
@@ -474,7 +474,7 @@ export default function AgentDetails() {
                             <CardTitle className="flex items-center justify-between">
                                 <span>Team Members</span>
                             </CardTitle>
-                            <CardDescription>Team members reporting to {agentData.name}</CardDescription>
+                            <CardDescription>Team members reporting to {agent.name}</CardDescription>
                         </CardHeader>
                         <CardContent>
                             <div className="rounded-md border">

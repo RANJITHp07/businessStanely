@@ -17,59 +17,8 @@ import { CalendarIcon, FileText, User, Phone, Mail, AlertCircle, Users } from "l
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
 
-// Mock data for clients
-const mockClients = [
-    {
-        id: "1",
-        name: "Acme Corporation",
-        contactPerson: "John Anderson",
-        email: "john.anderson@acme.com",
-        phone: "+1 (555) 123-4567",
-        clientType: "Corporate",
-    },
-    {
-        id: "2",
-        name: "Sarah Mitchell",
-        contactPerson: "Sarah Mitchell",
-        email: "sarah.mitchell@email.com",
-        phone: "+1 (555) 234-5678",
-        clientType: "Individual",
-    },
-    {
-        id: "3",
-        name: "TechStart Inc.",
-        contactPerson: "Michael Chen",
-        email: "michael.chen@techstart.com",
-        phone: "+1 (555) 345-6789",
-        clientType: "Corporate",
-    },
-    {
-        id: "4",
-        name: "Robert Williams",
-        contactPerson: "Robert Williams",
-        email: "robert.williams@email.com",
-        phone: "+1 (555) 456-7890",
-        clientType: "Individual",
-    },
-    {
-        id: "5",
-        name: "Global Enterprises",
-        contactPerson: "Lisa Thompson",
-        email: "lisa.thompson@global.com",
-        phone: "+1 (555) 567-8901",
-        clientType: "Corporate",
-    },
-]
-
-// Mock data for agents
-const mockAgents = [
-    { id: "1", name: "John Smith", type: "Senior Partner" },
-    { id: "2", name: "Sarah Johnson", type: "Partner" },
-    { id: "3", name: "Michael Brown", type: "Associate" },
-    { id: "4", name: "Emily Davis", type: "Junior Associate" },
-    { id: "5", name: "Robert Wilson", type: "Paralegal" },
-    { id: "6", name: "Jennifer Martinez", type: "Legal Assistant" },
-]
+import { Client, Agent, Task } from "@/types"
+import { useParams, useRouter } from "next/navigation"
 
 const taskPriorities = [
     { value: "low", label: "Low", color: "bg-green-100 text-green-800 border-green-200" },
@@ -77,59 +26,122 @@ const taskPriorities = [
     { value: "high", label: "High", color: "bg-red-100 text-red-800 border-red-200" },
 ]
 
-export default function CreateTask() {
+export default function TaskForm() {
     const [formData, setFormData] = useState({
-        taskName: "",
+        title: "",
         clientId: "",
-        contactNumber: "",
-        emailId: "",
         priority: "",
-        assignedAgent: "",
+        assignedToId: "",
         description: "",
     })
+    const [clients, setClients] = useState<Client[]>([])
+    const [agents, setAgents] = useState<Agent[]>([])
+    const [selectedClient, setSelectedClient] = useState<Client | null>(null)
+    const [dueDate, setDueDate] = useState<Date>()
+    const [isEditMode, setIsEditMode] = useState(false)
+    const params = useParams()
+    const router = useRouter()
+    const { id } = params
 
-    const [selectedClient, setSelectedClient] = useState<(typeof mockClients)[0] | null>(null)
-    const [completionDate, setCompletionDate] = useState<Date>()
+    useEffect(() => {
+        const fetchClientsAndAgents = async () => {
+            try {
+                const [clientsRes, agentsRes] = await Promise.all([
+                    fetch("/api/clients"),
+                    fetch("/api/agents"),
+                ]);
+                const clientsData = await clientsRes.json();
+                const agentsData = await agentsRes.json();
+                setClients(clientsData);
+                setAgents(agentsData);
+            } catch (error) {
+                console.error("Failed to fetch clients or agents", error);
+            }
+        };
+        fetchClientsAndAgents();
+
+        if (id) {
+            setIsEditMode(true)
+            const fetchTask = async () => {
+                try {
+                    const response = await fetch(`/api/tasks/${id}`)
+                    if (response.ok) {
+                        const task: Task = await response.json()
+                        setFormData({
+                            title: task.title,
+                            clientId: task.client?.id || "",
+                            priority: task.priority,
+                            assignedToId: task.assignedTo?.id || "",
+                            description: task.description || "",
+                        })
+                        if (task.dueDate) {
+                            setDueDate(new Date(task.dueDate))
+                        }
+                    }
+                } catch (error) {
+                    console.error("Failed to fetch task", error)
+                }
+            }
+            fetchTask()
+        }
+    }, [id]);
 
     // Auto-fill contact number and email when client is selected
     useEffect(() => {
         if (formData.clientId) {
-            const client = mockClients.find((c) => c.id === formData.clientId)
+            const client = clients.find((c) => c.id === formData.clientId)
             if (client) {
                 setSelectedClient(client)
-                setFormData((prev) => ({
-                    ...prev,
-                    contactNumber: client.phone,
-                    emailId: client.email,
-                }))
             }
         } else {
             setSelectedClient(null)
-            setFormData((prev) => ({
-                ...prev,
-                contactNumber: "",
-                emailId: "",
-            }))
         }
-    }, [formData.clientId])
+    }, [formData.clientId, clients])
 
     const handleInputChange = (field: string, value: string) => {
         setFormData((prev) => ({ ...prev, [field]: value }))
     }
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
-        console.log("Task submitted:", {
-            ...formData,
-            selectedClient,
-            completionDate,
-        })
-        // Handle form submission here
-        alert("Task created successfully!")
+        const url = isEditMode ? `/api/tasks/${id}` : '/api/tasks'
+        const method = isEditMode ? 'PUT' : 'POST'
+
+        if (!isEditMode && agents.length === 0) {
+            alert("Cannot create a task without any agents in the system.");
+            return;
+        }
+
+        try {
+            const response = await fetch(url, {
+                method,
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    ...formData,
+                    dueDate,
+                    status: 'To Do',
+                    createdById: !isEditMode ? agents[0].id : undefined,
+                }),
+            });
+
+            if (response.ok) {
+                alert(`Task ${isEditMode ? 'updated' : 'created'} successfully!`)
+                router.push('/task')
+            } else {
+                const errorData = await response.json();
+                alert(`Failed to ${isEditMode ? 'update' : 'create'} task: ${errorData.error}`);
+            }
+        } catch (error) {
+            console.error("Error submitting form:", error);
+            alert("An unexpected error occurred. Please try again.");
+        }
     }
 
-    const getPriorityBadge = (priority: string) => {
-        const priorityConfig = taskPriorities.find((p) => p.value === priority)
+    const getPriorityBadge = (priority: string | null) => {
+        if (!priority) return null;
+        const priorityConfig = taskPriorities.find((p) => p.value === priority.toLowerCase())
         if (!priorityConfig) return null
 
         return (
@@ -140,9 +152,10 @@ export default function CreateTask() {
         )
     }
 
-    const getClientTypeBadge = (type: string) => {
+    const getClientTypeBadge = (type: string | null) => {
+        if (!type) return null;
         return (
-            <Badge variant={type === "Corporate" ? "default" : "secondary"} className="text-xs">
+            <Badge variant={type === "organization" ? "default" : "secondary"} className="text-xs">
                 {type}
             </Badge>
         )
@@ -151,9 +164,9 @@ export default function CreateTask() {
     return (
         <div className="mx-auto p-6 max-w-10xl">
             <div className="mb-8">
-                <h1 className="text-3xl font-bold">Create New Task</h1>
+                <h1 className="text-3xl font-bold">{isEditMode ? "Edit Task" : "Create New Task"}</h1>
                 <p className="text-muted-foreground mt-2">
-                    Create and assign a new task with client information and completion date.
+                    {isEditMode ? "Update the details of the existing task." : "Create and assign a new task with client information and completion date."}
                 </p>
             </div>
 
@@ -173,8 +186,8 @@ export default function CreateTask() {
                             <Input
                                 id="task-name"
                                 placeholder="Enter task name (e.g., Contract Review, Legal Research)"
-                                value={formData.taskName}
-                                onChange={(e) => handleInputChange("taskName", e.target.value)}
+                                value={formData.title}
+                                onChange={(e) => handleInputChange("title", e.target.value)}
                                 required
                             />
                         </div>
@@ -210,23 +223,20 @@ export default function CreateTask() {
                                     <SelectValue placeholder="Choose a client" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    {mockClients.map((client) => (
+                                    {clients.map((client) => (
                                         <SelectItem key={client.id} value={client.id}>
                                             <div className="flex items-center justify-between w-full">
                                                 <div className="flex items-center gap-2">
                                                     <Avatar className="h-6 w-6">
                                                         <AvatarFallback className="text-xs">
-                                                            {client.name
-                                                                .split(" ")
+                                                            {(client.clientType === 'individual' ? `${client.firstName ?? ''} ${client.lastName ?? ''}` : client.organizationName)
+                                                                ?.split(" ")
                                                                 .map((n) => n[0])
                                                                 .join("")}
                                                         </AvatarFallback>
                                                     </Avatar>
                                                     <div>
-                                                        <span className="font-medium">{client.name}</span>
-                                                        {client.contactPerson !== client.name && (
-                                                            <span className="text-sm text-muted-foreground ml-2">({client.contactPerson})</span>
-                                                        )}
+                                                        <span className="font-medium">{client.clientType === 'individual' ? `${client.firstName} ${client.lastName}` : client.organizationName}</span>
                                                     </div>
                                                 </div>
                                                 {getClientTypeBadge(client.clientType)}
@@ -246,14 +256,14 @@ export default function CreateTask() {
                                     <Input
                                         id="contact-number"
                                         placeholder="Contact number will auto-fill"
-                                        value={formData.contactNumber}
-                                        onChange={(e) => handleInputChange("contactNumber", e.target.value)}
+                                        value={selectedClient?.phoneNumber || ''}
+                                        readOnly
                                         className="pl-10"
                                         required
                                     />
                                 </div>
                                 {selectedClient && (
-                                    <p className="text-xs text-muted-foreground">Auto-filled from {selectedClient.name}</p>
+                                    <p className="text-xs text-muted-foreground">Auto-filled from {selectedClient.clientType === 'individual' ? `${selectedClient.firstName} ${selectedClient.lastName}` : selectedClient.organizationName}</p>
                                 )}
                             </div>
 
@@ -265,14 +275,14 @@ export default function CreateTask() {
                                         id="email-id"
                                         type="email"
                                         placeholder="Email will auto-fill"
-                                        value={formData.emailId}
-                                        onChange={(e) => handleInputChange("emailId", e.target.value)}
+                                        value={selectedClient?.email || ''}
+                                        readOnly
                                         className="pl-10"
                                         required
                                     />
                                 </div>
                                 {selectedClient && (
-                                    <p className="text-xs text-muted-foreground">Auto-filled from {selectedClient.name}</p>
+                                    <p className="text-xs text-muted-foreground">Auto-filled from {selectedClient.clientType === 'individual' ? `${selectedClient.firstName} ${selectedClient.lastName}` : selectedClient.organizationName}</p>
                                 )}
                             </div>
                         </div>
@@ -283,15 +293,15 @@ export default function CreateTask() {
                                 <div className="flex items-center gap-3">
                                     <Avatar className="h-10 w-10">
                                         <AvatarFallback className="bg-blue-100 text-blue-600">
-                                            {selectedClient.name
-                                                .split(" ")
+                                            {(selectedClient.clientType === 'individual' ? `${selectedClient.firstName} ${selectedClient.lastName}` : selectedClient.organizationName)
+                                                ?.split(" ")
                                                 .map((n) => n[0])
                                                 .join("")}
                                         </AvatarFallback>
                                     </Avatar>
                                     <div className="flex-1">
-                                        <h4 className="font-medium text-blue-900">{selectedClient.name}</h4>
-                                        <p className="text-sm text-blue-600">Contact: {selectedClient.contactPerson}</p>
+                                        <h4 className="font-medium text-blue-900">{selectedClient.clientType === 'individual' ? `${selectedClient.firstName} ${selectedClient.lastName}` : selectedClient.organizationName}</h4>
+                                        <p className="text-sm text-blue-600">Contact: {selectedClient.authorizedPersonName || 'N/A'}</p>
                                     </div>
                                     {getClientTypeBadge(selectedClient.clientType)}
                                 </div>
@@ -334,14 +344,14 @@ export default function CreateTask() {
                             <div className="space-y-2">
                                 <Label htmlFor="assigned-agent">Assign Task To *</Label>
                                 <Select
-                                    value={formData.assignedAgent}
-                                    onValueChange={(value) => handleInputChange("assignedAgent", value)}
+                                    value={formData.assignedToId}
+                                    onValueChange={(value) => handleInputChange("assignedToId", value)}
                                 >
                                     <SelectTrigger className="w-full">
                                         <SelectValue placeholder="Select an agent" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {mockAgents.map((agent) => (
+                                        {agents.map((agent) => (
                                             <SelectItem key={agent.id} value={agent.id}>
                                                 <div className="flex items-center gap-2">
                                                     <Avatar className="h-6 w-6">
@@ -354,7 +364,7 @@ export default function CreateTask() {
                                                     </Avatar>
                                                     <div>
                                                         <span className="font-medium">{agent.name}</span>
-                                                        <span className="text-sm text-muted-foreground ml-2">({agent.type})</span>
+                                                        <span className="text-sm text-muted-foreground ml-2">({agent.agentType})</span>
                                                     </div>
                                                 </div>
                                             </SelectItem>
@@ -373,28 +383,28 @@ export default function CreateTask() {
                                         variant="outline"
                                         className={cn(
                                             "w-full justify-start text-left font-normal",
-                                            !completionDate && "text-muted-foreground",
+                                            !dueDate && "text-muted-foreground",
                                         )}
                                     >
                                         <CalendarIcon className="mr-2 h-4 w-4" />
-                                        {completionDate ? format(completionDate, "PPP") : "Select completion date"}
+                                        {dueDate ? format(dueDate, "PPP") : "Select completion date"}
                                     </Button>
                                 </PopoverTrigger>
                                 <PopoverContent className="w-auto p-0">
-                                    <Calendar mode="single" selected={completionDate} onSelect={setCompletionDate} initialFocus />
+                                    <Calendar mode="single" selected={dueDate} onSelect={setDueDate} initialFocus />
                                 </PopoverContent>
                             </Popover>
                             <p className="text-xs text-muted-foreground">Choose the date when this task should be completed</p>
                         </div>
 
                         {/* Assignment Preview */}
-                        {formData.assignedAgent && (
+                        {formData.assignedToId && (
                             <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
                                 <div className="flex items-center gap-3">
                                     <Avatar className="h-10 w-10">
                                         <AvatarFallback className="bg-green-100 text-green-600">
-                                            {mockAgents
-                                                .find((a) => a.id === formData.assignedAgent)
+                                            {agents
+                                                .find((a) => a.id === formData.assignedToId)
                                                 ?.name.split(" ")
                                                 .map((n) => n[0])
                                                 .join("")}
@@ -402,13 +412,13 @@ export default function CreateTask() {
                                     </Avatar>
                                     <div>
                                         <h4 className="font-medium text-green-900">
-                                            Assigned to: {mockAgents.find((a) => a.id === formData.assignedAgent)?.name}
+                                            Assigned to: {agents.find((a) => a.id === formData.assignedToId)?.name}
                                         </h4>
                                         <p className="text-sm text-green-600">
-                                            Role: {mockAgents.find((a) => a.id === formData.assignedAgent)?.type}
+                                            Role: {agents.find((a) => a.id === formData.assignedToId)?.agentType}
                                         </p>
-                                        {completionDate && (
-                                            <p className="text-sm text-green-600">Due: {format(completionDate, "EEEE, MMMM do, yyyy")}</p>
+                                        {dueDate && (
+                                            <p className="text-sm text-green-600">Due: {format(dueDate, "EEEE, MMMM do, yyyy")}</p>
                                         )}
                                     </div>
                                 </div>
@@ -423,7 +433,7 @@ export default function CreateTask() {
                         Cancel
                     </Button>
                     <Button type="submit" className="bg-primary hover:bg-primary/90">
-                        Create Task
+                        {isEditMode ? "Update Task" : "Create Task"}
                     </Button>
                 </div>
             </form>

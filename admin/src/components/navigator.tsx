@@ -9,8 +9,9 @@ export default function Navigator() {
     const segments = pathname.split('/').filter(Boolean)
 
     return (
-        <Breadcrumb className='container mx-auto px-6 max-w-7xl'>
-            <BreadcrumbList>
+       
+<Breadcrumb className="hidden md:block container mx-auto max-w-7xl">
+<BreadcrumbList>
                 <BreadcrumbItem>
                     <BreadcrumbLink href="/">Dashboard</BreadcrumbLink>
                 </BreadcrumbItem>

@@ -235,16 +235,17 @@ export default function AgentsTable() {
     }
 
     return (
-        <div className=" mx-auto p-6 max-w-10xl">
+        <div className=" container mx-auto p-6 max-w-7xl">
             <div className="mb-8">
-                <div className="flex justify-between items-center mb-4">
+                
+                <div className="flex  flex-col md:flex-row  justify-between md:items-center  mb-6 md:mb-4">
                     <div>
-                        <h1 className="text-3xl font-bold">Agent Management</h1>
-                        <p className="text-muted-foreground mt-2">Manage and organize your legal team members</p>
+                        <h1 className="text-[28px] md:text-3xl font-bold">Agent Management</h1>
+                        <p className=" text-[18px] md:text-[16px]  text-muted-foreground mt-2">Manage and organize your legal team members</p>
                     </div>
-                    <Link href="/agent/create">
-                        <Button className="flex items-center gap-2">
-                            <Plus className="h-4 w-4" />
+                    <Link href="/agent/create" className="flex justify-end">
+                    <Button className=" mt-[20px] md:mt-none   bg-[#003459] hover:bg-[#003459] text-white rounded-lg px-4 py-2 flex items-center gap-2 cursor-pointer shadow-none hover:shadow-md transition-shadow duration-300">
+                    <Plus className="h-4 w-4" />
                             Create Agent
                         </Button>
                     </Link>
@@ -330,8 +331,19 @@ export default function AgentsTable() {
 
                         {/* Results Summary */}
                         <div className="flex items-center justify-end gap-2 text-sm text-muted-foreground">
-                            <Button>Search</Button>
-                            <Button variant={'outline'}>Clear</Button>
+                        <Button
+  className="cursor-pointer bg-[#003459] hover:bg-[#003459] text-white rounded-lg px-4 py-2 shadow-none hover:shadow-lg transition-shadow duration-300"
+>
+  Search
+</Button>
+
+<Button
+  className="cursor-pointer hover:text-white text-white bg-[#f42b03] hover:bg-[#f42b03] rounded-lg px-4 py-2 shadow-none hover:shadow-lg transition-shadow duration-300"
+  variant="outline"
+>
+  Clear
+</Button>
+       
                         </div>
                     </CardContent>
                 </Card>
@@ -441,7 +453,7 @@ export default function AgentsTable() {
                             </div>
                             <div className="flex items-center space-x-2">
                                 <Button variant="outline" size="sm" onClick={() => handlePageChange(1)} disabled={currentPage === 1}>
-                                    <ChevronsLeft className="h-4 w-4" />
+                                    <ChevronsLeft className="h-4 w-4 " />
                                 </Button>
                                 <Button
                                     variant="outline"

@@ -342,18 +342,25 @@ export default function TaskDetails() {
         <div className="container mx-auto p-6 max-w-7xl">
             {/* Header */}
             <div className="mb-8">
-                <div className="flex items-center gap-4 mb-4">
-                    <div className="flex-1">
-                        <h1 className="text-3xl font-bold">Task Details</h1>
-                        <p className="text-muted-foreground mt-2">Comprehensive view of task progress and activity</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <Button className="flex items-center gap-2">
-                            <Edit className="h-4 w-4" />
-                            Edit Task
-                        </Button>
-                    </div>
-                </div>
+
+
+       
+
+
+                <div className="flex flex-col md:flex-row justify-between md:items-center mb-6 md:mb-4">
+  <div>
+  <h1 className="text-[28px] md:text-3xl font-bold">Task Details</h1>
+  <p className="text-[18px] md:text-[16px] text-muted-foreground mt-2">Comprehensive view of task progress and activity</p>
+
+  </div>
+<div className="flex justify-end">
+<Button className="mt-[20px] md:mt-0 w-fit bg-[#003459] hover:bg-[#003459] text-white rounded-lg px-4 py-2 flex items-center gap-2 cursor-pointer shadow-none hover:shadow-md transition-shadow duration-300">
+    <Edit className="h-4 w-4" />
+    Edit Task
+  </Button>
+</div>
+
+</div>
 
                 {/* Task Summary Card */}
                 <Card>
@@ -361,42 +368,43 @@ export default function TaskDetails() {
                         <div className="space-y-4">
                             <div className="flex items-start justify-between">
                                 <div className="flex-1">
-                                    <div className="flex items-center gap-3 mb-2">
-                                        <h2 className="text-2xl font-bold">{taskData.taskName}</h2>
+                                    <div className="flex flex-col  md:flex-row  items-start md:items-center gap-3 mb-2">
+                                        <h2 className="text-[18px] md:text-2xl font-bold">{taskData.taskName}</h2>
                                         {getStatusBadge(taskData.status)}
                                     </div>
-                                    <p className="text-muted-foreground mb-4">{taskData.description}</p>
+                                    <p className=" text-[16px] md:[18px] text-muted-foreground mb-4">{taskData.description}</p>
                                 </div>
                             </div>
 
                             {/* Follow-up and Status Checkboxes */}
-                            <div className="flex items-center gap-6 p-4 bg-muted/30 rounded-lg">
-                                <div className="flex items-center space-x-2">
-                                    <input
-                                        type="checkbox"
-                                        id="follow-up"
-                                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                                        defaultChecked={false}
-                                    />
-                                    <label htmlFor="follow-up" className="text-sm font-medium cursor-pointer">
-                                        Follow-up Required
-                                    </label>
-                                </div>
-                                <div className="flex items-center space-x-2">
-                                    <input
-                                        type="checkbox"
-                                        id="check-status"
-                                        className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
-                                        defaultChecked={false}
-                                    />
-                                    <label htmlFor="check-status" className="text-sm font-medium cursor-pointer">
-                                        Status Check Completed
-                                    </label>
-                                </div>
-                                <div className="text-xs text-muted-foreground ml-auto">
-                                    Last updated: {formatDateTime(new Date().toISOString())}
-                                </div>
-                            </div>
+                            <div className="flex flex-col md:flex-row md:items-center gap-4 md:gap-6 p-0 md:p-4 bg-muted/30 rounded-lg">
+  <div className="flex items-center space-x-2">
+    <input
+      type="checkbox"
+      id="follow-up"
+      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+      defaultChecked={false}
+    />
+    <label htmlFor="follow-up" className="text-sm font-medium cursor-pointer">
+      Follow-up Required
+    </label>
+  </div>
+  <div className="flex items-center space-x-2">
+    <input
+      type="checkbox"
+      id="check-status"
+      className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
+      defaultChecked={false}
+    />
+    <label htmlFor="check-status" className="text-sm font-medium cursor-pointer">
+      Status Check Completed
+    </label>
+  </div>
+  <div className="text-xs text-muted-foreground md:ml-auto">
+    Last updated: {formatDateTime(new Date().toISOString())}
+  </div>
+</div>
+
 
                         </div>
                     </CardContent>
@@ -407,16 +415,16 @@ export default function TaskDetails() {
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
                 <TabsList className="grid w-full grid-cols-3">
                     <TabsTrigger value="details" className="flex items-center gap-2">
-                        <FileText className="h-4 w-4" />
-                        Task Details
+                        <FileText  className="h-4 w-4 hidden md:block"/>
+                        <p className="text-[12px] md:text-[14px]">           Task Details </p>
                     </TabsTrigger>
                     <TabsTrigger value="comments" className="flex items-center gap-2">
-                        <MessageSquare className="h-4 w-4" />
-                        Comments ({taskComments.length})
+                        <MessageSquare  className="h-4 w-4 hidden md:block" />
+             <p className="text-[12px] md:text-[14px]">                  Comments ({taskComments.length}) </p>
                     </TabsTrigger>
                     <TabsTrigger value="timelog" className="flex items-center gap-2">
-                        <Clock className="h-4 w-4" />
-                        Time Log ({timeLogEntries.length})
+                        <Clock  className="h-4 w-4 hidden md:block" />
+                        <p className="text-[12px] md:text-[14px]">           Time Log ({timeLogEntries.length}) </p>
                     </TabsTrigger>
                 </TabsList>
 

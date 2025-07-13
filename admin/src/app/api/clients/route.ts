@@ -45,7 +45,11 @@ export async function POST(req: NextRequest) {
 
 export async function GET() {
   try {
-    const clients = await prisma.client.findMany();
+    const clients = await prisma.client.findMany({
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
     return NextResponse.json(clients);
   } catch (error) {
     console.error("Error fetching clients:", error);

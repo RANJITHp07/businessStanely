@@ -14,11 +14,12 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { CalendarIcon, FileText, User, Phone, Mail, AlertCircle, Users } from "lucide-react"
-import { format } from "date-fns"
+import { format, isBefore, startOfDay } from "date-fns"
 import { cn } from "@/lib/utils"
 
 import { Client, Agent, Task } from "@/types"
 import { useParams, useRouter } from "next/navigation"
+import { toast } from "react-toastify"
 
 const taskPriorities = [
     { value: "low", label: "Low", color: "bg-green-100 text-green-800 border-green-200" },
@@ -127,11 +128,11 @@ export default function TaskForm() {
             });
 
             if (response.ok) {
-                alert(`Task ${isEditMode ? 'updated' : 'created'} successfully!`)
+                toast.success(`Task ${isEditMode ? 'updated' : 'created'} successfully!`)
                 router.push('/task')
             } else {
                 const errorData = await response.json();
-                alert(`Failed to ${isEditMode ? 'update' : 'create'} task: ${errorData.error}`);
+                toast.error(errorData.error)
             }
         } catch (error) {
             console.error("Error submitting form:", error);
@@ -155,14 +156,14 @@ export default function TaskForm() {
     const getClientTypeBadge = (type: string | null) => {
         if (!type) return null;
         return (
-            <Badge variant={type === "organization" ? "default" : "secondary"} className="text-xs">
+            <Badge variant={type === "organization" ? "default" : "secondary"} className="text-xs mx-2">
                 {type}
             </Badge>
         )
     }
 
     return (
-        <div className="mx-auto p-6 max-w-10xl">
+        <div className="container mx-auto p-6 max-w-7xl">
             <div className="mb-8">
                 <h1 className="text-3xl font-bold">{isEditMode ? "Edit Task" : "Create New Task"}</h1>
                 <p className="text-muted-foreground mt-2">
@@ -299,7 +300,7 @@ export default function TaskForm() {
                                                 .join("")}
                                         </AvatarFallback>
                                     </Avatar>
-                                    <div className="flex-1">
+                                    <div className="flex-1 mx-2">
                                         <h4 className="font-medium text-blue-900">{selectedClient.clientType === 'individual' ? `${selectedClient.firstName} ${selectedClient.lastName}` : selectedClient.organizationName}</h4>
                                         <p className="text-sm text-blue-600">Contact: {selectedClient.authorizedPersonName || 'N/A'}</p>
                                     </div>
@@ -357,13 +358,15 @@ export default function TaskForm() {
                                                     <Avatar className="h-6 w-6">
                                                         <AvatarFallback className="text-xs">
                                                             {agent.name
+                                                                .toUpperCase()
                                                                 .split(" ")
                                                                 .map((n) => n[0])
                                                                 .join("")}
                                                         </AvatarFallback>
                                                     </Avatar>
                                                     <div>
-                                                        <span className="font-medium">{agent.name}</span>
+                                                        <span className="font-medium">{agent.name.charAt(0).toUpperCase() + agent.name.slice(1)}
+                                                        </span>
                                                         <span className="text-sm text-muted-foreground ml-2">({agent.agentType})</span>
                                                     </div>
                                                 </div>
@@ -391,7 +394,7 @@ export default function TaskForm() {
                                     </Button>
                                 </PopoverTrigger>
                                 <PopoverContent className="w-auto p-0">
-                                    <Calendar mode="single" selected={dueDate} onSelect={setDueDate} initialFocus />
+                                    <Calendar mode="single" disabled={(date) => isBefore(startOfDay(date), startOfDay(new Date()))} selected={dueDate} onSelect={setDueDate} initialFocus />
                                 </PopoverContent>
                             </Popover>
                             <p className="text-xs text-muted-foreground">Choose the date when this task should be completed</p>
@@ -407,7 +410,8 @@ export default function TaskForm() {
                                                 .find((a) => a.id === formData.assignedToId)
                                                 ?.name.split(" ")
                                                 .map((n) => n[0])
-                                                .join("")}
+                                                .join("")
+                                            }
                                         </AvatarFallback>
                                     </Avatar>
                                     <div>
@@ -429,10 +433,10 @@ export default function TaskForm() {
 
                 {/* Submit Buttons */}
                 <div className="flex justify-end gap-4">
-                    <Button type="button" variant="outline">
+                    <Button className="bg-[#f42b03] hover:bg-[#f42b03] shadow-none hover:shadow-lg transition-shadow duration-300 text-white hover:text-white cursor-pointer" type="button" variant="outline">
                         Cancel
                     </Button>
-                    <Button type="submit" className="bg-primary hover:bg-primary/90">
+                    <Button type="submit" className=" cursor-pointer shadow-none hover:shadow-lg transition-shadow duration-300" >
                         {isEditMode ? "Update Task" : "Create Task"}
                     </Button>
                 </div>

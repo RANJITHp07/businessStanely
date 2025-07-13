@@ -161,6 +161,12 @@ export default function TasksTable() {
         })
     }
 
+    const resetFilter = () => {
+        setSearchTerm("");
+        setSelectedPriority("All Priorities")
+        setSelectedStatus("All Status")
+    }
+
     const isOverdue = (dueDate: string | undefined, status: string) => {
         if (!dueDate) return false;
         return new Date(dueDate) < new Date() && status !== "Completed"
@@ -173,13 +179,13 @@ export default function TasksTable() {
     return (
         <div className="container mx-auto p-6 max-w-7xl">
             <div className="mb-8">
-                <div className="flex justify-between items-center mb-4">
+                <div className="flex  flex-col md:flex-row  justify-between md:items-center  mb-6 md:mb-4">
                     <div>
                         <h1 className="text-3xl font-bold">Task Management</h1>
                         <p className="text-muted-foreground mt-2">Manage and track all legal tasks and assignments</p>
                     </div>
-                    <Link href="/task/create">
-                        <Button className="flex items-center gap-2">
+                    <Link href="/task/create" className="flex justify-end">
+                        <Button className=" mt-[20px] md:mt-none   bg-[#003459] hover:bg-[#003459] text-white rounded-lg px-4 py-2 flex items-center gap-2 cursor-pointer shadow-none hover:shadow-md transition-shadow duration-300">
                             <Plus className="h-4 w-4" />
                             Create Task
                         </Button>
@@ -250,8 +256,13 @@ export default function TasksTable() {
 
                         {/* Results Summary */}
                         <div className="flex items-center justify-end gap-2 text-sm text-muted-foreground">
-                            <Button>Search</Button>
-                            <Button variant={'outline'}>Clear</Button>
+                            <Button
+                                onClick={resetFilter}
+                                className="cursor-pointer hover:text-white text-white bg-[#f42b03] hover:bg-[#f42b03] rounded-lg px-4 py-2 shadow-none hover:shadow-lg transition-shadow duration-300"
+                                variant="outline"
+                            >
+                                Clear
+                            </Button>
                         </div>
                     </CardContent>
                 </Card>
@@ -305,6 +316,7 @@ export default function TasksTable() {
                                                     <Avatar className="h-8 w-8">
                                                         <AvatarFallback className="text-xs">
                                                             {task.assignedTo?.name
+                                                                .toUpperCase()
                                                                 .split(" ")
                                                                 .map((n) => n[0])
                                                                 .join("")}

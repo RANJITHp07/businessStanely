@@ -119,6 +119,15 @@ export default function ClientsTable() {
         setCurrentPage(1)
     }
 
+    const resetFilters = () => {
+        setSearchTerm("");
+        setSelectedType("All Types");
+        setSelectedStatus("All Status");
+        setSelectedCommunication("All Communication")
+        setSelectedEntityType("All Entity Types")
+    };
+
+
     const handleDelete = async () => {
         if (!clientToDelete) return
 
@@ -180,13 +189,14 @@ export default function ClientsTable() {
     return (
         <div className="container mx-auto p-6 max-w-7xl">
             <div className="mb-8">
-                <div className="flex justify-between items-center mb-4">
+                <div className="flex  flex-col md:flex-row  justify-between md:items-center  mb-6 md:mb-4">
+
                     <div>
                         <h1 className="text-3xl font-bold">Client Management</h1>
                         <p className="text-muted-foreground mt-2">Manage and organize your client details</p>
                     </div>
-                    <Link href='/client/create'>
-                        <Button className="flex items-center gap-2">
+                    <Link href='/client/create' className="flex justify-end">
+                        <Button className=" mt-[20px] md:mt-none   bg-[#003459] hover:bg-[#003459] text-white rounded-lg px-4 py-2 flex items-center gap-2 cursor-pointer shadow-none hover:shadow-md transition-shadow duration-300">
                             <Plus className="h-4 w-4" />
                             Create Client
                         </Button>
@@ -290,8 +300,13 @@ export default function ClientsTable() {
 
                         {/* Results Summary */}
                         <div className="flex items-center justify-end gap-2 text-sm text-muted-foreground">
-                            <Button>Search</Button>
-                            <Button variant={'outline'}>Clear</Button>
+                            <Button
+                                onClick={resetFilters}
+                                className="cursor-pointer hover:text-white text-white bg-[#f42b03] hover:bg-[#f42b03] rounded-lg px-4 py-2 shadow-none hover:shadow-lg transition-shadow duration-300"
+                                variant="outline"
+                            >
+                                Clear
+                            </Button>
                         </div>
                     </CardContent>
                 </Card>
@@ -334,6 +349,7 @@ export default function ClientsTable() {
                                                             {client.clientType === "individual"
                                                                 ? `${client.firstName?.[0] ?? ''}${client.lastName?.[0] ?? ''}`
                                                                 : client.organizationName
+                                                                    ?.toUpperCase()
                                                                     ?.split(" ")
                                                                     .map((n) => n[0])
                                                                     .join("")
@@ -344,7 +360,7 @@ export default function ClientsTable() {
                                                         <div className="font-medium">{getClientDisplayName(client)}</div>
                                                         <div className="text-sm text-muted-foreground">
                                                             {client.clientType === "organization" && client.authorizedPersonName && (
-                                                                <>Contact: {client.authorizedPersonName}</>
+                                                                <>Contact: {client.authorizedPersonName.charAt(0).toUpperCase() + client?.authorizedPersonName?.slice(1)}</>
                                                             )}
                                                             {client.clientType === "individual" && client.gender && (
                                                                 <>{client.gender.charAt(0).toUpperCase() + client.gender.slice(1)}</>
@@ -383,12 +399,12 @@ export default function ClientsTable() {
                                                     </DropdownMenuTrigger>
                                                     <DropdownMenuContent align="end">
                                                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                                        <DropdownMenuItem asChild>
+                                                        {/* <DropdownMenuItem asChild>
                                                             <Link href={`/client/${client.id}`}>
                                                                 <Eye className="mr-2 h-4 w-4" />
                                                                 View Details
                                                             </Link>
-                                                        </DropdownMenuItem>
+                                                        </DropdownMenuItem> */}
                                                         <DropdownMenuItem asChild>
                                                             <Link href={`/client/${client.id}/edit`}>
                                                                 <Edit className="mr-2 h-4 w-4" />

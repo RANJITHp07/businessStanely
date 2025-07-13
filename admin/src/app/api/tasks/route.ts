@@ -42,6 +42,9 @@ export async function GET() {
         createdBy: true,
         assignedTo: true,
       },
+      orderBy: {
+        createdAt: 'desc'
+      }
     });
     return NextResponse.json(tasks);
   } catch (error) {

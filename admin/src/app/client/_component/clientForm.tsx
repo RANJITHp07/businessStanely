@@ -53,6 +53,8 @@ const communicationPreferences = [
 ]
 
 import { Client } from "@/types";
+import { toast } from "react-toastify"
+import { useRouter } from "next/navigation"
 
 interface ClientFormProps {
     client?: Client;
@@ -85,6 +87,7 @@ export default function ClientForm({ client }: ClientFormProps) {
 
     const [dateOfBirth, setDateOfBirth] = useState<Date | undefined>(client?.dateOfBirth ? new Date(client.dateOfBirth) : undefined)
     const [incorporationDate, setIncorporationDate] = useState<Date | undefined>(client?.incorporationDate ? new Date(client.incorporationDate) : undefined)
+    const router = useRouter()
 
     const handleInputChange = (field: string, value: string) => {
         setFormData((prev) => ({ ...prev, [field]: value }))
@@ -109,13 +112,12 @@ export default function ClientForm({ client }: ClientFormProps) {
             });
 
             if (response.ok) {
-                alert(`Client ${client ? 'updated' : 'created'} successfully!`);
-                if (!client) {
-                    resetForm();
-                }
+                toast.error(`Client ${client ? 'updated' : 'created'} successfully!`)
+                router.push("/client")
+
             } else {
                 const errorData = await response.json();
-                alert(`Failed to ${client ? 'update' : 'create'} client: ${errorData.error}`);
+                toast.error(errorData.error)
             }
         } catch (error) {
             console.error("Error submitting form:", error);
@@ -541,9 +543,16 @@ export default function ClientForm({ client }: ClientFormProps) {
                 {/* Submit Buttons */}
                 {formData.clientType && (
                     <div className="flex justify-end gap-4">
-                        <Button className="bg-[#f42b03] hover:bg-[#f42b03] shadow-none hover:shadow-lg transition-shadow duration-300 text-white hover:text-white cursor-pointer" type="button" variant="outline" onClick={resetForm}>
-                            Reset Form
-                        </Button>
+                        {
+                            !client ?
+                                <Button className="bg-[#f42b03] hover:bg-[#f42b03] shadow-none hover:shadow-lg transition-shadow duration-300 text-white hover:text-white cursor-pointer" type="button" variant="outline" onClick={resetForm}>
+                                    Reset Form
+                                </Button>
+                                :
+                                <Button className="bg-[#f42b03] hover:bg-[#f42b03] shadow-none hover:shadow-lg transition-shadow duration-300 text-white hover:text-white cursor-pointer" type="button" variant="outline" onClick={() => router.push("/client")}>
+                                    Cancel
+                                </Button>
+                        }
                         <Button type="submit" className="cursor-pointer shadow-none hover:shadow-lg transition-shadow duration-300" >
                             {client ? "Update Client" : "Create Client"}
                         </Button>

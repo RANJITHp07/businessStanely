@@ -34,6 +34,7 @@ import {
   UserMinus,
 } from "lucide-react"
 import { Agent } from "@/types"
+import Link from "next/link";
 
 // Mock tasks data for the agent
 const agentTasks = [
@@ -239,10 +240,12 @@ export default function AgentDetails() {
             </p>
           </div>
           <div className="flex justify-end">
-            <Button className="mt-[20px] md:mt-0 w-fit bg-[#003459] hover:bg-[#003459] text-white rounded-lg px-4 py-2 flex items-center gap-2 cursor-pointer shadow-none hover:shadow-md transition-shadow duration-300">
-              <Edit className="h-4 w-4" />
-              Edit Agent
-            </Button>
+            <Link href={`/agent/${agent?.id}/edit`}>
+              <Button className="mt-[20px] md:mt-0 w-fit bg-[#003459] hover:bg-[#003459] text-white rounded-lg px-4 py-2 flex items-center gap-2 cursor-pointer shadow-none hover:shadow-md transition-shadow duration-300">
+                <Edit className="h-4 w-4" />
+                Edit Agent
+              </Button>
+            </Link>
           </div>
 
         </div>

@@ -54,15 +54,10 @@ const agentTypes = [
 ]
 const jurisdictions = [
     "All Jurisdictions",
-    "Federal",
-    "New York",
-    "California",
-    "Texas",
-    "Florida",
-    "Illinois",
-    "Pennsylvania",
-    "Ohio",
-    "Georgia",
+    "India",
+    "USA",
+    "UAE",
+    "Others"
 ]
 
 import { Agent } from "@/types";
@@ -107,6 +102,12 @@ export default function AgentsTable() {
 
         return matchesSearch && matchesType && matchesJurisdiction
     })
+
+    const resetFilters = () => {
+        setSearchTerm("");
+        setSelectedType("All Types");
+        setSelectedJurisdiction("All Jurisdictions");
+    };
 
     // Pagination logic
     const totalPages = Math.ceil(filteredAgents.length / itemsPerPage)
@@ -237,15 +238,11 @@ export default function AgentsTable() {
 
                         {/* Results Summary */}
                         <div className="flex items-center justify-end gap-2 text-sm text-muted-foreground">
-                            <Button
-                                className="cursor-pointer bg-[#003459] hover:bg-[#003459] text-white rounded-lg px-4 py-2 shadow-none hover:shadow-lg transition-shadow duration-300"
-                            >
-                                Search
-                            </Button>
 
                             <Button
                                 className="cursor-pointer hover:text-white text-white bg-[#f42b03] hover:bg-[#f42b03] rounded-lg px-4 py-2 shadow-none hover:shadow-lg transition-shadow duration-300"
                                 variant="outline"
+                                onClick={resetFilters}
                             >
                                 Clear
                             </Button>
@@ -291,13 +288,16 @@ export default function AgentsTable() {
                                                         <AvatarImage src={agent.photo || ""} />
                                                         <AvatarFallback>
                                                             {agent.name
+                                                                .toUpperCase()
                                                                 .split(" ")
                                                                 .map((n) => n[0])
                                                                 .join("")}
                                                         </AvatarFallback>
                                                     </Avatar>
                                                     <div>
-                                                        <div className="font-medium">{agent.name}</div>
+                                                        <div className="font-medium">
+                                                            {agent.name.charAt(0).toUpperCase() + agent.name.slice(1)}
+                                                        </div>
                                                         <div className="text-sm text-muted-foreground">{agent.email}</div>
                                                     </div>
                                                 </div>

@@ -4,6 +4,8 @@ import "./globals.css";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import Navigator from "@/components/navigator";
+import { ToastContainer } from 'react-toastify';
+
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -38,6 +40,7 @@ export default function RootLayout({
             </div>
           </main>
         </SidebarProvider>
+        <ToastContainer />
       </body>
     </html>
   );

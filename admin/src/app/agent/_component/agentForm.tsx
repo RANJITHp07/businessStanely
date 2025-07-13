@@ -1,7 +1,6 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,37 +11,42 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Upload, X, User, FileText, Users } from "lucide-react"
+import { toast } from 'react-toastify';
+import { Agent } from "@/types";
+import { useRouter } from "next/navigation";
 
-const agentTypes = ["Senior Partner", "Partner", "Associate", "Junior Associate", "Paralegal", "Legal Assistant"]
+
+const agentTypes = [
+    "Owner",
+    "Partner",
+    "CEO",
+    "Senior Manager",
+    "Manager",
+    "Senior Executive",
+    "Executive",
+    "Junior Executive",
+    "Trainee",
+    "Intern"
+];
 
 const specializations = [
-    "Corporate Law",
-    "Criminal Law",
-    "Family Law",
-    "Real Estate Law",
-    "Personal Injury",
-    "Immigration Law",
-    "Tax Law",
-    "Employment Law",
-    "Intellectual Property",
-    "Environmental Law",
-    "Healthcare Law",
-    "Bankruptcy Law",
-]
+    "Secretarial & Company Laws",
+    "Foreign Exchange Management Laws",
+    "Labour Laws",
+    "Local Laws",
+    "Special Laws",
+    "Accounting and Bookkeeping",
+    "GST",
+    "Individual Tax",
+    "Corporate Tax",
+    "Other Laws"
+];
 
 const jurisdictions = [
-    "Federal",
-    "New York",
-    "California",
-    "Texas",
-    "Florida",
-    "Illinois",
-    "Pennsylvania",
-    "Ohio",
-    "Georgia",
-    "North Carolina",
-    "Michigan",
-    "New Jersey",
+    "India",
+    "UAE",
+    "USA",
+    "Others"
 ]
 
 // Mock data for existing agents
@@ -53,7 +57,6 @@ const existingAgents = [
     { id: "4", name: "Emily Davis", type: "Associate" },
 ]
 
-import { Agent } from "@/types";
 
 interface AgentFormProps {
     agent?: Agent;
@@ -72,8 +75,8 @@ export default function AgentForm({ agent }: AgentFormProps) {
         barAssociationId: agent?.barAssociationId || "",
         jurisdiction: agent?.jurisdiction || "",
     })
-
     const [agentSearch, setAgentSearch] = useState("")
+    const router = useRouter()
 
     const filteredAgents = existingAgents.filter(
         (agent) =>
@@ -136,10 +139,11 @@ export default function AgentForm({ agent }: AgentFormProps) {
             });
 
             if (response.ok) {
-                alert(`Agent ${agent ? 'updated' : 'created'} successfully!`);
+                toast.success(`Agent ${agent ? 'updated' : 'created'} successfully!`);
+                router.push("/agent")
             } else {
                 const errorData = await response.json();
-                alert(`Failed to ${agent ? 'update' : 'create'} agent: ${errorData.error}`);
+                toast.error(`${errorData.error}`);
             }
         } catch (error) {
             console.error("Error submitting form:", error);
@@ -304,7 +308,7 @@ export default function AgentForm({ agent }: AgentFormProps) {
                         </div>
 
                         <div className="space-y-2">
-                            <Label htmlFor="bar-id">Bar Association ID *</Label>
+                            <Label htmlFor="bar-id">Employee ID *</Label>
                             <Input
                                 id="bar-id"
                                 placeholder="Enter bar association ID"
@@ -465,7 +469,7 @@ export default function AgentForm({ agent }: AgentFormProps) {
 
                 {/* Submit Button */}
                 <div className="flex justify-end gap-4">
-                    <Button className="bg-[#f42b03] hover:bg-[#f42b03] shadow-none hover:shadow-lg transition-shadow duration-300 text-white hover:text-white cursor-pointer" type="button" variant="outline">
+                    <Button onClick={() => router.push("/agent")} className="bg-[#f42b03] hover:bg-[#f42b03] shadow-none hover:shadow-lg transition-shadow duration-300 text-white hover:text-white cursor-pointer" type="button" variant="outline">
                         Cancel
                     </Button>
                     <Button className=" cursor-pointer shadow-none hover:shadow-lg transition-shadow duration-300" type="submit">{agent ? "Update Agent" : "Create Agent"}</Button>

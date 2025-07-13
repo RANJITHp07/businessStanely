@@ -23,15 +23,29 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const body = await req.json();
-    const { specializations, subordinates, superior, ...agentData } = body;
+    const { email, specializations, subordinates, superior, ...agentData } = body;
+
+    // Check if another user already exists with the same email
+    const existingAgent = await prisma.agent.findUnique({
+      where: { email },
+    });
+
+    if (existingAgent && existingAgent.id !== params.id) {
+      return NextResponse.json(
+        { error: "Another user with the same email already exists." },
+        { status: 400 }
+      );
+    }
 
     const updatedAgent = await prisma.agent.update({
       where: { id: params.id },
       data: {
         ...agentData,
-        specializations: specializations,
+        email,
+        specializations,
       },
     });
+
     return NextResponse.json(updatedAgent);
   } catch (error) {
     console.error(`Error updating agent ${params.id}:`, error);

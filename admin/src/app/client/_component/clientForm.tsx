@@ -112,7 +112,7 @@ export default function ClientForm({ client }: ClientFormProps) {
             });
 
             if (response.ok) {
-                toast.error(`Client ${client ? 'updated' : 'created'} successfully!`)
+                toast.success(`Client ${client ? 'updated' : 'created'} successfully!`)
                 router.push("/client")
 
             } else {

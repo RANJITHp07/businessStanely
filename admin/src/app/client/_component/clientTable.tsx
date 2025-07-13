@@ -349,6 +349,7 @@ export default function ClientsTable() {
                                                             {client.clientType === "individual"
                                                                 ? `${client.firstName?.[0] ?? ''}${client.lastName?.[0] ?? ''}`
                                                                 : client.organizationName
+                                                                    ?.toUpperCase()
                                                                     ?.split(" ")
                                                                     .map((n) => n[0])
                                                                     .join("")
@@ -359,7 +360,7 @@ export default function ClientsTable() {
                                                         <div className="font-medium">{getClientDisplayName(client)}</div>
                                                         <div className="text-sm text-muted-foreground">
                                                             {client.clientType === "organization" && client.authorizedPersonName && (
-                                                                <>Contact: {client.authorizedPersonName}</>
+                                                                <>Contact: {client.authorizedPersonName.charAt(0).toUpperCase() + client?.authorizedPersonName?.slice(1)}</>
                                                             )}
                                                             {client.clientType === "individual" && client.gender && (
                                                                 <>{client.gender.charAt(0).toUpperCase() + client.gender.slice(1)}</>

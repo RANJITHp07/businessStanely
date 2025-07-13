@@ -162,7 +162,7 @@ export default function TaskForm() {
     }
 
     return (
-        <div className="mx-auto p-6 max-w-10xl">
+        <div className="container mx-auto p-6 max-w-7xl">
             <div className="mb-8">
                 <h1 className="text-3xl font-bold">{isEditMode ? "Edit Task" : "Create New Task"}</h1>
                 <p className="text-muted-foreground mt-2">
@@ -429,10 +429,10 @@ export default function TaskForm() {
 
                 {/* Submit Buttons */}
                 <div className="flex justify-end gap-4">
-                    <Button type="button" variant="outline">
+                    <Button className="bg-[#f42b03] hover:bg-[#f42b03] shadow-none hover:shadow-lg transition-shadow duration-300 text-white hover:text-white cursor-pointer" type="button" variant="outline">
                         Cancel
                     </Button>
-                    <Button type="submit" className="bg-primary hover:bg-primary/90">
+                    <Button type="submit" className=" cursor-pointer shadow-none hover:shadow-lg transition-shadow duration-300" >
                         {isEditMode ? "Update Task" : "Create Task"}
                     </Button>
                 </div>

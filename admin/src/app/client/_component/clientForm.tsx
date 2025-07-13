@@ -150,7 +150,7 @@ export default function ClientForm({ client }: ClientFormProps) {
     }
 
     return (
-        <div className="mx-auto p-6 max-w-10xl">
+        <div className="container mx-auto p-6 max-w-7xl">
             <div className="mb-8">
                 <h1 className="text-3xl font-bold">{client ? "Edit Client" : "Create New Client"}</h1>
                 <p className="text-muted-foreground mt-2">
@@ -541,10 +541,10 @@ export default function ClientForm({ client }: ClientFormProps) {
                 {/* Submit Buttons */}
                 {formData.clientType && (
                     <div className="flex justify-end gap-4">
-                        <Button type="button" variant="outline" onClick={resetForm}>
+                        <Button className="bg-[#f42b03] hover:bg-[#f42b03] shadow-none hover:shadow-lg transition-shadow duration-300 text-white hover:text-white cursor-pointer" type="button" variant="outline" onClick={resetForm}>
                             Reset Form
                         </Button>
-                        <Button type="submit" className="bg-primary hover:bg-primary/90">
+                        <Button type="submit" className="cursor-pointer shadow-none hover:shadow-lg transition-shadow duration-300" >
                             {client ? "Update Client" : "Create Client"}
                         </Button>
                     </div>

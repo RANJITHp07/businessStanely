@@ -34,9 +34,25 @@ export async function POST(req: NextRequest) {
   }
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    const { searchParams } = new URL(req.url);
+    const assignedToId = searchParams.get('assignedToId');
+    const clientId = searchParams.get('clientId');
+
+    // Build the where clause based on query parameters
+    const whereClause: Prisma.TaskWhereInput = {};
+    
+    if (assignedToId) {
+      whereClause.assignedToId = assignedToId;
+    }
+    
+    if (clientId) {
+      whereClause.clientId = clientId;
+    }
+
     const tasks = await prisma.task.findMany({
+      where: whereClause,
       include: {
         client: true,
         createdBy: true,

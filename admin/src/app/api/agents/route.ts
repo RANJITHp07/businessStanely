@@ -7,7 +7,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { specializations, subordinates, ...agentData } = body;
 
-    const data: any = {
+    const data: Prisma.AgentCreateInput = {
       ...agentData,
       ...(specializations?.length && {
         specializations: {
@@ -21,7 +21,13 @@ export async function POST(req: NextRequest) {
       }),
     };
 
-    const newAgent = await prisma.agent.create({ data });
+    const newAgent = await prisma.agent.create({ 
+      data,
+      include: {
+        superior: true,
+        subordinates: true,
+      }
+    });
 
     return NextResponse.json(newAgent, { status: 201 });
 
@@ -48,6 +54,10 @@ export async function POST(req: NextRequest) {
 export async function GET() {
   try {
     const agents = await prisma.agent.findMany({
+      include: {
+        superior: true,
+        subordinates: true,
+      },
       orderBy: {
         createdAt: 'desc'
       }

@@ -13,7 +13,8 @@ import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { CalendarIcon, FileText, User, Phone, Mail, AlertCircle, Users } from "lucide-react"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { CalendarIcon, FileText, User, Phone, Mail, AlertCircle, Users, Plus } from "lucide-react"
 import { format, isBefore, startOfDay } from "date-fns"
 import { cn } from "@/lib/utils"
 
@@ -40,6 +41,19 @@ export default function TaskForm() {
     const [selectedClient, setSelectedClient] = useState<Client | null>(null)
     const [dueDate, setDueDate] = useState<Date>()
     const [isEditMode, setIsEditMode] = useState(false)
+    const [isModalOpen, setIsModalOpen] = useState(false)
+    const [selectedClientType, setSelectedClientType] = useState("")
+    
+    // New client form state
+    const [newClientData, setNewClientData] = useState({
+        firstName: "",
+        lastName: "",
+        organizationName: "",
+        authorizedPersonName: "",
+        email: "",
+        phoneNumber: "",
+    })
+    
     const params = useParams()
     const router = useRouter()
     const { id } = params
@@ -103,6 +117,63 @@ export default function TaskForm() {
         setFormData((prev) => ({ ...prev, [field]: value }))
     }
 
+    const handleNewClientInputChange = (field: string, value: string) => {
+        setNewClientData((prev) => ({ ...prev, [field]: value }))
+    }
+
+    const handleAddClientClick = () => {
+        setIsModalOpen(true)
+        // Reset form data when opening modal
+        setSelectedClientType("")
+        setNewClientData({
+            firstName: "",
+            lastName: "",
+            organizationName: "",
+            authorizedPersonName: "",
+            email: "",
+            phoneNumber: "",
+        })
+    }
+
+    const handleCreateClient = async () => {
+        try {
+            const clientData = {
+                clientType: selectedClientType,
+                ...(selectedClientType === "individual" ? {
+                    firstName: newClientData.firstName,
+                    lastName: newClientData.lastName,
+                } : {
+                    organizationName: newClientData.organizationName,
+                    authorizedPersonName: newClientData.authorizedPersonName,
+                }),
+                email: newClientData.email,
+                phoneNumber: newClientData.phoneNumber,
+            }
+
+            const response = await fetch("/api/clients", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify(clientData),
+            })
+
+            if (response.ok) {
+                const newClient = await response.json()
+                setClients((prev) => [...prev, newClient])
+                setFormData((prev) => ({ ...prev, clientId: newClient.id }))
+                setIsModalOpen(false)
+                toast.success("Client created successfully!")
+            } else {
+                const errorData = await response.json()
+                toast.error(errorData.error || "Failed to create client")
+            }
+        } catch (error) {
+            console.error("Error creating client:", error)
+            toast.error("An unexpected error occurred while creating client")
+        }
+    }
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         const url = isEditMode ? `/api/tasks/${id}` : '/api/tasks'
@@ -162,6 +233,16 @@ export default function TaskForm() {
         )
     }
 
+    const isCreateClientFormValid = () => {
+        if (!selectedClientType || !newClientData.email || !newClientData.phoneNumber) return false
+        
+        if (selectedClientType === "individual") {
+            return newClientData.firstName && newClientData.lastName
+        } else {
+            return newClientData.organizationName && newClientData.authorizedPersonName
+        }
+    }
+
     return (
         <div className="container mx-auto p-6 max-w-7xl">
             <div className="mb-8">
@@ -209,13 +290,182 @@ export default function TaskForm() {
 
                 {/* Client Information */}
                 <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <User className="h-5 w-5" />
-                            Client Information
-                        </CardTitle>
-                        <CardDescription>Select client and their contact details will be auto-filled</CardDescription>
+                    <CardHeader className="flex items-center justify-between">
+                        <div>
+                            <CardTitle className="flex items-center gap-2">
+                                <User className="h-5 w-5" />
+                                Client Information
+                            </CardTitle>
+                            <CardDescription>
+                                Select client and their contact details will be auto-filled
+                            </CardDescription>
+                        </div>
+
+                        <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+                            <DialogTrigger asChild>
+                                <Button type="button" onClick={handleAddClientClick}>
+                                    <Plus className="h-4 w-4 mr-2" />
+                                    Add Client
+                                </Button>
+                            </DialogTrigger>
+                            <DialogContent className="sm:max-w-[500px] max-h-[80vh] overflow-y-auto">
+                                <DialogHeader>
+                                    <DialogTitle>Add New Client</DialogTitle>
+                                    <DialogDescription>
+                                        Select the client type and fill in the details
+                                    </DialogDescription>
+                                </DialogHeader>
+                                <div className="space-y-4 py-4">
+                                    {/* Client Type Selection */}
+                                    <div className="space-y-2">
+                                        <Label htmlFor="client-type">Client Type *</Label>
+                                        <Select value={selectedClientType} onValueChange={setSelectedClientType}>
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Choose client type" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="individual">
+                                                    <div className="flex items-center gap-2">
+                                                        <User className="h-4 w-4" />
+                                                        Individual
+                                                    </div>
+                                                </SelectItem>
+                                                <SelectItem value="organization">
+                                                    <div className="flex items-center gap-2">
+                                                        <Users className="h-4 w-4" />
+                                                        Organization
+                                                    </div>
+                                                </SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+
+                                    {/* Individual Form Fields */}
+                                    {selectedClientType === "individual" && (
+                                        <>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div className="space-y-2">
+                                                    <Label htmlFor="firstName">First Name *</Label>
+                                                    <Input
+                                                        id="firstName"
+                                                        placeholder="Enter first name"
+                                                        value={newClientData.firstName}
+                                                        onChange={(e) => handleNewClientInputChange("firstName", e.target.value)}
+                                                    />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <Label htmlFor="lastName">Last Name *</Label>
+                                                    <Input
+                                                        id="lastName"
+                                                        placeholder="Enter last name"
+                                                        value={newClientData.lastName}
+                                                        onChange={(e) => handleNewClientInputChange("lastName", e.target.value)}
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label htmlFor="email">Email *</Label>
+                                                <div className="relative">
+                                                    <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                                                    <Input
+                                                        id="email"
+                                                        type="email"
+                                                        placeholder="Enter email address"
+                                                        value={newClientData.email}
+                                                        onChange={(e) => handleNewClientInputChange("email", e.target.value)}
+                                                        className="pl-10"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label htmlFor="phoneNumber">Phone Number *</Label>
+                                                <div className="relative">
+                                                    <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                                                    <Input
+                                                        id="phoneNumber"
+                                                        placeholder="Enter phone number"
+                                                        value={newClientData.phoneNumber}
+                                                        onChange={(e) => handleNewClientInputChange("phoneNumber", e.target.value)}
+                                                        className="pl-10"
+                                                    />
+                                                </div>
+                                            </div>
+                                        </>
+                                    )}
+
+                                    {/* Organization Form Fields */}
+                                    {selectedClientType === "organization" && (
+                                        <>
+                                            <div className="space-y-2">
+                                                <Label htmlFor="organizationName">Organization Name *</Label>
+                                                <Input
+                                                    id="organizationName"
+                                                    placeholder="Enter organization name"
+                                                    value={newClientData.organizationName}
+                                                    onChange={(e) => handleNewClientInputChange("organizationName", e.target.value)}
+                                                />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label htmlFor="authorizedPersonName">Authorized Person *</Label>
+                                                <Input
+                                                    id="authorizedPersonName"
+                                                    placeholder="Enter authorized person name"
+                                                    value={newClientData.authorizedPersonName}
+                                                    onChange={(e) => handleNewClientInputChange("authorizedPersonName", e.target.value)}
+                                                />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label htmlFor="email">Email *</Label>
+                                                <div className="relative">
+                                                    <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                                                    <Input
+                                                        id="email"
+                                                        type="email"
+                                                        placeholder="Enter email address"
+                                                        value={newClientData.email}
+                                                        onChange={(e) => handleNewClientInputChange("email", e.target.value)}
+                                                        className="pl-10"
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label htmlFor="phoneNumber">Phone Number *</Label>
+                                                <div className="relative">
+                                                    <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                                                    <Input
+                                                        id="phoneNumber"
+                                                        placeholder="Enter phone number"
+                                                        value={newClientData.phoneNumber}
+                                                        onChange={(e) => handleNewClientInputChange("phoneNumber", e.target.value)}
+                                                        className="pl-10"
+                                                    />
+                                                </div>
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+                                
+                                {/* Modal Actions */}
+                                <div className="flex justify-end gap-3 pt-4 border-t">
+                                    <Button 
+                                        type="button" 
+                                        variant="outline" 
+                                        onClick={() => setIsModalOpen(false)}
+                                    >
+                                        Cancel
+                                    </Button>
+                                    <Button 
+                                        type="button" 
+                                        onClick={handleCreateClient}
+                                        disabled={!isCreateClientFormValid()}
+                                    >
+                                        Create Client
+                                    </Button>
+                                </div>
+                            </DialogContent>
+                        </Dialog>
                     </CardHeader>
+
                     <CardContent className="space-y-6">
                         <div className="space-y-2">
                             <Label htmlFor="client">Select Client *</Label>
@@ -302,7 +552,7 @@ export default function TaskForm() {
                                     </Avatar>
                                     <div className="flex-1 mx-2">
                                         <h4 className="font-medium text-blue-900">{selectedClient.clientType === 'individual' ? `${selectedClient.firstName} ${selectedClient.lastName}` : selectedClient.organizationName}</h4>
-                                        <p className="text-sm text-blue-600">Contact: {selectedClient.authorizedPersonName || 'N/A'}</p>
+                                        {/* <p className="text-sm text-blue-600">Contact: {selectedClient.authorizedPersonName || 'N/A'}</p> */}
                                     </div>
                                     {getClientTypeBadge(selectedClient.clientType)}
                                 </div>

@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Loader2 } from "lucide-react"
 import {
   Select,
   SelectContent,
@@ -48,6 +49,7 @@ import {
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
+  ArrowUpDown,
 } from "lucide-react";
 import Link from "next/link";
 import {
@@ -84,9 +86,12 @@ export default function AgentsTable() {
   const [selectedType, setSelectedType] = useState("All Types");
   const [selectedJurisdiction, setSelectedJurisdiction] =
     useState("All Jurisdictions");
+  const [sortBy, setSortBy] = useState("a-z");
+  const [sortByDate, setSortByDate] = useState("newest");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(5);
   const [agentToDelete, setAgentToDelete] = useState<Agent | null>(null);
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const fetchAgents = async () => {
@@ -101,10 +106,33 @@ export default function AgentsTable() {
       } catch (error) {
         console.error("Error fetching agents:", error);
       }
+      finally {
+        setLoading(false);
+    }
     };
 
     fetchAgents();
   }, []);
+
+  // Sort function
+  const sortAgents = (agents: Agent[], sortBy: string, sortByDate: string) => {
+    return [...agents].sort((a, b) => {
+      if (sortBy === "a-z") {
+        return a.name.localeCompare(b.name);
+      } else if (sortBy === "z-a") {
+        return b.name.localeCompare(a.name);
+      }
+      
+      // Date sorting (assuming agents have a createdAt field)
+      // if (sortByDate === "newest") {
+      //   return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
+      // } else if (sortByDate === "oldest") {
+      //   return new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime();
+      // }
+      
+      return 0;
+    });
+  }
 
   // Filter agents based on search and filters
   const filteredAgents = agents.filter((agent) => {
@@ -125,6 +153,9 @@ export default function AgentsTable() {
     return matchesSearch && matchesType && matchesJurisdiction;
   });
 
+  // Apply sorting to filtered agents
+  const sortedAgents = sortAgents(filteredAgents, sortBy, sortByDate);
+
   const resetFilters = () => {
     setSearchTerm("");
     setSelectedType("All Types");
@@ -132,10 +163,10 @@ export default function AgentsTable() {
   };
 
   // Pagination logic
-  const totalPages = Math.ceil(filteredAgents.length / itemsPerPage);
+  const totalPages = Math.ceil(sortedAgents.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
-  const currentAgents = filteredAgents.slice(startIndex, endIndex);
+  const currentAgents = sortedAgents.slice(startIndex, endIndex);
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
@@ -206,8 +237,12 @@ export default function AgentsTable() {
           </Link>
         </div>
 
-        {/* Filters */}
         <Card>
+
+
+
+
+
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Filter className="h-5 w-5" />
@@ -217,8 +252,15 @@ export default function AgentsTable() {
               Filter and search through your agents
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            {/* Search */}
+          <CardContent className="space-y-4"> 
+          {loading ? (
+        <>
+         <div className="h-[200px] w-full bg-gray-200 rounded-2xl mb-4"></div>
+             <div className="flex justify-between gap-4">
+               <div className="h-5 w-1/2 bg-gray-200 rounded-xl mb-3"></div>
+               <div className="h-5 w-1/2 bg-gray-200 rounded-xl mb-3"></div>
+             </div></>    
+          ) : (  <>       {/* Search */}
             <div className="flex items-center gap-4">
               <div className="flex-1">
                 <Label htmlFor="search">Search Agents</Label>
@@ -282,7 +324,8 @@ export default function AgentsTable() {
               >
                 Clear
               </Button>
-            </div>
+            </div> </> )}
+     
           </CardContent>
         </Card>
       </div>
@@ -290,12 +333,51 @@ export default function AgentsTable() {
       {/* Agents Table */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Users className="h-5 w-5" />
-            Agents ({filteredAgents.length})
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5" />
+              Agents ({sortedAgents.length})
+            </CardTitle>
+            <div className="flex items-center gap-2">
+              <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
+              <Select value={sortBy} onValueChange={setSortBy}>
+                <SelectTrigger className="w-32">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="a-z">A-Z</SelectItem>
+                  <SelectItem value="z-a">Z-A</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select  >
+  <SelectTrigger className="w-38">
+    <SelectValue className="text-black" placeholder="Jurisdiction" />
+  </SelectTrigger>
+  <SelectContent>
+    <SelectItem value="newest">Usa</SelectItem>
+    <SelectItem value="oldest">India</SelectItem>
+  </SelectContent>
+</Select>
+
+              <Select value={sortByDate} onValueChange={setSortByDate}>
+                <SelectTrigger className="w-32">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="newest">Newest</SelectItem>
+                  <SelectItem value="oldest">Oldest</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
         </CardHeader>
-        <CardContent>
+
+
+{loading ?(<div className="flex justify-center items-center py-8">
+  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+</div>
+)  : (  <>
+  <CardContent>
           <div className="rounded-md border">
             <Table>
               <TableHeader>
@@ -485,6 +567,15 @@ export default function AgentsTable() {
             </div>
           )}
         </CardContent>
+
+</>   ) }
+
+
+   
+
+
+
+
       </Card>
       <AlertDialog
         open={!!agentToDelete}
@@ -506,4 +597,4 @@ export default function AgentsTable() {
       </AlertDialog>
     </div>
   );
-}
+} 

@@ -16,6 +16,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
+import { SearchX } from "lucide-react";
 import {
   Edit,
   FileText,
@@ -193,11 +194,16 @@ export default function TaskDetails() {
   };
 
   if (loading) {
-    return <p>Loading...</p>;
+    return <div className="flex flex-col items-center justify-center min-h-screen bg-white"> <div className="w-12 h-12 border-[5px] border-t-blue-600 border-gray-300 rounded-full animate-spin  shadow-blue-100"></div> </div>
   }
 
   if (!taskData) {
-    return <p>Task not found.</p>;
+    return (
+      <div className="flex flex-col items-center bg-white justify-center min-h-screen text-center space-y-4">
+      <SearchX className="w-12 h-12 text-gray-400" />
+      <p className="text-gray-500 text-lg font-medium">Task not found.</p>
+    </div>
+    );
   }
 
   return (

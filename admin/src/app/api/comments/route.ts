@@ -1,22 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Prisma } from '@prisma/client';
-import prisma from '@/lib/prisma';
+import { Prisma } from "@prisma/client";
+import prisma from "@/lib/prisma";
+import { deleteFromS3 } from "@/lib/aws";
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { 
-      content, 
-      taskId, 
-      authorId, 
-      attachmentName, 
-      attachmentUrl, 
-      attachmentSize, 
-      attachmentType 
+    const {
+      content,
+      taskId,
+      authorId,
+      attachmentName,
+      attachmentUrl,
+      attachmentSize,
+      attachmentType,
     } = body;
 
     if (!content || !taskId || !authorId) {
-      return NextResponse.json({ error: "Content, taskId, and authorId are required" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Content, taskId, and authorId are required" },
+        { status: 400 }
+      );
     }
 
     const commentData: Prisma.CommentCreateInput = {
@@ -25,7 +29,6 @@ export async function POST(req: NextRequest) {
       author: { connect: { id: authorId } },
     };
 
-    // Add attachment fields if they exist
     if (attachmentName) {
       commentData.attachmentName = attachmentName;
       commentData.attachmentUrl = attachmentUrl;
@@ -51,19 +54,24 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     console.error("Error creating comment:", error);
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      // Handle known Prisma errors
     }
-    return NextResponse.json({ error: "Failed to create comment" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to create comment" },
+      { status: 500 }
+    );
   }
 }
 
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-    const taskId = searchParams.get('taskId');
+    const taskId = searchParams.get("taskId");
 
     if (!taskId) {
-      return NextResponse.json({ error: "taskId is required" }, { status: 400 });
+      return NextResponse.json(
+        { error: "taskId is required" },
+        { status: 400 }
+      );
     }
 
     const comments = await prisma.comment.findMany({
@@ -79,13 +87,58 @@ export async function GET(req: NextRequest) {
         },
       },
       orderBy: {
-        createdAt: 'desc'
-      }
+        createdAt: "desc",
+      },
     });
 
     return NextResponse.json(comments);
   } catch (error) {
     console.error("Error fetching comments:", error);
-    return NextResponse.json({ error: "Failed to fetch comments" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to fetch comments" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(req: NextRequest) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const commentId = searchParams.get("commentId");
+
+    if (!commentId) {
+      return NextResponse.json(
+        { error: "commentId is required" },
+        { status: 400 }
+      );
+    }
+
+    const comment = await prisma.comment.findUnique({
+      where: { id: commentId },
+    });
+
+    if (!comment) {
+      return NextResponse.json({ error: "Comment not found" }, { status: 404 });
+    }
+
+    if (comment.attachmentUrl) {
+      try {
+        await deleteFromS3(comment.attachmentUrl);
+      } catch (error) {
+        console.error("Error deleting file from S3:", error);
+      }
+    }
+
+    await prisma.comment.delete({
+      where: { id: commentId },
+    });
+
+    return NextResponse.json({ message: "Comment deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting comment:", error);
+    return NextResponse.json(
+      { error: "Failed to delete comment" },
+      { status: 500 }
+    );
   }
 }

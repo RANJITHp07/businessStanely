@@ -23,7 +23,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const body = await req.json();
-    const { email, specializations, subordinates, superior, ...agentData } = body;
+    const { email, specializations, subordinates, ...agentData } = body;
 
     // Check if another user already exists with the same email
     const existingAgent = await prisma.agent.findUnique({
@@ -43,6 +43,15 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
         ...agentData,
         email,
         specializations,
+        ...(subordinates && {
+          subordinates: {
+            set: subordinates.map((id: string) => ({ id })),
+          },
+        }),
+      },
+      include: {
+        superior: true,
+        subordinates: true,
       },
     });
 

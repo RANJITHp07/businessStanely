@@ -1,8 +1,19 @@
-"use client"
+"use client";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
+import { useState, useEffect } from "react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+} from "@/components/ui/chart";
 import {
   BarChart,
   Bar,
@@ -17,7 +28,7 @@ import {
   Line,
   AreaChart,
   Area,
-} from "recharts"
+} from "recharts";
 import {
   Users,
   UserCheck,
@@ -29,10 +40,10 @@ import {
   Calendar,
   Building2,
   User,
-} from "lucide-react"
+} from "lucide-react";
 
-// Mock data for dashboard
-const dashboardStats = {
+// Mock data for dashboard - will be replaced with real data for charts
+const mockDashboardStats = {
   agents: {
     total: 25,
     active: 23,
@@ -53,15 +64,15 @@ const dashboardStats = {
     overdue: 12,
     growth: -2.1,
   },
-}
+  taskStatusData: [
+    { name: "Completed", value: 169, color: "#22c55e" },
+    { name: "In Progress", value: 128, color: "#3b82f6" },
+    { name: "Pending", value: 45, color: "#f59e0b" },
+    { name: "Overdue", value: 12, color: "#ef4444" },
+  ],
+};
 
 // Chart data
-const taskStatusData = [
-  { name: "Completed", value: 169, color: "#22c55e" },
-  { name: "In Progress", value: 128, color: "#3b82f6" },
-  { name: "Pending", value: 45, color: "#f59e0b" },
-  { name: "Overdue", value: 12, color: "#ef4444" },
-]
 
 const monthlyTasksData = [
   { month: "Jan", completed: 45, created: 52 },
@@ -70,7 +81,7 @@ const monthlyTasksData = [
   { month: "Apr", completed: 61, created: 55 },
   { month: "May", completed: 55, created: 67 },
   { month: "Jun", completed: 67, created: 59 },
-]
+];
 
 const agentPerformanceData = [
   { name: "John Smith", tasks: 28, completed: 25 },
@@ -78,7 +89,7 @@ const agentPerformanceData = [
   { name: "Michael Brown", tasks: 19, completed: 16 },
   { name: "Emily Davis", tasks: 15, completed: 14 },
   { name: "Robert Wilson", tasks: 12, completed: 10 },
-]
+];
 
 const clientGrowthData = [
   { month: "Jan", individual: 85, organization: 45 },
@@ -87,7 +98,7 @@ const clientGrowthData = [
   { month: "Apr", individual: 95, organization: 53 },
   { month: "May", individual: 96, organization: 56 },
   { month: "Jun", individual: 98, organization: 58 },
-]
+];
 
 const recentActivities = [
   {
@@ -122,9 +133,32 @@ const recentActivities = [
     icon: Users,
     color: "text-purple-600",
   },
-]
+];
 
 export default function Dashboard() {
+  const [dashboardStats, setDashboardStats] = useState(mockDashboardStats);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchDashboardStats = async () => {
+      try {
+        const response = await fetch("/api/dashboard");
+        if (response.ok) {
+          const data = await response.json();
+          setDashboardStats(data);
+        } else {
+          console.error("Failed to fetch dashboard stats");
+        }
+      } catch (error) {
+        console.error("Error fetching dashboard stats:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDashboardStats();
+  }, []);
+
   const chartConfig = {
     completed: {
       label: "Completed",
@@ -142,7 +176,7 @@ export default function Dashboard() {
       label: "Organization",
       color: "hsl(var(--chart-4))",
     },
-  }
+  };
 
   return (
     <div className="container mx-auto p-6 max-w-7xl space-y-8">
@@ -163,19 +197,50 @@ export default function Dashboard() {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{dashboardStats.agents.total}</div>
-            <div className="flex items-center space-x-2 text-xs text-muted-foreground mt-2">
-              <Badge variant="outline" className="text-green-600 border-green-200">
-                {dashboardStats.agents.active} Active
-              </Badge>
-              <Badge variant="outline" className="text-gray-600 border-gray-200">
-                {dashboardStats.agents.inactive} Inactive
-              </Badge>
-            </div>
-            <div className="flex items-center mt-2">
-              <TrendingUp className="h-3 w-3 text-green-600 mr-1" />
-              <span className="text-xs text-green-600">+{dashboardStats.agents.growth}% from last month</span>
-            </div>
+            {loading ? (
+              <div className="animate-pulse">
+                <div className="h-8 bg-gray-200 rounded w-16 mb-3"></div>
+                <div className="h-4 bg-gray-200 rounded w-full mb-2"></div>
+                <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+              </div>
+            ) : (
+              <>
+                <div className="text-2xl font-bold">
+                  {dashboardStats.agents.total}
+                </div>
+                <div className="flex items-center space-x-2 text-xs text-muted-foreground mt-2">
+                  <Badge
+                    variant="outline"
+                    className="text-green-600 border-green-200"
+                  >
+                    {dashboardStats.agents.active} Active
+                  </Badge>
+                  <Badge
+                    variant="outline"
+                    className="text-gray-600 border-gray-200"
+                  >
+                    {dashboardStats.agents.inactive} Inactive
+                  </Badge>
+                </div>
+                <div className="flex items-center mt-2">
+                  {dashboardStats.agents.growth >= 0 ? (
+                    <>
+                      <TrendingUp className="h-3 w-3 text-green-600 mr-1" />
+                      <span className="text-xs text-green-600">
+                        +{dashboardStats.agents.growth}% from last month
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <TrendingDown className="h-3 w-3 text-red-600 mr-1" />
+                      <span className="text-xs text-red-600">
+                        {dashboardStats.agents.growth}% from last month
+                      </span>
+                    </>
+                  )}
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
 
@@ -186,21 +251,52 @@ export default function Dashboard() {
             <UserCheck className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{dashboardStats.clients.total}</div>
-            <div className="flex items-center space-x-2 text-xs text-muted-foreground mt-2">
-              <Badge variant="outline" className="text-blue-600 border-blue-200">
-                <User className="h-3 w-3 mr-1" />
-                {dashboardStats.clients.individual} Individual
-              </Badge>
-              <Badge variant="outline" className="text-purple-600 border-purple-200">
-                <Building2 className="h-3 w-3 mr-1" />
-                {dashboardStats.clients.organization} Org
-              </Badge>
-            </div>
-            <div className="flex items-center mt-2">
-              <TrendingUp className="h-3 w-3 text-green-600 mr-1" />
-              <span className="text-xs text-green-600">+{dashboardStats.clients.growth}% from last month</span>
-            </div>
+            {loading ? (
+              <div className="animate-pulse">
+                <div className="h-8 bg-gray-200 rounded w-16 mb-3"></div>
+                <div className="h-4 bg-gray-200 rounded w-full mb-2"></div>
+                <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+              </div>
+            ) : (
+              <>
+                <div className="text-2xl font-bold">
+                  {dashboardStats.clients.total}
+                </div>
+                <div className="flex items-center space-x-2 text-xs text-muted-foreground mt-2">
+                  <Badge
+                    variant="outline"
+                    className="text-blue-600 border-blue-200"
+                  >
+                    <User className="h-3 w-3 mr-1" />
+                    {dashboardStats.clients.individual} Individual
+                  </Badge>
+                  <Badge
+                    variant="outline"
+                    className="text-purple-600 border-purple-200"
+                  >
+                    <Building2 className="h-3 w-3 mr-1" />
+                    {dashboardStats.clients.organization} Org
+                  </Badge>
+                </div>
+                <div className="flex items-center mt-2">
+                  {dashboardStats.clients.growth >= 0 ? (
+                    <>
+                      <TrendingUp className="h-3 w-3 text-green-600 mr-1" />
+                      <span className="text-xs text-green-600">
+                        +{dashboardStats.clients.growth}% from last month
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <TrendingDown className="h-3 w-3 text-red-600 mr-1" />
+                      <span className="text-xs text-red-600">
+                        {dashboardStats.clients.growth}% from last month
+                      </span>
+                    </>
+                  )}
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
 
@@ -211,22 +307,56 @@ export default function Dashboard() {
             <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{dashboardStats.tasks.total}</div>
-            <div className="flex items-center space-x-1 text-xs text-muted-foreground mt-2">
-              <Badge variant="outline" className="text-green-600 border-green-200">
-                {dashboardStats.tasks.completed} Done
-              </Badge>
-              <Badge variant="outline" className="text-blue-600 border-blue-200">
-                {dashboardStats.tasks.inProgress} Active
-              </Badge>
-              <Badge variant="outline" className="text-red-600 border-red-200">
-                {dashboardStats.tasks.overdue} Overdue
-              </Badge>
-            </div>
-            <div className="flex items-center mt-2">
-              <TrendingDown className="h-3 w-3 text-red-600 mr-1" />
-              <span className="text-xs text-red-600">{Math.abs(dashboardStats.tasks.growth)}% from last month</span>
-            </div>
+            {loading ? (
+              <div className="animate-pulse">
+                <div className="h-8 bg-gray-200 rounded w-16 mb-3"></div>
+                <div className="h-4 bg-gray-200 rounded w-full mb-2"></div>
+                <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+              </div>
+            ) : (
+              <>
+                <div className="text-2xl font-bold">
+                  {dashboardStats.tasks.total}
+                </div>
+                <div className="flex items-center space-x-1 text-xs text-muted-foreground mt-2">
+                  <Badge
+                    variant="outline"
+                    className="text-green-600 border-green-200"
+                  >
+                    {dashboardStats.tasks.completed} Done
+                  </Badge>
+                  <Badge
+                    variant="outline"
+                    className="text-blue-600 border-blue-200"
+                  >
+                    {dashboardStats.tasks.inProgress} Active
+                  </Badge>
+                  <Badge
+                    variant="outline"
+                    className="text-red-600 border-red-200"
+                  >
+                    {dashboardStats.tasks.overdue} Overdue
+                  </Badge>
+                </div>
+                <div className="flex items-center mt-2">
+                  {dashboardStats.tasks.growth >= 0 ? (
+                    <>
+                      <TrendingUp className="h-3 w-3 text-green-600 mr-1" />
+                      <span className="text-xs text-green-600">
+                        +{dashboardStats.tasks.growth}% from last month
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <TrendingDown className="h-3 w-3 text-red-600 mr-1" />
+                      <span className="text-xs text-red-600">
+                        {dashboardStats.tasks.growth}% from last month
+                      </span>
+                    </>
+                  )}
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -237,39 +367,61 @@ export default function Dashboard() {
         <Card>
           <CardHeader>
             <CardTitle>Task Status Distribution</CardTitle>
-            <CardDescription>Current status breakdown of all tasks</CardDescription>
+            <CardDescription>
+              Current status breakdown of all tasks
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <ChartContainer config={chartConfig} className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={taskStatusData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={100}
-                    paddingAngle={5}
-                    dataKey="value"
-                  >
-                    {taskStatusData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <ChartTooltip content={<ChartTooltipContent />} />
-                </PieChart>
-              </ResponsiveContainer>
-            </ChartContainer>
-            <div className="grid grid-cols-2 gap-2 mt-4">
-              {taskStatusData.map((item) => (
-                <div key={item.name} className="flex items-center space-x-2">
-                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
-                  <span className="text-sm">
-                    {item.name}: {item.value}
-                  </span>
+            {loading ? (
+              <div className="animate-pulse">
+                <div className="h-[300px] bg-gray-200 rounded mb-4"></div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="h-4 bg-gray-200 rounded"></div>
+                  <div className="h-4 bg-gray-200 rounded"></div>
+                  <div className="h-4 bg-gray-200 rounded"></div>
+                  <div className="h-4 bg-gray-200 rounded"></div>
                 </div>
-              ))}
-            </div>
+              </div>
+            ) : (
+              <>
+                <ChartContainer config={chartConfig} className="h-[300px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={dashboardStats.taskStatusData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={100}
+                        paddingAngle={5}
+                        dataKey="value"
+                      >
+                        {dashboardStats.taskStatusData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <ChartTooltip content={<ChartTooltipContent />} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </ChartContainer>
+                <div className="grid grid-cols-2 gap-2 mt-4">
+                  {dashboardStats.taskStatusData.map((item) => (
+                    <div
+                      key={item.name}
+                      className="flex items-center space-x-2"
+                    >
+                      <div
+                        className="w-3 h-3 rounded-full"
+                        style={{ backgroundColor: item.color }}
+                      />
+                      <span className="text-sm">
+                        {item.name}: {item.value}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
 
@@ -277,7 +429,9 @@ export default function Dashboard() {
         <Card>
           <CardHeader>
             <CardTitle>Monthly Tasks Trend</CardTitle>
-            <CardDescription>Tasks created vs completed over time</CardDescription>
+            <CardDescription>
+              Tasks created vs completed over time
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <ChartContainer config={chartConfig} className="h-[300px]">
@@ -292,7 +446,11 @@ export default function Dashboard() {
                     dataKey="completed"
                     stroke="var(--color-completed)"
                     strokeWidth={3}
-                    dot={{ fill: "var(--color-completed)", strokeWidth: 2, r: 4 }}
+                    dot={{
+                      fill: "var(--color-completed)",
+                      strokeWidth: 2,
+                      r: 4,
+                    }}
                   />
                   <Line
                     type="monotone"
@@ -336,7 +494,9 @@ export default function Dashboard() {
         <Card>
           <CardHeader>
             <CardTitle>Client Growth Trend</CardTitle>
-            <CardDescription>Individual vs Organization client growth</CardDescription>
+            <CardDescription>
+              Individual vs Organization client growth
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <ChartContainer config={chartConfig} className="h-[300px]">
@@ -376,18 +536,27 @@ export default function Dashboard() {
             <Calendar className="h-5 w-5" />
             Recent Activity
           </CardTitle>
-          <CardDescription>Latest updates and activities in your system</CardDescription>
+          <CardDescription>
+            Latest updates and activities in your system
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
             {recentActivities.map((activity) => (
-              <div key={activity.id} className="flex items-center space-x-4 p-3 rounded-lg bg-muted/50">
-                <div className={`p-2 rounded-full bg-background ${activity.color}`}>
+              <div
+                key={activity.id}
+                className="flex items-center space-x-4 p-3 rounded-lg bg-muted/50"
+              >
+                <div
+                  className={`p-2 rounded-full bg-background ${activity.color}`}
+                >
                   <activity.icon className="h-4 w-4" />
                 </div>
                 <div className="flex-1">
                   <p className="text-sm font-medium">{activity.description}</p>
-                  <p className="text-xs text-muted-foreground">{activity.time}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {activity.time}
+                  </p>
                 </div>
               </div>
             ))}
@@ -402,7 +571,9 @@ export default function Dashboard() {
             <div className="text-center">
               <Users className="h-8 w-8 mx-auto mb-2 text-blue-600" />
               <h3 className="font-semibold">Create Agent</h3>
-              <p className="text-sm text-muted-foreground">Add new team member</p>
+              <p className="text-sm text-muted-foreground">
+                Add new team member
+              </p>
             </div>
           </CardContent>
         </Card>
@@ -428,5 +599,5 @@ export default function Dashboard() {
         </Card>
       </div>
     </div>
-  )
+  );
 }

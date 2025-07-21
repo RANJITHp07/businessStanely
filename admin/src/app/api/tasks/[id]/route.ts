@@ -9,6 +9,21 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
         client: true,
         createdBy: true,
         assignedTo: true,
+        comments: {
+          include: {
+            author: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                photo: true,
+              },
+            },
+          },
+          orderBy: {
+            createdAt: 'desc',
+          },
+        },
       },
     });
     if (!task) {

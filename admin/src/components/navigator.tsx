@@ -8,10 +8,11 @@ export default function Navigator() {
     const pathname = usePathname()
     const segments = pathname.split('/').filter(Boolean)
 
+
     return (
-       
-<Breadcrumb className="hidden md:block container mx-auto max-w-7xl">
-<BreadcrumbList>
+
+        <Breadcrumb className="hidden md:block container mx-auto max-w-7xl">
+            <BreadcrumbList>
                 <BreadcrumbItem>
                     <BreadcrumbLink href="/">Dashboard</BreadcrumbLink>
                 </BreadcrumbItem>

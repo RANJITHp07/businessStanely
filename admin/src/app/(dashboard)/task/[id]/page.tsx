@@ -31,6 +31,7 @@ import {
 import { format } from "date-fns";
 import { Task, Comment } from "@/types";
 import { useParams } from "next/navigation";
+import Image from "next/image";
 
 export default function TaskDetails() {
   const [taskData, setTaskData] = useState<Task | null>(null);
@@ -52,7 +53,6 @@ export default function TaskDetails() {
           if (response.ok) {
             const data = await response.json();
             setTaskData(data);
-            // Set comments from task data if available
             if (data.comments) {
               setComments(data.comments);
               setCommentsLoading(false);
@@ -69,7 +69,6 @@ export default function TaskDetails() {
     };
 
     const fetchComments = async () => {
-      // Comments will be loaded with task data, this is just for fallback
       setCommentsLoading(false);
     };
 
@@ -132,14 +131,11 @@ export default function TaskDetails() {
 
     setSubmittingComment(true);
     try {
-      // For demo purposes, using a placeholder authorId
-      // In a real app, you'd get this from authentication context
       const authorId =
         taskData.assignedTo?.id || taskData.createdBy?.id || "placeholder-id";
 
       let attachmentData = {};
 
-      // Handle file upload if a file is selected
       if (selectedFile) {
         const formData = new FormData();
         formData.append("file", selectedFile);
@@ -545,26 +541,111 @@ export default function TaskDetails() {
                           <p className="text-sm">{comment.content}</p>
                           {comment.attachmentName && (
                             <div className="mt-2">
-                              <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted p-2 rounded border">
-                                <Paperclip className="h-3 w-3" />
-                                <span className="font-medium">
-                                  {comment.attachmentName}
-                                </span>
-                                <span>
-                                  ({(comment.attachmentSize! / 1024).toFixed(1)}{" "}
-                                  KB)
-                                </span>
-                                {comment.attachmentUrl && (
-                                  <a
-                                    href={comment.attachmentUrl}
-                                    className="text-blue-600 hover:text-blue-800 underline ml-auto"
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                  >
-                                    Download
-                                  </a>
-                                )}
-                              </div>
+                              {/* Check if attachment is an image */}
+                              {comment.attachmentType?.startsWith("image/") &&
+                              comment.attachmentUrl ? (
+                                <div className="space-y-2">
+                                  {/* Image preview */}
+                                  <div className="relative inline-block">
+                                    {/* Use regular img for local URLs, Image for external URLs */}
+                                    {comment.attachmentUrl.startsWith(
+                                      "http"
+                                    ) ? (
+                                      <Image
+                                        src={comment.attachmentUrl}
+                                        alt={comment.attachmentName}
+                                        width={300}
+                                        height={200}
+                                        className="max-w-xs max-h-48 rounded-lg border shadow-sm cursor-pointer hover:shadow-md transition-shadow object-cover"
+                                        onClick={() =>
+                                          window.open(
+                                            comment.attachmentUrl,
+                                            "_blank"
+                                          )
+                                        }
+                                      />
+                                    ) : (
+                                      <Image
+                                        src={
+                                          comment.attachmentUrl?.startsWith("/")
+                                            ? comment.attachmentUrl
+                                            : `/${comment.attachmentUrl}`
+                                        }
+                                        alt={comment.attachmentName}
+                                        width={300}
+                                        height={200}
+                                        className="max-w-xs max-h-48 rounded-lg border shadow-sm cursor-pointer hover:shadow-md transition-shadow object-cover"
+                                        onClick={() =>
+                                          window.open(
+                                            comment.attachmentUrl?.startsWith(
+                                              "/"
+                                            )
+                                              ? comment.attachmentUrl
+                                              : `/${comment.attachmentUrl}`,
+                                            "_blank"
+                                          )
+                                        }
+                                        unoptimized={true}
+                                      />
+                                    )}
+                                  </div>
+                                  {/* Image file info */}
+                                  <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted p-2 rounded border">
+                                    <Paperclip className="h-3 w-3" />
+                                    <span className="font-medium">
+                                      {comment.attachmentName}
+                                    </span>
+                                    <span>
+                                      (
+                                      {(comment.attachmentSize! / 1024).toFixed(
+                                        1
+                                      )}{" "}
+                                      KB)
+                                    </span>
+                                    <a
+                                      href={
+                                        comment.attachmentUrl?.startsWith("/")
+                                          ? comment.attachmentUrl
+                                          : `/${comment.attachmentUrl}`
+                                      }
+                                      className="text-blue-600 hover:text-blue-800 underline ml-auto"
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                    >
+                                      Download
+                                    </a>
+                                  </div>
+                                </div>
+                              ) : (
+                                /* Non-image file attachment */
+                                <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted p-2 rounded border">
+                                  <Paperclip className="h-3 w-3" />
+                                  <span className="font-medium">
+                                    {comment.attachmentName}
+                                  </span>
+                                  <span>
+                                    (
+                                    {(comment.attachmentSize! / 1024).toFixed(
+                                      1
+                                    )}{" "}
+                                    KB)
+                                  </span>
+                                  {comment.attachmentUrl && (
+                                    <a
+                                      href={
+                                        comment.attachmentUrl?.startsWith("/")
+                                          ? comment.attachmentUrl
+                                          : `/${comment.attachmentUrl}`
+                                      }
+                                      className="text-blue-600 hover:text-blue-800 underline ml-auto"
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                    >
+                                      Download
+                                    </a>
+                                  )}
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>

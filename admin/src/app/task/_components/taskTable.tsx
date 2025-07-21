@@ -7,6 +7,8 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Loader2 } from "lucide-react"
+
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import {
     AlertDialog,
@@ -41,6 +43,7 @@ import {
     ChevronsRight,
     AlertCircle,
     Calendar,
+    ArrowUpDown,
 } from "lucide-react"
 import Link from "next/link"
 
@@ -56,6 +59,7 @@ export default function TasksTable() {
     const [searchTerm, setSearchTerm] = useState("")
     const [selectedPriority, setSelectedPriority] = useState("All Priorities")
     const [selectedStatus, setSelectedStatus] = useState("All Status")
+    const [sortBy, setSortBy] = useState("a-z")
     const [currentPage, setCurrentPage] = useState(1)
     const [itemsPerPage, setItemsPerPage] = useState(5)
     const [taskToDelete, setTaskToDelete] = useState<Task | null>(null)
@@ -101,6 +105,18 @@ export default function TasksTable() {
         }
     }
 
+    // Sort function
+    const sortTasks = (tasks: Task[], sortBy: string) => {
+        return [...tasks].sort((a, b) => {
+            if (sortBy === "a-z") {
+                return a.title.localeCompare(b.title)
+            } else if (sortBy === "z-a") {
+                return b.title.localeCompare(a.title)
+            }
+            return 0
+        })
+    }
+
     // Filter tasks based on search and filters
     const filteredTasks = (tasks || []).filter((task) => {
         const matchesSearch =
@@ -115,11 +131,14 @@ export default function TasksTable() {
         return matchesSearch && matchesPriority && matchesStatus
     })
 
+    // Apply sorting to filtered tasks
+    const sortedTasks = sortTasks(filteredTasks, sortBy)
+
     // Pagination logic
-    const totalPages = Math.ceil(filteredTasks.length / itemsPerPage)
+    const totalPages = Math.ceil(sortedTasks.length / itemsPerPage)
     const startIndex = (currentPage - 1) * itemsPerPage
     const endIndex = startIndex + itemsPerPage
-    const currentTasks = filteredTasks.slice(startIndex, endIndex)
+    const currentTasks = sortedTasks.slice(startIndex, endIndex)
 
     const handlePageChange = (page: number) => {
         setCurrentPage(page)
@@ -151,7 +170,6 @@ export default function TasksTable() {
         )
     }
 
-
     const formatDate = (dateString: string | undefined) => {
         if (!dateString) return 'N/A';
         return new Date(dateString).toLocaleDateString("en-US", {
@@ -172,9 +190,9 @@ export default function TasksTable() {
         return new Date(dueDate) < new Date() && status !== "Completed"
     }
 
-    if (loading) {
-        return <p>Loading...</p>;
-    }
+    // if (loading) {
+    //     return <p>Loading...</p>;
+    // }
 
     return (
         <div className="container mx-auto p-6 max-w-7xl">
@@ -202,81 +220,153 @@ export default function TasksTable() {
                         <CardDescription>Filter and search through your tasks</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                        {/* Search */}
-                        <div className="flex items-center gap-4">
-                            <div className="flex-1">
-                                <Label htmlFor="search">Search Tasks</Label>
-                                <div className="relative my-2 ">
-                                    <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                                    <Input
-                                        id="search"
-                                        placeholder="Search by task name, client, agent, or description..."
-                                        value={searchTerm}
-                                        onChange={(e) => setSearchTerm(e.target.value)}
-                                        className="pl-10"
-                                    />
-                                </div>
-                            </div>
-                        </div>
 
-                        {/* Filter Controls */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <Label>Priority</Label>
-                                <Select value={selectedPriority} onValueChange={setSelectedPriority}>
-                                    <SelectTrigger className="w-full">
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {priorities.map((priority) => (
-                                            <SelectItem key={priority} value={priority}>
-                                                {priority}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
+                    <Card>
+  {loading ? (
+    <CardContent>
+    <div className="h-[200px] w-full bg-gray-200 rounded-2xl mb-4"></div>
 
-                            <div className="space-y-2">
-                                <Label>Status</Label>
-                                <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-                                    <SelectTrigger className="w-full">
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {statuses.map((status) => (
-                                            <SelectItem key={status} value={status}>
-                                                {status}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                        </div>
+<div className="flex justify-between gap-4">
+  <div className="h-5 w-1/2 bg-gray-200 rounded-xl mb-3"></div>
+  <div className="h-5 w-1/2 bg-gray-200 rounded-xl mb-3"></div>
+</div>
 
-                        {/* Results Summary */}
-                        <div className="flex items-center justify-end gap-2 text-sm text-muted-foreground">
-                            <Button
-                                onClick={resetFilter}
-                                className="cursor-pointer hover:text-white text-white bg-[#f42b03] hover:bg-[#f42b03] rounded-lg px-4 py-2 shadow-none hover:shadow-lg transition-shadow duration-300"
-                                variant="outline"
-                            >
-                                Clear
-                            </Button>
-                        </div>
+    </CardContent>
+  ) : (
+    <>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Filter className="h-5 w-5" />
+          Filters & Search
+        </CardTitle>
+        <CardDescription>Filter and search through your tasks</CardDescription>
+      </CardHeader>
+
+      <CardContent className="space-y-4">
+        {/* Search */}
+        <div className="flex items-center gap-4">
+          <div className="flex-1">
+            <Label htmlFor="search">Search Tasks</Label>
+            <div className="relative my-2">
+              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+              <Input
+                id="search"
+                placeholder="Search by task name, client, agent, or description..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Filter Controls */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label>Priority</Label>
+            <Select value={selectedPriority} onValueChange={setSelectedPriority}>
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {priorities.map((priority) => (
+                  <SelectItem key={priority} value={priority}>
+                    {priority}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Status</Label>
+            <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {statuses.map((status) => (
+                  <SelectItem key={status} value={status}>
+                    {status}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        {/* Results Summary */}
+        <div className="flex items-center justify-end gap-2 text-sm text-muted-foreground">
+          <Button
+            onClick={resetFilter}
+            className="cursor-pointer hover:text-white text-white bg-[#f42b03] hover:bg-[#f42b03] rounded-lg px-4 py-2 shadow-none hover:shadow-lg transition-shadow duration-300"
+            variant="outline"
+          >
+            Clear
+          </Button>
+        </div>
+      </CardContent>
+    </>
+  )}
+</Card>
+
+
+
+                    
                     </CardContent>
                 </Card>
             </div>
 
-            {/* Tasks Table */}
+
+       
             <Card>
                 <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                        <FileText className="h-5 w-5" />
-                        Tasks ({filteredTasks.length})
-                    </CardTitle>
+                    <div className="flex items-center justify-between">
+                        <CardTitle className="flex items-center gap-2">
+                            <FileText className="h-5 w-5" />
+                            Tasks ({sortedTasks.length})
+                        </CardTitle>
+                        <div className="flex items-center gap-2">
+                            <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
+                            <Select value={sortBy} onValueChange={setSortBy}>
+                                <SelectTrigger className="w-32">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="a-z">A-Z</SelectItem>
+                                    <SelectItem value="z-a">Z-A</SelectItem>
+                                </SelectContent>
+                            </Select>
+                            <Select  >
+  <SelectTrigger className="w-28">
+    <SelectValue className="text-black" placeholder="Priority" />
+  </SelectTrigger>
+  <SelectContent>
+    <SelectItem value="low">Low</SelectItem>
+    <SelectItem value="medium">Medium</SelectItem>
+    <SelectItem value="high">High</SelectItem>
+  </SelectContent>
+</Select>
+                            <Select defaultValue="newest">
+                                <SelectTrigger className="w-32">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="newest">Newest</SelectItem>
+                                    <SelectItem value="oldest">Oldest</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
                 </CardHeader>
-                <CardContent>
+
+
+  {loading ? (<div className="flex justify-center items-center py-8">
+  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+</div>
+) : (
+     <> 
+     <CardContent>
                     <div className="rounded-md border">
                         <Table>
                             <TableHeader>
@@ -458,6 +548,11 @@ export default function TasksTable() {
                         </div>
                     )}
                 </CardContent>
+  </> ) }
+
+
+
+             
             </Card>
             <AlertDialog open={!!taskToDelete} onOpenChange={() => setTaskToDelete(null)}>
                 <AlertDialogContent>

@@ -1,12 +1,12 @@
-import React from 'react'
-import AgentForm from '@/app/agent/_component/agentForm'
+import React from "react";
+import AgentForm from "@/app/(dashboard)/agent/_component/agentForm";
 
 function AgentCreate() {
-    return (
-        <div>
-            <AgentForm />
-        </div>
-    )
+  return (
+    <div>
+      <AgentForm />
+    </div>
+  );
 }
 
-export default AgentCreate
+export default AgentCreate;

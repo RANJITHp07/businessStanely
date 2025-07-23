@@ -34,7 +34,21 @@ export default function EditClientPage() {
     }, [id]);
 
     if (loading) {
-        return <div className="flex flex-col items-center justify-center min-h-screen bg-white"> <div className="w-12 h-12 border-[5px] border-t-blue-600 border-gray-300 rounded-full animate-spin  shadow-blue-100"></div> </div>
+  return <>
+  <div className="px-[20px] py-[20px]  bg-[white]">
+    <div className="animate-pulse">
+      <div className="h-[200px] w-full bg-gray-200 rounded-2xl mb-4"></div>
+      <div className="h-[400px] w-full bg-gray-200 rounded-2xl mb-4"></div>
+
+      <div className="flex justify-between gap-4">
+        <div className="h-[50px] w-1/2 bg-gray-200 rounded-xl mb-3"></div>
+        <div className="h-[50px] w-1/2 bg-gray-200 rounded-xl mb-3"></div>
+      </div>
+    </div>
+  </div>
+</>
+
+
     }
 
     if (!client) {

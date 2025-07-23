@@ -1,4 +1,4 @@
-import { Calendar, ClipboardCheck, Home, Inbox, Search, Settings, UserRoundPen, UserSearch } from "lucide-react"
+import { Calendar, ClipboardCheck, Home, Images, Inbox, Search, Settings, UserRoundPen, UserSearch } from "lucide-react"
 
 import {
     Sidebar,
@@ -10,6 +10,7 @@ import {
     SidebarMenuButton,
     SidebarMenuItem,
 } from "@/components/ui/sidebar"
+import Image from "next/image"
 
 // Menu items.
 const items = [
@@ -46,7 +47,8 @@ export function AppSidebar() {
         <Sidebar >
             <SidebarContent>
                 <SidebarGroup>
-                    <SidebarGroupLabel className="text-xl mb-5 text-white Camelcase">Business Stanely</SidebarGroupLabel>
+                    <SidebarGroupLabel className="text-xl mb-5 text-white Camelcase">
+                    <Image className="mt-[20px]" src="/LS NEW Logo Corporate Law Firm.jpg" alt="Corporate Law Firm Logo" width={500} height={300} />                        </SidebarGroupLabel>
                     <SidebarGroupContent>
                         <SidebarMenu>
                             {items.map((item) => (

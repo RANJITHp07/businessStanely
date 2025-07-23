@@ -5,6 +5,7 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import Navigator from "@/components/navigator";
 import { ToastContainer } from 'react-toastify';
+import Image from "next/image";
 
 
 const inter = Inter({ subsets: ["latin"] });
@@ -29,8 +30,16 @@ export default function RootLayout({
               <Navigator />
 
               {/* ✅ justify-between wrapper for Title and SidebarTrigger */}
-              <div className="flex justify-between items-center flex-1 pr-4">
-                <h1 className="text-[25px] block md:hidden">Business Stanely</h1>
+              <div className="flex justify-between items-center flex-1 ">
+               <>
+               <Image
+                  className=" block md:hidden"
+                  src="/LS NEW Logo Corporate Law Firm.jpg"
+                  alt="Corporate Law Firm Logo"
+                  width={200}
+                  height={100}
+                /></>
+        
                 <SidebarTrigger />
               </div>
             </div>

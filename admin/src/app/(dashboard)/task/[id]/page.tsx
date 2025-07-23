@@ -208,8 +208,8 @@ export default function TaskDetails() {
             </p>
           </div>
           <div className="flex justify-end">
-            <Button className="mt-[20px] md:mt-0 w-fit bg-[#003459] hover:bg-[#003459] text-white rounded-lg px-4 py-2 flex items-center gap-2 cursor-pointer shadow-none hover:shadow-md transition-shadow duration-300">
-              <a href={`/task/${id}/edit`}>
+            <Button className="mt-[20px] md:mt-0 w-fit f bg-[#003459] hover:bg-[#003459] text-white rounded-lg px-4 py-2 flex items-center gap-2 cursor-pointer shadow-none hover:shadow-md transition-shadow duration-300">
+              <a href={`/task/${id}/edit`} className="flex items-center gap-1">
                 <Edit className="h-4 w-4" />
                 Edit Task
               </a>
@@ -543,7 +543,7 @@ export default function TaskDetails() {
                             <div className="mt-2">
                               {/* Check if attachment is an image */}
                               {comment.attachmentType?.startsWith("image/") &&
-                              comment.attachmentUrl ? (
+                                comment.attachmentUrl ? (
                                 <div className="space-y-2">
                                   {/* Image preview */}
                                   <div className="relative inline-block">

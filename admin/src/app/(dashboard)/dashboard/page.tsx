@@ -384,32 +384,32 @@ export default function Dashboard() {
                             </div>
                         ) : (
                             <>
-                                <ChartContainer config={chartConfig} className="h-[300px]">
-                                    <ResponsiveContainer width="100%" height="100%">
-                                        <PieChart>
-                                            <Pie
-                                                data={dashboardStats.taskStatusData}
-                                                cx="50%"
-                                                cy="50%"
-                                                innerRadius={60}
-                                                outerRadius={100}
-                                                paddingAngle={5}
-                                                dataKey="value"
-                                            >
-                                                {dashboardStats.taskStatusData.map((entry, index) => (
-                                                    <Cell key={`cell-${index}`} fill={entry.color} />
-                                                ))}
-                                            </Pie>
-                                            <ChartTooltip content={<ChartTooltipContent />} />
-                                        </PieChart>
-                                    </ResponsiveContainer>
-                                </ChartContainer>
+                                <div className="h-[300px] flex items-center justify-center">
+                                    <ChartContainer config={chartConfig} className="w-full h-full">
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <PieChart>
+                                                <Pie
+                                                    data={dashboardStats.taskStatusData}
+                                                    cx="50%"
+                                                    cy="50%"
+                                                    innerRadius={60}
+                                                    outerRadius={100}
+                                                    paddingAngle={5}
+                                                    dataKey="value"
+                                                >
+                                                    {dashboardStats.taskStatusData.map((entry, index) => (
+                                                        <Cell key={`cell-${index}`} fill={entry.color} />
+                                                    ))}
+                                                </Pie>
+                                                <ChartTooltip content={<ChartTooltipContent />} />
+                                            </PieChart>
+                                        </ResponsiveContainer>
+                                    </ChartContainer>
+                                </div>
+
                                 <div className="grid grid-cols-2 gap-2 mt-4">
                                     {dashboardStats.taskStatusData.map((item) => (
-                                        <div
-                                            key={item.name}
-                                            className="flex items-center space-x-2"
-                                        >
+                                        <div key={item.name} className="flex items-center space-x-2">
                                             <div
                                                 className="w-3 h-3 rounded-full"
                                                 style={{ backgroundColor: item.color }}
@@ -423,6 +423,7 @@ export default function Dashboard() {
                             </>
                         )}
                     </CardContent>
+
                 </Card>
 
                 {/* Monthly Tasks Trend */}
@@ -433,43 +434,50 @@ export default function Dashboard() {
                             Tasks created vs completed over time
                         </CardDescription>
                     </CardHeader>
-                    <CardContent>
-                        <ChartContainer config={chartConfig} className="h-[300px]">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <LineChart data={monthlyTasksData}>
-                                    <CartesianGrid strokeDasharray="3 3" />
-                                    <XAxis dataKey="month" />
-                                    <YAxis />
-                                    <ChartTooltip content={<ChartTooltipContent />} />
-                                    <Line
-                                        type="monotone"
-                                        dataKey="completed"
-                                        stroke="var(--color-completed)"
-                                        strokeWidth={3}
-                                        dot={{
-                                            fill: "var(--color-completed)",
-                                            strokeWidth: 2,
-                                            r: 4,
-                                        }}
-                                    />
-                                    <Line
-                                        type="monotone"
-                                        dataKey="created"
-                                        stroke="var(--color-created)"
-                                        strokeWidth={3}
-                                        dot={{ fill: "var(--color-created)", strokeWidth: 2, r: 4 }}
-                                    />
-                                </LineChart>
-                            </ResponsiveContainer>
-                        </ChartContainer>
+                    <CardContent className="overflow-x-auto">
+                        <div className="w-full h-[300px]">
+                            <ChartContainer config={chartConfig} className="w-full h-full">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <LineChart data={monthlyTasksData}>
+                                        <CartesianGrid strokeDasharray="3 3" />
+                                        <XAxis dataKey="month" />
+                                        <YAxis />
+                                        <ChartTooltip content={<ChartTooltipContent />} />
+                                        <Line
+                                            type="monotone"
+                                            dataKey="completed"
+                                            stroke="var(--color-completed)"
+                                            strokeWidth={3}
+                                            dot={{
+                                                fill: "var(--color-completed)",
+                                                strokeWidth: 2,
+                                                r: 4,
+                                            }}
+                                        />
+                                        <Line
+                                            type="monotone"
+                                            dataKey="created"
+                                            stroke="var(--color-created)"
+                                            strokeWidth={3}
+                                            dot={{
+                                                fill: "var(--color-created)",
+                                                strokeWidth: 2,
+                                                r: 4,
+                                            }}
+                                        />
+                                    </LineChart>
+                                </ResponsiveContainer>
+                            </ChartContainer>
+                        </div>
                     </CardContent>
                 </Card>
+
             </div>
 
             {/* Charts Row 2 */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Agent Performance */}
-                <Card>
+                {/* <Card>
                     <CardHeader>
                         <CardTitle>Top Agent Performance</CardTitle>
                         <CardDescription>Task completion rates by agent</CardDescription>
@@ -488,10 +496,10 @@ export default function Dashboard() {
                             </ResponsiveContainer>
                         </ChartContainer>
                     </CardContent>
-                </Card>
+                </Card> */}
 
                 {/* Client Growth */}
-                <Card>
+                {/* <Card>
                     <CardHeader>
                         <CardTitle>Client Growth Trend</CardTitle>
                         <CardDescription>
@@ -526,7 +534,7 @@ export default function Dashboard() {
                             </ResponsiveContainer>
                         </ChartContainer>
                     </CardContent>
-                </Card>
+                </Card> */}
             </div>
 
             {/* Recent Activity */}

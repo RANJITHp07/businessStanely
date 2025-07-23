@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -189,11 +190,97 @@ export default function TaskDetails() {
   };
 
   if (loading) {
-    return <p>Loading...</p>;
+    return (
+      <div className="container mx-auto p-6 max-w-7xl">
+        {/* Header Skeleton */}
+        <div className="mb-8">
+          <div className="flex flex-col md:flex-row justify-between md:items-center mb-6 md:mb-4">
+            <div>
+              <Skeleton className="h-8 w-40 mb-2" />
+              <Skeleton className="h-5 w-80" />
+            </div>
+            <Skeleton className="h-10 w-32 mt-[20px] md:mt-0" />
+          </div>
+          <Card>
+            <CardContent className="p-6">
+              <div className="space-y-4">
+                <Skeleton className="h-6 w-1/2 mb-2" />
+                <Skeleton className="h-4 w-full mb-4" />
+                <div className="flex flex-col md:flex-row md:items-center gap-4 md:gap-6 p-0 md:p-4 bg-muted/30 rounded-lg">
+                  <Skeleton className="h-4 w-32" />
+                  <Skeleton className="h-4 w-32" />
+                  <Skeleton className="h-4 w-40 md:ml-auto" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+        {/* Tabs Skeleton */}
+        <Skeleton className="h-10 w-full mb-6" />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 space-y-6">
+            <Card>
+              <CardHeader>
+                <Skeleton className="h-6 w-40" />
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <Skeleton className="h-4 w-full mb-2" />
+                <Skeleton className="h-4 w-full mb-2" />
+                <Skeleton className="h-4 w-full mb-2" />
+                <Skeleton className="h-4 w-full" />
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <Skeleton className="h-6 w-40" />
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <Skeleton className="h-4 w-full mb-2" />
+                <Skeleton className="h-4 w-full mb-2" />
+                <Skeleton className="h-4 w-full" />
+              </CardContent>
+            </Card>
+          </div>
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <Skeleton className="h-6 w-40" />
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <Skeleton className="h-4 w-full mb-2" />
+                <Skeleton className="h-3 w-full" />
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <Skeleton className="h-6 w-40" />
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <Skeleton className="h-4 w-32 mb-2" />
+                <Skeleton className="h-4 w-32" />
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   if (!taskData) {
-    return <p>Task not found.</p>;
+    return (
+      <div className="container mx-auto p-6 max-w-7xl">
+        <Skeleton className="h-10 w-1/2 mb-6" />
+        <Card>
+          <CardContent className="p-6">
+            <Skeleton className="h-6 w-1/3 mb-2" />
+            <Skeleton className="h-4 w-full mb-4" />
+          </CardContent>
+        </Card>
+        <p className="text-center text-muted-foreground mt-8">
+          Task not found.
+        </p>
+      </div>
+    );
   }
 
   return (
@@ -543,7 +630,7 @@ export default function TaskDetails() {
                             <div className="mt-2">
                               {/* Check if attachment is an image */}
                               {comment.attachmentType?.startsWith("image/") &&
-                                comment.attachmentUrl ? (
+                              comment.attachmentUrl ? (
                                 <div className="space-y-2">
                                   {/* Image preview */}
                                   <div className="relative inline-block">

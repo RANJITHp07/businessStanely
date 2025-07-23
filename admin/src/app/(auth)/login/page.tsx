@@ -18,6 +18,8 @@ import { Label } from "@/components/ui/label";
 import { toast } from "react-toastify";
 import { Eye, EyeOff, LogIn } from "lucide-react";
 import { useAuthRedirect } from "@/hooks/useAuth";
+import Image from "next/image";
+import logo from "../../../../public/Logo.jpg"
 
 export default function LoginPage() {
   const router = useRouter();
@@ -104,8 +106,14 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <Card className="w-full max-w-md">
+    <div className="min-h-screen w-full flex items-center justify-center bg-[rgb(0,52,89)] py-12 px-4 sm:px-6 lg:px-8 relative">
+      
+      {/* Logo at top-left corner */}
+      <div className="absolute top-4 bg-[white] left-4">
+      <Image className="h-[50px] w-[220px]" src={logo} alt="logo" />
+      </div>
+  
+      <Card className=" mt-[150px] md:mt-[0px]  w-full max-w-md">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl font-bold">Sign In</CardTitle>
           <CardDescription>
@@ -238,4 +246,5 @@ export default function LoginPage() {
       </Card>
     </div>
   );
+  
 }

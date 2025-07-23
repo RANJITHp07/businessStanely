@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { ArrowLeft, Edit, Trash2, User, Building2 } from 'lucide-react';
+import { Skeleton } from "@/components/ui/skeleton";
 
 import { Client } from '@/types';
 
@@ -39,9 +40,7 @@ export default function ClientDetailsPage() {
         fetchClient();
     }, [id]);
 
-    if (loading) {
-        return <div>Loading...</div>;
-    }
+  
 
     if (!client) {
         return notFound();

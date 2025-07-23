@@ -16,7 +16,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "react-toastify";
 import { ArrowLeft, Mail } from "lucide-react";
-
+import Image from "next/image";
+import logo from "../../../../public/Logo.jpg"
 export default function ForgotPasswordPage() {
     const [email, setEmail] = useState("");
     const [isLoading, setIsLoading] = useState(false);
@@ -175,8 +176,13 @@ export default function ForgotPasswordPage() {
     }
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 w-full px-4 sm:px-6 lg:px-8">
-            <Card className="w-full max-w-md">
+        <div className="min-h-screen w-full flex items-center justify-center bg-[rgb(0,52,89)] py-12 px-4 sm:px-6 lg:px-8 relative">
+          <div className="absolute top-4 bg-[white] left-4">
+          <Image className="h-[50px] w-[220px]" src={logo} alt="logo" />
+          </div>
+         
+         
+      <Card className=" mt-[150px] md:mt-[0px]  w-full max-w-md">
                 <CardHeader className="text-center">
                     <CardTitle className="text-2xl font-bold">Forgot Password</CardTitle>
                     <CardDescription>

@@ -33,7 +33,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-
+import Image from "next/image";
+import Logo from "./../../public/Logo.jpg"
 // Menu items.
 const items = [
   {
@@ -94,8 +95,8 @@ export function AppSidebar() {
       <Sidebar>
         <SidebarContent>
           <SidebarGroup>
-            <SidebarGroupLabel className="text-xl mb-5 text-white Camelcase">
-              Business Stanely
+            <SidebarGroupLabel className="mt-[10px] ">
+             <Image  src={Logo} alt="logo" />
             </SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
@@ -121,7 +122,7 @@ export function AppSidebar() {
                 <SidebarMenuItem>
                   <SidebarMenuButton
                     onClick={() => setShowLogoutDialog(true)}
-                    className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                    className="text-red-600 cursor-pointer hover:text-red-700 hover:bg-red-50"
                   >
                     <LogOut />
                     <span className="text-[16px]">Logout</span>

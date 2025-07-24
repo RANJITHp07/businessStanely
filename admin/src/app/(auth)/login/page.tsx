@@ -19,7 +19,7 @@ import { toast } from "react-toastify";
 import { Eye, EyeOff, LogIn } from "lucide-react";
 import { useAuthRedirect } from "@/hooks/useAuth";
 import Image from "next/image";
-import logo from "../../../../public/Logo.jpg"
+import logo from "../../../../public/Logo.jpg";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -37,7 +37,6 @@ export default function LoginPage() {
     password: "",
   });
 
-  // Clear field errors when user starts typing
   const clearFieldError = (field: string) => {
     if (fieldErrors[field as keyof typeof fieldErrors]) {
       setFieldErrors((prev) => ({ ...prev, [field]: "" }));
@@ -46,11 +45,8 @@ export default function LoginPage() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    // Clear previous errors
     setFieldErrors({ username: "", email: "", password: "" });
 
-    // Basic client-side validation - just check if fields are provided
     if (!password || (!username && !email)) {
       const errorMessage = "Please fill in all required fields";
       toast(errorMessage);
@@ -75,20 +71,15 @@ export default function LoginPage() {
       const data = await response.json();
 
       if (!response.ok) {
-        // For login, show generic error and highlight all credential fields
         const errorMessage = data.error || "Login failed. Please try again.";
-
-        // Highlight all credential fields to indicate the issue could be with any of them
         setFieldErrors({
           username: "Please check your credentials",
           email: "Please check your credentials",
           password: "Please check your credentials",
         });
-
         throw new Error(errorMessage);
       }
 
-      // Store token and user data in localStorage
       localStorage.setItem("token", data.token);
       localStorage.setItem("user", JSON.stringify(data.user));
 
@@ -106,15 +97,16 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center bg-[rgb(0,52,89)] py-12 px-4 sm:px-6 lg:px-8 relative">
+    <div className="min-h-screen w-full flex items-center justify-center bg-[#e3f2fd] py-12 px-4 sm:px-6 lg:px-8 relative">
       
-      {/* Logo at top-left corner */}
-      <div className="absolute top-4 bg-[white] left-4">
-      <Image className="h-[50px] w-[220px]" src={logo} alt="logo" />
-      </div>
-  
-      <Card className=" mt-[150px] md:mt-[0px]  w-full max-w-md">
-        <CardHeader className="text-center">
+      {/* Removed absolute top-left logo */}
+
+      <Card className="mt-[150px] md:mt-[0px] w-full max-w-md">
+        <CardHeader className="text-center space-y-4">
+          {/* Centered logo inside the card */}
+          <div className="flex justify-center">
+            <Image src={logo} alt="logo" className="h-[50px] w-[220px]" />
+          </div>
           <CardTitle className="text-2xl font-bold">Sign In</CardTitle>
           <CardDescription>
             Enter your credentials to access your account
@@ -246,5 +238,4 @@ export default function LoginPage() {
       </Card>
     </div>
   );
-  
 }

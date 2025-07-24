@@ -191,176 +191,158 @@ export default function Dashboard() {
 
             {/* Stats Cards */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-    {/* Agents Card - Dark Blue Background */}
-    <Card className="bg-gradient-to-br from-blue-700 to-blue-800 text-white border-0">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-[20px] font-medium text-white">Total Agents</CardTitle>
-            <Users className="h-[35px] w-[35px] lg:h-[50px] lg:w-[50px] text-blue-200" />
-        </CardHeader>
-        <CardContent>
-            {loading ? (
-                <div className="animate-pulse">
-                    <div className="h-8 bg-blue-600 rounded w-16 mb-3"></div>
-                    <div className="h-4 bg-blue-600 rounded w-full mb-2"></div>
-                    <div className="h-4 bg-blue-600 rounded w-3/4"></div>
-                </div>
+  {/* Agents Card - Slate Blue */}
+  <Card className="bg-[#1e293b] text-white border-0 shadow-md">
+    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+      <CardTitle className="text-[20px] font-medium text-white">Total Agents</CardTitle>
+      <Users className="h-[35px] w-[35px] lg:h-[50px] lg:w-[50px] text-blue-400" />
+    </CardHeader>
+    <CardContent>
+      {loading ? (
+        <div className="animate-pulse">
+          <div className="h-8 bg-blue-700 rounded w-16 mb-3"></div>
+          <div className="h-4 bg-blue-700 rounded w-full mb-2"></div>
+          <div className="h-4 bg-blue-700 rounded w-3/4"></div>
+        </div>
+      ) : (
+        <>
+          <div className="text-[30px] font-bold text-white">
+            {dashboardStats.agents.total}
+          </div>
+          <div className="flex items-center space-x-2 text-xs mt-2">
+            <Badge className="bg-green-600/20 text-green-300 border-green-400/30">
+              {dashboardStats.agents.active} Active
+            </Badge>
+            <Badge className="bg-gray-600/20 text-gray-300 border-gray-400/30">
+              {dashboardStats.agents.inactive} Inactive
+            </Badge>
+          </div>
+          <div className="flex items-center mt-2">
+            {dashboardStats.agents.growth >= 0 ? (
+              <>
+                <TrendingUp className="h-3 w-3 text-green-300 mr-1" />
+                <span className="text-xs text-green-300">
+                  +{dashboardStats.agents.growth}% from last month
+                </span>
+              </>
             ) : (
-                <>
-                    <div className="text-[24px] md:text-[30px] font-bold text-white">
-                        {dashboardStats.agents.total}
-                    </div>
-                    <div className="flex items-center space-x-2 text-xs mt-2">
-                        <Badge
-                            variant="outline"
-                            className="text-green-100 border-green-300 bg-green-500/20"
-                        >
-                            {dashboardStats.agents.active} Active
-                        </Badge>
-                        <Badge
-                            variant="outline"
-                            className="text-gray-100 border-gray-300 bg-gray-500/20"
-                        >
-                            {dashboardStats.agents.inactive} Inactive
-                        </Badge>
-                    </div>
-                    <div className="flex items-center mt-2">
-                        {dashboardStats.agents.growth >= 0 ? (
-                            <>
-                                <TrendingUp className="h-3 w-3 text-green-200 mr-1" />
-                                <span className="text-xs text-green-200">
-                                    +{dashboardStats.agents.growth}% from last month
-                                </span>
-                            </>
-                        ) : (
-                            <>
-                                <TrendingDown className="h-3 w-3 text-red-200 mr-1" />
-                                <span className="text-xs text-red-200">
-                                    {dashboardStats.agents.growth}% from last month
-                                </span>
-                            </>
-                        )}
-                    </div>
-                </>
+              <>
+                <TrendingDown className="h-3 w-3 text-red-300 mr-1" />
+                <span className="text-xs text-red-300">
+                  {dashboardStats.agents.growth}% from last month
+                </span>
+              </>
             )}
-        </CardContent>
-    </Card>
+          </div>
+        </>
+      )}
+    </CardContent>
+  </Card>
 
-    {/* Clients Card - Dark Purple Background */}
-    <Card className="bg-gradient-to-br from-purple-700 to-purple-800 text-white border-0">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-[20px] font-medium text-white">Total Clients</CardTitle>
-            <UserCheck className="h-[35px] w-[35px] lg:h-[50px] lg:w-[50px] text-purple-200" />
-        </CardHeader>
-        <CardContent>
-            {loading ? (
-                <div className="animate-pulse">
-                    <div className="h-8 bg-purple-600 rounded w-16 mb-3"></div>
-                    <div className="h-4 bg-purple-600 rounded w-full mb-2"></div>
-                    <div className="h-4 bg-purple-600 rounded w-3/4"></div>
-                </div>
+  {/* Clients Card - Dark Indigo */}
+  <Card className="bg-[#1e1b4b] text-white border-0 shadow-md">
+    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+      <CardTitle className="text-[20px] font-medium text-white">Total Clients</CardTitle>
+      <UserCheck className="h-[35px] w-[35px] lg:h-[50px] lg:w-[50px] text-indigo-300" />
+    </CardHeader>
+    <CardContent>
+      {loading ? (
+        <div className="animate-pulse">
+          <div className="h-8 bg-indigo-700 rounded w-16 mb-3"></div>
+          <div className="h-4 bg-indigo-700 rounded w-full mb-2"></div>
+          <div className="h-4 bg-indigo-700 rounded w-3/4"></div>
+        </div>
+      ) : (
+        <>
+          <div className="text-[30px] font-bold text-white">
+            {dashboardStats.clients.total}
+          </div>
+          <div className="flex items-center space-x-2 text-xs mt-2">
+            <Badge className="bg-blue-600/20 text-blue-300 border-blue-400/30">
+              <User className="h-3 w-3 mr-1" />
+              {dashboardStats.clients.individual} Individual
+            </Badge>
+            <Badge className="bg-pink-600/20 text-pink-300 border-pink-400/30">
+              <Building2 className="h-3 w-3 mr-1" />
+              {dashboardStats.clients.organization} Org
+            </Badge>
+          </div>
+          <div className="flex items-center mt-2">
+            {dashboardStats.clients.growth >= 0 ? (
+              <>
+                <TrendingUp className="h-3 w-3 text-green-300 mr-1" />
+                <span className="text-xs text-green-300">
+                  +{dashboardStats.clients.growth}% from last month
+                </span>
+              </>
             ) : (
-                <>
-                    <div className="text-[24px] md:text-[30px] font-bold text-white">
-                        {dashboardStats.clients.total}
-                    </div>
-                    <div className="flex items-center space-x-2 text-xs mt-2">
-                        <Badge
-                            variant="outline"
-                            className="text-blue-100 border-blue-300 bg-blue-500/20"
-                        >
-                            <User className="h-3 w-3 mr-1" />
-                            {dashboardStats.clients.individual} Individual
-                        </Badge>
-                        <Badge
-                            variant="outline"
-                            className="text-pink-100 border-pink-300 bg-pink-500/20"
-                        >
-                            <Building2 className="h-3 w-3 mr-1" />
-                            {dashboardStats.clients.organization} Org
-                        </Badge>
-                    </div>
-                    <div className="flex items-center mt-2">
-                        {dashboardStats.clients.growth >= 0 ? (
-                            <>
-                                <TrendingUp className="h-3 w-3 text-green-200 mr-1" />
-                                <span className="text-xs text-green-200">
-                                    +{dashboardStats.clients.growth}% from last month
-                                </span>
-                            </>
-                        ) : (
-                            <>
-                                <TrendingDown className="h-3 w-3 text-red-200 mr-1" />
-                                <span className="text-xs text-red-200">
-                                    {dashboardStats.clients.growth}% from last month
-                                </span>
-                            </>
-                        )}
-                    </div>
-                </>
+              <>
+                <TrendingDown className="h-3 w-3 text-red-300 mr-1" />
+                <span className="text-xs text-red-300">
+                  {dashboardStats.clients.growth}% from last month
+                </span>
+              </>
             )}
-        </CardContent>
-    </Card>
+          </div>
+        </>
+      )}
+    </CardContent>
+  </Card>
 
-    {/* Tasks Card - Dark Green Background */}
-    <Card className="bg-gradient-to-br from-green-700 to-green-800 text-white border-0">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-[20px] font-medium text-white">Total Tasks</CardTitle>
-            <FileText className="h-[35px] w-[35px] lg:h-[50px] lg:w-[50px] text-green-200" />
-        </CardHeader>
-        <CardContent>
-            {loading ? (
-                <div className="animate-pulse">
-                    <div className="h-8 bg-green-600 rounded w-16 mb-3"></div>
-                    <div className="h-4 bg-green-600 rounded w-full mb-2"></div>
-                    <div className="h-4 bg-green-600 rounded w-3/4"></div>
-                </div>
+  {/* Tasks Card - Deep Dark Teal */}
+  <Card className="bg-[#0f3f3c] text-white border-0 shadow-md">
+    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+      <CardTitle className="text-[20px] font-medium text-white">Total Tasks</CardTitle>
+      <FileText className="h-[35px] w-[35px] lg:h-[50px] lg:w-[50px] text-teal-300" />
+    </CardHeader>
+    <CardContent>
+      {loading ? (
+        <div className="animate-pulse">
+          <div className="h-8 bg-teal-700 rounded w-16 mb-3"></div>
+          <div className="h-4 bg-teal-700 rounded w-full mb-2"></div>
+          <div className="h-4 bg-teal-700 rounded w-3/4"></div>
+        </div>
+      ) : (
+        <>
+          <div className="text-[30px] font-bold text-white">
+            {dashboardStats.tasks.total}
+          </div>
+          <div className="flex items-center space-x-2 text-xs mt-2">
+            <Badge className="bg-emerald-600/20 text-emerald-300 border-emerald-400/30">
+              {dashboardStats.tasks.completed} Done
+            </Badge>
+            <Badge className="bg-blue-600/20 text-blue-300 border-blue-400/30">
+              {dashboardStats.tasks.inProgress} Active
+            </Badge>
+            <Badge className="bg-red-600/20 text-red-300 border-red-400/30">
+              {dashboardStats.tasks.overdue} Overdue
+            </Badge>
+          </div>
+          <div className="flex items-center mt-2">
+            {dashboardStats.tasks.growth >= 0 ? (
+              <>
+                <TrendingUp className="h-3 w-3 text-green-300 mr-1" />
+                <span className="text-xs text-green-300">
+                  +{dashboardStats.tasks.growth}% from last month
+                </span>
+              </>
             ) : (
-                <>
-                    <div className="text-[24px] md:text-[30px] font-bold text-white">
-                        {dashboardStats.tasks.total}
-                    </div>
-                    <div className="flex items-center space-x-1 text-xs mt-2">
-                        <Badge
-                            variant="outline"
-                            className="text-emerald-100 border-emerald-300 bg-emerald-500/20"
-                        >
-                            {dashboardStats.tasks.completed} Done
-                        </Badge>
-                        <Badge
-                            variant="outline"
-                            className="text-blue-100 border-blue-300 bg-blue-500/20"
-                        >
-                            {dashboardStats.tasks.inProgress} Active
-                        </Badge>
-                        <Badge
-                            variant="outline"
-                            className="text-red-100 border-red-300 bg-red-500/20"
-                        >
-                            {dashboardStats.tasks.overdue} Overdue
-                        </Badge>
-                    </div>
-                    <div className="flex items-center mt-2">
-                        {dashboardStats.tasks.growth >= 0 ? (
-                            <>
-                                <TrendingUp className="h-3 w-3 text-green-200 mr-1" />
-                                <span className="text-xs text-green-200">
-                                    +{dashboardStats.tasks.growth}% from last month
-                                </span>
-                            </>
-                        ) : (
-                            <>
-                                <TrendingDown className="h-3 w-3 text-red-200 mr-1" />
-                                <span className="text-xs text-red-200">
-                                    {dashboardStats.tasks.growth}% from last month
-                                </span>
-                            </>
-                        )}
-                    </div>
-                </>
+              <>
+                <TrendingDown className="h-3 w-3 text-red-300 mr-1" />
+                <span className="text-xs text-red-300">
+                  {dashboardStats.tasks.growth}% from last month
+                </span>
+              </>
             )}
-        </CardContent>
-    </Card>
+          </div>
+        </>
+      )}
+    </CardContent>
+  </Card>
 </div>
+
+
+
 
             {/* Charts Row 1 */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

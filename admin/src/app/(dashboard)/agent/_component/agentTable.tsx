@@ -380,15 +380,16 @@ export default function AgentsTable() {
   <CardContent>
           <div className="rounded-md border">
             <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Agent</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Specializations</TableHead>
-                  <TableHead>Jurisdiction</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
+            <TableHeader>
+  <TableRow isHeader>
+    <TableHead>Agent</TableHead>
+    <TableHead>Type</TableHead>
+    <TableHead>Specializations</TableHead>
+    <TableHead>Jurisdiction</TableHead>
+    <TableHead className="text-right">Actions</TableHead>
+  </TableRow>
+</TableHeader>
+
               <TableBody>
                 {currentAgents.length === 0 ? (
                   <TableRow>

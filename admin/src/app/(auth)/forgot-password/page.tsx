@@ -18,6 +18,7 @@ import { toast } from "react-toastify";
 import { ArrowLeft, Mail } from "lucide-react";
 import Image from "next/image";
 import logo from "../../../../public/Logo.jpg"
+
 export default function ForgotPasswordPage() {
     const [email, setEmail] = useState("");
     const [isLoading, setIsLoading] = useState(false);
@@ -25,7 +26,6 @@ export default function ForgotPasswordPage() {
     const [resendCooldown, setResendCooldown] = useState(0);
     const [canResend, setCanResend] = useState(true);
 
-    // Countdown timer for resend functionality
     useEffect(() => {
         let timer: NodeJS.Timeout;
         if (resendCooldown > 0) {
@@ -50,7 +50,6 @@ export default function ForgotPasswordPage() {
     const handleSendOTP = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        // Validate email format
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(email)) {
             toast("Please enter a valid email address.");
@@ -78,7 +77,7 @@ export default function ForgotPasswordPage() {
             }
 
             setIsEmailSent(true);
-            startResendCooldown(60); // Start 60-second cooldown
+            startResendCooldown(60);
             toast("OTP sent to your email address.");
         } catch (error: unknown) {
             const errorMessage =
@@ -113,7 +112,7 @@ export default function ForgotPasswordPage() {
                 throw new Error(data.error || "Failed to resend OTP");
             }
 
-            startResendCooldown(60); // Start 60-second cooldown after successful resend
+            startResendCooldown(60);
             toast("OTP has been sent again.");
         } catch (error: unknown) {
             const errorMessage =
@@ -128,7 +127,7 @@ export default function ForgotPasswordPage() {
 
     if (isEmailSent) {
         return (
-            <div className="min-h-screen w-full flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+            <div className="min-h-screen w-full flex items-center justify-center bg-[#e3f2fd] py-12 px-4 sm:px-6 lg:px-8">
                 <Card className="w-full max-w-md">
                     <CardHeader className="text-center">
                         <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-green-100">
@@ -176,14 +175,14 @@ export default function ForgotPasswordPage() {
     }
 
     return (
-        <div className="min-h-screen w-full flex items-center justify-center bg-[rgb(0,52,89)] py-12 px-4 sm:px-6 lg:px-8 relative">
-          <div className="absolute top-4 bg-[white] left-4">
-          <Image className="h-[50px] w-[220px]" src={logo} alt="logo" />
-          </div>
-         
-         
-      <Card className=" mt-[150px] md:mt-[0px]  w-full max-w-md">
-                <CardHeader className="text-center">
+        <div className="min-h-screen w-full flex items-center justify-center bg-[#e3f2fd] py-12 px-4 sm:px-6 lg:px-8 relative">
+            {/* Removed absolute logo at top-left */}
+            <Card className="mt-[150px] md:mt-[0px] w-full max-w-md">
+                <CardHeader className="text-center space-y-4">
+                    {/* Centered logo inside the card */}
+                    <div className="flex justify-center">
+                        <Image className="h-[50px] w-[220px]" src={logo} alt="logo" />
+                    </div>
                     <CardTitle className="text-2xl font-bold">Forgot Password</CardTitle>
                     <CardDescription>
                         Enter your email address and we&apos;ll send you an OTP to reset

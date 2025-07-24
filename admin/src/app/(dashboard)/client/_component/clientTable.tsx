@@ -401,15 +401,16 @@ export default function ClientsTable() {
   <CardContent>
   <div className="rounded-md border">
       <Table>
-          <TableHeader>
-              <TableRow>
-                  <TableHead>Client</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Contact Info</TableHead>
-                  <TableHead>Communication</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-          </TableHeader>
+      <TableHeader>
+  <TableRow>
+    <TableHead>Client</TableHead>
+    <TableHead>Type</TableHead>
+    <TableHead>Contact Info</TableHead>
+    <TableHead>Communication</TableHead>
+    <TableHead className="text-right">Actions</TableHead>
+  </TableRow>
+</TableHeader>
+
           <TableBody>
               {currentClients.length === 0 ? (
                   <TableRow>

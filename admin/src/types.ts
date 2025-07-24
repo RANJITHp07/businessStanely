@@ -60,11 +60,17 @@ export interface Comment {
   updatedAt: string;
   taskId: string;
   authorId: string;
+  authorType: "USER" | "AGENT";
   attachmentName?: string;
   attachmentUrl?: string;
   attachmentSize?: number;
   attachmentType?: string;
-  author: {
+  user?: {
+    id: string;
+    username: string;
+    email: string;
+  };
+  agent?: {
     id: string;
     name: string;
     email: string;

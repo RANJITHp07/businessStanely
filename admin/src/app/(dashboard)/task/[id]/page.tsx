@@ -13,8 +13,8 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -43,6 +43,23 @@ export default function TaskDetails() {
   const [newComment, setNewComment] = useState("");
   const [submittingComment, setSubmittingComment] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [currentUser, setCurrentUser] = useState<{
+    username: string;
+    id: string;
+  } | null>(null);
+
+  // Load user data on mount
+  useEffect(() => {
+    const userStr = localStorage.getItem("user");
+    if (userStr) {
+      try {
+        const userData = JSON.parse(userStr);
+        setCurrentUser(userData);
+      } catch (err) {
+        console.error("Error parsing user data:", err);
+      }
+    }
+  }, []);
   const params = useParams();
   const { id } = params;
 
@@ -132,8 +149,9 @@ export default function TaskDetails() {
 
     setSubmittingComment(true);
     try {
-      const authorId =
-        taskData.assignedTo?.id || taskData.createdBy?.id || "placeholder-id";
+      if (!currentUser?.id) {
+        throw new Error("User not logged in");
+      }
 
       let attachmentData = {};
 
@@ -161,29 +179,43 @@ export default function TaskDetails() {
         }
       }
 
-      const response = await fetch("/api/comments", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          content: newComment,
-          taskId: id,
-          authorId: authorId,
-          ...attachmentData,
-        }),
-      });
+      try {
+        const response = await fetch("/api/comments", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            content: newComment,
+            taskId: id,
+            authorId: currentUser.id,
+            ...attachmentData,
+          }),
+        });
 
-      if (response.ok) {
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || "Failed to add comment");
+        }
+
         const newCommentData = await response.json();
         setComments((prev) => [newCommentData, ...prev]);
         setNewComment("");
         setSelectedFile(null);
-      } else {
-        console.error("Failed to add comment");
+      } catch (error) {
+        console.error(
+          "Failed to add comment:",
+          error instanceof Error ? error.message : "Unknown error"
+        );
+        // You might want to show an error message to the user here
+        // For example, using a toast notification
       }
     } catch (error) {
-      console.error("Error adding comment:", error);
+      console.error(
+        "Error in comment submission:",
+        error instanceof Error ? error.message : "Unknown error"
+      );
+      // Handle file upload or other errors
     } finally {
       setSubmittingComment(false);
     }
@@ -541,7 +573,18 @@ export default function TaskDetails() {
               <div className="space-y-4">
                 <div className="flex items-start gap-3">
                   <Avatar className="h-8 w-8">
-                    <AvatarFallback className="text-xs">JS</AvatarFallback>
+                    <AvatarFallback className="text-xs">
+                      {(() => {
+                        const userStr = localStorage.getItem("user");
+                        if (!userStr) return "U";
+                        try {
+                          const user = JSON.parse(userStr);
+                          return user?.username?.[0]?.toUpperCase() || "U";
+                        } catch {
+                          return "U";
+                        }
+                      })()}
+                    </AvatarFallback>
                   </Avatar>
                   <div className="flex-1 space-y-2">
                     <Textarea
@@ -610,16 +653,22 @@ export default function TaskDetails() {
                       >
                         <Avatar className="h-8 w-8">
                           <AvatarFallback className="text-xs">
-                            {comment.author.name
-                              .split(" ")
-                              .map((n) => n[0])
-                              .join("")}
+                            {comment.authorType === "USER"
+                              ? comment.user?.username
+                                  ?.charAt(0)
+                                  .toUpperCase() || "U"
+                              : comment.agent?.name
+                                  ?.split(" ")
+                                  .map((n) => n[0])
+                                  .join("") || "A"}
                           </AvatarFallback>
                         </Avatar>
                         <div className="flex-1 space-y-1">
                           <div className="flex items-center gap-2">
                             <span className="font-medium text-sm">
-                              {comment.author.name}
+                              {comment.authorType === "USER"
+                                ? comment.user?.username
+                                : comment.agent?.name}
                             </span>
                             <span className="text-xs text-muted-foreground">
                               {formatDateTime(comment.createdAt)}

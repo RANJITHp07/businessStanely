@@ -6,18 +6,14 @@ import { useRouter } from "next/navigation";
 export default function RootPage() {
   const router = useRouter();
 
-  useEffect(() => {
-    const timeout = setTimeout(() => {
-      const token = localStorage.getItem("token");
-      if (token) {
-        router.replace("/dashboard");
-      } else {
-        router.replace("/login");
-      }
-    }, 10000); // 10 seconds = 10000 ms
-
-    return () => clearTimeout(timeout); // Clean up if component unmounts early
-  }, [router]);
+useEffect(() => {
+  const token = localStorage.getItem("token");
+  if (token) {
+    router.replace("/dashboard");
+  } else {
+    router.replace("/login");
+  }
+}, [router]);
 
   return (
     <div className="flex flex-col items-center w-full justify-center min-h-screen bg-white">

@@ -15,8 +15,6 @@ import {
     ChartTooltipContent,
 } from "@/components/ui/chart";
 import {
-    BarChart,
-    Bar,
     XAxis,
     YAxis,
     CartesianGrid,
@@ -26,8 +24,6 @@ import {
     Cell,
     LineChart,
     Line,
-    AreaChart,
-    Area,
 } from "recharts";
 import {
     Users,
@@ -84,22 +80,22 @@ const monthlyTasksData = [
     { month: "Jun", completed: 67, created: 59 },
 ];
 
-const agentPerformanceData = [
-    { name: "John Smith", tasks: 28, completed: 25 },
-    { name: "Sarah Johnson", tasks: 24, completed: 22 },
-    { name: "Michael Brown", tasks: 19, completed: 16 },
-    { name: "Emily Davis", tasks: 15, completed: 14 },
-    { name: "Robert Wilson", tasks: 12, completed: 10 },
-];
+// const agentPerformanceData = [
+//     { name: "John Smith", tasks: 28, completed: 25 },
+//     { name: "Sarah Johnson", tasks: 24, completed: 22 },
+//     { name: "Michael Brown", tasks: 19, completed: 16 },
+//     { name: "Emily Davis", tasks: 15, completed: 14 },
+//     { name: "Robert Wilson", tasks: 12, completed: 10 },
+// ];
 
-const clientGrowthData = [
-    { month: "Jan", individual: 85, organization: 45 },
-    { month: "Feb", individual: 88, organization: 47 },
-    { month: "Mar", individual: 92, organization: 50 },
-    { month: "Apr", individual: 95, organization: 53 },
-    { month: "May", individual: 96, organization: 56 },
-    { month: "Jun", individual: 98, organization: 58 },
-];
+// const clientGrowthData = [
+//     { month: "Jan", individual: 85, organization: 45 },
+//     { month: "Feb", individual: 88, organization: 47 },
+//     { month: "Mar", individual: 92, organization: 50 },
+//     { month: "Apr", individual: 95, organization: 53 },
+//     { month: "May", individual: 96, organization: 56 },
+//     { month: "Jun", individual: 98, organization: 58 },
+// ];
 
 const recentActivities = [
     {

@@ -28,7 +28,7 @@ export default function RootLayout({
               </div>
             </div>
 
-            <div className="w-full min-h-screen flex-1 bg-[#e3f2fd]">{children}</div>
+            <div className="w-full  flex-1 bg-[#e3f2fd]">{children}</div>
           </main>
         </SidebarProvider>
         <ToastContainer />

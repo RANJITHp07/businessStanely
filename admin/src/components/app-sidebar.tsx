@@ -36,7 +36,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import Image from "next/image";
-import Logo from "./../../public/Logo.jpg"
+import Logo from "./../../public/Logo.jpg";
 // Menu items.
 const items = [
   {

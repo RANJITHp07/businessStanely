@@ -1,20 +1,54 @@
 'use client'
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Eye, EyeOff, RefreshCw, User, } from "lucide-react"
+import { Eye, EyeOff, RefreshCw, User, Shield } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { toast } from "react-toastify"
 import { Button } from '@/components/ui/button'
 
-function Create({ admin }: any) {
+export interface Admin {
+    id?: string;
+    username: string;
+    email: string;
+    adminType: "owner" | "admin";
+}
+
+interface CreateProps {
+    admin?: Admin;
+}
+function Create({ admin }: CreateProps) {
     const [formData, setFormData] = useState({
-        username: "",
-        email: "",
+        username: admin?.username || "",
+        email: admin?.email || "",
         password: "",
-        role: "Admin",
+        adminType: admin?.adminType || "admin",
     })
     const [showPassword, setShowPassword] = useState(false)
+    const router = useRouter()
+    
+    // Check if the current user is an owner
+    useEffect(() => {
+        const userStr = localStorage.getItem("user")
+        if (userStr) {
+            try {
+                const user = JSON.parse(userStr)
+                if (user.adminType !== "owner") {
+                    // Redirect non-owner users away from this page
+                    toast.error("Only owners can create or edit admins")
+                    router.push("/admin")
+                }
+            } catch (error) {
+                console.error("Error parsing user data:", error)
+                router.push("/admin")
+            }
+        } else {
+            // If user data is not available, redirect to admin page
+            router.push("/admin")
+        }
+    }, [router])
 
 
     const generatePassword = () => {
@@ -26,12 +60,43 @@ function Create({ admin }: any) {
         setFormData((prev) => ({ ...prev, password }))
     }
 
+
     // Handle form submission
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
-        if (!formData.username || !formData.email || !formData.password) {
-            alert("Please fill in all required fields")
+        if (!formData.username || !formData.email || (!admin && !formData.password)) {
+            toast.error("Please fill in all required fields")
             return
+        }
+
+        try {
+            const url = admin 
+                ? `/api/admins/${admin.id}` 
+                : "/api/auth/create-admin"
+            
+            const response = await fetch(url, {
+                method: admin ? "PUT" : "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    username: formData.username,
+                    email: formData.email,
+                    ...(formData.password ? { password: formData.password } : {}),
+                    adminType: formData.adminType
+                }),
+            });
+
+            if (response.ok) {
+                toast.success(`Admin ${admin ? "updated" : "created"} successfully`);
+                router.push("/admin");
+            } else {
+                const error = await response.json();
+                toast.error(error.message || "Something went wrong");
+            }
+        } catch (error) {
+            console.error("Error:", error);
+            toast.error("An unexpected error occurred");
         }
     }
 
@@ -82,23 +147,35 @@ function Create({ admin }: any) {
                         </div>
 
                         <div className="space-y-2 mt-3">
-                            <Label htmlFor="role">Role</Label>
+                            <Label htmlFor="adminType">Admin Type</Label>
                             <Select
-                                value={formData.role}
-                                onValueChange={(value) => setFormData((prev) => ({ ...prev, role: value }))}
+                                value={formData.adminType}
+                                onValueChange={(value: "owner" | "admin") => setFormData((prev) => ({ ...prev, adminType: value }))}
                             >
                                 <SelectTrigger className='w-full'>
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="Owner">Owner</SelectItem>
-                                    <SelectItem value="Admin">Admin</SelectItem>
+                                    <SelectItem value="owner">
+                                        <div className="flex items-center">
+                                            <Shield className="w-4 h-4 mr-2" />
+                                            Owner
+                                        </div>
+                                    </SelectItem>
+                                    <SelectItem value="admin">
+                                        <div className="flex items-center">
+                                            <User className="w-4 h-4 mr-2" />
+                                            Admin
+                                        </div>
+                                    </SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
 
                         <div className="space-y-2">
-                            <Label htmlFor="password">Password *</Label>
+                            <Label htmlFor="password">
+                                Password {admin ? "(Leave blank to keep current password)" : "*"}
+                            </Label>
                             <div className="flex gap-2">
                                 <div className="relative flex-1">
                                     <Input
@@ -106,8 +183,8 @@ function Create({ admin }: any) {
                                         type={showPassword ? "text" : "password"}
                                         value={formData.password}
                                         onChange={(e) => setFormData((prev) => ({ ...prev, password: e.target.value }))}
-                                        placeholder="Enter password"
-                                        required
+                                        placeholder={admin ? "Leave blank to keep current password" : "Enter password"}
+                                        required={!admin}
                                     />
                                     <Button
                                         type="button"
@@ -135,6 +212,7 @@ function Create({ admin }: any) {
                 </Card>
                 <div className="flex justify-end gap-4">
                     <Button
+                        onClick={() => router.push("/admin")}
                         className="bg-[#f42b03] hover:bg-[#f42b03] shadow-none hover:shadow-lg transition-shadow duration-300 text-white hover:text-white cursor-pointer"
                         type="button"
                         variant="outline"

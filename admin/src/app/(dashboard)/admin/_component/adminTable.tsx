@@ -45,9 +45,7 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 
-const adminRoles = ["All Roles", "Super Admin", "Admin", "Manager", "Moderator", "Support"]
-
-const adminStatuses = ["All Status", "active", "inactive"]
+const adminRoles = ["All Roles", "Owner", "Admin", "Manager", "Moderator", "Support"]
 
 export interface Admin {
     id: number
@@ -69,7 +67,7 @@ const mockAdmins: Admin[] = [
         name: "John Smith",
         username: "john_admin",
         email: "john@company.com",
-        role: "Super Admin",
+        role: "Owner",
         status: "active",
         createdAt: "2024-01-15",
         lastLogin: "2024-01-28",
@@ -116,7 +114,7 @@ const mockAdmins: Admin[] = [
         name: "David Brown",
         username: "david_super",
         email: "david@company.com",
-        role: "Super Admin",
+        role: "Owner",
         status: "active",
         createdAt: "2024-02-15",
         lastLogin: "2024-01-28",
@@ -171,15 +169,39 @@ export default function AdminsTable() {
     const [itemsPerPage, setItemsPerPage] = useState(5)
     const [adminToDelete, setAdminToDelete] = useState<Admin | null>(null)
     const [loading, setLoading] = useState(true)
+    const [currentUserRole, setCurrentUserRole] = useState<string>("")
+
+    // Get the current user's role from localStorage
+    useEffect(() => {
+        const userStr = localStorage.getItem("user")
+        if (userStr) {
+            try {
+                const user = JSON.parse(userStr)
+                setCurrentUserRole(user.adminType || "")
+            } catch (error) {
+                console.error("Error parsing user data:", error)
+            }
+        }
+    }, [])
 
     useEffect(() => {
         const fetchAdmins = async () => {
             try {
-                // Simulate API call
-                await new Promise((resolve) => setTimeout(resolve, 1000))
-                setAdmins(mockAdmins)
+                setLoading(true)
+                
+                // Fetch all admins
+                const response = await fetch('/api/admins')
+                
+                if (!response.ok) {
+                    throw new Error('Failed to fetch admins')
+                }
+                
+                const data = await response.json()
+                setAdmins(data)
             } catch (error) {
                 console.error("Error fetching admins:", error)
+                // Use mock data as fallback if API call fails
+                setAdmins(mockAdmins)
             } finally {
                 setLoading(false)
             }
@@ -247,7 +269,16 @@ export default function AdminsTable() {
     const handleDelete = async () => {
         if (!adminToDelete) return
         try {
-            // Simulate API call
+            // Call the API to delete the admin
+            const response = await fetch(`/api/admins/${adminToDelete.id}`, {
+                method: 'DELETE',
+            })
+            
+            if (!response.ok) {
+                throw new Error('Failed to delete admin')
+            }
+            
+            // Update the UI by removing the deleted admin
             setAdmins(admins.filter((admin) => admin.id !== adminToDelete.id))
             setAdminToDelete(null)
         } catch (error) {
@@ -257,24 +288,13 @@ export default function AdminsTable() {
 
     const getAdminRoleBadge = (role: string) => {
         const colors = {
-            "Super Admin": "bg-purple-100 text-purple-800",
+            "Owner": "bg-purple-100 text-purple-800",
             Admin: "bg-blue-100 text-blue-800",
             Manager: "bg-green-100 text-green-800",
             Moderator: "bg-yellow-100 text-yellow-800",
             Support: "bg-orange-100 text-orange-800",
         }
         return <Badge className={colors[role as keyof typeof colors] || "bg-gray-100 text-gray-800"}>{role}</Badge>
-    }
-
-    const getStatusBadge = (status: string) => {
-        return (
-            <Badge
-                variant={status === "active" ? "default" : "secondary"}
-                className={status === "active" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}
-            >
-                {status}
-            </Badge>
-        )
     }
 
     return (
@@ -287,12 +307,14 @@ export default function AdminsTable() {
                             Manage and organize your admin team members
                         </p>
                     </div>
-                    <Link href="/admin/create" className="flex justify-end">
-                        <Button className="mt-[20px] md:mt-none bg-[#003459] hover:bg-[#003459] text-white rounded-lg px-4 py-2 flex items-center gap-2 cursor-pointer shadow-none hover:shadow-md transition-shadow duration-300">
-                            <Plus className="h-4 w-4" />
-                            Create Admin
-                        </Button>
-                    </Link>
+                    {currentUserRole === "owner" && (
+                        <Link href="/admin/create" className="flex justify-end">
+                            <Button className="mt-[20px] md:mt-none bg-[#003459] hover:bg-[#003459] text-white rounded-lg px-4 py-2 flex items-center gap-2 cursor-pointer shadow-none hover:shadow-md transition-shadow duration-300">
+                                <Plus className="h-4 w-4" />
+                                Create Admin
+                            </Button>
+                        </Link>
+                    )}
                 </div>
                 <Card>
                     <CardHeader>
@@ -387,7 +409,7 @@ export default function AdminsTable() {
                                     <SelectValue className="text-black" placeholder="Role" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="super-admin">Super Admin</SelectItem>
+                                    <SelectItem value="owner">Owner</SelectItem>
                                     <SelectItem value="admin">Admin</SelectItem>
                                 </SelectContent>
                             </Select>
@@ -471,17 +493,23 @@ export default function AdminsTable() {
                                                                         View Details
                                                                     </Link>
                                                                 </DropdownMenuItem>
-                                                                <DropdownMenuItem asChild>
-                                                                    <Link href={`/admin/${admin.id}/edit`}>
-                                                                        <Edit className="mr-2 h-4 w-4" />
-                                                                        Edit Admin
-                                                                    </Link>
-                                                                </DropdownMenuItem>
-                                                                <DropdownMenuSeparator />
-                                                                <DropdownMenuItem className="text-destructive" onClick={() => setAdminToDelete(admin)}>
-                                                                    <Trash2 className="mr-2 h-4 w-4" />
-                                                                    Delete Admin
-                                                                </DropdownMenuItem>
+                                                                {currentUserRole === "owner" && (
+                                                                    <DropdownMenuItem asChild>
+                                                                        <Link href={`/admin/${admin.id}/edit`}>
+                                                                            <Edit className="mr-2 h-4 w-4" />
+                                                                            Edit Admin
+                                                                        </Link>
+                                                                    </DropdownMenuItem>
+                                                                )}
+                                                                {currentUserRole === "owner" && (
+                                                                    <>
+                                                                        <DropdownMenuSeparator />
+                                                                        <DropdownMenuItem className="text-destructive" onClick={() => setAdminToDelete(admin)}>
+                                                                            <Trash2 className="mr-2 h-4 w-4" />
+                                                                            Delete Admin
+                                                                        </DropdownMenuItem>
+                                                                    </>
+                                                                )}
                                                             </DropdownMenuContent>
                                                         </DropdownMenu>
                                                     </TableCell>

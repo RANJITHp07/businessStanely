@@ -9,14 +9,19 @@ generator client {
 }
 
 model User {
-  id        String    @id @default(auto()) @map("_id") @db.ObjectId
-  username  String    @unique
-  email     String    @unique
-  password  String
-  name      String? // Added name field for display in comments
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  comments  Comment[] @relation("UserComments")
+  id          String    @id @default(auto()) @map("_id") @db.ObjectId
+  username    String    @unique
+  email       String    @unique
+  password    String
+  name        String? // Added name field for display in comments
+  adminType   String    @default("admin") // Either "owner" or "admin"
+  status      String    @default("active") // "active" or "inactive"
+  photo       String?
+  lastLogin   DateTime?
+  permissions String[]  @default([])
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  comments    Comment[] @relation("UserComments")
 
   // OTP fields for password reset
   resetOtp      String?

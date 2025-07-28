@@ -7,6 +7,8 @@ import {
   Settings,
   UserRoundPen,
   UserSearch,
+  Boxes,
+  ShieldUser
 } from "lucide-react";
 import { useState } from "react";
 import Link from "next/link";
@@ -58,6 +60,16 @@ const items = [
     icon: ClipboardCheck,
   },
   {
+    title: "Task category",
+    url: "/task_category",
+    icon: Boxes,
+  },
+  {
+    title: "Admin",
+    url: "/admin",
+    icon: ShieldUser,
+  },
+  {
     title: "Settings",
     url: "/setting",
     icon: Settings,
@@ -96,7 +108,7 @@ export function AppSidebar() {
         <SidebarContent>
           <SidebarGroup>
             <SidebarGroupLabel className="mt-[10px] ">
-             <Image  src={Logo} alt="logo" />
+              <Image src={Logo} alt="logo" />
             </SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>

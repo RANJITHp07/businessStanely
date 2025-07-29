@@ -1,14 +1,16 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { use } from "react"
+import { toast } from "react-toastify"
+import Link from "next/link"
+
+// UI Components
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { Loader2 } from "lucide-react"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import {
     DropdownMenu,
@@ -18,10 +20,10 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+
+// Icons
 import {
-    ArrowLeft,
-    CheckCircle,
-    X,
+    Loader2,
     MoreHorizontal,
     Edit,
     Trash2,
@@ -37,20 +39,9 @@ import {
     Tag,
     FileText,
 } from "lucide-react"
-import Link from "next/link"
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
 
 export interface TaskCategory {
-    id: number
+    id: string
     name: string
     description: string
     color: string
@@ -59,175 +50,62 @@ export interface TaskCategory {
     createdAt: string
     updatedAt: string
     createdBy: string
+    createdById: string
+    approvedBy?: string | null
+    approvedById?: string | null
+    approvedAt?: string | null
+    rejectedBy?: string | null
+    rejectedById?: string | null
+    rejectedAt?: string | null
+    rejectionReason?: string | null
     photo?: string
 }
 
 
 export interface Task {
-    id: number
+    id: string
     title: string
     description: string
     status: "pending" | "in_progress" | "completed" | "cancelled"
     priority: "low" | "medium" | "high" | "urgent"
-    assignedTo: string
-    assignedBy: string
+    assignedTo: string | UserInfo
+    assignedToId: string
+    assignedBy: string | UserInfo
+    assignedById: string
     dueDate: string
     createdAt: string
     updatedAt: string
-    categoryId: number
+    categoryId: string
+    categoryName?: string
     estimatedHours: number
     actualHours?: number
+    completionPercent?: number
     tags: string[]
     attachments?: string[]
 }
 
 
-// Mock category data
-const mockCategory: TaskCategory = {
-    id: 3,
-    name: "Marketing",
-    description:
-        "Marketing campaigns and promotional activities including social media management, content creation, advertising campaigns, and brand development initiatives.",
-    color: "green",
-    status: "pending",
-    taskCount: 0,
-    createdAt: "2024-01-20",
-    updatedAt: "2024-01-28",
-    createdBy: "Mike Wilson",
-    photo: "/placeholder.svg?height=80&width=80",
+// User type definition for assignedTo and assignedBy
+interface UserInfo {
+    id: string
+    name: string
+    email: string
+    phoneNumber?: string
+    secondaryPhoneNumber?: string
+    agentType?: string
+    barAssociationId?: string
+    jurisdiction?: string
+    specializations?: string[]
+    photo?: string
+    createdAt?: string
+    updatedAt?: string
+    superiorId?: string
 }
 
-// Mock tasks data
-const mockTasks: Task[] = [
-    {
-        id: 1,
-        title: "Social Media Campaign Q1",
-        description: "Create and execute social media campaign for Q1 product launch",
-        status: "in_progress",
-        priority: "high",
-        assignedTo: "Sarah Johnson",
-        assignedBy: "Mike Wilson",
-        dueDate: "2024-02-15",
-        createdAt: "2024-01-20",
-        updatedAt: "2024-01-25",
-        categoryId: 3,
-        estimatedHours: 40,
-        actualHours: 25,
-        tags: ["social-media", "campaign", "q1"],
-        attachments: ["campaign-brief.pdf", "assets.zip"],
-    },
-    {
-        id: 2,
-        title: "Brand Guidelines Update",
-        description: "Update brand guidelines to reflect new visual identity",
-        status: "pending",
-        priority: "medium",
-        assignedTo: "Alex Rodriguez",
-        assignedBy: "Mike Wilson",
-        dueDate: "2024-02-20",
-        createdAt: "2024-01-22",
-        updatedAt: "2024-01-22",
-        categoryId: 3,
-        estimatedHours: 20,
-        tags: ["branding", "guidelines"],
-    },
-    {
-        id: 3,
-        title: "Email Marketing Automation",
-        description: "Set up automated email sequences for new customer onboarding",
-        status: "completed",
-        priority: "medium",
-        assignedTo: "Lisa Chen",
-        assignedBy: "Mike Wilson",
-        dueDate: "2024-01-30",
-        createdAt: "2024-01-15",
-        updatedAt: "2024-01-28",
-        categoryId: 3,
-        estimatedHours: 15,
-        actualHours: 18,
-        tags: ["email", "automation", "onboarding"],
-    },
-    {
-        id: 4,
-        title: "Market Research Analysis",
-        description: "Analyze competitor strategies and market trends for Q2 planning",
-        status: "in_progress",
-        priority: "high",
-        assignedTo: "David Brown",
-        assignedBy: "Mike Wilson",
-        dueDate: "2024-02-10",
-        createdAt: "2024-01-25",
-        updatedAt: "2024-01-27",
-        categoryId: 3,
-        estimatedHours: 30,
-        actualHours: 12,
-        tags: ["research", "analysis", "competitors"],
-        attachments: ["research-data.xlsx"],
-    },
-    {
-        id: 5,
-        title: "Content Calendar Creation",
-        description: "Develop content calendar for social media and blog posts for Q1",
-        status: "pending",
-        priority: "low",
-        assignedTo: "Emma Davis",
-        assignedBy: "Mike Wilson",
-        dueDate: "2024-02-25",
-        createdAt: "2024-01-28",
-        updatedAt: "2024-01-28",
-        categoryId: 3,
-        estimatedHours: 12,
-        tags: ["content", "calendar", "planning"],
-    },
-    {
-        id: 6,
-        title: "Website Analytics Setup",
-        description: "Configure Google Analytics 4 and set up conversion tracking",
-        status: "completed",
-        priority: "urgent",
-        assignedTo: "Nina Patel",
-        assignedBy: "Mike Wilson",
-        dueDate: "2024-01-25",
-        createdAt: "2024-01-18",
-        updatedAt: "2024-01-24",
-        categoryId: 3,
-        estimatedHours: 8,
-        actualHours: 10,
-        tags: ["analytics", "tracking", "website"],
-    },
-    {
-        id: 7,
-        title: "Influencer Partnership Program",
-        description: "Develop and launch influencer partnership program for brand awareness",
-        status: "pending",
-        priority: "medium",
-        assignedTo: "John Smith",
-        assignedBy: "Mike Wilson",
-        dueDate: "2024-03-01",
-        createdAt: "2024-01-30",
-        updatedAt: "2024-01-30",
-        categoryId: 3,
-        estimatedHours: 25,
-        tags: ["influencer", "partnership", "awareness"],
-    },
-    {
-        id: 8,
-        title: "Customer Feedback Survey",
-        description: "Create and distribute customer satisfaction survey",
-        status: "cancelled",
-        priority: "low",
-        assignedTo: "Sarah Johnson",
-        assignedBy: "Mike Wilson",
-        dueDate: "2024-02-05",
-        createdAt: "2024-01-20",
-        updatedAt: "2024-01-26",
-        categoryId: 3,
-        estimatedHours: 6,
-        tags: ["survey", "feedback", "customer"],
-    },
-]
 
-export default function ApproveCategory() {
+export default function CategoryDetail({ params }: { params: Promise<{ id: string }> | { id: string } }) {
+    // Unwrap params using React.use() to future-proof the code
+    const resolvedParams = params instanceof Promise ? use(params) : params
     const [category, setCategory] = useState<TaskCategory | null>(null)
     const [tasks, setTasks] = useState<Task[]>([])
     const [sortBy, setSortBy] = useState("a-z")
@@ -235,26 +113,45 @@ export default function ApproveCategory() {
     const [currentPage, setCurrentPage] = useState(1)
     const [itemsPerPage, setItemsPerPage] = useState(5)
     const [loading, setLoading] = useState(true)
-    const [approving, setApproving] = useState(false)
-    const [rejecting, setRejecting] = useState(false)
-    const [rejectionReason, setRejectionReason] = useState("")
-    const [showRejectDialog, setShowRejectDialog] = useState(false)
+    // We only need the loading state for this view page
+    // Other states were needed for approve page but not here
 
     useEffect(() => {
         const fetchData = async () => {
             try {
-                // Simulate API calls
-                await new Promise((resolve) => setTimeout(resolve, 1000))
-                setCategory(mockCategory)
-                setTasks(mockTasks)
+                // Fetch category from API
+                const categoryId = resolvedParams.id
+                const categoryResponse = await fetch(`/api/task-categories/${categoryId}`)
+                
+                if (!categoryResponse.ok) {
+                    throw new Error('Failed to fetch category')
+                }
+                
+                const categoryData = await categoryResponse.json()
+                setCategory(categoryData)
+                
+                // Fetch tasks associated with this category
+                const tasksResponse = await fetch(`/api/tasks?categoryId=${categoryId}`)
+                
+                if (tasksResponse.ok) {
+                    const tasksData = await tasksResponse.json()
+                    setTasks(tasksData)
+                } else {
+                    console.error("Error fetching tasks:", await tasksResponse.text())
+                    setTasks([])
+                }
             } catch (error) {
                 console.error("Error fetching data:", error)
+                const errorMessage = error instanceof Error ? error.message : "Unknown error occurred"
+                toast.error(`Failed to load category: ${errorMessage}`)
+                setCategory(null)
+                setTasks([])
             } finally {
                 setLoading(false)
             }
         }
         fetchData()
-    }, [])
+    }, [resolvedParams.id])
 
     // Sort function
     const sortTasks = (tasks: Task[], sortBy: string, sortByDate: string) => {
@@ -293,51 +190,9 @@ export default function ApproveCategory() {
         setCurrentPage(1)
     }
 
-    const handleApprove = async () => {
-        if (!category) return
-        setApproving(true)
-        try {
-            // Simulate API call
-            await new Promise((resolve) => setTimeout(resolve, 1500))
-            alert("Category approved successfully!")
-            // Redirect back to category management
-            window.history.back()
-        } catch (error) {
-            console.error("Error approving category:", error)
-            alert("Failed to approve category")
-        } finally {
-            setApproving(false)
-        }
-    }
+    // These functions were for approval/rejection and aren't needed in the detail view page
 
-    const handleReject = async () => {
-        if (!category || !rejectionReason.trim()) return
-        setRejecting(true)
-        try {
-            // Simulate API call
-            await new Promise((resolve) => setTimeout(resolve, 1500))
-            alert("Category rejected successfully!")
-            setShowRejectDialog(false)
-            // Redirect back to category management
-            window.history.back()
-        } catch (error) {
-            console.error("Error rejecting category:", error)
-            alert("Failed to reject category")
-        } finally {
-            setRejecting(false)
-        }
-    }
-
-    const getStatusBadge = (status: string) => {
-        const colors = {
-            pending: "bg-yellow-100 text-yellow-800",
-            in_progress: "bg-blue-100 text-blue-800",
-            completed: "bg-green-100 text-green-800",
-            cancelled: "bg-red-100 text-red-800",
-        }
-        return <Badge className={colors[status as keyof typeof colors]}>{status.replace("_", " ")}</Badge>
-    }
-
+    // Only keeping the priority badge function that's actually used
     const getPriorityBadge = (priority: string) => {
         const colors = {
             low: "bg-gray-100 text-gray-800",
@@ -346,22 +201,6 @@ export default function ApproveCategory() {
             urgent: "bg-red-100 text-red-800",
         }
         return <Badge className={colors[priority as keyof typeof colors]}>{priority}</Badge>
-    }
-
-    const getColorBadge = (color: string) => {
-        const colorClasses = {
-            blue: "bg-blue-500",
-            green: "bg-green-500",
-            red: "bg-red-500",
-            yellow: "bg-yellow-500",
-            purple: "bg-purple-500",
-            pink: "bg-pink-500",
-            indigo: "bg-indigo-500",
-            orange: "bg-orange-500",
-        }
-        return (
-            <div className={`w-6 h-6 rounded-full ${colorClasses[color as keyof typeof colorClasses] || "bg-gray-500"}`} />
-        )
     }
 
     if (loading) {
@@ -420,8 +259,14 @@ export default function ApproveCategory() {
                                     <div className="flex-1">
                                         <div className="flex items-center gap-3 mb-2">
                                             <h2 className="text-2xl font-semibold">{category.name}</h2>
-                                            <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">
-                                                Pending Approval
+                                            <Badge 
+                                                variant="secondary" 
+                                                className={category.status === "approved" 
+                                                    ? "bg-green-100 text-green-800" 
+                                                    : "bg-yellow-100 text-yellow-800"
+                                                }
+                                            >
+                                                {category.status === "approved" ? "Approved" : "Pending Approval"}
                                             </Badge>
                                         </div>
                                         <p className="text-muted-foreground mb-4">{category.description}</p>
@@ -534,16 +379,26 @@ export default function ApproveCategory() {
                                                             <div className="flex items-center space-x-2">
                                                                 <Avatar className="h-8 w-8">
                                                                     <AvatarFallback className="text-xs">
-                                                                        {task.assignedTo
-                                                                            .toUpperCase()
-                                                                            .split(" ")
-                                                                            .map((n) => n[0])
-                                                                            .join("")}
+                                                                        {typeof task.assignedTo === 'string' 
+                                                                            ? task.assignedTo
+                                                                                .toUpperCase()
+                                                                                .split(" ")
+                                                                                .map((n) => n[0])
+                                                                                .join("")
+                                                                            : "U"}
                                                                     </AvatarFallback>
                                                                 </Avatar>
                                                                 <div>
-                                                                    <div className="font-medium text-sm">{task.assignedTo}</div>
-                                                                    <div className="text-xs text-muted-foreground">by {task.assignedBy}</div>
+                                                                    <div className="font-medium text-sm">
+                                                                        {typeof task.assignedTo === 'string' 
+                                                                            ? task.assignedTo 
+                                                                            : task.assignedTo?.name || 'Unassigned'}
+                                                                    </div>
+                                                                    <div className="text-xs text-muted-foreground">
+                                                                        by {typeof task.assignedBy === 'string'
+                                                                            ? task.assignedBy
+                                                                            : task.assignedBy?.name || 'System'}
+                                                                    </div>
                                                                 </div>
                                                             </div>
                                                         </TableCell>
@@ -677,45 +532,7 @@ export default function ApproveCategory() {
                     )}
                 </Card>
 
-                <AlertDialog open={showRejectDialog} onOpenChange={setShowRejectDialog}>
-                    <AlertDialogContent>
-                        <AlertDialogHeader>
-                            <AlertDialogTitle>Reject Category</AlertDialogTitle>
-                            <AlertDialogDescription>
-                                Please provide a reason for rejecting this category. This will help the creator understand what needs to
-                                be improved.
-                            </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <div className="py-4">
-                            <Label htmlFor="rejection-reason">Rejection Reason *</Label>
-                            <Textarea
-                                id="rejection-reason"
-                                value={rejectionReason}
-                                onChange={(e) => setRejectionReason(e.target.value)}
-                                placeholder="Enter reason for rejection..."
-                                rows={4}
-                                className="mt-2"
-                            />
-                        </div>
-                        <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction
-                                onClick={handleReject}
-                                disabled={!rejectionReason.trim() || rejecting}
-                                className="bg-red-600 hover:bg-red-700"
-                            >
-                                {rejecting ? (
-                                    <>
-                                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                                        Rejecting...
-                                    </>
-                                ) : (
-                                    "Reject Category"
-                                )}
-                            </AlertDialogAction>
-                        </AlertDialogFooter>
-                    </AlertDialogContent>
-                </AlertDialog>
+                {/* No AlertDialog needed for the detail view */}
             </div>
         </div>
     )

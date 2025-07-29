@@ -27,6 +27,8 @@ function Create({ admin }: CreateProps) {
         adminType: admin?.adminType || "admin",
     })
     const [showPassword, setShowPassword] = useState(false)
+    const [emailError, setEmailError] = useState<string | null>(null)
+    const [isCheckingEmail, setIsCheckingEmail] = useState(false)
     const router = useRouter()
     
     // Check if the current user is an owner
@@ -59,14 +61,78 @@ function Create({ admin }: CreateProps) {
         }
         setFormData((prev) => ({ ...prev, password }))
     }
+    
+    // Check if email already exists
+    const checkEmailExists = async (email: string) => {
+        if (!email || admin) return // Don't check if editing or email is empty
+        
+        try {
+            setIsCheckingEmail(true)
+            setEmailError(null)
+            
+            // Add a small delay to prevent too many requests while typing
+            await new Promise(resolve => setTimeout(resolve, 500))
+            
+            // Check email validity first
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+            if (!emailRegex.test(email)) {
+                setEmailError("Please enter a valid email address")
+                return
+            }
+            
+            const response = await fetch(`/api/admins/check-email?email=${encodeURIComponent(email)}`)
+            const data = await response.json()
+            
+            if (data.exists) {
+                setEmailError("This email is already in use")
+            } else {
+                setEmailError(null)
+            }
+        } catch (error) {
+            console.error("Error checking email:", error)
+            // Don't set error here - it's better not to block the user if this check fails
+        } finally {
+            setIsCheckingEmail(false)
+        }
+    }
 
 
     // Handle form submission
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
-        if (!formData.username || !formData.email || (!admin && !formData.password)) {
+        // When creating a new admin, require all fields
+        // When editing, only require username and adminType
+        if (!formData.username || 
+            (!admin && !formData.email) || 
+            (!admin && !formData.password)) {
             toast.error("Please fill in all required fields")
             return
+        }
+        
+        // Check for email errors before submitting
+        if (!admin && emailError) {
+            toast.error("Please fix the email error before submitting")
+            return
+        }
+        
+        // For new admin creation, do a final check of the email
+        if (!admin) {
+            setIsCheckingEmail(true)
+            try {
+                const response = await fetch(`/api/admins/check-email?email=${encodeURIComponent(formData.email)}`)
+                const data = await response.json()
+                
+                if (data.exists) {
+                    setEmailError("This email is already in use")
+                    toast.error("Email is already in use. Please use a different email.")
+                    setIsCheckingEmail(false)
+                    return
+                }
+            } catch (error) {
+                console.error("Error checking email:", error)
+                // Continue with form submission even if this check fails
+            }
+            setIsCheckingEmail(false)
         }
 
         try {
@@ -81,7 +147,8 @@ function Create({ admin }: CreateProps) {
                 },
                 body: JSON.stringify({
                     username: formData.username,
-                    email: formData.email,
+                    // Only include email when creating a new admin, not when updating
+                    ...(admin ? {} : { email: formData.email }),
                     ...(formData.password ? { password: formData.password } : {}),
                     adminType: formData.adminType
                 }),
@@ -135,14 +202,37 @@ function Create({ admin }: CreateProps) {
                             </div>
                             <div className="space-y-2">
                                 <Label htmlFor="email">Email *</Label>
-                                <Input
-                                    id="email"
-                                    type="email"
-                                    value={formData.email}
-                                    onChange={(e) => setFormData((prev) => ({ ...prev, email: e.target.value }))}
-                                    placeholder="Enter email address"
-                                    required
-                                />
+                                <div className="relative">
+                                    <Input
+                                        id="email"
+                                        type="email"
+                                        value={formData.email}
+                                        onChange={(e) => {
+                                            const newEmail = e.target.value;
+                                            setFormData((prev) => ({ ...prev, email: newEmail }));
+                                            if (newEmail.includes('@') && newEmail.includes('.')) {
+                                                checkEmailExists(newEmail);
+                                            }
+                                        }}
+                                        onBlur={() => formData.email && checkEmailExists(formData.email)}
+                                        placeholder="Enter email address"
+                                        required
+                                        disabled={!!admin} // Disable email field when editing an admin
+                                        title={admin ? "Email cannot be changed after creation" : ""}
+                                        className={emailError ? "border-red-500" : ""}
+                                    />
+                                    {isCheckingEmail && (
+                                        <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                                            <RefreshCw className="h-4 w-4 animate-spin text-gray-400" />
+                                        </div>
+                                    )}
+                                </div>
+                                {admin && (
+                                    <p className="text-xs text-muted-foreground mt-1">Email cannot be changed after admin creation</p>
+                                )}
+                                {!admin && emailError && (
+                                    <p className="text-xs text-red-500 mt-1">{emailError}</p>
+                                )}
                             </div>
                         </div>
 

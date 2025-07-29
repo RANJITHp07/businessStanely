@@ -1,15 +1,48 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import Link from "next/link"
+import { toast } from "react-toastify"
+import { 
+  ArrowUpDown, 
+  ChevronLeft, 
+  ChevronRight, 
+  ChevronsLeft, 
+  ChevronsRight, 
+  CheckCircle, 
+  Clock, 
+  Edit, 
+  Eye, 
+  Filter, 
+  Loader2, 
+  MoreHorizontal, 
+  Plus, 
+  Search, 
+  Trash2 
+} from "lucide-react"
+import {
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow
+} from "@/components/ui/table"
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue
+} from "@/components/ui/select"
+import {
+  Card, CardContent, CardDescription, CardHeader, CardTitle
+} from "@/components/ui/card"
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle
+} from "@/components/ui/alert-dialog"
+import { 
+  Avatar, AvatarFallback, AvatarImage 
+} from "@/components/ui/avatar"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Loader2 } from "lucide-react"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import {
+  Tabs, TabsContent, TabsList, TabsTrigger
+} from "@/components/ui/tabs"
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -18,142 +51,30 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import {
-    Plus,
-    Search,
-    Filter,
-    MoreHorizontal,
-    Edit,
-    Trash2,
-    Eye,
-    ChevronLeft,
-    ChevronRight,
-    ChevronsLeft,
-    ChevronsRight,
-    ArrowUpDown,
-    CheckCircle,
-    Clock,
-} from "lucide-react"
-import Link from "next/link"
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
 
-const colorOptions = [
-    { value: "blue", label: "Blue", class: "bg-blue-500" },
-    { value: "green", label: "Green", class: "bg-green-500" },
-    { value: "red", label: "Red", class: "bg-red-500" },
-    { value: "yellow", label: "Yellow", class: "bg-yellow-500" },
-    { value: "purple", label: "Purple", class: "bg-purple-500" },
-    { value: "pink", label: "Pink", class: "bg-pink-500" },
-    { value: "indigo", label: "Indigo", class: "bg-indigo-500" },
-    { value: "orange", label: "Orange", class: "bg-orange-500" },
-]
+// Define the TaskCategory interface
+interface TaskCategory {
+    id: string
+    name: string
+    description: string
+    color: string
+    status: "approved" | "pending"
+    taskCount: number
+    createdAt: string
+    updatedAt: string
+    createdBy: string
+    createdById: string
+    approvedBy?: string | null
+    approvedById?: string | null
+    approvedAt?: string | null
+    rejectedBy?: string | null
+    rejectedById?: string | null
+    rejectedAt?: string | null
+    rejectionReason?: string | null
+    photo?: string
+}
 
-// Mock data for demonstration
-const mockTaskCategories: any[] = [
-    {
-        id: 1,
-        name: "Development",
-        description: "Software development and programming tasks",
-        color: "blue",
-        status: "approved",
-        taskCount: 25,
-        createdAt: "2024-01-15",
-        updatedAt: "2024-01-20",
-        createdBy: "John Admin",
-        photo: "/placeholder.svg?height=40&width=40",
-    },
-    {
-        id: 2,
-        name: "Design",
-        description: "UI/UX design and creative tasks",
-        color: "purple",
-        status: "approved",
-        taskCount: 18,
-        createdAt: "2024-01-18",
-        updatedAt: "2024-01-25",
-        createdBy: "Sarah Manager",
-        photo: "/placeholder.svg?height=40&width=40",
-    },
-    {
-        id: 3,
-        name: "Marketing",
-        description: "Marketing campaigns and promotional activities",
-        color: "green",
-        status: "pending",
-        taskCount: 0,
-        createdAt: "2024-01-20",
-        updatedAt: "2024-01-28",
-        createdBy: "Mike Wilson",
-    },
-    {
-        id: 4,
-        name: "Testing",
-        description: "Quality assurance and testing procedures",
-        color: "red",
-        status: "pending",
-        taskCount: 0,
-        createdAt: "2024-01-22",
-        updatedAt: "2024-01-26",
-        createdBy: "Lisa Chen",
-        photo: "/placeholder.svg?height=40&width=40",
-    },
-    {
-        id: 5,
-        name: "Documentation",
-        description: "Technical documentation and user guides",
-        color: "yellow",
-        status: "approved",
-        taskCount: 15,
-        createdAt: "2024-01-25",
-        updatedAt: "2024-01-28",
-        createdBy: "David Brown",
-        photo: "/placeholder.svg?height=40&width=40",
-    },
-    {
-        id: 6,
-        name: "Support",
-        description: "Customer support and help desk tasks",
-        color: "orange",
-        status: "approved",
-        taskCount: 22,
-        createdAt: "2024-02-01",
-        updatedAt: "2024-02-05",
-        createdBy: "Emma Davis",
-    },
-    {
-        id: 7,
-        name: "Research",
-        description: "Market research and analysis tasks",
-        color: "indigo",
-        status: "pending",
-        taskCount: 0,
-        createdAt: "2024-02-03",
-        updatedAt: "2024-02-03",
-        createdBy: "Alex Rodriguez",
-        photo: "/placeholder.svg?height=40&width=40",
-    },
-    {
-        id: 8,
-        name: "Training",
-        description: "Employee training and development programs",
-        color: "pink",
-        status: "pending",
-        taskCount: 0,
-        createdAt: "2024-02-05",
-        updatedAt: "2024-02-05",
-        createdBy: "Nina Patel",
-    },
-]
+// We'll use the API data instead of mock data
 
 export default function TaskCategoryTable() {
     const [categories, setCategories] = useState<TaskCategory[]>([])
@@ -165,21 +86,77 @@ export default function TaskCategoryTable() {
     const [categoryToDelete, setCategoryToDelete] = useState<TaskCategory | null>(null)
     const [loading, setLoading] = useState(true)
     const [activeTab, setActiveTab] = useState("approved")
+    const [currentUserRole, setCurrentUserRole] = useState<string>("")
 
+    // Get the current user's role from localStorage
+    useEffect(() => {
+        const userStr = localStorage.getItem("user")
+        if (userStr) {
+            try {
+                const user = JSON.parse(userStr)
+                const userRole = user.adminType || ""
+                setCurrentUserRole(userRole)
+                
+                // If user is not an owner and the active tab is "pending", switch to "approved"
+                if (userRole !== "owner" && activeTab === "pending") {
+                    setActiveTab("approved")
+                }
+            } catch (error) {
+                console.error("Error parsing user data:", error)
+            }
+        }
+    }, [activeTab])
+
+    // State to store all categories for counting
+    const [allCategories, setAllCategories] = useState<TaskCategory[]>([]);
+
+    // Fetch all categories for counting tabs
+    useEffect(() => {
+        const fetchAllCategories = async () => {
+            try {
+                const response = await fetch(`/api/task-categories`);
+                
+                if (!response.ok) {
+                    throw new Error('Failed to fetch all categories');
+                }
+                
+                const data = await response.json();
+                setAllCategories(data);
+            } catch (error) {
+                console.error("Error fetching all categories:", error);
+                setAllCategories([]);
+            }
+        };
+        fetchAllCategories();
+    }, []);
+    
     useEffect(() => {
         const fetchCategories = async () => {
             try {
-                // Simulate API call
-                await new Promise((resolve) => setTimeout(resolve, 1000))
-                setCategories(mockTaskCategories)
+                setLoading(true);
+                // Fetch categories from API based on active tab
+                const status = activeTab === 'approved' ? 'approved' : 'pending';
+                const response = await fetch(`/api/task-categories?status=${status}`);
+                
+                if (!response.ok) {
+                    throw new Error('Failed to fetch categories');
+                }
+                
+                const data = await response.json();
+                setCategories(data);
             } catch (error) {
-                console.error("Error fetching categories:", error)
+                console.error("Error fetching categories:", error);
+                // Show empty state instead of mock data
+                setCategories([]);
+                if (error instanceof Error) {
+                    toast.error(error.message);
+                }
             } finally {
-                setLoading(false)
+                setLoading(false);
             }
-        }
-        fetchCategories()
-    }, [])
+        };
+        fetchCategories();
+    }, [activeTab])
 
     // Sort function
     const sortCategories = (categories: TaskCategory[], sortBy: string, sortByDate: string) => {
@@ -237,26 +214,28 @@ export default function TaskCategoryTable() {
     const handleDelete = async () => {
         if (!categoryToDelete) return
         try {
-            // Simulate API call
+            // Call API to delete category
+            const response = await fetch(`/api/task-categories/${categoryToDelete.id}`, {
+                method: 'DELETE',
+            })
+            
+            if (!response.ok) {
+                throw new Error('Failed to delete category')
+            }
+            
+            // Update both category lists in the UI
             setCategories(categories.filter((category) => category.id !== categoryToDelete.id))
+            setAllCategories(allCategories.filter((category) => category.id !== categoryToDelete.id))
             setCategoryToDelete(null)
+            toast.success("Category deleted successfully")
         } catch (error) {
             console.error("Error deleting category:", error)
+            const errorMessage = error instanceof Error ? error.message : "Failed to delete category"
+            toast.error(errorMessage)
         }
     }
 
-    const handleApprove = async (categoryId: number) => {
-        try {
-            // Simulate API call
-            setCategories(
-                categories.map((category) =>
-                    category.id === categoryId ? { ...category, status: "approved" as const } : category,
-                ),
-            )
-        } catch (error) {
-            console.error("Error approving category:", error)
-        }
-    }
+
 
     const getStatusBadge = (status: string) => {
         return (
@@ -269,14 +248,9 @@ export default function TaskCategoryTable() {
         )
     }
 
-    const getColorBadge = (color: string) => {
-        const colorClass = colorOptions.find((c) => c.value === color)?.class || "bg-gray-500"
-        return <div className={`w-4 h-4 rounded-full ${colorClass}`} />
-    }
-
-    // Get counts for tabs
-    const approvedCount = categories.filter((cat) => cat.status === "approved").length
-    const pendingCount = categories.filter((cat) => cat.status === "pending").length
+    // Get counts for tabs from allCategories to always show correct counts
+    const approvedCount = allCategories.filter((cat) => cat.status === "approved").length
+    const pendingCount = allCategories.filter((cat) => cat.status === "pending").length
 
     return (
         <div className="container mx-auto p-6 max-w-7xl">
@@ -288,7 +262,7 @@ export default function TaskCategoryTable() {
                             Manage and organize your task categories
                         </p>
                     </div>
-                    <Link href="/task-category/create" className="flex justify-end">
+                    <Link href="/task_category/create" className="flex justify-end">
                         <Button className="mt-[20px] md:mt-none bg-[#003459] hover:bg-[#003459] text-white rounded-lg px-4 py-2 flex items-center gap-2 cursor-pointer shadow-none hover:shadow-md transition-shadow duration-300">
                             <Plus className="h-4 w-4" />
                             Create Category
@@ -349,15 +323,17 @@ export default function TaskCategoryTable() {
 
             {/* Categories Table with Tabs */}
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-                <TabsList className="grid w-full grid-cols-2">
+                <TabsList className={`grid w-full ${currentUserRole === "owner" ? "grid-cols-2" : "grid-cols-1"}`}>
                     <TabsTrigger value="approved" className="flex items-center gap-2">
                         <CheckCircle className="h-4 w-4" />
                         Approved Categories ({approvedCount})
                     </TabsTrigger>
-                    <TabsTrigger value="pending" className="flex items-center gap-2">
-                        <Clock className="h-4 w-4" />
-                        Pending Categories ({pendingCount})
-                    </TabsTrigger>
+                    {currentUserRole === "owner" && (
+                        <TabsTrigger value="pending" className="flex items-center gap-2">
+                            <Clock className="h-4 w-4" />
+                            Pending Categories ({pendingCount})
+                        </TabsTrigger>
+                    )}
                 </TabsList>
 
                 <TabsContent value="approved">
@@ -465,13 +441,13 @@ export default function TaskCategoryTable() {
                                                                     <DropdownMenuContent align="end">
                                                                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
                                                                         <DropdownMenuItem asChild>
-                                                                            <Link href={`/task-category/${category.id}`}>
+                                                                            <Link href={`/task_category/${category.id}`}>
                                                                                 <Eye className="mr-2 h-4 w-4" />
                                                                                 View Details
                                                                             </Link>
                                                                         </DropdownMenuItem>
                                                                         <DropdownMenuItem asChild>
-                                                                            <Link href={`/task-category/${category.id}/edit`}>
+                                                                            <Link href={`/task_category/${category.id}/edit`}>
                                                                                 <Edit className="mr-2 h-4 w-4" />
                                                                                 Edit Category
                                                                             </Link>
@@ -672,12 +648,12 @@ export default function TaskCategoryTable() {
                                                                     </DropdownMenuTrigger>
                                                                     <DropdownMenuContent align="end">
                                                                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                                                        <Link href={'/task_category/approve/1'}>
-                                                                            <DropdownMenuItem onClick={() => handleApprove(category.id)}>
+                                                                        <DropdownMenuItem asChild>
+                                                                            <Link href={`/task_category/approve/${category.id}`}>
                                                                                 <CheckCircle className="mr-2 h-4 w-4" />
                                                                                 Approve/Reject Category
-                                                                            </DropdownMenuItem>
-                                                                        </Link>
+                                                                            </Link>
+                                                                        </DropdownMenuItem>
                                                                     </DropdownMenuContent>
                                                                 </DropdownMenu>
                                                             </TableCell>

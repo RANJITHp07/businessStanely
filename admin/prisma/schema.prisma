@@ -23,6 +23,11 @@ model User {
   updatedAt   DateTime  @updatedAt
   comments    Comment[] @relation("UserComments")
 
+  // Task Category relations
+  createdCategories     TaskCategory[] @relation()
+  approvedCategories    TaskCategory[] @relation("CategoryApprovals")
+  rejectedCategories    TaskCategory[] @relation("CategoryRejections")
+
   // OTP fields for password reset
   resetOtp      String?
   otpExpiry     DateTime?
@@ -126,4 +131,29 @@ model Comment {
   authorType String @default("USER") // "USER" or "AGENT"
   user       User?  @relation("UserComments", fields: [authorId], references: [id])
   agent      Agent? @relation("CommentAuthor", fields: [authorId], references: [id])
+}
+
+model TaskCategory {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  name        String
+  description String?
+  color       String   @default("blue")
+  status      String   @default("pending") // "pending" or "approved"
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Creator information
+  createdById String   @db.ObjectId
+  createdBy   User     @relation(fields: [createdById], references: [id])
+  
+  // Approval information
+  approvedById String?  @db.ObjectId
+  approvedBy   User?    @relation("CategoryApprovals", fields: [approvedById], references: [id])
+  approvedAt   DateTime?
+  
+  // Rejection information
+  rejectedById String?  @db.ObjectId
+  rejectedBy   User?    @relation("CategoryRejections", fields: [rejectedById], references: [id])
+  rejectedAt   DateTime?
+  rejectionReason String?
 }

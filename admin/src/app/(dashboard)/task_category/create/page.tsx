@@ -3,22 +3,60 @@ import React, { useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Eye, EyeOff, RefreshCw, User, } from "lucide-react"
+import { User } from "lucide-react"
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
+import { useRouter } from "next/navigation"
+import { toast } from "react-toastify"
 
-function Create({ admin }: any) {
+interface CreateProps {
+    admin?: {
+        id: string;
+        name?: string;
+    } | null;
+}
+
+function Create({ admin }: CreateProps) {
     const [formData, setFormData] = useState({
         name: "",
         description: "",
     })
+    const [isSubmitting, setIsSubmitting] = useState(false)
+    const router = useRouter()
 
     // Handle form submission
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         if (!formData.name) {
-            alert("Please fill in all required fields")
+            toast.error("Category name is required")
             return
+        }
+
+        try {
+            setIsSubmitting(true)
+            // Call API to create category
+            const response = await fetch('/api/task-categories', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(formData),
+            })
+            
+            if (!response.ok) {
+                const errorData = await response.json()
+                throw new Error(errorData.error || 'Failed to create category')
+            }
+            
+            toast.success("Category created successfully! It will be visible after approval.")
+            // Use router for better navigation
+            router.push('/task_category')
+        } catch (error) {
+            console.error("Error creating category:", error)
+            const errorMessage = error instanceof Error ? error.message : "Failed to create category"
+            toast.error(errorMessage)
+        } finally {
+            setIsSubmitting(false)
         }
     }
 
@@ -50,13 +88,13 @@ function Create({ admin }: any) {
                                 <Input
                                     id="username"
                                     value={formData.name}
-                                    onChange={(e) => setFormData((prev) => ({ ...prev, username: e.target.value }))}
+                                    onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
                                     placeholder="Enter task category name"
                                     required
                                 />
                             </div>
                             <div className="space-y-2 mt-3">
-                                <Label htmlFor="email">Description *</Label>
+                                <Label htmlFor="description">Description</Label>
                                 <Textarea
                                     id="description"
                                     value={formData.description}
@@ -73,14 +111,16 @@ function Create({ admin }: any) {
                         className="bg-[#f42b03] hover:bg-[#f42b03] shadow-none hover:shadow-lg transition-shadow duration-300 text-white hover:text-white cursor-pointer"
                         type="button"
                         variant="outline"
+                        onClick={() => router.push('/task_category')}
                     >
                         Cancel
                     </Button>
                     <Button
-                        className=" cursor-pointer shadow-none hover:shadow-lg transition-shadow duration-300"
+                        className="cursor-pointer shadow-none hover:shadow-lg transition-shadow duration-300"
                         type="submit"
+                        disabled={isSubmitting}
                     >
-                        {admin ? "Update Cateory" : "Create Category"}
+                        {isSubmitting ? "Processing..." : admin ? "Update Category" : "Create Category"}
                     </Button>
                 </div>
             </form>

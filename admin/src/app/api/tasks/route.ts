@@ -39,6 +39,7 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const assignedToId = searchParams.get('assignedToId');
     const clientId = searchParams.get('clientId');
+    const categoryId = searchParams.get('categoryId');
 
     // Build the where clause based on query parameters
     const whereClause: Prisma.TaskWhereInput = {};
@@ -49,6 +50,13 @@ export async function GET(req: NextRequest) {
     
     if (clientId) {
       whereClause.clientId = clientId;
+    }
+    
+    // Note: categoryId is not directly available in the Task model yet
+    // For now, we'll return empty array when categoryId is requested
+    if (categoryId) {
+      // Return empty array for now since there's no category relation
+      return NextResponse.json([]);
     }
 
     const tasks = await prisma.task.findMany({

@@ -334,53 +334,59 @@ export default function AdminsTable() {
             {/* Admins Table */}
             <Card>
                 <CardHeader>
-                    <div className="flex items-center justify-between">
+                    <div className="lg:flex items-center justify-between">
                         <CardTitle className="flex items-center gap-2">
                             <Shield className="h-5 w-5" />
                             Admins ({sortedAdmins.length})
                         </CardTitle>
-                        <div className="flex items-center gap-2">
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                    refreshData();
-                                    router.refresh();
-                                }}
-                                className="gap-2"
-                            >
-                                <RefreshCcw className="h-4 w-4" />
-                                Refresh
-                            </Button>
-                            <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
-                            <Select value={sortBy} onValueChange={setSortBy}>
-                                <SelectTrigger className="w-32">
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="a-z">A-Z</SelectItem>
-                                    <SelectItem value="z-a">Z-A</SelectItem>
-                                </SelectContent>
-                            </Select>
-                            <Select>
-                                <SelectTrigger className="w-38">
-                                    <SelectValue className="text-black" placeholder="Role" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="owner">Owner</SelectItem>
-                                    <SelectItem value="admin">Admin</SelectItem>
-                                </SelectContent>
-                            </Select>
-                            <Select value={sortByDate} onValueChange={setSortByDate}>
-                                <SelectTrigger className="w-32">
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="newest">Newest</SelectItem>
-                                    <SelectItem value="oldest">Oldest</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
+                        
+                        <div className="mt-[20px] flex justify-end">
+    <div className="flex flex-wrap items-center gap-2  justify-end lg:justify-between">
+        <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+                refreshData();
+                router.refresh();
+            }}
+            className="gap-2"
+        >
+            <RefreshCcw className="h-4 w-4" />
+            Refresh
+        </Button>
+        <Select value={sortBy} onValueChange={setSortBy}>
+            <SelectTrigger className="w-32">
+                <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+                <SelectItem value="a-z">A-Z</SelectItem>
+                <SelectItem value="z-a">Z-A</SelectItem>
+            </SelectContent>
+        </Select>
+        <Select>
+            <SelectTrigger className="w-38">
+                <SelectValue className="text-black" placeholder="Role" />
+            </SelectTrigger>
+            <SelectContent>
+                <SelectItem value="owner">Owner</SelectItem>
+                <SelectItem value="admin">Admin</SelectItem>
+            </SelectContent>
+        </Select>
+        <Select value={sortByDate} onValueChange={setSortByDate}>
+            <SelectTrigger className="w-32">
+                <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+                <SelectItem value="newest">Newest</SelectItem>
+                <SelectItem value="oldest">Oldest</SelectItem>
+            </SelectContent>
+        </Select>
+    </div>
+</div>
+
+
+
+                        
                     </div>
                 </CardHeader>
                 {loading ? (

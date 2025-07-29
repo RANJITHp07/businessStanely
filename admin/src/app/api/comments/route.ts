@@ -23,10 +23,29 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // First check if it's a user or agent
+    const user = await prisma.user.findUnique({
+      where: { id: authorId },
+    });
+
+    const agent = await prisma.agent.findUnique({
+      where: { id: authorId },
+    });
+
+    if (!user && !agent) {
+      return NextResponse.json(
+        { error: "Invalid authorId. No user or agent found with this ID." },
+        { status: 404 }
+      );
+    }
+
     const commentData: Prisma.CommentCreateInput = {
       content,
       task: { connect: { id: taskId } },
-      author: { connect: { id: authorId } },
+      authorType: user ? "USER" : "AGENT",
+      ...(user
+        ? { user: { connect: { id: authorId } } }
+        : { agent: { connect: { id: authorId } } }),
     };
 
     if (attachmentName) {
@@ -39,7 +58,14 @@ export async function POST(req: NextRequest) {
     const newComment = await prisma.comment.create({
       data: commentData,
       include: {
-        author: {
+        user: {
+          select: {
+            id: true,
+            username: true,
+            email: true,
+          },
+        },
+        agent: {
           select: {
             id: true,
             name: true,
@@ -77,7 +103,14 @@ export async function GET(req: NextRequest) {
     const comments = await prisma.comment.findMany({
       where: { taskId },
       include: {
-        author: {
+        user: {
+          select: {
+            id: true,
+            username: true,
+            email: true,
+          },
+        },
+        agent: {
           select: {
             id: true,
             name: true,

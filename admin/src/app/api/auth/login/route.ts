@@ -56,22 +56,33 @@ const loginRateLimiter = new LoginRateLimiter();
 
 export async function POST(req: NextRequest) {
   try {
+    // First verify database connection
+    try {
+      await prisma.$connect();
+    } catch (dbError) {
+      console.error("Database connection error:", dbError);
+      return NextResponse.json(
+        { error: "Database connection failed" },
+        { status: 500 }
+      );
+    }
+
     const body = await req.json();
-    const { username, email, password } = body;
+    const { email, password } = body;
 
     // Basic validation - just check if credentials are provided
-    if (!password || (!username && !email)) {
+    if (!password || !email) {
       return NextResponse.json(
         {
           error:
-            "Incorrect username/email or password. Please check your credentials and try again.",
+            "Incorrect email or password. Please check your credentials and try again.",
         },
         { status: 401 }
       );
     }
 
-    // Check rate limiting using email or username as identifier
-    const identifier = email || username;
+    // Check rate limiting using email as identifier
+    const identifier = email;
     if (!loginRateLimiter.isAllowed(identifier)) {
       const remainingTime = loginRateLimiter.getRemainingTime(identifier);
       const minutes = Math.ceil(remainingTime / (60 * 1000));
@@ -85,12 +96,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Find user by username or email
-    const user = await prisma.user.findFirst({
+    // Find user by email
+    const user = await prisma.user.findUnique({
       where: {
-        OR: [username ? { username } : {}, email ? { email } : {}].filter(
-          (obj) => Object.keys(obj).length > 0
-        ),
+        email
       },
     });
 
@@ -98,7 +107,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         {
           error:
-            "Incorrect username/email or password. Please check your credentials and try again.",
+            "Incorrect email or password. Please check your credentials and try again.",
         },
         { status: 401 }
       );
@@ -110,7 +119,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         {
           error:
-            "Incorrect username/email or password. Please check your credentials and try again.",
+            "Incorrect email or password. Please check your credentials and try again.",
         },
         { status: 401 }
       );
@@ -119,6 +128,15 @@ export async function POST(req: NextRequest) {
     // Reset rate limiter on successful login
     loginRateLimiter.reset(identifier);
 
+    // Check if JWT_SECRET is set
+    if (!process.env.JWT_SECRET) {
+      console.error("JWT_SECRET is not set");
+      return NextResponse.json(
+        { error: "Server configuration error" },
+        { status: 500 }
+      );
+    }
+
     // Generate JWT token
     const token = jwt.sign(
       {
@@ -126,7 +144,7 @@ export async function POST(req: NextRequest) {
         username: user.username,
         email: user.email,
       },
-      process.env.JWT_SECRET || "fallback-secret",
+      process.env.JWT_SECRET,
       { expiresIn: "24h" }
     );
 
@@ -137,16 +155,20 @@ export async function POST(req: NextRequest) {
         id: user.id,
         username: user.username,
         email: user.email,
+        adminType: user.adminType, // Include adminType in the response
       },
       token,
     });
 
     // Set HTTP-only cookie for middleware
+    const isProduction = process.env.NEXT_PUBLIC_VERCEL_ENV === 'production' || 
+                      process.env.NEXT_PUBLIC_DEPLOYMENT === 'production';
+    
     response.cookies.set({
       name: "auth-token",
       value: token,
       httpOnly: true,
-      secure: false, // Set to false for localhost development
+      secure: isProduction, // Set to true in production
       sameSite: "lax",
       maxAge: 24 * 60 * 60, // 24 hours in seconds
       path: "/", // Ensure cookie is available for all paths
@@ -155,8 +177,19 @@ export async function POST(req: NextRequest) {
     return response;
   } catch (error) {
     console.error("Login error:", error);
+    
+    // Temporarily show detailed errors in production for debugging
+    const errorMessage = error instanceof Error 
+      ? `Error: ${error.message}\nStack: ${error.stack}`
+      : 'Unknown error';
+    
+    console.error(errorMessage);
+    
     return NextResponse.json(
-      { error: "Internal server error" },
+      { 
+        error: "Internal server error",
+        details: errorMessage // Remove this in production after debugging
+      },
       { status: 500 }
     );
   }

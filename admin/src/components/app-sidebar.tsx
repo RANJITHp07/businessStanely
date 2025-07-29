@@ -7,6 +7,8 @@ import {
   Settings,
   UserRoundPen,
   UserSearch,
+  Boxes,
+  ShieldUser
 } from "lucide-react";
 import { useState } from "react";
 import Link from "next/link";
@@ -34,7 +36,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import Image from "next/image";
-import Logo from "./../../public/Logo.jpg"
+import Logo from "./../../public/Logo.jpg";
 // Menu items.
 const items = [
   {
@@ -56,6 +58,16 @@ const items = [
     title: "Task",
     url: "/task",
     icon: ClipboardCheck,
+  },
+  {
+    title: "Task category",
+    url: "/task_category",
+    icon: Boxes,
+  },
+  {
+    title: "Admin",
+    url: "/admin",
+    icon: ShieldUser,
   },
   {
     title: "Settings",
@@ -96,7 +108,7 @@ export function AppSidebar() {
         <SidebarContent>
           <SidebarGroup>
             <SidebarGroupLabel className="mt-[10px] ">
-             <Image  src={Logo} alt="logo" />
+              <Image src={Logo} alt="logo" />
             </SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>

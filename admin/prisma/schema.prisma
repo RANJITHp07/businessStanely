@@ -4,43 +4,55 @@ datasource db {
 }
 
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-1.0.x"]
 }
 
 model User {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  username  String   @unique
-  email     String   @unique
-  password  String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  
+  id          String    @id @default(auto()) @map("_id") @db.ObjectId
+  username    String    @unique // Used for both login and display
+  email       String    @unique
+  password    String
+  adminType   String    @default("admin") // Either "owner" or "admin"
+  status      String    @default("active") // "active" or "inactive"
+  photo       String?
+  lastLogin   DateTime?
+  permissions String[]  @default([])
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  comments    Comment[] @relation("UserComments")
+
+  // Task Category relations
+  createdCategories     TaskCategory[] @relation()
+  approvedCategories    TaskCategory[] @relation("CategoryApprovals")
+  rejectedCategories    TaskCategory[] @relation("CategoryRejections")
+
   // OTP fields for password reset
-  resetOtp       String?
-  otpExpiry      DateTime?
-  isOtpVerified  Boolean @default(false)
+  resetOtp      String?
+  otpExpiry     DateTime?
+  isOtpVerified Boolean   @default(false)
 }
 
 model Client {
-  id                       String   @id @default(auto()) @map("_id") @db.ObjectId
-  clientType               String
-  email                    String   @unique
-  phoneNumber              String
-  secondaryPhoneNumber     String?
-  address                  String?
-  preferredCommunication   String?
-  notes                    String?
-  createdAt                DateTime @default(now())
-  updatedAt                DateTime @updatedAt
-  tasks                    Task[]
+  id                     String   @id @default(auto()) @map("_id") @db.ObjectId
+  clientType             String
+  email                  String   @unique
+  phoneNumber            String
+  secondaryPhoneNumber   String?
+  address                String?
+  preferredCommunication String?
+  notes                  String?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+  tasks                  Task[]
 
   // Individual Fields
-  firstName       String?
-  lastName        String?
-  gender          String?
-  dateOfBirth     DateTime?
-  idProofType     String?
-  idProofNumber   String?
+  firstName     String?
+  lastName      String?
+  gender        String?
+  dateOfBirth   DateTime?
+  idProofType   String?
+  idProofNumber String?
 
   // Organization Fields
   organizationName     String?
@@ -54,43 +66,43 @@ model Client {
 }
 
 model Agent {
-  id                    String   @id @default(auto()) @map("_id") @db.ObjectId
-  name                  String
-  email                 String   @unique
-  phoneNumber           String
-  secondaryPhoneNumber  String?
-  agentType             String
-  barAssociationId      String
-  jurisdiction          String
-  specializations       String[]
-  photo                 String?
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  id                   String   @id @default(auto()) @map("_id") @db.ObjectId
+  name                 String
+  email                String   @unique
+  phoneNumber          String
+  secondaryPhoneNumber String?
+  agentType            String
+  barAssociationId     String
+  jurisdiction         String
+  specializations      String[]
+  photo                String?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 
   // Team Management
-  superiorId   String?  @db.ObjectId
-  superior     Agent?   @relation("AgentHierarchy", fields: [superiorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  subordinates Agent[]  @relation("AgentHierarchy")
-  createdTasks Task[]     @relation("CreatedTasks")
+  superiorId    String?   @db.ObjectId
+  superior      Agent?    @relation("AgentHierarchy", fields: [superiorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  subordinates  Agent[]   @relation("AgentHierarchy")
+  createdTasks  Task[]    @relation("CreatedTasks")
   assignedTasks Task[]    @relation("AssignedTasks")
-  comments     Comment[]  @relation("CommentAuthor")
+  comments      Comment[] @relation("CommentAuthor")
 }
 
 model Task {
-  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  id          String    @id @default(auto()) @map("_id") @db.ObjectId
   title       String
   description String?
-  status      String   @default("To Do") // e.g., To Do, In Progress, Done
-  priority    String   @default("Medium") // e.g., Low, Medium, High
+  status      String    @default("To Do") // e.g., To Do, In Progress, Done
+  priority    String    @default("Medium") // e.g., Low, Medium, High
   dueDate     DateTime?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   clientId String? @db.ObjectId
   client   Client? @relation(fields: [clientId], references: [id])
 
-  createdById String?  @db.ObjectId
-  createdBy   Agent?   @relation("CreatedTasks", fields: [createdById], references: [id])
+  createdById String? @db.ObjectId
+  createdBy   Agent?  @relation("CreatedTasks", fields: [createdById], references: [id])
 
   assignedToId String? @db.ObjectId
   assignedTo   Agent?  @relation("AssignedTasks", fields: [assignedToId], references: [id])
@@ -113,6 +125,34 @@ model Comment {
   taskId String @db.ObjectId
   task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
-  authorId String @db.ObjectId
-  author   Agent  @relation("CommentAuthor", fields: [authorId], references: [id])
+  // Author can be either a User or an Agent
+  authorId   String @db.ObjectId
+  authorType String @default("USER") // "USER" or "AGENT"
+  user       User?  @relation("UserComments", fields: [authorId], references: [id])
+  agent      Agent? @relation("CommentAuthor", fields: [authorId], references: [id])
+}
+
+model TaskCategory {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  name        String
+  description String?
+  color       String   @default("blue")
+  status      String   @default("pending") // "pending" or "approved"
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Creator information
+  createdById String   @db.ObjectId
+  createdBy   User     @relation(fields: [createdById], references: [id])
+  
+  // Approval information
+  approvedById String?  @db.ObjectId
+  approvedBy   User?    @relation("CategoryApprovals", fields: [approvedById], references: [id])
+  approvedAt   DateTime?
+  
+  // Rejection information
+  rejectedById String?  @db.ObjectId
+  rejectedBy   User?    @relation("CategoryRejections", fields: [rejectedById], references: [id])
+  rejectedAt   DateTime?
+  rejectionReason String?
 }

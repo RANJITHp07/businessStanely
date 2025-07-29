@@ -62,7 +62,6 @@ export function useAuthRedirect() {
     // List of auth pages
     const authRoutes = [
       "/login",
-      "/signup",
       "/forgot-password",
       "/reset-password",
     ];

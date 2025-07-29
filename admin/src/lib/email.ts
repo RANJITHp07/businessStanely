@@ -1,12 +1,11 @@
 import nodemailer from "nodemailer";
 
-// Create transporter for Gmail SMTP
-const createTransporter = () => {
+export const createTransporter = () => {
   return nodemailer.createTransport({
     service: "gmail",
     auth: {
       user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASSWORD, // Use App Password for Gmail
+      pass: process.env.EMAIL_PASSWORD,
     },
   });
 };
@@ -20,6 +19,12 @@ interface SendOTPEmailProps {
 interface SendWelcomeEmailProps {
   to: string;
   userName: string;
+}
+
+interface SendAdminInviteEmailProps {
+  to: string;
+  userName: string;
+  password: string;
 }
 
 export async function sendOTPEmail({ to, otp, userName }: SendOTPEmailProps) {
@@ -167,9 +172,7 @@ export async function sendWelcomeEmail({
             </div>
             
             <div style="text-align: center; margin: 30px 0;">
-              <a href="${
-                process.env.NEXTAUTH_URL || "http://localhost:3000"
-              }/dashboard" 
+              <a href="${process.env.NEXTAUTH_URL}/dashboard" 
                  style="background-color: #007bff; color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; display: inline-block; font-weight: bold; font-size: 16px; transition: background-color 0.3s;">
                 🏁 Get Started Now
               </a>
@@ -220,9 +223,7 @@ export async function sendWelcomeEmail({
         - Start managing your business tasks efficiently
         - Discover our powerful automation tools
         
-        Get started now: ${
-          process.env.NEXTAUTH_URL || "http://localhost:3000"
-        }/dashboard
+        Get started now: ${process.env.NEXTAUTH_URL}/dashboard
         
         Pro Tip: Bookmark your dashboard for quick access to all your business tools!
         
@@ -241,6 +242,107 @@ export async function sendWelcomeEmail({
     return { success: true, messageId: result.messageId };
   } catch (error) {
     console.error("Error sending welcome email:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error",
+    };
+  }
+}
+
+export async function sendAdminInviteEmail({
+  to,
+  userName,
+  password,
+}: SendAdminInviteEmailProps) {
+  try {
+    const transporter = createTransporter();
+
+    const mailOptions = {
+      from: `"${process.env.COMPANY_NAME || "Business Stanley"}" <${
+        process.env.EMAIL_USER
+      }>`,
+      to: to,
+      subject: "Welcome to Business Stanley - Admin Account Created",
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Welcome to Business Stanley</title>
+        </head>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+            <h1 style="color: white; margin: 0; font-size: 28px;">Welcome to Business Stanley</h1>
+          </div>
+          
+          <div style="background: #f8f9fa; padding: 30px; border-radius: 0 0 10px 10px; border: 1px solid #e9ecef;">
+            <p style="font-size: 16px; margin-bottom: 20px;">
+              Hello ${userName},
+            </p>
+            
+            <p style="font-size: 16px; margin-bottom: 20px;">
+              Your admin account has been created in the Business Stanley management system. Here are your login credentials:
+            </p>
+
+            <div style="background: #ffffff; padding: 20px; border-radius: 5px; border: 1px solid #dee2e6; margin-bottom: 20px;">
+              <p style="margin: 5px 0;"><strong>Email:</strong> ${to}</p>
+              <p style="margin: 5px 0;"><strong>Password:</strong> ${password}</p>
+            </div>
+
+            <p style="font-size: 16px; margin-bottom: 20px;">
+              Please login using your email and the password above. For security purposes, change your password immediately after logging in.
+            </p>
+
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${
+                process.env.NEXTAUTH_URL
+              }/login" style="background: #4c51bf; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-weight: bold;">
+                Login Now
+              </a>
+            </div>
+
+            <p style="font-size: 14px; color: #6c757d; margin-top: 30px;">
+              For security reasons, please change your password immediately after logging in.
+            </p>
+          </div>
+          
+          <div style="text-align: center; padding: 20px; color: #6c757d; font-size: 12px;">
+            <p style="margin: 0;">
+              © ${new Date().getFullYear()} Business Stanley. All rights reserved.
+            </p>
+          </div>
+        </body>
+        </html>
+      `,
+      text: `
+        Welcome to Business Stanley!
+        
+        Hello ${userName}!
+        
+        Your admin account has been created in the Business Stanley management system. Here are your login credentials:
+        
+        Email: ${to}
+        Password: ${password}
+        
+        Please login using your email and the password above. For security purposes, change your password immediately after logging in.
+        
+        Login now: ${process.env.NEXTAUTH_URL}/login
+        
+        For security reasons, please change your password immediately after logging in.
+        
+        Best regards,
+        The Business Stanley Team
+        
+        © ${new Date().getFullYear()} Business Stanley. All rights reserved.
+      `,
+    };
+
+    const result = await transporter.sendMail(mailOptions);
+    console.log("Admin invite email sent successfully:", result.messageId);
+    return { success: true, messageId: result.messageId };
+  } catch (error) {
+    console.error("Error sending admin invite email:", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : "Unknown error",

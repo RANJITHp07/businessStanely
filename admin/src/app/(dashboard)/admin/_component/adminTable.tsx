@@ -1,11 +1,12 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Loader2 } from "lucide-react"
+import { Loader2, MoreHorizontal, Shield, ArrowUpDown, RefreshCcw } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -22,7 +23,6 @@ import {
     Plus,
     Search,
     Filter,
-    MoreHorizontal,
     Edit,
     Trash2,
     Eye,
@@ -30,8 +30,6 @@ import {
     ChevronRight,
     ChevronsLeft,
     ChevronsRight,
-    ArrowUpDown,
-    Shield,
 } from "lucide-react"
 import Link from "next/link"
 import {
@@ -49,8 +47,7 @@ const adminRoles = ["All Roles", "Owner", "Admin", "Manager", "Moderator", "Supp
 
 export interface Admin {
     id: number
-    name: string
-    username: string
+    name: string // This will be username if no name is set
     email: string
     role: string
     status: "active" | "inactive"
@@ -60,105 +57,10 @@ export interface Admin {
     permissions: string[]
 }
 
-// Mock data for demonstration
-const mockAdmins: Admin[] = [
-    {
-        id: 1,
-        name: "John Smith",
-        username: "john_admin",
-        email: "john@company.com",
-        role: "Owner",
-        status: "active",
-        createdAt: "2024-01-15",
-        lastLogin: "2024-01-28",
-        permissions: ["user_management", "system_settings", "reports"],
-        photo: "/placeholder.svg?height=40&width=40",
-    },
-    {
-        id: 2,
-        name: "Sarah Johnson",
-        username: "sarah_manager",
-        email: "sarah@company.com",
-        role: "Admin",
-        status: "active",
-        createdAt: "2024-01-20",
-        lastLogin: "2024-01-27",
-        permissions: ["user_management", "reports"],
-        photo: "/placeholder.svg?height=40&width=40",
-    },
-    {
-        id: 3,
-        name: "Mike Wilson",
-        username: "mike_support",
-        email: "mike@company.com",
-        role: "Support",
-        status: "inactive",
-        createdAt: "2024-02-01",
-        lastLogin: "2024-01-25",
-        permissions: ["support_tickets"],
-    },
-    {
-        id: 4,
-        name: "Lisa Chen",
-        username: "lisa_admin",
-        email: "lisa@company.com",
-        role: "Admin",
-        status: "active",
-        createdAt: "2024-02-10",
-        lastLogin: "2024-01-28",
-        permissions: ["user_management", "reports"],
-        photo: "/placeholder.svg?height=40&width=40",
-    },
-    {
-        id: 5,
-        name: "David Brown",
-        username: "david_super",
-        email: "david@company.com",
-        role: "Owner",
-        status: "active",
-        createdAt: "2024-02-15",
-        lastLogin: "2024-01-28",
-        permissions: ["user_management", "system_settings", "reports", "security"],
-        photo: "/placeholder.svg?height=40&width=40",
-    },
-    {
-        id: 6,
-        name: "Emma Davis",
-        username: "emma_mod",
-        email: "emma@company.com",
-        role: "Moderator",
-        status: "inactive",
-        createdAt: "2024-02-20",
-        lastLogin: "2024-01-20",
-        permissions: ["content_moderation"],
-    },
-    {
-        id: 7,
-        name: "Alex Rodriguez",
-        username: "alex_admin",
-        email: "alex@company.com",
-        role: "Admin",
-        status: "active",
-        createdAt: "2024-03-01",
-        lastLogin: "2024-01-28",
-        permissions: ["user_management", "reports"],
-        photo: "/placeholder.svg?height=40&width=40",
-    },
-    {
-        id: 8,
-        name: "Nina Patel",
-        username: "nina_support",
-        email: "nina@company.com",
-        role: "Support",
-        status: "active",
-        createdAt: "2024-03-05",
-        lastLogin: "2024-01-27",
-        permissions: ["support_tickets", "user_assistance"],
-        photo: "/placeholder.svg?height=40&width=40",
-    },
-]
+
 
 export default function AdminsTable() {
+    const router = useRouter()
     const [admins, setAdmins] = useState<Admin[]>([])
     const [searchTerm, setSearchTerm] = useState("")
     const [selectedRole, setSelectedRole] = useState("All Roles")
@@ -170,6 +72,7 @@ export default function AdminsTable() {
     const [adminToDelete, setAdminToDelete] = useState<Admin | null>(null)
     const [loading, setLoading] = useState(true)
     const [currentUserRole, setCurrentUserRole] = useState<string>("")
+    const [refreshKey, setRefreshKey] = useState(0) // Add refresh key
 
     // Get the current user's role from localStorage
     useEffect(() => {
@@ -184,13 +87,33 @@ export default function AdminsTable() {
         }
     }, [])
 
+    // Refresh data when component becomes visible
+    useEffect(() => {
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible') {
+                refreshData();
+            }
+        };
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        return () => {
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
+    }, []);
+
     useEffect(() => {
         const fetchAdmins = async () => {
             try {
                 setLoading(true)
                 
-                // Fetch all admins
-                const response = await fetch('/api/admins')
+                // Fetch all admins with no-store cache option and force revalidation
+                const response = await fetch('/api/admins', {
+                    cache: 'no-store',
+                    headers: {
+                        'Cache-Control': 'no-cache',
+                        'Pragma': 'no-cache'
+                    }
+                })
                 
                 if (!response.ok) {
                     throw new Error('Failed to fetch admins')
@@ -201,13 +124,13 @@ export default function AdminsTable() {
             } catch (error) {
                 console.error("Error fetching admins:", error)
                 // Use mock data as fallback if API call fails
-                setAdmins(mockAdmins)
+                setAdmins([])
             } finally {
                 setLoading(false)
             }
         }
         fetchAdmins()
-    }, [])
+    }, [refreshKey]) // Add refreshKey to dependencies
 
     // Sort function
     const sortAdmins = (admins: Admin[], sortBy: string, sortByDate: string) => {
@@ -233,7 +156,6 @@ export default function AdminsTable() {
         const matchesSearch =
             admin.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
             admin.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            admin.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
             admin.permissions.join(", ").toLowerCase().includes(searchTerm.toLowerCase())
 
         const matchesRole = selectedRole === "All Roles" || admin.role === selectedRole
@@ -266,6 +188,30 @@ export default function AdminsTable() {
         setCurrentPage(1)
     }
 
+    const refreshData = async () => {
+        setLoading(true)
+        try {
+            const response = await fetch('/api/admins', {
+                cache: 'no-store',
+                headers: {
+                    'Cache-Control': 'no-cache',
+                    'Pragma': 'no-cache'
+                }
+            })
+            
+            if (!response.ok) {
+                throw new Error('Failed to fetch admins')
+            }
+            
+            const data = await response.json()
+            setAdmins(data)
+        } catch (error) {
+            console.error("Error refreshing admins:", error)
+        } finally {
+            setLoading(false)
+        }
+    }
+
     const handleDelete = async () => {
         if (!adminToDelete) return
         try {
@@ -278,8 +224,8 @@ export default function AdminsTable() {
                 throw new Error('Failed to delete admin')
             }
             
-            // Update the UI by removing the deleted admin
-            setAdmins(admins.filter((admin) => admin.id !== adminToDelete.id))
+            // Refresh the admin list
+            setRefreshKey(prev => prev + 1)
             setAdminToDelete(null)
         } catch (error) {
             console.error("Error deleting admin:", error)
@@ -394,6 +340,18 @@ export default function AdminsTable() {
                             Admins ({sortedAdmins.length})
                         </CardTitle>
                         <div className="flex items-center gap-2">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                    refreshData();
+                                    router.refresh();
+                                }}
+                                className="gap-2"
+                            >
+                                <RefreshCcw className="h-4 w-4" />
+                                Refresh
+                            </Button>
                             <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
                             <Select value={sortBy} onValueChange={setSortBy}>
                                 <SelectTrigger className="w-32">

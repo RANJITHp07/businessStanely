@@ -4,8 +4,9 @@ import type { NextRequest } from 'next/server'
 // Define protected routes that require authentication
 const protectedRoutes = [
   '/dashboard',
+  '/admin',
   '/agent',
-  '/client', 
+  '/client',
   '/task',
   '/setting'
 ]
@@ -13,7 +14,6 @@ const protectedRoutes = [
 // Define public routes that don't require authentication
 const publicRoutes = [
   '/login',
-  '/signup', 
   '/forgot-password',
   '/reset-password'
 ]

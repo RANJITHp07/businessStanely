@@ -26,28 +26,26 @@ export default function LoginPage() {
   // Redirect if already logged in
   useAuthRedirect();
 
-  const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [fieldErrors, setFieldErrors] = useState({
-    username: "",
     email: "",
     password: "",
   });
 
-  const clearFieldError = (field: string) => {
-    if (fieldErrors[field as keyof typeof fieldErrors]) {
+  const clearFieldError = (field: "email" | "password") => {
+    if (fieldErrors[field]) {
       setFieldErrors((prev) => ({ ...prev, [field]: "" }));
     }
   };
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setFieldErrors({ username: "", email: "", password: "" });
+    setFieldErrors({ email: "", password: "" });
 
-    if (!password || (!username && !email)) {
+    if (!password || !email) {
       const errorMessage = "Please fill in all required fields";
       toast(errorMessage);
       return;
@@ -62,7 +60,6 @@ export default function LoginPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          username: username.trim() || undefined,
           email: email.trim() || undefined,
           password,
         }),
@@ -73,7 +70,6 @@ export default function LoginPage() {
       if (!response.ok) {
         const errorMessage = data.error || "Login failed. Please try again.";
         setFieldErrors({
-          username: "Please check your credentials",
           email: "Please check your credentials",
           password: "Please check your credentials",
         });
@@ -115,23 +111,6 @@ export default function LoginPage() {
         <form onSubmit={handleLogin}>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="username">Username</Label>
-              <Input
-                id="username"
-                type="text"
-                value={username}
-                onChange={(e) => {
-                  setUsername(e.target.value);
-                  clearFieldError("username");
-                }}
-                placeholder="Enter your username"
-                className={fieldErrors.username ? "border-red-500" : ""}
-              />
-              {fieldErrors.username && (
-                <p className="text-xs text-red-500">{fieldErrors.username}</p>
-              )}
-            </div>
-            <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input
                 id="email"
@@ -143,13 +122,11 @@ export default function LoginPage() {
                 }}
                 placeholder="Enter your email"
                 className={fieldErrors.email ? "border-red-500" : ""}
+                required
               />
               {fieldErrors.email && (
                 <p className="text-xs text-red-500">{fieldErrors.email}</p>
               )}
-              <p className="text-xs text-muted-foreground">
-                Enter either username or email
-              </p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
@@ -223,15 +200,6 @@ export default function LoginPage() {
               >
                 Forgot your password?
               </Link>
-              <div className="text-sm text-gray-600">
-                {"Don't have an account? "}
-                <Link
-                  href="/signup"
-                  className="text-blue-600 hover:text-blue-500 hover:underline"
-                >
-                  Sign up
-                </Link>
-              </div>
             </div>
           </CardContent>
         </form>

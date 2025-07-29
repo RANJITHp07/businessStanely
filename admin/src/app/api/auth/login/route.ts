@@ -68,21 +68,21 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { username, email, password } = body;
+    const { email, password } = body;
 
     // Basic validation - just check if credentials are provided
-    if (!password || (!username && !email)) {
+    if (!password || !email) {
       return NextResponse.json(
         {
           error:
-            "Incorrect username/email or password. Please check your credentials and try again.",
+            "Incorrect email or password. Please check your credentials and try again.",
         },
         { status: 401 }
       );
     }
 
-    // Check rate limiting using email or username as identifier
-    const identifier = email || username;
+    // Check rate limiting using email as identifier
+    const identifier = email;
     if (!loginRateLimiter.isAllowed(identifier)) {
       const remainingTime = loginRateLimiter.getRemainingTime(identifier);
       const minutes = Math.ceil(remainingTime / (60 * 1000));
@@ -96,12 +96,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Find user by username or email
-    const user = await prisma.user.findFirst({
+    // Find user by email
+    const user = await prisma.user.findUnique({
       where: {
-        OR: [username ? { username } : {}, email ? { email } : {}].filter(
-          (obj) => Object.keys(obj).length > 0
-        ),
+        email
       },
     });
 
@@ -109,7 +107,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         {
           error:
-            "Incorrect username/email or password. Please check your credentials and try again.",
+            "Incorrect email or password. Please check your credentials and try again.",
         },
         { status: 401 }
       );
@@ -121,7 +119,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         {
           error:
-            "Incorrect username/email or password. Please check your credentials and try again.",
+            "Incorrect email or password. Please check your credentials and try again.",
         },
         { status: 401 }
       );
@@ -157,6 +155,7 @@ export async function POST(req: NextRequest) {
         id: user.id,
         username: user.username,
         email: user.email,
+        adminType: user.adminType, // Include adminType in the response
       },
       token,
     });

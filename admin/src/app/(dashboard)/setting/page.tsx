@@ -15,11 +15,13 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "react-toastify";
 import { Eye, EyeOff, Save, Shield } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 
 interface User {
   id: string;
   username: string;
   email: string;
+  adminType?: "owner" | "admin";
 }
 
 export default function AdminSettingsPage() {
@@ -180,8 +182,15 @@ export default function AdminSettingsPage() {
     <div className="container mx-auto p-6 max-w-7xl py-10 space-y-6">
       {/* Profile Settings */}
       <Card>
-        <CardHeader>
-          <CardTitle className="text-2xl">Profile Settings</CardTitle>
+        <CardHeader className="flex flex-col space-y-2">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-2xl">Profile Settings</CardTitle>
+            {user?.adminType && (
+              <Badge variant={user.adminType === "owner" ? "destructive" : "secondary"}>
+                {user.adminType === "owner" ? "Owner" : "Admin"}
+              </Badge>
+            )}
+          </div>
           <CardDescription>Manage your account information.</CardDescription>
         </CardHeader>
         <form onSubmit={handleProfileSave}>

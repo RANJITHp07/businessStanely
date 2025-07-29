@@ -178,3 +178,64 @@ export async function PUT(
     );
   }
 }
+
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    // Get the current admin user
+    const currentAdmin = await getCurrentAdmin(req);
+    
+    if (!currentAdmin) {
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 }
+      );
+    }
+
+    // Only owner can delete categories
+    if (currentAdmin.adminType !== "owner") {
+      return NextResponse.json(
+        { error: "Only owners can delete categories" },
+        { status: 403 }
+      );
+    }
+
+    const { id } = params;
+
+    // Check if category exists
+    const existingCategory = await prisma.taskCategory.findUnique({
+      where: { id },
+    });
+
+    if (!existingCategory) {
+      return NextResponse.json(
+        { error: "Category not found" },
+        { status: 404 }
+      );
+    }
+
+    // Delete the category
+    await prisma.taskCategory.delete({
+      where: { id },
+    });
+
+    return NextResponse.json({ message: "Category deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting task category:", error);
+    
+    // Check for foreign key constraint violations
+    if (error instanceof Error && 'code' in error && error.code === 'P2003') {
+      return NextResponse.json(
+        { error: "Cannot delete category because it is being used by tasks" },
+        { status: 409 }
+      );
+    }
+
+    return NextResponse.json(
+      { error: "Failed to delete category" },
+      { status: 500 }
+    );
+  }
+}

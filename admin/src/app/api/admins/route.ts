@@ -23,16 +23,15 @@ export async function GET(req: NextRequest) {
 
     // Map the data to match the Admin interface in the frontend
     const formattedAdmins = admins.map(admin => ({
-      id: admin.id,
-      name: admin.name || admin.username,
-      username: admin.username,
-      email: admin.email,
-      role: admin.adminType,
-      status: "active", // Default to active since we just added this field
-      createdAt: admin.createdAt.toISOString(),
-      photo: "/placeholder.svg?height=40&width=40", // Default placeholder image
-      lastLogin: undefined, // We don't have this data yet
-      permissions: [], // Default empty permissions array
+        id: admin.id,
+        name: admin.username, // Use username for display
+        email: admin.email,
+        role: admin.adminType,
+        status: "active", // Default to active since we just added this field
+        createdAt: admin.createdAt.toISOString(),
+        photo: "/placeholder.svg?height=40&width=40", // Default placeholder image
+        lastLogin: undefined, // We don't have this data yet
+        permissions: [], // Default empty permissions array
     }));
 
     return NextResponse.json(formattedAdmins);

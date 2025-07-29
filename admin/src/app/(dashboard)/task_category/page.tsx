@@ -97,10 +97,8 @@ export default function TaskCategoryTable() {
                 const userRole = user.adminType || ""
                 setCurrentUserRole(userRole)
                 
-                // If user is not an owner and the active tab is "pending", switch to "approved"
-                if (userRole !== "owner" && activeTab === "pending") {
-                    setActiveTab("approved")
-                }
+                // No longer restrict pending tab for non-owners
+                // We'll use the isOwner flag for controlling actions instead
             } catch (error) {
                 console.error("Error parsing user data:", error)
             }
@@ -323,17 +321,15 @@ export default function TaskCategoryTable() {
 
             {/* Categories Table with Tabs */}
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-                <TabsList className={`grid w-full ${currentUserRole === "owner" ? "grid-cols-2" : "grid-cols-1"}`}>
+                <TabsList className="grid w-full grid-cols-2">
                     <TabsTrigger value="approved" className="flex items-center gap-2">
                         <CheckCircle className="h-4 w-4" />
                         Approved Categories ({approvedCount})
                     </TabsTrigger>
-                    {currentUserRole === "owner" && (
-                        <TabsTrigger value="pending" className="flex items-center gap-2">
-                            <Clock className="h-4 w-4" />
-                            Pending Categories ({pendingCount})
-                        </TabsTrigger>
-                    )}
+                    <TabsTrigger value="pending" className="flex items-center gap-2">
+                        <Clock className="h-4 w-4" />
+                        Pending Categories ({pendingCount})
+                    </TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="approved">
@@ -446,20 +442,24 @@ export default function TaskCategoryTable() {
                                                                                 View Details
                                                                             </Link>
                                                                         </DropdownMenuItem>
-                                                                        <DropdownMenuItem asChild>
-                                                                            <Link href={`/task_category/${category.id}/edit`}>
-                                                                                <Edit className="mr-2 h-4 w-4" />
-                                                                                Edit Category
-                                                                            </Link>
-                                                                        </DropdownMenuItem>
-                                                                        <DropdownMenuSeparator />
-                                                                        <DropdownMenuItem
-                                                                            className="text-destructive"
-                                                                            onClick={() => setCategoryToDelete(category)}
-                                                                        >
-                                                                            <Trash2 className="mr-2 h-4 w-4" />
-                                                                            Delete Category
-                                                                        </DropdownMenuItem>
+                                                                        {currentUserRole === "owner" && (
+                                                                            <>
+                                                                                <DropdownMenuItem asChild>
+                                                                                    <Link href={`/task_category/${category.id}/edit`}>
+                                                                                        <Edit className="mr-2 h-4 w-4" />
+                                                                                        Edit Category
+                                                                                    </Link>
+                                                                                </DropdownMenuItem>
+                                                                                <DropdownMenuSeparator />
+                                                                                <DropdownMenuItem
+                                                                                    className="text-destructive"
+                                                                                    onClick={() => setCategoryToDelete(category)}
+                                                                                >
+                                                                                    <Trash2 className="mr-2 h-4 w-4" />
+                                                                                    Delete Category
+                                                                                </DropdownMenuItem>
+                                                                            </>
+                                                                        )}
                                                                     </DropdownMenuContent>
                                                                 </DropdownMenu>
                                                             </TableCell>
@@ -649,11 +649,19 @@ export default function TaskCategoryTable() {
                                                                     <DropdownMenuContent align="end">
                                                                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
                                                                         <DropdownMenuItem asChild>
-                                                                            <Link href={`/task_category/approve/${category.id}`}>
-                                                                                <CheckCircle className="mr-2 h-4 w-4" />
-                                                                                Approve/Reject Category
+                                                                            <Link href={`/task_category/${category.id}`}>
+                                                                                <Eye className="mr-2 h-4 w-4" />
+                                                                                View Details
                                                                             </Link>
                                                                         </DropdownMenuItem>
+                                                                        {currentUserRole === "owner" && (
+                                                                            <DropdownMenuItem asChild>
+                                                                                <Link href={`/task_category/approve/${category.id}`}>
+                                                                                    <CheckCircle className="mr-2 h-4 w-4" />
+                                                                                    Approve/Reject Category
+                                                                                </Link>
+                                                                            </DropdownMenuItem>
+                                                                        )}
                                                                     </DropdownMenuContent>
                                                                 </DropdownMenu>
                                                             </TableCell>

@@ -48,7 +48,7 @@ function Create({ admin }: CreateProps) {
                 throw new Error(errorData.error || 'Failed to create category')
             }
             
-            toast.success("Category created successfully! It will be visible after approval.")
+            toast.success("Category created successfully!")
             // Use router for better navigation
             router.push('/task_category')
         } catch (error) {

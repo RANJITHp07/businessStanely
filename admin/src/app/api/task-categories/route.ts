@@ -19,28 +19,16 @@ export async function GET(req: NextRequest) {
     const url = new URL(req.url);
     const statusParam = url.searchParams.get("status");
 
-    // Build query based on user role and status parameter
-    const query: Record<string, string> = {};
-    
-    // If user is not an owner, only show approved categories
-    if (currentAdmin.adminType !== "owner") {
-      query.status = "approved";
-    } 
-    // If status parameter is provided and user is owner, filter by status
-    else if (statusParam && ["approved", "pending"].includes(statusParam)) {
-      query.status = statusParam;
-    }
-
     // Build where clause for the query
     const where: { status?: string } = {};
     
-    // Filter by status if needed
-    if (currentAdmin.adminType !== "owner") {
-      where.status = "approved";
-    } else if (statusParam && ["approved", "pending"].includes(statusParam)) {
+    // If status parameter is provided, filter by status
+    if (statusParam && ["approved", "pending"].includes(statusParam)) {
       where.status = statusParam;
     }
+    // Otherwise show all categories (both pending and approved)
     
+    // Get categories from the database with proper relations
     // Get categories from the database with proper relations
     const categories = await prisma.taskCategory.findMany({
       where,
@@ -49,14 +37,13 @@ export async function GET(req: NextRequest) {
           select: {
             id: true,
             username: true,
-            email: true,
-            name: true,
+            email: true
           }
         },
         approvedBy: {
           select: {
             id: true,
-            username: true,
+            username: true
           }
         }
       },
@@ -87,6 +74,7 @@ export async function GET(req: NextRequest) {
         approvedBy: category.approvedBy?.username || null,
         approvedAt: category.approvedAt?.toISOString() || null,
         taskCount: taskCount,
+        isOwner: currentAdmin.adminType === "owner", // Add flag to indicate if user has owner permissions
       };
     }));
 

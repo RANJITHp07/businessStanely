@@ -64,13 +64,8 @@ export async function GET(
       );
     }
     
-    // If user is not an owner and category is not approved, return 404
-    if (currentAdmin.adminType !== "owner" && category.status !== "approved") {
-      return NextResponse.json(
-        { error: "Category not found" },
-        { status: 404 }
-      );
-    }
+    // Add isOwner flag to indicate if the current user can perform owner actions
+    const isOwner = currentAdmin.adminType === "owner";
     
     // Count tasks associated with this category
     // Note: We don't seem to have a direct relation between Task and TaskCategory in the schema
@@ -80,7 +75,8 @@ export async function GET(
     const formattedCategory = {
       ...category,
       taskCount,
-      createdBy: category.createdBy?.username || "Unknown"
+      createdBy: category.createdBy?.username || "Unknown",
+      isOwner  // Add flag to indicate if user has owner permissions
     };
 
     return NextResponse.json(formattedCategory);
@@ -88,6 +84,96 @@ export async function GET(
     console.error("Error fetching task category:", error);
     return NextResponse.json(
       { error: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function PUT(
+  req: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    // Get the current admin user
+    const currentAdmin = await getCurrentAdmin(req);
+    
+    if (!currentAdmin) {
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 }
+      );
+    }
+
+    // Only owner can edit categories
+    if (currentAdmin.adminType !== "owner") {
+      return NextResponse.json(
+        { error: "Only owners can edit categories" },
+        { status: 403 }
+      );
+    }
+
+    const { id } = params;
+    const body = await req.json();
+    const { name, description, color } = body;
+
+    // Validate required fields
+    if (!name) {
+      return NextResponse.json(
+        { error: "Name is required" },
+        { status: 400 }
+      );
+    }
+
+    // Check if category exists
+    const existingCategory = await prisma.taskCategory.findUnique({
+      where: { id },
+    });
+
+    if (!existingCategory) {
+      return NextResponse.json(
+        { error: "Category not found" },
+        { status: 404 }
+      );
+    }
+
+    // Update the category
+    const updatedCategory = await prisma.taskCategory.update({
+      where: { id },
+      data: {
+        name,
+        description: description || "",
+        color: color || "blue",
+      },
+      include: {
+        createdBy: {
+          select: {
+            id: true,
+            username: true,
+          }
+        },
+        approvedBy: {
+          select: {
+            id: true,
+            username: true,
+          }
+        }
+      }
+    });
+
+    return NextResponse.json(updatedCategory);
+  } catch (error) {
+    console.error("Error updating task category:", error);
+    
+    // Check for unique constraint violations
+    if (error instanceof Error && 'code' in error && error.code === 'P2002') {
+      return NextResponse.json(
+        { error: "A category with this name already exists" },
+        { status: 409 }
+      );
+    }
+
+    return NextResponse.json(
+      { error: "Failed to update category" },
       { status: 500 }
     );
   }

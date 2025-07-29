@@ -10,10 +10,9 @@ generator client {
 
 model User {
   id          String    @id @default(auto()) @map("_id") @db.ObjectId
-  username    String    @unique
+  username    String    @unique // Used for both login and display
   email       String    @unique
   password    String
-  name        String? // Added name field for display in comments
   adminType   String    @default("admin") // Either "owner" or "admin"
   status      String    @default("active") // "active" or "inactive"
   photo       String?

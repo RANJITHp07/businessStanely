@@ -14,12 +14,17 @@ interface CreateProps {
         id: string;
         name?: string;
     } | null;
+    initialData?: {
+        id: string;
+        name: string;
+        description: string;
+    };
 }
 
-function Create({ admin }: CreateProps) {
+function Create({ admin, initialData }: CreateProps) {
     const [formData, setFormData] = useState({
-        name: "",
-        description: "",
+        name: initialData?.name || "",
+        description: initialData?.description || "",
     })
     const [isSubmitting, setIsSubmitting] = useState(false)
     const router = useRouter()
@@ -34,21 +39,27 @@ function Create({ admin }: CreateProps) {
 
         try {
             setIsSubmitting(true)
-            // Call API to create category
-            const response = await fetch('/api/task-categories', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(formData),
-            })
+            // Determine if we're creating or updating
+            const isEditing = !!admin?.id
+
+            // Call API to create/update category
+            const response = await fetch(
+                isEditing ? `/api/task-categories/${admin.id}` : '/api/task-categories', 
+                {
+                    method: isEditing ? 'PUT' : 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(formData),
+                }
+            )
             
             if (!response.ok) {
                 const errorData = await response.json()
-                throw new Error(errorData.error || 'Failed to create category')
+                throw new Error(errorData.error || `Failed to ${isEditing ? 'update' : 'create'} category`)
             }
             
-            toast.success("Category created successfully!")
+            toast.success(`Category ${isEditing ? 'updated' : 'created'} successfully!`)
             // Use router for better navigation
             router.push('/task_category')
         } catch (error) {

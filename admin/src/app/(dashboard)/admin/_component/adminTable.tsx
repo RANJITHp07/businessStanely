@@ -43,7 +43,7 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 
-const adminRoles = ["All Roles", "Owner", "Admin", "Manager", "Moderator", "Support"]
+const adminRoles = ["All Roles", "owner", "admin"]
 
 export interface Admin {
     id: number
@@ -54,7 +54,7 @@ export interface Admin {
     createdAt: string
     photo?: string
     lastLogin?: string
-    permissions: string[]
+    permissions?: string[] // Make permissions optional since API might not return it
 }
 
 
@@ -106,41 +106,86 @@ export default function AdminsTable() {
             try {
                 setLoading(true)
                 
+                // Check if user is logged in
+                const userStr = localStorage.getItem("user")
+                if (!userStr) {
+                    console.error("No user found in localStorage")
+                    router.push('/login')
+                    return
+                }
+                
+                // Log user data for debugging
+                console.log("User from localStorage:", JSON.parse(userStr))
+                
+                // Check if auth token cookie exists
+                const authToken = document.cookie
+                    .split('; ')
+                    .find(row => row.startsWith('auth-token='))
+                console.log("Auth token cookie found:", !!authToken)
+                
                 // Fetch all admins with no-store cache option and force revalidation
                 const response = await fetch('/api/admins', {
                     cache: 'no-store',
+                    credentials: 'include', // Include cookies for authentication
                     headers: {
                         'Cache-Control': 'no-cache',
                         'Pragma': 'no-cache'
                     }
                 })
                 
+                console.log("API Response status:", response.status)
+                
                 if (!response.ok) {
-                    throw new Error('Failed to fetch admins')
+                    if (response.status === 401) {
+                        console.error("Unauthorized - checking auth token...")
+                        console.error("All cookies:", document.cookie)
+                        router.push('/login')
+                        return
+                    }
+                    const errorData = await response.text()
+                    console.error("API Error:", response.status, errorData)
+                    throw new Error(`Failed to fetch admins: ${response.status}`)
                 }
                 
                 const data = await response.json()
                 setAdmins(data)
             } catch (error) {
                 console.error("Error fetching admins:", error)
-                // Use mock data as fallback if API call fails
+                // Use empty array as fallback if API call fails
                 setAdmins([])
             } finally {
                 setLoading(false)
             }
         }
         fetchAdmins()
-    }, [refreshKey]) // Add refreshKey to dependencies
+    }, [refreshKey, router]) // Add router to dependencies
 
     // Sort function
     const sortAdmins = (admins: Admin[], sortBy: string, sortByDate: string) => {
-        return [...admins].sort((a, b) => {
+        const sorted = [...admins].sort((a, b) => {
+            // Primary sorting based on what user selected most recently
+            // If user wants alphabetical sorting
             if (sortBy === "a-z") {
-                return a.name.localeCompare(b.name)
+                const nameComparison = a.name.localeCompare(b.name)
+                if (nameComparison !== 0) return nameComparison
+                // If names are the same, use date as secondary
+                if (sortByDate === "newest") {
+                    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+                } else if (sortByDate === "oldest") {
+                    return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+                }
             } else if (sortBy === "z-a") {
-                return b.name.localeCompare(a.name)
+                const nameComparison = b.name.localeCompare(a.name)
+                if (nameComparison !== 0) return nameComparison
+                // If names are the same, use date as secondary
+                if (sortByDate === "newest") {
+                    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+                } else if (sortByDate === "oldest") {
+                    return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+                }
             }
 
+            // If no alphabetical sorting specified, use date as primary
             if (sortByDate === "newest") {
                 return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
             } else if (sortByDate === "oldest") {
@@ -149,6 +194,17 @@ export default function AdminsTable() {
 
             return 0
         })
+        
+        // Debug logging to verify sorting
+        console.log(`Sorting by: ${sortBy} (alphabetical), ${sortByDate} (date)`)
+        console.log('Sorted admins:', sorted.map(admin => ({
+            name: admin.name,
+            role: admin.role,
+            createdAt: admin.createdAt,
+            createdDate: new Date(admin.createdAt).toLocaleDateString()
+        })))
+        
+        return sorted
     }
 
     // Filter admins based on search and filters
@@ -156,9 +212,9 @@ export default function AdminsTable() {
         const matchesSearch =
             admin.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
             admin.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            admin.permissions.join(", ").toLowerCase().includes(searchTerm.toLowerCase())
+            (admin.permissions && admin.permissions.join(", ").toLowerCase().includes(searchTerm.toLowerCase()))
 
-        const matchesRole = selectedRole === "All Roles" || admin.role === selectedRole
+        const matchesRole = selectedRole === "All Roles" || admin.role.toLowerCase() === selectedRole.toLowerCase()
         const matchesStatus = selectedStatus === "All Status" || admin.status === selectedStatus
 
         return matchesSearch && matchesRole && matchesStatus
@@ -191,8 +247,17 @@ export default function AdminsTable() {
     const refreshData = async () => {
         setLoading(true)
         try {
+            // Check if user is logged in
+            const userStr = localStorage.getItem("user")
+            if (!userStr) {
+                console.error("No user found in localStorage")
+                router.push('/login')
+                return
+            }
+
             const response = await fetch('/api/admins', {
                 cache: 'no-store',
+                credentials: 'include', // Include cookies for authentication
                 headers: {
                     'Cache-Control': 'no-cache',
                     'Pragma': 'no-cache'
@@ -200,7 +265,14 @@ export default function AdminsTable() {
             })
             
             if (!response.ok) {
-                throw new Error('Failed to fetch admins')
+                if (response.status === 401) {
+                    console.error("Unauthorized - redirecting to login")
+                    router.push('/login')
+                    return
+                }
+                const errorData = await response.text()
+                console.error("API Error:", response.status, errorData)
+                throw new Error(`Failed to fetch admins: ${response.status}`)
             }
             
             const data = await response.json()
@@ -218,6 +290,7 @@ export default function AdminsTable() {
             // Call the API to delete the admin
             const response = await fetch(`/api/admins/${adminToDelete.id}`, {
                 method: 'DELETE',
+                credentials: 'include', // Include cookies for authentication
             })
             
             if (!response.ok) {
@@ -234,13 +307,14 @@ export default function AdminsTable() {
 
     const getAdminRoleBadge = (role: string) => {
         const colors = {
-            "Owner": "bg-purple-100 text-purple-800",
-            Admin: "bg-blue-100 text-blue-800",
-            Manager: "bg-green-100 text-green-800",
-            Moderator: "bg-yellow-100 text-yellow-800",
-            Support: "bg-orange-100 text-orange-800",
+            "owner": "bg-purple-100 text-purple-800",
+            "admin": "bg-blue-100 text-blue-800",
+            "Owner": "bg-purple-100 text-purple-800", // Fallback for capitalized
+            "Admin": "bg-blue-100 text-blue-800", // Fallback for capitalized
         }
-        return <Badge className={colors[role as keyof typeof colors] || "bg-gray-100 text-gray-800"}>{role}</Badge>
+        return <Badge className={colors[role as keyof typeof colors] || "bg-gray-100 text-gray-800"}>
+            {role.charAt(0).toUpperCase() + role.slice(1)}
+        </Badge>
     }
 
     return (
@@ -298,7 +372,7 @@ export default function AdminsTable() {
                                     </div>
                                 </div>
                                 {/* Filter Controls */}
-                                <div className="grid grid-cols-1  gap-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     <div className="space-y-2">
                                         <Label>Admin Role</Label>
                                         <Select value={selectedRole} onValueChange={setSelectedRole}>
@@ -311,6 +385,19 @@ export default function AdminsTable() {
                                                         {role}
                                                     </SelectItem>
                                                 ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label>Status</Label>
+                                        <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+                                            <SelectTrigger className="w-full">
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="All Status">All Status</SelectItem>
+                                                <SelectItem value="active">Active</SelectItem>
+                                                <SelectItem value="inactive">Inactive</SelectItem>
                                             </SelectContent>
                                         </Select>
                                     </div>
@@ -362,11 +449,12 @@ export default function AdminsTable() {
                                     <SelectItem value="z-a">Z-A</SelectItem>
                                 </SelectContent>
                             </Select>
-                            <Select>
+                            <Select value={selectedRole} onValueChange={setSelectedRole}>
                                 <SelectTrigger className="w-38">
                                     <SelectValue className="text-black" placeholder="Role" />
                                 </SelectTrigger>
                                 <SelectContent>
+                                    <SelectItem value="All Roles">All Roles</SelectItem>
                                     <SelectItem value="owner">Owner</SelectItem>
                                     <SelectItem value="admin">Admin</SelectItem>
                                 </SelectContent>
@@ -397,6 +485,7 @@ export default function AdminsTable() {
                                             <TableHead>Admin</TableHead>
                                             <TableHead>Role</TableHead>
                                             <TableHead>Email</TableHead>
+                                            <TableHead>Status</TableHead>
                                             <TableHead className="text-right">Actions</TableHead>
                                         </TableRow>
                                     </TableHeader>
@@ -433,7 +522,11 @@ export default function AdminsTable() {
                                                     <TableCell>
                                                         <div className="text-sm text-muted-foreground">{admin.email}</div>
                                                     </TableCell>
-
+                                                    <TableCell>
+                                                        <Badge variant={admin.status === "active" ? "default" : "secondary"}>
+                                                            {admin.status.charAt(0).toUpperCase() + admin.status.slice(1)}
+                                                        </Badge>
+                                                    </TableCell>
 
                                                     <TableCell className="text-right">
                                                         <DropdownMenu>

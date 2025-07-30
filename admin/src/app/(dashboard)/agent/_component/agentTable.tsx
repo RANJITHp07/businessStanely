@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
+import { useRouter } from "next/navigation";
 import {
   Card,
   CardContent,
@@ -338,7 +339,7 @@ export default function AgentsTable() {
               <Users className="h-5 w-5" />
               Agents ({sortedAgents.length})
             </CardTitle>
-            <div className="flex items-center gap-2">
+            {/* <div className="flex items-center gap-2">
               <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
               <Select value={sortBy} onValueChange={setSortBy}>
                 <SelectTrigger className="w-32">
@@ -368,7 +369,7 @@ export default function AgentsTable() {
                   <SelectItem value="oldest">Oldest</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
+            </div> */}
           </div>
         </CardHeader>
 
@@ -390,101 +391,106 @@ export default function AgentsTable() {
   </TableRow>
 </TableHeader>
 
-              <TableBody>
-                {currentAgents.length === 0 ? (
-                  <TableRow>
-                    <TableCell
-                      colSpan={5}
-                      className="text-center py-8 text-muted-foreground"
-                    >
-                      No agents found matching your criteria.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  currentAgents.map((agent) => (
-                    <TableRow key={agent.id}>
-                      <TableCell>
-                        <div className="flex items-center space-x-3">
-                          <Avatar className="h-10 w-10">
-                            <AvatarImage src={agent.photo || ""} />
-                            <AvatarFallback>
-                              {agent.name
-                                .toUpperCase()
-                                .split(" ")
-                                .map((n) => n[0])
-                                .join("")}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <div className="font-medium">
-                              {agent.name.charAt(0).toUpperCase() +
-                                agent.name.slice(1)}
-                            </div>
-                            <div className="text-sm text-muted-foreground">
-                              {agent.email}
-                            </div>
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {getAgentTypeBadge(agent.agentType)}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-wrap gap-1">
-                          {agent.specializations.slice(0, 2).map((spec) => (
-                            <Badge
-                              key={spec}
-                              variant="outline"
-                              className="text-xs"
-                            >
-                              {spec}
-                            </Badge>
-                          ))}
-                          {agent.specializations.length > 2 && (
-                            <Badge variant="outline" className="text-xs">
-                              +{agent.specializations.length - 2}
-                            </Badge>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>{agent.jurisdiction}</TableCell>
-                      <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" className="h-8 w-8 p-0">
-                              <span className="sr-only">Open menu</span>
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                            <DropdownMenuItem asChild>
-                              <Link href={`/agent/${agent.id}`}>
-                                <Eye className="mr-2 h-4 w-4" />
-                                View Details
-                              </Link>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem asChild>
-                              <Link href={`/agent/${agent.id}/edit`}>
-                                <Edit className="mr-2 h-4 w-4" />
-                                Edit Agent
-                              </Link>
-                            </DropdownMenuItem>
-                            <DropdownMenuSeparator />
-                            <DropdownMenuItem
-                              className="text-destructive"
-                              onClick={() => setAgentToDelete(agent)}
-                            >
-                              <Trash2 className="mr-2 h-4 w-4" />
-                              Delete Agent
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
+<TableBody>
+  {currentAgents.length === 0 ? (
+    <TableRow>
+      <TableCell
+        colSpan={5}
+        className="text-center py-8 text-muted-foreground"
+      >
+        No agents found matching your criteria.
+      </TableCell>
+    </TableRow>
+  ) : (
+    currentAgents.map((agent) => {
+      const router = useRouter();
+      return (
+        <TableRow
+          key={agent.id}
+          onClick={() => router.push(`/agent/${agent.id}`)}
+          className="cursor-pointer hover:bg-muted/50"
+        >
+          <TableCell>
+            <div className="flex items-center space-x-3">
+              <Avatar className="h-10 w-10">
+                <AvatarImage src={agent.photo || ""} />
+                <AvatarFallback>
+                  {agent.name
+                    .toUpperCase()
+                    .split(" ")
+                    .map((n) => n[0])
+                    .join("")}
+                </AvatarFallback>
+              </Avatar>
+              <div>
+                <div className="font-medium">
+                  {agent.name.charAt(0).toUpperCase() + agent.name.slice(1)}
+                </div>
+                <div className="text-sm text-muted-foreground">
+                  {agent.email}
+                </div>
+              </div>
+            </div>
+          </TableCell>
+          <TableCell>{getAgentTypeBadge(agent.agentType)}</TableCell>
+          <TableCell>
+            <div className="flex flex-wrap gap-1">
+              {agent.specializations.slice(0, 2).map((spec) => (
+                <Badge key={spec} variant="outline" className="text-xs">
+                  {spec}
+                </Badge>
+              ))}
+              {agent.specializations.length > 2 && (
+                <Badge variant="outline" className="text-xs">
+                  +{agent.specializations.length - 2}
+                </Badge>
+              )}
+            </div>
+          </TableCell>
+          <TableCell>{agent.jurisdiction}</TableCell>
+          <TableCell
+            className="text-right"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="h-8 w-8 p-0">
+                  <span className="sr-only">Open menu</span>
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                <DropdownMenuItem asChild>
+                  <Link href={`/agent/${agent.id}`}>
+                    <Eye className="mr-2 h-4 w-4" />
+                    View Details
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href={`/agent/${agent.id}/edit`}>
+                    <Edit className="mr-2 h-4 w-4" />
+                    Edit Agent
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="text-destructive"
+                  onClick={() => setAgentToDelete(agent)}
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete Agent
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </TableCell>
+        </TableRow>
+      );
+    })
+  )}
+</TableBody>
+
+
             </Table>
           </div>
 

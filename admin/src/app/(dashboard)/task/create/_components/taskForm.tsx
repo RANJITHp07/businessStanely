@@ -644,8 +644,14 @@ export default function TaskForm() {
                                     </Button>
                                 </PopoverTrigger>
                                 <PopoverContent className="w-auto p-0">
-                                    <Calendar mode="single" disabled={(date) => isBefore(startOfDay(date), startOfDay(new Date()))} selected={dueDate} onSelect={setDueDate} initialFocus />
-                                </PopoverContent>
+  <Calendar 
+    mode="single" 
+    selected={dueDate} 
+    onSelect={setDueDate} 
+    fromDate={new Date()}
+    initialFocus 
+  />
+</PopoverContent>
                             </Popover>
                             <p className="text-xs text-muted-foreground">Choose the date when this task should be completed</p>
                         </div>

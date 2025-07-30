@@ -370,7 +370,7 @@ export default function ClientsTable() {
                             <Users className="h-5 w-5" />
                             Clients ({sortedClients.length})
                         </CardTitle>
-                        <div className="flex items-center gap-2">
+                        {/* <div className="flex items-center gap-2">
                             <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
                             <Select value={sortBy} onValueChange={setSortBy}>
                                 <SelectTrigger className="w-32">
@@ -390,7 +390,7 @@ export default function ClientsTable() {
                                     <SelectItem value="oldest">Oldest</SelectItem>
                                 </SelectContent>
                             </Select>
-                        </div>
+                        </div> */}
                     </div>
                 </CardHeader>
 

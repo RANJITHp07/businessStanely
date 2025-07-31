@@ -20,6 +20,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { Skeleton } from "@/components/ui/skeleton";
 
 // Icons
 import {
@@ -206,10 +207,50 @@ export default function CategoryDetail({ params }: { params: Promise<{ id: strin
     if (loading) {
         return (
             <div className="container mx-auto p-6 max-w-7xl">
-                <div className="flex justify-center items-center py-20">
-                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            {/* Header Skeleton */}
+            <div className="mb-8">
+              <div className="flex flex-col md:flex-row justify-between md:items-center mb-6 md:mb-4">
+                <div>
+                  <Skeleton className="h-8 w-40 mb-2" />
+                  <Skeleton className="h-5 w-80" />
                 </div>
+                <Skeleton className="h-10 w-32 mt-[20px] md:mt-0" />
+              </div>
+              <Card>
+                <CardContent className="p-6">
+                  <div className="space-y-4">
+                    <Skeleton className="h-6 w-1/2 mb-2" />
+                    <Skeleton className="h-4 w-full mb-4" />
+                    <div className="flex flex-col md:flex-row md:items-center gap-4 md:gap-6 p-0 md:p-4 bg-muted/30 rounded-lg">
+                      <Skeleton className="h-4 w-32" />
+                      <Skeleton className="h-4 w-32" />
+                      <Skeleton className="h-4 w-40 md:ml-auto" />
+                    </div>
+                  </div>
+
+                </CardContent>
+
+              </Card>
+
+              <Card className="mt-[20px]">
+                <CardContent className="p-6 mt-[30px]">
+                  <div className="space-y-4">
+                    <Skeleton className="h-6 w-1/2 mb-2" />
+                    <Skeleton className="h-4 w-full mb-4" />
+                    <div className="flex flex-col md:flex-row md:items-center gap-4 md:gap-6 p-0 md:p-4 bg-muted/30 rounded-lg">
+                      <Skeleton className="h-4 w-32" />
+                      <Skeleton className="h-4 w-32" />
+                      <Skeleton className="h-4 w-40 md:ml-auto" />
+                    </div>
+                  </div>
+
+                </CardContent>
+                
+              </Card>
             </div>
+        
+         
+          </div>
         )
     }
 
@@ -228,7 +269,7 @@ export default function CategoryDetail({ params }: { params: Promise<{ id: strin
             <div className="mb-8">
                 <div className="flex items-center gap-4 mb-6">
                     <div>
-                        <h1 className="text-[28px] md:text-3xl font-bold">Task Category Detail</h1>
+                        <h1 className="text-[28px] md:text-3xl font-bold">Task Category Details</h1>
                         <p className="text-[18px] md:text-[16px] text-muted-foreground mt-2">
                             Comprehensive view of task category details and associated tasks
                         </p>

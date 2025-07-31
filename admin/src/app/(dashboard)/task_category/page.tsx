@@ -343,7 +343,7 @@ export default function TaskCategoryTable() {
                                 <div className="flex items-center gap-2">
                                     <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
                                     <Select value={sortBy} onValueChange={setSortBy}>
-                                        <SelectTrigger className="w-32">
+                                        <SelectTrigger className="md:w-32">
                                             <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent>
@@ -352,7 +352,7 @@ export default function TaskCategoryTable() {
                                         </SelectContent>
                                     </Select>
                                     <Select value={sortByDate} onValueChange={setSortByDate}>
-                                        <SelectTrigger className="w-32">
+                                        <SelectTrigger className="md:w-32">
                                             <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent>

@@ -8,6 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Loader2 } from "lucide-react"
+import { useRouter } from "next/navigation";
+
 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import {
@@ -212,13 +214,13 @@ export default function TasksTable() {
 
                 {/* Filters */}
                 <Card>
-                    <CardHeader>
+                    {/* <CardHeader>
                         <CardTitle className="flex items-center gap-2">
                             <Filter className="h-5 w-5" />
                             Filters & Search
                         </CardTitle>
                         <CardDescription>Filter and search through your tasks</CardDescription>
-                    </CardHeader>
+                    </CardHeader> */}
                     <CardContent className="space-y-4">
 
                     <Card>
@@ -380,102 +382,125 @@ export default function TasksTable() {
                                     <TableHead className="text-right">Actions</TableHead>
                                 </TableRow>
                             </TableHeader>
+
+
                             <TableBody>
-                                {currentTasks.length === 0 ? (
-                                    <TableRow>
-                                        <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                                            No tasks found matching your criteria.
-                                        </TableCell>
-                                    </TableRow>
-                                ) : (
-                                    currentTasks.map((task) => (
-                                        <TableRow key={task.id} className={isOverdue(task.dueDate, task.status) ? "bg-red-50" : ""}>
-                                            <TableCell>
-                                                <div className="space-y-1">
-                                                    <div className="font-medium">{task.title}</div>
-                                                </div>
-                                            </TableCell>
-                                            <TableCell>
-                                                <div className="space-y-1">
-                                                    <div className="font-medium">{task.client ? (task.client.clientType === 'individual' ? `${task.client.firstName} ${task.client.lastName}` : task.client.organizationName) : 'N/A'}</div>
-                                                    <div className="text-sm text-muted-foreground">{task.client?.email}</div>
-                                                </div>
-                                            </TableCell>
-                                            <TableCell>
-                                                <div className="flex items-center space-x-2">
-                                                    <Avatar className="h-8 w-8">
-                                                        <AvatarFallback className="text-xs">
-                                                            {task.assignedTo?.name
-                                                                .toUpperCase()
-                                                                .split(" ")
-                                                                .map((n) => n[0])
-                                                                .join("")}
-                                                        </AvatarFallback>
-                                                    </Avatar>
-                                                    <div>
-                                                        <div className="font-medium text-sm">{task.assignedTo?.name}</div>
-                                                        <div className="text-xs text-muted-foreground">{task.assignedTo?.agentType}</div>
-                                                    </div>
-                                                </div>
-                                            </TableCell>
-                                            <TableCell>{getPriorityBadge(task.priority)}</TableCell>
-                                            <TableCell>
-                                                <div className="flex items-center gap-1">
-                                                    <Calendar className="h-4 w-4 text-muted-foreground" />
-                                                    <span className={isOverdue(task.dueDate, task.status) ? "text-red-600 font-medium" : ""}>
-                                                        {task.dueDate ? formatDate(task.dueDate) : 'N/A'}
-                                                    </span>
-                                                </div>
-                                                {task.dueDate && isOverdue(task.dueDate, task.status) && (
-                                                    <Badge variant="destructive" className="text-xs mt-1">
-                                                        Overdue
-                                                    </Badge>
-                                                )}
-                                            </TableCell>
-                                            <TableCell>
-                                                <div className="space-y-2">
-                                                    <div className="flex items-center justify-between">
-                                                        <span className="text-sm font-medium">{task.status}</span>
-                                                    </div>
-                                                </div>
-                                            </TableCell>
-                                            <TableCell className="text-right">
-                                                <DropdownMenu>
-                                                    <DropdownMenuTrigger asChild>
-                                                        <Button variant="ghost" className="h-8 w-8 p-0">
-                                                            <span className="sr-only">Open menu</span>
-                                                            <MoreHorizontal className="h-4 w-4" />
-                                                        </Button>
-                                                    </DropdownMenuTrigger>
-                                                    <DropdownMenuContent align="end">
-                                                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                                        <DropdownMenuItem asChild>
-                                                            <Link href={`/task/${task.id}`}>
-                                                                <Eye className="mr-2 h-4 w-4" />
-                                                                View Details
-                                                            </Link>
-                                                        </DropdownMenuItem>
-                                                        <DropdownMenuItem asChild>
-                                                            <Link href={`/task/${task.id}/edit`}>
-                                                                <Edit className="mr-2 h-4 w-4" />
-                                                                Edit Task
-                                                            </Link>
-                                                        </DropdownMenuItem>
-                                                        <DropdownMenuSeparator />
-                                                        <DropdownMenuItem
-                                                            className="text-destructive"
-                                                            onClick={() => setTaskToDelete(task)}
-                                                        >
-                                                            <Trash2 className="mr-2 h-4 w-4" />
-                                                            Delete Task
-                                                        </DropdownMenuItem>
-                                                    </DropdownMenuContent>
-                                                </DropdownMenu>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))
-                                )}
-                            </TableBody>
+  {currentTasks.length === 0 ? (
+    <TableRow>
+      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+        No tasks found matching your criteria.
+      </TableCell>
+    </TableRow>
+  ) : (
+    currentTasks.map((task) => {
+      const router = useRouter();
+      return (
+        <TableRow
+          key={task.id}
+          onClick={() => router.push(`/task/${task.id}`)}
+          className={`cursor-pointer hover:bg-muted/50 ${
+            isOverdue(task.dueDate, task.status) ? "bg-red-50" : ""
+          }`}
+        >
+          <TableCell>
+            <div className="space-y-1">
+              <div className="font-medium">{task.title}</div>
+            </div>
+          </TableCell>
+          <TableCell>
+            <div className="space-y-1">
+              <div className="font-medium">
+                {task.client
+                  ? task.client.clientType === "individual"
+                    ? `${task.client.firstName} ${task.client.lastName}`
+                    : task.client.organizationName
+                  : "N/A"}
+              </div>
+              <div className="text-sm text-muted-foreground">{task.client?.email}</div>
+            </div>
+          </TableCell>
+          <TableCell>
+            <div className="flex items-center space-x-2">
+              <Avatar className="h-8 w-8">
+                <AvatarFallback className="text-xs">
+                  {task.assignedTo?.name
+                    .toUpperCase()
+                    .split(" ")
+                    .map((n) => n[0])
+                    .join("")}
+                </AvatarFallback>
+              </Avatar>
+              <div>
+                <div className="font-medium text-sm">{task.assignedTo?.name}</div>
+                <div className="text-xs text-muted-foreground">{task.assignedTo?.agentType}</div>
+              </div>
+            </div>
+          </TableCell>
+          <TableCell>{getPriorityBadge(task.priority)}</TableCell>
+          <TableCell>
+            <div className="flex items-center gap-1">
+              <Calendar className="h-4 w-4 text-muted-foreground" />
+              <span className={isOverdue(task.dueDate, task.status) ? "text-red-600 font-medium" : ""}>
+                {task.dueDate ? formatDate(task.dueDate) : "N/A"}
+              </span>
+            </div>
+            {task.dueDate && isOverdue(task.dueDate, task.status) && (
+              <Badge variant="destructive" className="text-xs mt-1">
+                Overdue
+              </Badge>
+            )}
+          </TableCell>
+          <TableCell>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">{task.status}</span>
+              </div>
+            </div>
+          </TableCell>
+          <TableCell
+            className="text-right"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="h-8 w-8 p-0">
+                  <span className="sr-only">Open menu</span>
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                <DropdownMenuItem asChild>
+                  <Link href={`/task/${task.id}`}>
+                    <Eye className="mr-2 h-4 w-4" />
+                    View Details
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href={`/task/${task.id}/edit`}>
+                    <Edit className="mr-2 h-4 w-4" />
+                    Edit Task
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="text-destructive"
+                  onClick={() => setTaskToDelete(task)}
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete Task
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </TableCell>
+        </TableRow>
+      );
+    })
+  )}
+</TableBody>
+
+
+
                         </Table>
                     </div>
 

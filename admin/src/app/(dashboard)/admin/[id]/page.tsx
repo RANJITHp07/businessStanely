@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowLeft, Edit, Loader2, Shield, User } from "lucide-react";
 import { toast } from "react-toastify";
 import Link from "next/link";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface Admin {
   id: string;
@@ -57,9 +58,37 @@ export default function AdminDetailsPage() {
 
   if (isLoading) {
     return (
-      <div className="flex justify-center items-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="container mx-auto p-6 max-w-7xl">
+      {/* Header Skeleton */}
+      <div className="mb-8">
+        <div className="flex flex-col md:flex-row justify-between md:items-center mb-6 md:mb-4">
+          <div>
+            <Skeleton className="h-8 w-40 mb-2" />
+            <Skeleton className="h-5 w-80" />
+          </div>
+          <Skeleton className="h-10 w-32 mt-[20px] md:mt-0" />
+        </div>
+        <Card>
+          <CardContent className="p-6">
+            <div className="space-y-4">
+              <Skeleton className="h-6 w-1/2 mb-2" />
+              <Skeleton className="h-4 w-full mb-4" />
+              <div className="flex flex-col md:flex-row md:items-center gap-4 md:gap-6 p-0 md:p-4 bg-muted/30 rounded-lg">
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-4 w-40 md:ml-auto" />
+              </div>
+            </div>
+
+          </CardContent>
+
+        </Card>
+
+
       </div>
+  
+   
+    </div>
     );
   }
 

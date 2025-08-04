@@ -74,12 +74,15 @@ export default function AdminsTable() {
     const [currentUserRole, setCurrentUserRole] = useState<string>("")
     const [refreshKey, setRefreshKey] = useState(0) // Add refresh key
 
+    console.log(currentUserRole)
+
     // Get the current user's role from localStorage
     useEffect(() => {
         const userStr = localStorage.getItem("user")
         if (userStr) {
             try {
                 const user = JSON.parse(userStr)
+                console.log(user)
                 setCurrentUserRole(user.adminType || "")
             } catch (error) {
                 console.error("Error parsing user data:", error)
@@ -105,7 +108,7 @@ export default function AdminsTable() {
         const fetchAdmins = async () => {
             try {
                 setLoading(true)
-                
+
                 // Check if user is logged in
                 const userStr = localStorage.getItem("user")
                 if (!userStr) {
@@ -113,16 +116,16 @@ export default function AdminsTable() {
                     router.push('/login')
                     return
                 }
-                
+
                 // Log user data for debugging
                 console.log("User from localStorage:", JSON.parse(userStr))
-                
+
                 // Check if auth token cookie exists
                 const authToken = document.cookie
                     .split('; ')
                     .find(row => row.startsWith('auth-token='))
                 console.log("Auth token cookie found:", !!authToken)
-                
+
                 // Fetch all admins with no-store cache option and force revalidation
                 const response = await fetch('/api/admins', {
                     cache: 'no-store',
@@ -132,9 +135,9 @@ export default function AdminsTable() {
                         'Pragma': 'no-cache'
                     }
                 })
-                
+
                 console.log("API Response status:", response.status)
-                
+
                 if (!response.ok) {
                     if (response.status === 401) {
                         console.error("Unauthorized - checking auth token...")
@@ -146,7 +149,7 @@ export default function AdminsTable() {
                     console.error("API Error:", response.status, errorData)
                     throw new Error(`Failed to fetch admins: ${response.status}`)
                 }
-                
+
                 const data = await response.json()
                 setAdmins(data)
             } catch (error) {
@@ -194,7 +197,7 @@ export default function AdminsTable() {
 
             return 0
         })
-        
+
         // Debug logging to verify sorting
         console.log(`Sorting by: ${sortBy} (alphabetical), ${sortByDate} (date)`)
         console.log('Sorted admins:', sorted.map(admin => ({
@@ -203,7 +206,7 @@ export default function AdminsTable() {
             createdAt: admin.createdAt,
             createdDate: new Date(admin.createdAt).toLocaleDateString()
         })))
-        
+
         return sorted
     }
 
@@ -263,7 +266,7 @@ export default function AdminsTable() {
                     'Pragma': 'no-cache'
                 }
             })
-            
+
             if (!response.ok) {
                 if (response.status === 401) {
                     console.error("Unauthorized - redirecting to login")
@@ -274,7 +277,7 @@ export default function AdminsTable() {
                 console.error("API Error:", response.status, errorData)
                 throw new Error(`Failed to fetch admins: ${response.status}`)
             }
-            
+
             const data = await response.json()
             setAdmins(data)
         } catch (error) {
@@ -292,11 +295,11 @@ export default function AdminsTable() {
                 method: 'DELETE',
                 credentials: 'include', // Include cookies for authentication
             })
-            
+
             if (!response.ok) {
                 throw new Error('Failed to delete admin')
             }
-            
+
             // Refresh the admin list
             setRefreshKey(prev => prev + 1)
             setAdminToDelete(null)
@@ -426,7 +429,7 @@ export default function AdminsTable() {
                             <Shield className="h-5 w-5" />
                             Admins ({sortedAdmins.length})
                         </CardTitle>
-                        <div className="flex items-center gap-2">
+                        {/* <div className="flex items-center gap-2">
                             <Button
                                 variant="outline"
                                 size="sm"
@@ -468,7 +471,7 @@ export default function AdminsTable() {
                                     <SelectItem value="oldest">Oldest</SelectItem>
                                 </SelectContent>
                             </Select>
-                        </div>
+                        </div> */}
                     </div>
                 </CardHeader>
                 {loading ? (

@@ -23,9 +23,9 @@ model User {
   comments    Comment[] @relation("UserComments")
 
   // Task Category relations
-  createdCategories     TaskCategory[] @relation()
-  approvedCategories    TaskCategory[] @relation("CategoryApprovals")
-  rejectedCategories    TaskCategory[] @relation("CategoryRejections")
+  createdCategories  TaskCategory[] @relation()
+  approvedCategories TaskCategory[] @relation("CategoryApprovals")
+  rejectedCategories TaskCategory[] @relation("CategoryRejections")
 
   // OTP fields for password reset
   resetOtp      String?
@@ -69,7 +69,6 @@ model Agent {
   id                   String   @id @default(auto()) @map("_id") @db.ObjectId
   name                 String
   email                String   @unique
-  password             String   // Add password field for authentication
   phoneNumber          String
   secondaryPhoneNumber String?
   agentType            String
@@ -77,15 +76,8 @@ model Agent {
   jurisdiction         String
   specializations      String[]
   photo                String?
-  status               String   @default("active") // "active" or "inactive"
-  lastLogin            DateTime?
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
-
-  // OTP fields for password reset
-  resetOtp             String?
-  otpExpiry            DateTime?
-  isOtpVerified        Boolean  @default(false)
 
   // Team Management
   superiorId    String?   @db.ObjectId
@@ -148,19 +140,19 @@ model TaskCategory {
   status      String   @default("pending") // "pending" or "approved"
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
-  
+
   // Creator information
-  createdById String   @db.ObjectId
-  createdBy   User     @relation(fields: [createdById], references: [id])
-  
+  createdById String @db.ObjectId
+  createdBy   User   @relation(fields: [createdById], references: [id])
+
   // Approval information
-  approvedById String?  @db.ObjectId
-  approvedBy   User?    @relation("CategoryApprovals", fields: [approvedById], references: [id])
+  approvedById String?   @db.ObjectId
+  approvedBy   User?     @relation("CategoryApprovals", fields: [approvedById], references: [id])
   approvedAt   DateTime?
-  
+
   // Rejection information
-  rejectedById String?  @db.ObjectId
-  rejectedBy   User?    @relation("CategoryRejections", fields: [rejectedById], references: [id])
-  rejectedAt   DateTime?
+  rejectedById    String?   @db.ObjectId
+  rejectedBy      User?     @relation("CategoryRejections", fields: [rejectedById], references: [id])
+  rejectedAt      DateTime?
   rejectionReason String?
 }

@@ -74,8 +74,6 @@ export default function AdminsTable() {
     const [currentUserRole, setCurrentUserRole] = useState<string>("")
     const [refreshKey, setRefreshKey] = useState(0) // Add refresh key
 
-    console.log(currentUserRole)
-
     // Get the current user's role from localStorage
     useEffect(() => {
         const userStr = localStorage.getItem("user")

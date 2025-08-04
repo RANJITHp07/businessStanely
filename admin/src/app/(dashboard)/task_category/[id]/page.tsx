@@ -123,17 +123,17 @@ export default function CategoryDetail({ params }: { params: Promise<{ id: strin
                 // Fetch category from API
                 const categoryId = resolvedParams.id
                 const categoryResponse = await fetch(`/api/task-categories/${categoryId}`)
-                
+
                 if (!categoryResponse.ok) {
                     throw new Error('Failed to fetch category')
                 }
-                
+
                 const categoryData = await categoryResponse.json()
                 setCategory(categoryData)
-                
+
                 // Fetch tasks associated with this category
                 const tasksResponse = await fetch(`/api/tasks?categoryId=${categoryId}`)
-                
+
                 if (tasksResponse.ok) {
                     const tasksData = await tasksResponse.json()
                     setTasks(tasksData)
@@ -207,50 +207,50 @@ export default function CategoryDetail({ params }: { params: Promise<{ id: strin
     if (loading) {
         return (
             <div className="container mx-auto p-6 max-w-7xl">
-            {/* Header Skeleton */}
-            <div className="mb-8">
-              <div className="flex flex-col md:flex-row justify-between md:items-center mb-6 md:mb-4">
-                <div>
-                  <Skeleton className="h-8 w-40 mb-2" />
-                  <Skeleton className="h-5 w-80" />
+                {/* Header Skeleton */}
+                <div className="mb-8">
+                    <div className="flex flex-col md:flex-row justify-between md:items-center mb-6 md:mb-4">
+                        <div>
+                            <Skeleton className="h-8 w-40 mb-2" />
+                            <Skeleton className="h-5 w-80" />
+                        </div>
+                        <Skeleton className="h-10 w-32 mt-[20px] md:mt-0" />
+                    </div>
+                    <Card>
+                        <CardContent className="p-6">
+                            <div className="space-y-4">
+                                <Skeleton className="h-6 w-1/2 mb-2" />
+                                <Skeleton className="h-4 w-full mb-4" />
+                                <div className="flex flex-col md:flex-row md:items-center gap-4 md:gap-6 p-0 md:p-4 bg-muted/30 rounded-lg">
+                                    <Skeleton className="h-4 w-32" />
+                                    <Skeleton className="h-4 w-32" />
+                                    <Skeleton className="h-4 w-40 md:ml-auto" />
+                                </div>
+                            </div>
+
+                        </CardContent>
+
+                    </Card>
+
+                    <Card className="mt-[20px]">
+                        <CardContent className="p-6 mt-[30px]">
+                            <div className="space-y-4">
+                                <Skeleton className="h-6 w-1/2 mb-2" />
+                                <Skeleton className="h-4 w-full mb-4" />
+                                <div className="flex flex-col md:flex-row md:items-center gap-4 md:gap-6 p-0 md:p-4 bg-muted/30 rounded-lg">
+                                    <Skeleton className="h-4 w-32" />
+                                    <Skeleton className="h-4 w-32" />
+                                    <Skeleton className="h-4 w-40 md:ml-auto" />
+                                </div>
+                            </div>
+
+                        </CardContent>
+
+                    </Card>
                 </div>
-                <Skeleton className="h-10 w-32 mt-[20px] md:mt-0" />
-              </div>
-              <Card>
-                <CardContent className="p-6">
-                  <div className="space-y-4">
-                    <Skeleton className="h-6 w-1/2 mb-2" />
-                    <Skeleton className="h-4 w-full mb-4" />
-                    <div className="flex flex-col md:flex-row md:items-center gap-4 md:gap-6 p-0 md:p-4 bg-muted/30 rounded-lg">
-                      <Skeleton className="h-4 w-32" />
-                      <Skeleton className="h-4 w-32" />
-                      <Skeleton className="h-4 w-40 md:ml-auto" />
-                    </div>
-                  </div>
 
-                </CardContent>
 
-              </Card>
-
-              <Card className="mt-[20px]">
-                <CardContent className="p-6 mt-[30px]">
-                  <div className="space-y-4">
-                    <Skeleton className="h-6 w-1/2 mb-2" />
-                    <Skeleton className="h-4 w-full mb-4" />
-                    <div className="flex flex-col md:flex-row md:items-center gap-4 md:gap-6 p-0 md:p-4 bg-muted/30 rounded-lg">
-                      <Skeleton className="h-4 w-32" />
-                      <Skeleton className="h-4 w-32" />
-                      <Skeleton className="h-4 w-40 md:ml-auto" />
-                    </div>
-                  </div>
-
-                </CardContent>
-                
-              </Card>
             </div>
-        
-         
-          </div>
         )
     }
 
@@ -300,10 +300,10 @@ export default function CategoryDetail({ params }: { params: Promise<{ id: strin
                                     <div className="flex-1">
                                         <div className="flex items-center gap-3 mb-2">
                                             <h2 className="text-2xl font-semibold">{category.name}</h2>
-                                            <Badge 
-                                                variant="secondary" 
-                                                className={category.status === "approved" 
-                                                    ? "bg-green-100 text-green-800" 
+                                            <Badge
+                                                variant="secondary"
+                                                className={category.status === "approved"
+                                                    ? "bg-green-100 text-green-800"
                                                     : "bg-yellow-100 text-yellow-800"
                                                 }
                                             >
@@ -343,7 +343,7 @@ export default function CategoryDetail({ params }: { params: Promise<{ id: strin
                                 <FileText className="h-5 w-5" />
                                 Category Tasks ({tasks.length})
                             </CardTitle>
-                            <div className="flex items-center gap-2">
+                            {/* <div className="flex items-center gap-2">
                                 <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
                                 <Select value={sortBy} onValueChange={setSortBy}>
                                     <SelectTrigger className="w-32">
@@ -373,7 +373,7 @@ export default function CategoryDetail({ params }: { params: Promise<{ id: strin
                                         <SelectItem value="oldest">Oldest</SelectItem>
                                     </SelectContent>
                                 </Select>
-                            </div>
+                            </div> */}
                         </div>
                     </CardHeader>
                     {loading ? (
@@ -420,7 +420,7 @@ export default function CategoryDetail({ params }: { params: Promise<{ id: strin
                                                             <div className="flex items-center space-x-2">
                                                                 <Avatar className="h-8 w-8">
                                                                     <AvatarFallback className="text-xs">
-                                                                        {typeof task.assignedTo === 'string' 
+                                                                        {typeof task.assignedTo === 'string'
                                                                             ? task.assignedTo
                                                                                 .toUpperCase()
                                                                                 .split(" ")
@@ -431,8 +431,8 @@ export default function CategoryDetail({ params }: { params: Promise<{ id: strin
                                                                 </Avatar>
                                                                 <div>
                                                                     <div className="font-medium text-sm">
-                                                                        {typeof task.assignedTo === 'string' 
-                                                                            ? task.assignedTo 
+                                                                        {typeof task.assignedTo === 'string'
+                                                                            ? task.assignedTo
                                                                             : task.assignedTo?.name || 'Unassigned'}
                                                                     </div>
                                                                     <div className="text-xs text-muted-foreground">

@@ -3,45 +3,45 @@
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { toast } from "react-toastify"
-import { 
-  ArrowUpDown, 
-  ChevronLeft, 
-  ChevronRight, 
-  ChevronsLeft, 
-  ChevronsRight, 
-  CheckCircle, 
-  Clock, 
-  Edit, 
-  Eye, 
-  Filter, 
-  Loader2, 
-  MoreHorizontal, 
-  Plus, 
-  Search, 
-  Trash2 
+import {
+    ArrowUpDown,
+    ChevronLeft,
+    ChevronRight,
+    ChevronsLeft,
+    ChevronsRight,
+    CheckCircle,
+    Clock,
+    Edit,
+    Eye,
+    Filter,
+    Loader2,
+    MoreHorizontal,
+    Plus,
+    Search,
+    Trash2
 } from "lucide-react"
 import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow
+    Table, TableBody, TableCell, TableHead, TableHeader, TableRow
 } from "@/components/ui/table"
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue
+    Select, SelectContent, SelectItem, SelectTrigger, SelectValue
 } from "@/components/ui/select"
 import {
-  Card, CardContent, CardDescription, CardHeader, CardTitle
+    Card, CardContent, CardDescription, CardHeader, CardTitle
 } from "@/components/ui/card"
 import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle
+    AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+    AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle
 } from "@/components/ui/alert-dialog"
-import { 
-  Avatar, AvatarFallback, AvatarImage 
+import {
+    Avatar, AvatarFallback, AvatarImage
 } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import {
-  Tabs, TabsContent, TabsList, TabsTrigger
+    Tabs, TabsContent, TabsList, TabsTrigger
 } from "@/components/ui/tabs"
 import {
     DropdownMenu,
@@ -96,7 +96,7 @@ export default function TaskCategoryTable() {
                 const user = JSON.parse(userStr)
                 const userRole = user.adminType || ""
                 setCurrentUserRole(userRole)
-                
+
                 // No longer restrict pending tab for non-owners
                 // We'll use the isOwner flag for controlling actions instead
             } catch (error) {
@@ -113,11 +113,11 @@ export default function TaskCategoryTable() {
         const fetchAllCategories = async () => {
             try {
                 const response = await fetch(`/api/task-categories`);
-                
+
                 if (!response.ok) {
                     throw new Error('Failed to fetch all categories');
                 }
-                
+
                 const data = await response.json();
                 setAllCategories(data);
             } catch (error) {
@@ -127,7 +127,7 @@ export default function TaskCategoryTable() {
         };
         fetchAllCategories();
     }, []);
-    
+
     useEffect(() => {
         const fetchCategories = async () => {
             try {
@@ -135,11 +135,11 @@ export default function TaskCategoryTable() {
                 // Fetch categories from API based on active tab
                 const status = activeTab === 'approved' ? 'approved' : 'pending';
                 const response = await fetch(`/api/task-categories?status=${status}`);
-                
+
                 if (!response.ok) {
                     throw new Error('Failed to fetch categories');
                 }
-                
+
                 const data = await response.json();
                 setCategories(data);
             } catch (error) {
@@ -216,11 +216,11 @@ export default function TaskCategoryTable() {
             const response = await fetch(`/api/task-categories/${categoryToDelete.id}`, {
                 method: 'DELETE',
             })
-            
+
             if (!response.ok) {
                 throw new Error('Failed to delete category')
             }
-            
+
             // Update both category lists in the UI
             setCategories(categories.filter((category) => category.id !== categoryToDelete.id))
             setAllCategories(allCategories.filter((category) => category.id !== categoryToDelete.id))
@@ -340,7 +340,7 @@ export default function TaskCategoryTable() {
                                     <CheckCircle className="h-5 w-5" />
                                     Approved Categories ({sortedCategories.length})
                                 </CardTitle>
-                                <div className="flex items-center gap-2">
+                                {/* <div className="flex items-center gap-2">
                                     <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
                                     <Select value={sortBy} onValueChange={setSortBy}>
                                         <SelectTrigger className="md:w-32">
@@ -360,7 +360,7 @@ export default function TaskCategoryTable() {
                                             <SelectItem value="oldest">Oldest</SelectItem>
                                         </SelectContent>
                                     </Select>
-                                </div>
+                                </div> */}
                             </div>
                         </CardHeader>
                         {loading ? (

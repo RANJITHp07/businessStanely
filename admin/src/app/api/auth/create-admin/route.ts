@@ -8,7 +8,7 @@ export async function POST(req: NextRequest) {
   try {
     // Get the current admin user
     const currentAdmin = await getCurrentAdmin(req);
-    
+
     if (!currentAdmin) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -45,7 +45,6 @@ export async function POST(req: NextRequest) {
       data: {
         username,
         email,
-        name: username, // Use username as the name field
         password: hashedPassword,
         adminType: adminType || "admin", // Use provided adminType or default to "admin"
       },
@@ -64,7 +63,7 @@ export async function POST(req: NextRequest) {
     );
   } catch (error) {
     console.error("Error creating admin:", error);
-    
+
     // Check for unique constraint violations (email or username already exists)
     if (error instanceof Error && 'code' in error && error.code === 'P2002') {
       return NextResponse.json(
@@ -72,7 +71,7 @@ export async function POST(req: NextRequest) {
         { status: 409 }
       );
     }
-    
+
     return NextResponse.json(
       { error: "Error creating admin" },
       { status: 500 }

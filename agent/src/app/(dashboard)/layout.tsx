@@ -1,82 +1,38 @@
-'use client'
+"use client";
 
-import { useState } from 'react'
-import { usePathname } from 'next/navigation'
-import { Menu } from 'lucide-react'
-import Sidebar from '../../components/sidebar/sidebar'
-import MobileMenu from '../../components/sidebar/mobile-menu'
+import "../globals.css";
+import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { AppSidebar } from "@/components/app-sidebar";
+import Navigator from "@/components/navigator";
+import { ToastContainer } from "react-toastify";
+import { AuthGuard } from "@/components/AuthGuard";
 
-export default function DashboardLayout({
+export default function RootLayout({
   children,
-}: {
-  children: React.ReactNode
-}) {
-  const pathname = usePathname()
-  const [menuOpen, setMenuOpen] = useState(false)
-
-  const getPageName = (path: string) => {
-    switch (path) {
-      case '/dashboard':
-        return 'Dashboard'
-      case '/task':
-        return 'My Tasks'
-      case '/settings':
-        return 'Settings'
-      default:
-        return 'Dashboard'
-    }
-  }
-
-  const getCurrentDate = () => {
-    const date = new Date()
-    const day = date.getDate()
-    const weekday = date.toLocaleDateString('en-US', { weekday: 'long' })
-    const month = date.toLocaleDateString('en-US', { month: 'long' })
-    const year = date.getFullYear()
-    return `${day} ${weekday} ${month} ${year}`
-  }
-
-  const handleLogout = () => {
-    console.log('Logout clicked')
-  }
-
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
   return (
-    <div className="flex min-h-screen bg-gray-100">
-      {/* Sidebar for large screens */}
-      <div className="hidden lg:block h-screen sticky top-0">
-        <Sidebar onLogout={handleLogout} />
-      </div>
+    // <AuthGuard>
+    <div className={`overflow-auto flex w-full`}>
+      <SidebarProvider>
+        <AppSidebar />
+        <main className="flex flex-col flex-1">
+          <div className="flex gap-[20px] items-center py-[20px] p-6 md:pl-[20px] md:py-[15px] border-b">
+            <Navigator />
+            <div className="flex justify-between items-center flex-1 pr-4">
+              <h1 className="text-[25px] block md:hidden">
+                Business Stanely
+              </h1>
+              <SidebarTrigger />
+            </div>
+          </div>
 
-      {/* Mobile Menu */}
-      <MobileMenu
-        isOpen={menuOpen}
-        onClose={() => setMenuOpen(false)}
-        onLogout={handleLogout}
-      />
-
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col w-0">
-        {/* Topbar for mobile */}
-        <header className="lg:hidden bg-white border-b border-gray-200 px-4 py-4 flex justify-between items-center">
-          <h1 className="text-xl font-bold text-gray-900">BusinessStanley</h1>
-          <button className="text-gray-700" onClick={() => setMenuOpen(true)}>
-            <Menu className="h-6 w-6" />
-          </button>
-        </header>
-
-        {/* Page Title & Date */}
-        <div className="lg:px-6 px-4 py-4 lg:pt-6 bg-white">
-          <h2 className="text-[20px] font-semibold text-gray-800">
-            {getPageName(pathname)}
-          </h2>
-          <p className="text-[16px] mt-[2px] text-gray-500">{getCurrentDate()}</p>
-        </div>
-
-        {/* Page Content */}
-        <main className="px-4 lg:px-6 py-4 bg-[#f5f7ff]">
-          {children}
+          <div className="w-full  flex-1 bg-[#e3f2fd]">{children}</div>
         </main>
-      </div>
+      </SidebarProvider>
+      <ToastContainer />
     </div>
-  )
+    // </AuthGuard>
+  );
 }

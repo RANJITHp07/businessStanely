@@ -2,82 +2,82 @@
 
 import { useState, useEffect } from "react";
 import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
-    ChartContainer,
-    ChartTooltip,
-    ChartTooltipContent,
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
 } from "@/components/ui/chart";
 import {
-    XAxis,
-    YAxis,
-    CartesianGrid,
-    ResponsiveContainer,
-    PieChart,
-    Pie,
-    Cell,
-    LineChart,
-    Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  LineChart,
+  Line,
 } from "recharts";
 import {
-    Users,
-    UserCheck,
-    FileText,
-    CheckCircle,
-    AlertTriangle,
-    TrendingUp,
-    TrendingDown,
-    Calendar,
-    Building2,
-    User,
+  Users,
+  UserCheck,
+  FileText,
+  CheckCircle,
+  AlertTriangle,
+  TrendingUp,
+  TrendingDown,
+  Calendar,
+  Building2,
+  User,
 } from "lucide-react";
 
 import { useRouter } from "next/navigation";
 // Mock data for dashboard - will be replaced with real data for charts
 const mockDashboardStats = {
-    agents: {
-        total: 25,
-        active: 23,
-        inactive: 2,
-        growth: 8.5,
-    },
-    clients: {
-        total: 156,
-        individual: 98,
-        organization: 58,
-        growth: 12.3,
-    },
-    tasks: {
-        total: 342,
-        pending: 45,
-        inProgress: 128,
-        completed: 169,
-        overdue: 12,
-        growth: -2.1,
-    },
-    taskStatusData: [
-        { name: "Completed", value: 169, color: "#22c55e" },
-        { name: "In Progress", value: 128, color: "#3b82f6" },
-        { name: "Pending", value: 45, color: "#f59e0b" },
-        { name: "Overdue", value: 12, color: "#ef4444" },
-    ],
+  agents: {
+    total: 25,
+    active: 23,
+    inactive: 2,
+    growth: 8.5,
+  },
+  clients: {
+    total: 156,
+    individual: 98,
+    organization: 58,
+    growth: 12.3,
+  },
+  tasks: {
+    total: 342,
+    pending: 45,
+    inProgress: 128,
+    completed: 169,
+    overdue: 12,
+    growth: -2.1,
+  },
+  taskStatusData: [
+    { name: "Completed", value: 169, color: "#22c55e" },
+    { name: "In Progress", value: 128, color: "#3b82f6" },
+    { name: "Pending", value: 45, color: "#f59e0b" },
+    { name: "Overdue", value: 12, color: "#ef4444" },
+  ],
 };
 
 // Chart data
 
 const monthlyTasksData = [
-    { month: "Jan", completed: 45, created: 52 },
-    { month: "Feb", completed: 52, created: 48 },
-    { month: "Mar", completed: 48, created: 61 },
-    { month: "Apr", completed: 61, created: 55 },
-    { month: "May", completed: 55, created: 67 },
-    { month: "Jun", completed: 67, created: 59 },
+  { month: "Jan", completed: 45, created: 52 },
+  { month: "Feb", completed: 52, created: 48 },
+  { month: "Mar", completed: 48, created: 61 },
+  { month: "Apr", completed: 61, created: 55 },
+  { month: "May", completed: 55, created: 67 },
+  { month: "Jun", completed: 67, created: 59 },
 ];
 
 // const agentPerformanceData = [
@@ -98,440 +98,448 @@ const monthlyTasksData = [
 // ];
 
 const recentActivities = [
-    {
-        id: 1,
-        type: "task_completed",
-        description: "Contract Review completed by John Smith",
-        time: "2 hours ago",
-        icon: CheckCircle,
-        color: "text-green-600",
-    },
-    {
-        id: 2,
-        type: "client_added",
-        description: "New client 'TechCorp Inc.' added to system",
-        time: "4 hours ago",
-        icon: UserCheck,
-        color: "text-blue-600",
-    },
-    {
-        id: 3,
-        type: "task_overdue",
-        description: "Legal Research task is now overdue",
-        time: "6 hours ago",
-        icon: AlertTriangle,
-        color: "text-red-600",
-    },
-    {
-        id: 4,
-        type: "agent_assigned",
-        description: "Emily Davis assigned to new case",
-        time: "8 hours ago",
-        icon: Users,
-        color: "text-purple-600",
-    },
+  {
+    id: 1,
+    type: "task_completed",
+    description: "Contract Review completed by John Smith",
+    time: "2 hours ago",
+    icon: CheckCircle,
+    color: "text-green-600",
+  },
+  {
+    id: 2,
+    type: "client_added",
+    description: "New client 'TechCorp Inc.' added to system",
+    time: "4 hours ago",
+    icon: UserCheck,
+    color: "text-blue-600",
+  },
+  {
+    id: 3,
+    type: "task_overdue",
+    description: "Legal Research task is now overdue",
+    time: "6 hours ago",
+    icon: AlertTriangle,
+    color: "text-red-600",
+  },
+  {
+    id: 4,
+    type: "agent_assigned",
+    description: "Emily Davis assigned to new case",
+    time: "8 hours ago",
+    icon: Users,
+    color: "text-purple-600",
+  },
 ];
 
 export default function Dashboard() {
-    const [dashboardStats, setDashboardStats] = useState(mockDashboardStats);
-    const [loading, setLoading] = useState(true);
-    const router = useRouter();
-    useEffect(() => {
-        const fetchDashboardStats = async () => {
-            try {
-                const response = await fetch("/api/dashboard");
-                if (response.ok) {
-                    const data = await response.json();
-                    setDashboardStats(data);
-                } else {
-                    console.error("Failed to fetch dashboard stats");
-                }
-            } catch (error) {
-                console.error("Error fetching dashboard stats:", error);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchDashboardStats();
-    }, []);
-
-    const chartConfig = {
-        completed: {
-            label: "Completed",
-            color: "hsl(var(--chart-1))",
-        },
-        created: {
-            label: "Created",
-            color: "hsl(var(--chart-2))",
-        },
-        individual: {
-            label: "Individual",
-            color: "hsl(var(--chart-3))",
-        },
-        organization: {
-            label: "Organization",
-            color: "hsl(var(--chart-4))",
-        },
+  const [dashboardStats, setDashboardStats] = useState(mockDashboardStats);
+  const [pieChartEmpty, setPieChartEmpty] = useState(false)
+  const [loading, setLoading] = useState(true);
+  const router = useRouter();
+  useEffect(() => {
+    const fetchDashboardStats = async () => {
+      try {
+        const response = await fetch("/api/dashboard");
+        if (response.ok) {
+          const data = await response.json();
+          if (data.tasks.total == 0) {
+            setPieChartEmpty(true)
+          }
+          setDashboardStats(data);
+        } else {
+          console.error("Failed to fetch dashboard stats");
+        }
+      } catch (error) {
+        console.error("Error fetching dashboard stats:", error);
+      } finally {
+        setLoading(false);
+      }
     };
 
-    return (
-        <div className="container mx-auto p-6 max-w-7xl space-y-8">
-            {/* Header */}
-            <div className="mb-8">
-                <h1 className="text-3xl font-bold">Dashboard</h1>
-                <p className="text-muted-foreground mt-2">
-                    Overview of your legal management system performance and key metrics
-                </p>
-            </div>
+    fetchDashboardStats();
+  }, []);
 
-            {/* Stats Cards */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-  {/* Agents Card - Slate Blue */}
-  <Card className="bg-[#1e293b] text-white border-0 shadow-md">
-    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-      <CardTitle className="text-[20px] font-medium text-white">Total Agents</CardTitle>
-      <Users className="h-[35px] w-[35px] lg:h-[50px] lg:w-[50px] text-blue-400" />
-    </CardHeader>
-    <CardContent>
-      {loading ? (
-        <div className="animate-pulse">
-          <div className="h-8 bg-blue-700 rounded w-16 mb-3"></div>
-          <div className="h-4 bg-blue-700 rounded w-full mb-2"></div>
-          <div className="h-4 bg-blue-700 rounded w-3/4"></div>
-        </div>
-      ) : (
-        <>
-          <div className="text-[30px] font-bold text-white">
-            {dashboardStats.agents.total}
-          </div>
-          <div className="flex items-center space-x-2 text-xs mt-2">
-            <Badge className="bg-green-600/20 text-green-300 border-green-400/30">
-              {dashboardStats.agents.active} Active
-            </Badge>
-            <Badge className="bg-gray-600/20 text-gray-300 border-gray-400/30">
-              {dashboardStats.agents.inactive} Inactive
-            </Badge>
-          </div>
-          <div className="flex items-center mt-2">
-            {dashboardStats.agents.growth >= 0 ? (
-              <>
-                <TrendingUp className="h-3 w-3 text-green-300 mr-1" />
-                <span className="text-xs text-green-300">
-                  +{dashboardStats.agents.growth}% from last month
-                </span>
-              </>
+  const chartConfig = {
+    completed: {
+      label: "Completed",
+      color: "hsl(var(--chart-1))",
+    },
+    created: {
+      label: "Created",
+      color: "hsl(var(--chart-2))",
+    },
+    individual: {
+      label: "Individual",
+      color: "hsl(var(--chart-3))",
+    },
+    organization: {
+      label: "Organization",
+      color: "hsl(var(--chart-4))",
+    },
+  };
+
+  return (
+    <div className="container mx-auto p-6 max-w-7xl space-y-8">
+      {/* Header */}
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold">Dashboard</h1>
+        <p className="text-muted-foreground mt-2">
+          Overview of your legal management system performance and key metrics
+        </p>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Agents Card - Slate Blue */}
+        <Card className="bg-[#1e293b] text-white border-0 shadow-md">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-[20px] font-medium text-white">Total Agents</CardTitle>
+            <Users className="h-[35px] w-[35px] lg:h-[50px] lg:w-[50px] text-blue-400" />
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <div className="animate-pulse">
+                <div className="h-8 bg-blue-700 rounded w-16 mb-3"></div>
+                <div className="h-4 bg-blue-700 rounded w-full mb-2"></div>
+                <div className="h-4 bg-blue-700 rounded w-3/4"></div>
+              </div>
             ) : (
               <>
-                <TrendingDown className="h-3 w-3 text-red-300 mr-1" />
-                <span className="text-xs text-red-300">
-                  {dashboardStats.agents.growth}% from last month
-                </span>
+                <div className="text-[30px] font-bold text-white">
+                  {dashboardStats.agents.total}
+                </div>
+                <div className="flex items-center space-x-2 text-xs mt-2">
+                  <Badge className="bg-green-600/20 text-green-300 border-green-400/30">
+                    {dashboardStats.agents.active} Active
+                  </Badge>
+                  <Badge className="bg-gray-600/20 text-gray-300 border-gray-400/30">
+                    {dashboardStats.agents.inactive} Inactive
+                  </Badge>
+                </div>
+                <div className="flex items-center mt-2">
+                  {dashboardStats.agents.growth >= 0 ? (
+                    <>
+                      <TrendingUp className="h-3 w-3 text-green-300 mr-1" />
+                      <span className="text-xs text-green-300">
+                        +{dashboardStats.agents.growth}% from last month
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <TrendingDown className="h-3 w-3 text-red-300 mr-1" />
+                      <span className="text-xs text-red-300">
+                        {dashboardStats.agents.growth}% from last month
+                      </span>
+                    </>
+                  )}
+                </div>
               </>
             )}
-          </div>
-        </>
-      )}
-    </CardContent>
-  </Card>
+          </CardContent>
+        </Card>
 
-  {/* Clients Card - Dark Indigo */}
-  <Card className="bg-[#1e1b4b] text-white border-0 shadow-md">
-    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-      <CardTitle className="text-[20px] font-medium text-white">Total Clients</CardTitle>
-      <UserCheck className="h-[35px] w-[35px] lg:h-[50px] lg:w-[50px] text-indigo-300" />
-    </CardHeader>
-    <CardContent>
-      {loading ? (
-        <div className="animate-pulse">
-          <div className="h-8 bg-indigo-700 rounded w-16 mb-3"></div>
-          <div className="h-4 bg-indigo-700 rounded w-full mb-2"></div>
-          <div className="h-4 bg-indigo-700 rounded w-3/4"></div>
-        </div>
-      ) : (
-        <>
-          <div className="text-[30px] font-bold text-white">
-            {dashboardStats.clients.total}
-          </div>
-          <div className="flex items-center space-x-2 text-xs mt-2">
-            <Badge className="bg-blue-600/20 text-blue-300 border-blue-400/30">
-              <User className="h-3 w-3 mr-1" />
-              {dashboardStats.clients.individual} Individual
-            </Badge>
-            <Badge className="bg-pink-600/20 text-pink-300 border-pink-400/30">
-              <Building2 className="h-3 w-3 mr-1" />
-              {dashboardStats.clients.organization} Org
-            </Badge>
-          </div>
-          <div className="flex items-center mt-2">
-            {dashboardStats.clients.growth >= 0 ? (
-              <>
-                <TrendingUp className="h-3 w-3 text-green-300 mr-1" />
-                <span className="text-xs text-green-300">
-                  +{dashboardStats.clients.growth}% from last month
-                </span>
-              </>
+        {/* Clients Card - Dark Indigo */}
+        <Card className="bg-[#1e1b4b] text-white border-0 shadow-md">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-[20px] font-medium text-white">Total Clients</CardTitle>
+            <UserCheck className="h-[35px] w-[35px] lg:h-[50px] lg:w-[50px] text-indigo-300" />
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <div className="animate-pulse">
+                <div className="h-8 bg-indigo-700 rounded w-16 mb-3"></div>
+                <div className="h-4 bg-indigo-700 rounded w-full mb-2"></div>
+                <div className="h-4 bg-indigo-700 rounded w-3/4"></div>
+              </div>
             ) : (
               <>
-                <TrendingDown className="h-3 w-3 text-red-300 mr-1" />
-                <span className="text-xs text-red-300">
-                  {dashboardStats.clients.growth}% from last month
-                </span>
+                <div className="text-[30px] font-bold text-white">
+                  {dashboardStats.clients.total}
+                </div>
+                <div className="flex items-center space-x-2 text-xs mt-2">
+                  <Badge className="bg-blue-600/20 text-blue-300 border-blue-400/30">
+                    <User className="h-3 w-3 mr-1" />
+                    {dashboardStats.clients.individual} Individual
+                  </Badge>
+                  <Badge className="bg-pink-600/20 text-pink-300 border-pink-400/30">
+                    <Building2 className="h-3 w-3 mr-1" />
+                    {dashboardStats.clients.organization} Org
+                  </Badge>
+                </div>
+                <div className="flex items-center mt-2">
+                  {dashboardStats.clients.growth >= 0 ? (
+                    <>
+                      <TrendingUp className="h-3 w-3 text-green-300 mr-1" />
+                      <span className="text-xs text-green-300">
+                        +{dashboardStats.clients.growth}% from last month
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <TrendingDown className="h-3 w-3 text-red-300 mr-1" />
+                      <span className="text-xs text-red-300">
+                        {dashboardStats.clients.growth}% from last month
+                      </span>
+                    </>
+                  )}
+                </div>
               </>
             )}
-          </div>
-        </>
-      )}
-    </CardContent>
-  </Card>
+          </CardContent>
+        </Card>
 
-  {/* Tasks Card - Deep Dark Teal */}
-  <Card className="bg-[#0f3f3c] text-white border-0 shadow-md">
-    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-      <CardTitle className="text-[20px] font-medium text-white">Total Tasks</CardTitle>
-      <FileText className="h-[35px] w-[35px] lg:h-[50px] lg:w-[50px] text-teal-300" />
-    </CardHeader>
-    <CardContent>
-      {loading ? (
-        <div className="animate-pulse">
-          <div className="h-8 bg-teal-700 rounded w-16 mb-3"></div>
-          <div className="h-4 bg-teal-700 rounded w-full mb-2"></div>
-          <div className="h-4 bg-teal-700 rounded w-3/4"></div>
-        </div>
-      ) : (
-        <>
-          <div className="text-[30px] font-bold text-white">
-            {dashboardStats.tasks.total}
-          </div>
-          <div className="flex items-center space-x-2 text-xs mt-2">
-            <Badge className="bg-emerald-600/20 text-emerald-300 border-emerald-400/30">
-              {dashboardStats.tasks.completed} Done
-            </Badge>
-            <Badge className="bg-blue-600/20 text-blue-300 border-blue-400/30">
-              {dashboardStats.tasks.inProgress} Active
-            </Badge>
-            <Badge className="bg-red-600/20 text-red-300 border-red-400/30">
-              {dashboardStats.tasks.overdue} Overdue
-            </Badge>
-          </div>
-          <div className="flex items-center mt-2">
-            {dashboardStats.tasks.growth >= 0 ? (
-              <>
-                <TrendingUp className="h-3 w-3 text-green-300 mr-1" />
-                <span className="text-xs text-green-300">
-                  +{dashboardStats.tasks.growth}% from last month
-                </span>
-              </>
+        {/* Tasks Card - Deep Dark Teal */}
+        <Card className="bg-[#0f3f3c] text-white border-0 shadow-md">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-[20px] font-medium text-white">Total Tasks</CardTitle>
+            <FileText className="h-[35px] w-[35px] lg:h-[50px] lg:w-[50px] text-teal-300" />
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <div className="animate-pulse">
+                <div className="h-8 bg-teal-700 rounded w-16 mb-3"></div>
+                <div className="h-4 bg-teal-700 rounded w-full mb-2"></div>
+                <div className="h-4 bg-teal-700 rounded w-3/4"></div>
+              </div>
             ) : (
               <>
-                <TrendingDown className="h-3 w-3 text-red-300 mr-1" />
-                <span className="text-xs text-red-300">
-                  {dashboardStats.tasks.growth}% from last month
-                </span>
+                <div className="text-[30px] font-bold text-white">
+                  {dashboardStats.tasks.total}
+                </div>
+                <div className="flex items-center space-x-2 text-xs mt-2">
+                  <Badge className="bg-emerald-600/20 text-emerald-300 border-emerald-400/30">
+                    {dashboardStats.tasks.completed} Done
+                  </Badge>
+                  <Badge className="bg-blue-600/20 text-blue-300 border-blue-400/30">
+                    {dashboardStats.tasks.inProgress} Active
+                  </Badge>
+                  <Badge className="bg-red-600/20 text-red-300 border-red-400/30">
+                    {dashboardStats.tasks.overdue} Overdue
+                  </Badge>
+                </div>
+                <div className="flex items-center mt-2">
+                  {dashboardStats.tasks.growth >= 0 ? (
+                    <>
+                      <TrendingUp className="h-3 w-3 text-green-300 mr-1" />
+                      <span className="text-xs text-green-300">
+                        +{dashboardStats.tasks.growth}% from last month
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <TrendingDown className="h-3 w-3 text-red-300 mr-1" />
+                      <span className="text-xs text-red-300">
+                        {dashboardStats.tasks.growth}% from last month
+                      </span>
+                    </>
+                  )}
+                </div>
               </>
             )}
-          </div>
-        </>
-      )}
-    </CardContent>
-  </Card>
-</div>
+          </CardContent>
+        </Card>
+      </div>
 
 
 
 
-            {/* Charts Row 1 */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Task Status Distribution */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Task Status Distribution</CardTitle>
-                        <CardDescription>
-                            Current status breakdown of all tasks
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        {loading ? (
-                            <div className="animate-pulse">
-                                <div className="h-[300px] bg-gray-200 rounded mb-4"></div>
-                                <div className="grid grid-cols-2 gap-2">
-                                    <div className="h-4 bg-gray-200 rounded"></div>
-                                    <div className="h-4 bg-gray-200 rounded"></div>
-                                    <div className="h-4 bg-gray-200 rounded"></div>
-                                    <div className="h-4 bg-gray-200 rounded"></div>
-                                </div>
-                            </div>
-                        ) : (
-                            <>
-                                <div className="h-[300px] flex items-center justify-center">
-                                    <ChartContainer config={chartConfig} className="w-full h-full">
-                                        <ResponsiveContainer width="100%" height="100%">
-                                            <PieChart>
-                                                <Pie
-                                                    data={dashboardStats.taskStatusData}
-                                                    cx="50%"
-                                                    cy="50%"
-                                                    innerRadius={60}
-                                                    outerRadius={100}
-                                                    paddingAngle={5}
-                                                    dataKey="value"
-                                                >
-                                                    {dashboardStats.taskStatusData.map((entry, index) => (
-                                                        <Cell key={`cell-${index}`} fill={entry.color} />
-                                                    ))}
-                                                </Pie>
-                                                <ChartTooltip content={<ChartTooltipContent />} />
-                                            </PieChart>
-                                        </ResponsiveContainer>
-                                    </ChartContainer>
-                                </div>
+      {/* Charts Row 1 */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Task Status Distribution */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Task Status Distribution</CardTitle>
+            <CardDescription>
+              Current status breakdown of all tasks
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <div className="animate-pulse">
+                <div className="h-[300px] bg-gray-200 rounded mb-4"></div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="h-4 bg-gray-200 rounded"></div>
+                  <div className="h-4 bg-gray-200 rounded"></div>
+                  <div className="h-4 bg-gray-200 rounded"></div>
+                  <div className="h-4 bg-gray-200 rounded"></div>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="h-[300px] flex items-center justify-center">
+                  {pieChartEmpty ? (
+                    <p className="text-gray-500 text-sm">No task data available</p>
+                  ) : (
+                    <ChartContainer config={chartConfig} className="w-full h-full">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={dashboardStats.taskStatusData}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={60}
+                            outerRadius={100}
+                            paddingAngle={5}
+                            dataKey="value"
+                          >
+                            {dashboardStats.taskStatusData.map((entry, index) => (
+                              <Cell key={`cell-${index}`} fill={entry.color} />
+                            ))}
+                          </Pie>
+                          <ChartTooltip content={<ChartTooltipContent />} />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </ChartContainer>
+                  )}
+                </div>
 
-                                <div className="grid grid-cols-2 gap-2 mt-4">
-                                    {dashboardStats.taskStatusData.map((item) => (
-                                        <div key={item.name} className="flex items-center space-x-2">
-                                            <div
-                                                className="w-3 h-3 rounded-full"
-                                                style={{ backgroundColor: item.color }}
-                                            />
-                                            <span className="text-sm">
-                                                {item.name}: {item.value}
-                                            </span>
-                                        </div>
-                                    ))}
-                                </div>
-                            </>
-                        )}
-                    </CardContent>
-
-                </Card>
-
-                {/* Monthly Tasks Trend */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Monthly Tasks Trend</CardTitle>
-                        <CardDescription>
-                            Tasks created vs completed over time
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent className="overflow-x-auto">
-                        <div className="w-full h-[300px]">
-                            <ChartContainer config={chartConfig} className="w-full h-full">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <LineChart data={monthlyTasksData}>
-                                        <CartesianGrid strokeDasharray="3 3" />
-                                        <XAxis dataKey="month" />
-                                        <YAxis />
-                                        <ChartTooltip content={<ChartTooltipContent />} />
-                                        <Line
-                                            type="monotone"
-                                            dataKey="completed"
-                                            stroke="var(--color-completed)"
-                                            strokeWidth={3}
-                                            dot={{
-                                                fill: "var(--color-completed)",
-                                                strokeWidth: 2,
-                                                r: 4,
-                                            }}
-                                        />
-                                        <Line
-                                            type="monotone"
-                                            dataKey="created"
-                                            stroke="var(--color-created)"
-                                            strokeWidth={3}
-                                            dot={{
-                                                fill: "var(--color-created)",
-                                                strokeWidth: 2,
-                                                r: 4,
-                                            }}
-                                        />
-                                    </LineChart>
-                                </ResponsiveContainer>
-                            </ChartContainer>
-                        </div>
-                    </CardContent>
-                </Card>
-
-            </div>
-
-            {/* Charts Row 2 */}
-      
-
-            {/* Recent Activity */}
-            <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                        <Calendar className="h-5 w-5" />
-                        Recent Activity
-                    </CardTitle>
-                    <CardDescription>
-                        Latest updates and activities in your system
-                    </CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <div className="space-y-4">
-                        {recentActivities.map((activity) => (
-                            <div
-                                key={activity.id}
-                                className="flex items-center space-x-4 p-3 rounded-lg bg-muted/50"
-                            >
-                                <div
-                                    className={`p-2 rounded-full bg-background ${activity.color}`}
-                                >
-                                    <activity.icon className="h-4 w-4" />
-                                </div>
-                                <div className="flex-1">
-                                    <p className="text-sm font-medium">{activity.description}</p>
-                                    <p className="text-xs text-muted-foreground">
-                                        {activity.time}
-                                    </p>
-                                </div>
-                            </div>
-                        ))}
+                <div className="grid grid-cols-2 gap-2 mt-4">
+                  {dashboardStats.taskStatusData.map((item) => (
+                    <div key={item.name} className="flex items-center space-x-2">
+                      <div
+                        className="w-3 h-3 rounded-full"
+                        style={{ backgroundColor: item.color }}
+                      />
+                      <span className="text-sm">
+                        {item.name}: {item.value}
+                      </span>
                     </div>
-                </CardContent>
-            </Card>
+                  ))}
+                </div>
+              </>
+            )}
+          </CardContent>
 
-            {/* Quick Actions */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-      <Card
-        onClick={() => router.push("/agent/create")}
-        className="cursor-pointer hover:shadow-md transition-shadow"
-      >
-        <CardContent className="flex items-center justify-center p-6">
-          <div className="text-center">
-            <Users className="h-8 w-8 mx-auto mb-2 text-blue-600" />
-            <h3 className="font-semibold">Create Agent</h3>
-            <p className="text-sm text-muted-foreground">Add new team member</p>
+        </Card>
+
+        {/* Monthly Tasks Trend */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Monthly Tasks Trend</CardTitle>
+            <CardDescription>
+              Tasks created vs completed over time
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="overflow-x-auto">
+            <div className="w-full h-[300px]">
+              <ChartContainer config={chartConfig} className="w-full h-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={monthlyTasksData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="month" />
+                    <YAxis />
+                    <ChartTooltip content={<ChartTooltipContent />} />
+                    <Line
+                      type="monotone"
+                      dataKey="completed"
+                      stroke="var(--color-completed)"
+                      strokeWidth={3}
+                      dot={{
+                        fill: "var(--color-completed)",
+                        strokeWidth: 2,
+                        r: 4,
+                      }}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="created"
+                      stroke="var(--color-created)"
+                      strokeWidth={3}
+                      dot={{
+                        fill: "var(--color-created)",
+                        strokeWidth: 2,
+                        r: 4,
+                      }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </ChartContainer>
+            </div>
+          </CardContent>
+        </Card>
+
+      </div>
+
+      {/* Charts Row 2 */}
+
+
+      {/* Recent Activity */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Calendar className="h-5 w-5" />
+            Recent Activity
+          </CardTitle>
+          <CardDescription>
+            Latest updates and activities in your system
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {recentActivities.map((activity) => (
+              <div
+                key={activity.id}
+                className="flex items-center space-x-4 p-3 rounded-lg bg-muted/50"
+              >
+                <div
+                  className={`p-2 rounded-full bg-background ${activity.color}`}
+                >
+                  <activity.icon className="h-4 w-4" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-medium">{activity.description}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {activity.time}
+                  </p>
+                </div>
+              </div>
+            ))}
           </div>
         </CardContent>
       </Card>
 
-      <Card
-        onClick={() => router.push("/client/create")}
-        className="cursor-pointer hover:shadow-md transition-shadow"
-      >
-        <CardContent className="flex items-center justify-center p-6">
-          <div className="text-center">
-            <UserCheck className="h-8 w-8 mx-auto mb-2 text-green-600" />
-            <h3 className="font-semibold">Create Client</h3>
-            <p className="text-sm text-muted-foreground">Add new client</p>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Quick Actions */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <Card
+          onClick={() => router.push("/agent/create")}
+          className="cursor-pointer hover:shadow-md transition-shadow"
+        >
+          <CardContent className="flex items-center justify-center p-6">
+            <div className="text-center">
+              <Users className="h-8 w-8 mx-auto mb-2 text-blue-600" />
+              <h3 className="font-semibold">Create Agent</h3>
+              <p className="text-sm text-muted-foreground">Add new team member</p>
+            </div>
+          </CardContent>
+        </Card>
 
-      <Card
-        onClick={() => router.push("/task/create")}
-        className="cursor-pointer hover:shadow-md transition-shadow"
-      >
-        <CardContent className="flex items-center justify-center p-6">
-          <div className="text-center">
-            <FileText className="h-8 w-8 mx-auto mb-2 text-purple-600" />
-            <h3 className="font-semibold">Create Task</h3>
-            <p className="text-sm text-muted-foreground">Assign new task</p>
-          </div>
-        </CardContent>
-      </Card>
+        <Card
+          onClick={() => router.push("/client/create")}
+          className="cursor-pointer hover:shadow-md transition-shadow"
+        >
+          <CardContent className="flex items-center justify-center p-6">
+            <div className="text-center">
+              <UserCheck className="h-8 w-8 mx-auto mb-2 text-green-600" />
+              <h3 className="font-semibold">Create Client</h3>
+              <p className="text-sm text-muted-foreground">Add new client</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card
+          onClick={() => router.push("/task/create")}
+          className="cursor-pointer hover:shadow-md transition-shadow"
+        >
+          <CardContent className="flex items-center justify-center p-6">
+            <div className="text-center">
+              <FileText className="h-8 w-8 mx-auto mb-2 text-purple-600" />
+              <h3 className="font-semibold">Create Task</h3>
+              <p className="text-sm text-muted-foreground">Assign new task</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
-        </div>
-    );
+  );
 }

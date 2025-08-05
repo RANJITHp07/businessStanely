@@ -66,6 +66,8 @@ export default function TasksTable() {
   const [itemsPerPage, setItemsPerPage] = useState(5)
   const [taskToDelete, setTaskToDelete] = useState<Task | null>(null)
 
+  const router = useRouter();
+
   useEffect(() => {
     const fetchTasks = async () => {
       try {
@@ -320,7 +322,7 @@ export default function TasksTable() {
               <FileText className="h-5 w-5" />
               Tasks ({sortedTasks.length})
             </CardTitle>
-            <div className="flex items-center gap-2">
+            {/* <div className="flex items-center gap-2">
               <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
               <Select value={sortBy} onValueChange={setSortBy}>
                 <SelectTrigger className="w-32">
@@ -350,7 +352,7 @@ export default function TasksTable() {
                   <SelectItem value="oldest">Oldest</SelectItem>
                 </SelectContent>
               </Select>
-            </div>
+            </div> */}
           </div>
         </CardHeader>
 
@@ -385,7 +387,6 @@ export default function TasksTable() {
                       </TableRow>
                     ) : (
                       currentTasks.map((task) => {
-                        const router = useRouter();
                         return (
                           <TableRow
                             key={task.id}

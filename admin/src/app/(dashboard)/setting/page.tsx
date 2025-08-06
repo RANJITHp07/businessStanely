@@ -184,7 +184,7 @@ export default function AdminSettingsPage() {
       <Card>
         <CardHeader className="flex flex-col space-y-2">
           <div className="flex items-center justify-between">
-            <CardTitle className="text-2xl">Profile Settings</CardTitle>
+            <CardTitle className="text-2xl mr-2">Profile Settings</CardTitle>
             {user?.adminType && (
               <Badge variant={user.adminType === "owner" ? "destructive" : "secondary"}>
                 {user.adminType === "owner" ? "Owner" : "Admin"}

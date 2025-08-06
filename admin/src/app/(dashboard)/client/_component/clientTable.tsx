@@ -9,8 +9,7 @@ import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Loader2 } from "lucide-react"
-import 
-{
+import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
@@ -57,6 +56,7 @@ const communicationPreferences = ["All Communication", "Email", "Phone", "SMS", 
 const entityTypes = ["All Entity Types", "Corporation", "LLC", "Partnership", "Sole Proprietorship", "Non-Profit"]
 
 import { Client } from "@/types";
+import { useRouter } from "next/navigation"
 
 export default function ClientsTable() {
     const [clients, setClients] = useState<Client[]>([]);
@@ -71,6 +71,8 @@ export default function ClientsTable() {
     const [itemsPerPage, setItemsPerPage] = useState(5)
     const [clientToDelete, setClientToDelete] = useState<Client | null>(null)
     const [loading, setLoading] = useState(true)
+
+    const router = useRouter()
 
     useEffect(() => {
         const fetchClients = async () => {
@@ -104,7 +106,7 @@ export default function ClientsTable() {
                 const nameB = b.clientType === "individual" ? `${b.firstName} ${b.lastName}` : b.organizationName || '';
                 return nameB.localeCompare(nameA);
             }
-            
+
             return 0;
         });
     }
@@ -244,118 +246,118 @@ export default function ClientsTable() {
 
 
                     <CardContent className="space-y-4">
-  {loading ? (
-    <>
-      <div className="h-[200px] w-full bg-gray-200 rounded-2xl mb-4"></div>
+                        {loading ? (
+                            <>
+                                <div className="h-[200px] w-full bg-gray-200 rounded-2xl mb-4"></div>
 
-      <div className="flex justify-between gap-4">
-        <div className="h-5 w-1/2 bg-gray-200 rounded-xl mb-3"></div>
-        <div className="h-5 w-1/2 bg-gray-200 rounded-xl mb-3"></div>
-      </div>
-    </>
-  ) : (
-    <>
-      {/* Search */}
-      <div className="flex items-center gap-4">
-        <div className="flex-1">
-          <Label htmlFor="search">Search Clients</Label>
-          <div className="relative my-2">
-            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-            <Input
-              id="search"
-              placeholder="Search by name, email, phone, or address..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-        </div>
-      </div>
+                                <div className="flex justify-between gap-4">
+                                    <div className="h-5 w-1/2 bg-gray-200 rounded-xl mb-3"></div>
+                                    <div className="h-5 w-1/2 bg-gray-200 rounded-xl mb-3"></div>
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                {/* Search */}
+                                <div className="flex items-center gap-4">
+                                    <div className="flex-1">
+                                        <Label htmlFor="search">Search Clients</Label>
+                                        <div className="relative my-2">
+                                            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                                            <Input
+                                                id="search"
+                                                placeholder="Search by name, email, phone, or address..."
+                                                value={searchTerm}
+                                                onChange={(e) => setSearchTerm(e.target.value)}
+                                                className="pl-10"
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
 
-      {/* Filter Controls */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        {/* Client Type */}
-        <div className="space-y-2">
-          <Label>Client Type</Label>
-          <Select value={selectedType} onValueChange={setSelectedType}>
-            <SelectTrigger className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {clientTypes.map((type) => (
-                <SelectItem key={type} value={type}>
-                  {type}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+                                {/* Filter Controls */}
+                                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                    {/* Client Type */}
+                                    <div className="space-y-2">
+                                        <Label>Client Type</Label>
+                                        <Select value={selectedType} onValueChange={setSelectedType}>
+                                            <SelectTrigger className="w-full">
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {clientTypes.map((type) => (
+                                                    <SelectItem key={type} value={type}>
+                                                        {type}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
 
-        {/* Status */}
-        <div className="space-y-2">
-          <Label>Status</Label>
-          <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-            <SelectTrigger className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {statusOptions.map((status) => (
-                <SelectItem key={status} value={status}>
-                  {status}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+                                    {/* Status */}
+                                    <div className="space-y-2">
+                                        <Label>Status</Label>
+                                        <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+                                            <SelectTrigger className="w-full">
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {statusOptions.map((status) => (
+                                                    <SelectItem key={status} value={status}>
+                                                        {status}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
 
-        {/* Communication */}
-        <div className="space-y-2">
-          <Label>Communication</Label>
-          <Select value={selectedCommunication} onValueChange={setSelectedCommunication}>
-            <SelectTrigger className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {communicationPreferences.map((comm) => (
-                <SelectItem key={comm} value={comm}>
-                  {comm}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+                                    {/* Communication */}
+                                    <div className="space-y-2">
+                                        <Label>Communication</Label>
+                                        <Select value={selectedCommunication} onValueChange={setSelectedCommunication}>
+                                            <SelectTrigger className="w-full">
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {communicationPreferences.map((comm) => (
+                                                    <SelectItem key={comm} value={comm}>
+                                                        {comm}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
 
-        {/* Entity Type */}
-        <div className="space-y-2">
-          <Label>Entity Type</Label>
-          <Select value={selectedEntityType} onValueChange={setSelectedEntityType}>
-            <SelectTrigger className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {entityTypes.map((entity) => (
-                <SelectItem key={entity} value={entity}>
-                  {entity}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
+                                    {/* Entity Type */}
+                                    <div className="space-y-2">
+                                        <Label>Entity Type</Label>
+                                        <Select value={selectedEntityType} onValueChange={setSelectedEntityType}>
+                                            <SelectTrigger className="w-full">
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {entityTypes.map((entity) => (
+                                                    <SelectItem key={entity} value={entity}>
+                                                        {entity}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                </div>
 
-      {/* Results Summary */}
-      <div className="flex items-center justify-end gap-2 text-sm text-muted-foreground">
-        <Button
-          onClick={resetFilters}
-          className="cursor-pointer hover:text-white text-white bg-[#f42b03] hover:bg-[#f42b03] rounded-lg px-4 py-2 shadow-none hover:shadow-lg transition-shadow duration-300"
-          variant="outline"
-        >
-          Clear
-        </Button>
-      </div>
-    </>
-  )}
-</CardContent>
+                                {/* Results Summary */}
+                                <div className="flex items-center justify-end gap-2 text-sm text-muted-foreground">
+                                    <Button
+                                        onClick={resetFilters}
+                                        className="cursor-pointer hover:text-white text-white bg-[#f42b03] hover:bg-[#f42b03] rounded-lg px-4 py-2 shadow-none hover:shadow-lg transition-shadow duration-300"
+                                        variant="outline"
+                                    >
+                                        Clear
+                                    </Button>
+                                </div>
+                            </>
+                        )}
+                    </CardContent>
 
 
 
@@ -395,193 +397,193 @@ export default function ClientsTable() {
                 </CardHeader>
 
 
-{loading ? (<div className="flex justify-center items-center py-8">
-  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-</div>) : ( <>
-  <CardContent>
-  <div className="rounded-md border">
-      <Table>
-      <TableHeader>
-  <TableRow>
-    <TableHead>Client</TableHead>
-    <TableHead>Type</TableHead>
-    <TableHead>Contact Info</TableHead>
-    <TableHead>Communication</TableHead>
-    <TableHead className="text-right">Actions</TableHead>
-  </TableRow>
-</TableHeader>
+                {loading ? (<div className="flex justify-center items-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                </div>) : (<>
+                    <CardContent>
+                        <div className="rounded-md border">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Client</TableHead>
+                                        <TableHead>Type</TableHead>
+                                        <TableHead>Contact Info</TableHead>
+                                        <TableHead>Communication</TableHead>
+                                        <TableHead className="text-right">Actions</TableHead>
+                                    </TableRow>
+                                </TableHeader>
 
-          <TableBody>
-              {currentClients.length === 0 ? (
-                  <TableRow>
-                      <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-                          No clients found matching your criteria.
-                      </TableCell>
-                  </TableRow>
-              ) : (
-                  currentClients.map((client) => (
-                      <TableRow key={client.id}>
-                          <TableCell>
-                              <div className="flex items-center space-x-3">
-                                  <Avatar className="h-10 w-10">
-                                      <AvatarFallback>
-                                          {client.clientType === "individual"
-                                              ? `${client.firstName?.[0] ?? ''}${client.lastName?.[0] ?? ''}`
-                                              : client.organizationName
-                                                  ?.toUpperCase()
-                                                  ?.split(" ")
-                                                  .map((n) => n[0])
-                                                  .join("")
-                                                  .slice(0, 2)}
-                                      </AvatarFallback>
-                                  </Avatar>
-                                  <div>
-                                      <div className="font-medium">{getClientDisplayName(client)}</div>
-                                      <div className="text-sm text-muted-foreground">
-                                          {client.clientType === "organization" && client.authorizedPersonName && (
-                                              <>Contact: {client.authorizedPersonName.charAt(0).toUpperCase() + client?.authorizedPersonName?.slice(1)}</>
-                                          )}
-                                          {client.clientType === "individual" && client.gender && (
-                                              <>{client.gender.charAt(0).toUpperCase() + client.gender.slice(1)}</>
-                                          )}
-                                      </div>
-                                  </div>
-                              </div>
-                          </TableCell>
-                          <TableCell>{getClientTypeBadge(client.clientType)}</TableCell>
-                          <TableCell>
-                              <div className="space-y-1">
-                                  <div className="flex items-center gap-1 text-sm">
-                                      <Mail className="h-3 w-3 text-muted-foreground" />
-                                      <span>{client.email}</span>
-                                  </div>
-                                  <div className="flex items-center gap-1 text-sm">
-                                      <Phone className="h-3 w-3 text-muted-foreground" />
-                                      <span>{client.phoneNumber}</span>
-                                  </div>
-                                  {client.address && (
-                                      <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                                          <MapPin className="h-3 w-3" />
-                                          <span className="truncate max-w-[200px]">{client.address}</span>
-                                      </div>
-                                  )}
-                              </div>
-                          </TableCell>
-                          <TableCell>{getCommunicationBadge(client.preferredCommunication || "")}</TableCell>
-                          <TableCell className="text-right">
-                              <DropdownMenu>
-                                  <DropdownMenuTrigger asChild>
-                                      <Button variant="ghost" className="h-8 w-8 p-0">
-                                          <span className="sr-only">Open menu</span>
-                                          <MoreHorizontal className="h-4 w-4" />
-                                      </Button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end">
-                                      <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                      {/* <DropdownMenuItem asChild>
+                                <TableBody>
+                                    {currentClients.length === 0 ? (
+                                        <TableRow>
+                                            <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                                                No clients found matching your criteria.
+                                            </TableCell>
+                                        </TableRow>
+                                    ) : (
+                                        currentClients.map((client) => (
+                                            <TableRow className="cursor-pointer hover:bg-muted/50" key={client.id} onClick={() => router.push(`/client/${client.id}/edit`)}>
+                                                <TableCell>
+                                                    <div className="flex items-center space-x-3">
+                                                        <Avatar className="h-10 w-10">
+                                                            <AvatarFallback>
+                                                                {client.clientType === "individual"
+                                                                    ? `${client.firstName?.[0] ?? ''}${client.lastName?.[0] ?? ''}`
+                                                                    : client.organizationName
+                                                                        ?.toUpperCase()
+                                                                        ?.split(" ")
+                                                                        .map((n) => n[0])
+                                                                        .join("")
+                                                                        .slice(0, 2)}
+                                                            </AvatarFallback>
+                                                        </Avatar>
+                                                        <div>
+                                                            <div className="font-medium">{getClientDisplayName(client)}</div>
+                                                            <div className="text-sm text-muted-foreground">
+                                                                {client.clientType === "organization" && client.authorizedPersonName && (
+                                                                    <>Contact: {client.authorizedPersonName.charAt(0).toUpperCase() + client?.authorizedPersonName?.slice(1)}</>
+                                                                )}
+                                                                {client.clientType === "individual" && client.gender && (
+                                                                    <>{client.gender.charAt(0).toUpperCase() + client.gender.slice(1)}</>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell>{getClientTypeBadge(client.clientType)}</TableCell>
+                                                <TableCell>
+                                                    <div className="space-y-1">
+                                                        <div className="flex items-center gap-1 text-sm">
+                                                            <Mail className="h-3 w-3 text-muted-foreground" />
+                                                            <span>{client.email}</span>
+                                                        </div>
+                                                        <div className="flex items-center gap-1 text-sm">
+                                                            <Phone className="h-3 w-3 text-muted-foreground" />
+                                                            <span>{client.phoneNumber}</span>
+                                                        </div>
+                                                        {client.address && (
+                                                            <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                                                                <MapPin className="h-3 w-3" />
+                                                                <span className="truncate max-w-[200px]">{client.address}</span>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell>{getCommunicationBadge(client.preferredCommunication || "")}</TableCell>
+                                                <TableCell className="text-right">
+                                                    <DropdownMenu>
+                                                        <DropdownMenuTrigger asChild>
+                                                            <Button variant="ghost" className="h-8 w-8 p-0">
+                                                                <span className="sr-only">Open menu</span>
+                                                                <MoreHorizontal className="h-4 w-4" />
+                                                            </Button>
+                                                        </DropdownMenuTrigger>
+                                                        <DropdownMenuContent align="end">
+                                                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                                            {/* <DropdownMenuItem asChild>
                                           <Link href={`/client/${client.id}`}>
                                               <Eye className="mr-2 h-4 w-4" />
                                               View Details
                                           </Link>
                                       </DropdownMenuItem> */}
-                                      <DropdownMenuItem asChild>
-                                          <Link href={`/client/${client.id}/edit`}>
-                                              <Edit className="mr-2 h-4 w-4" />
-                                              Edit Client
-                                          </Link>
-                                      </DropdownMenuItem>
-                                      <DropdownMenuSeparator />
-                                      <DropdownMenuItem
-                                          className="text-destructive"
-                                          onClick={() => setClientToDelete(client)}
-                                      >
-                                          <Trash2 className="mr-2 h-4 w-4" />
-                                          Delete Client
-                                      </DropdownMenuItem>
-                                  </DropdownMenuContent>
-                              </DropdownMenu>
-                          </TableCell>
-                      </TableRow>
-                  ))
-              )}
-          </TableBody>
-      </Table>
-  </div>
+                                                            <DropdownMenuItem asChild>
+                                                                <Link href={`/client/${client.id}/edit`}>
+                                                                    <Edit className="mr-2 h-4 w-4" />
+                                                                    Edit Client
+                                                                </Link>
+                                                            </DropdownMenuItem>
+                                                            <DropdownMenuSeparator />
+                                                            <DropdownMenuItem
+                                                                className="text-destructive"
+                                                                onClick={() => setClientToDelete(client)}
+                                                            >
+                                                                <Trash2 className="mr-2 h-4 w-4" />
+                                                                Delete Client
+                                                            </DropdownMenuItem>
+                                                        </DropdownMenuContent>
+                                                    </DropdownMenu>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))
+                                    )}
+                                </TableBody>
+                            </Table>
+                        </div>
 
-  {/* Pagination */}
-  {totalPages > 1 && (
-      <div className="flex items-center justify-between space-x-2 py-4">
-          <div className="text-sm text-muted-foreground">
-              Page {currentPage} of {totalPages}
-          </div>
-          <div className="flex items-center space-x-2">
-              <Select value={itemsPerPage.toString()} onValueChange={handleItemsPerPageChange}>
-                  <SelectTrigger className="w-24">
-                      <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                      {[5, 10, 20, 50].map((value) => (
-                          <SelectItem key={value} value={value.toString()}>
-                              {value} / page
-                          </SelectItem>
-                      ))}
-                  </SelectContent>
-              </Select>
-              <Button variant="outline" size="sm" onClick={() => handlePageChange(1)} disabled={currentPage === 1}>
-                  <ChevronsLeft className="h-4 w-4" />
-              </Button>
-              <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handlePageChange(currentPage - 1)}
-                  disabled={currentPage === 1}
-              >
-                  <ChevronLeft className="h-4 w-4" />
-              </Button>
+                        {/* Pagination */}
+                        {totalPages > 1 && (
+                            <div className="flex items-center justify-between space-x-2 py-4">
+                                <div className="text-sm text-muted-foreground">
+                                    Page {currentPage} of {totalPages}
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                    <Select value={itemsPerPage.toString()} onValueChange={handleItemsPerPageChange}>
+                                        <SelectTrigger className="w-24">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {[5, 10, 20, 50].map((value) => (
+                                                <SelectItem key={value} value={value.toString()}>
+                                                    {value} / page
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                    <Button variant="outline" size="sm" onClick={() => handlePageChange(1)} disabled={currentPage === 1}>
+                                        <ChevronsLeft className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => handlePageChange(currentPage - 1)}
+                                        disabled={currentPage === 1}
+                                    >
+                                        <ChevronLeft className="h-4 w-4" />
+                                    </Button>
 
-              {/* Page Numbers */}
-              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                  const pageNumber = Math.max(1, Math.min(totalPages - 4, currentPage - 2)) + i
-                  if (pageNumber <= totalPages) {
-                      return (
-                          <Button
-                              key={pageNumber}
-                              variant={currentPage === pageNumber ? "default" : "outline"}
-                              size="sm"
-                              onClick={() => handlePageChange(pageNumber)}
-                          >
-                              {pageNumber}
-                          </Button>
-                      )
-                  }
-                  return null
-              })}
+                                    {/* Page Numbers */}
+                                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                                        const pageNumber = Math.max(1, Math.min(totalPages - 4, currentPage - 2)) + i
+                                        if (pageNumber <= totalPages) {
+                                            return (
+                                                <Button
+                                                    key={pageNumber}
+                                                    variant={currentPage === pageNumber ? "default" : "outline"}
+                                                    size="sm"
+                                                    onClick={() => handlePageChange(pageNumber)}
+                                                >
+                                                    {pageNumber}
+                                                </Button>
+                                            )
+                                        }
+                                        return null
+                                    })}
 
-              <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handlePageChange(currentPage + 1)}
-                  disabled={currentPage === totalPages}
-              >
-                  <ChevronRight className="h-4 w-4" />
-              </Button>
-              <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handlePageChange(totalPages)}
-                  disabled={currentPage === totalPages}
-              >
-                  <ChevronsRight className="h-4 w-4" />
-              </Button>
-          </div>
-      </div>
-  )}
-</CardContent>
-</>) }
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => handlePageChange(currentPage + 1)}
+                                        disabled={currentPage === totalPages}
+                                    >
+                                        <ChevronRight className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => handlePageChange(totalPages)}
+                                        disabled={currentPage === totalPages}
+                                    >
+                                        <ChevronsRight className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                            </div>
+                        )}
+                    </CardContent>
+                </>)}
 
 
 
-              
+
             </Card>
             <AlertDialog open={!!clientToDelete} onOpenChange={() => setClientToDelete(null)}>
                 <AlertDialogContent>

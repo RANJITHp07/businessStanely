@@ -499,7 +499,7 @@ export default function AdminsTable() {
                                             </TableRow>
                                         ) : (
                                             currentAdmins.map((admin) => (
-                                                <TableRow key={admin.id}>
+                                                <TableRow key={admin.id} className="cursor-pointer hover:bg-muted/50" onClick={() => router.push(`/admin/${admin.id}`)}>
                                                     <TableCell>
                                                         <div className="flex items-center space-x-3">
                                                             <Avatar className="h-10 w-10">

@@ -51,6 +51,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { useRouter } from "next/navigation"
 
 // Define the TaskCategory interface
 interface TaskCategory {
@@ -87,6 +88,8 @@ export default function TaskCategoryTable() {
     const [loading, setLoading] = useState(true)
     const [activeTab, setActiveTab] = useState("approved")
     const [currentUserRole, setCurrentUserRole] = useState<string>("")
+
+    const router = useRouter()
 
     // Get the current user's role from localStorage
     useEffect(() => {
@@ -390,7 +393,7 @@ export default function TaskCategoryTable() {
                                                     </TableRow>
                                                 ) : (
                                                     currentCategories.map((category) => (
-                                                        <TableRow key={category.id}>
+                                                        <TableRow key={category.id} className="cursor-pointer hover:bg-muted/50" onClick={() => router.push(`/task_category/${category.id}`)}>
                                                             <TableCell>
                                                                 <div className="flex items-center space-x-3">
                                                                     <Avatar className="h-10 w-10">
@@ -554,7 +557,7 @@ export default function TaskCategoryTable() {
                                     <Clock className="h-5 w-5" />
                                     Pending Categories ({sortedCategories.length})
                                 </CardTitle>
-                                <div className="flex items-center gap-2">
+                                {/* <div className="flex items-center gap-2">
                                     <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
                                     <Select value={sortBy} onValueChange={setSortBy}>
                                         <SelectTrigger className="w-32">
@@ -574,7 +577,7 @@ export default function TaskCategoryTable() {
                                             <SelectItem value="oldest">Oldest</SelectItem>
                                         </SelectContent>
                                     </Select>
-                                </div>
+                                </div> */}
                             </div>
                         </CardHeader>
                         {loading ? (
@@ -604,7 +607,7 @@ export default function TaskCategoryTable() {
                                                     </TableRow>
                                                 ) : (
                                                     currentCategories.map((category) => (
-                                                        <TableRow key={category.id}>
+                                                        <TableRow key={category.id} className="cursor-pointer hover:bg-muted/50" onClick={() => router.push(`/category/${category.id}`)}>
                                                             <TableCell>
                                                                 <div className="flex items-center space-x-3">
                                                                     <Avatar className="h-10 w-10">

@@ -94,6 +94,27 @@ export default function TaskForm() {
   const [agentSearchQuery, setAgentSearchQuery] = useState("");
   const [showAgentSuggestions, setShowAgentSuggestions] = useState(false);
 
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+const [newCategoryData, setNewCategoryData] = useState({
+  name: "",
+  description: "",
+});
+
+// Add this handler function
+const handleNewCategoryInputChange = (field: string, value: string) => {
+  setNewCategoryData((prev) => ({ ...prev, [field]: value }));
+};
+
+const handleAddCategoryClick = () => {
+  setIsCategoryModalOpen(true);
+  // Reset form data when opening modal
+  setNewCategoryData({
+    name: "",
+    description: "",
+  });
+};
+
+
   // Add this filtering logic
   const filteredAgents = agents.filter((agent) => {
     return (
@@ -380,6 +401,99 @@ export default function TaskForm() {
                 required
               />
             </div>
+
+            <div>
+            <div className="w-full">
+  {/* Top-right Add Button */}
+  <div className="flex justify-end mb-4">
+    <Dialog open={isCategoryModalOpen} onOpenChange={setIsCategoryModalOpen}>
+      <DialogTrigger asChild>
+        <Button
+          type="button"
+          onClick={handleAddCategoryClick}
+          className="h-10"
+        >
+          <Plus className="h-4 w-4 mr-2" />
+          Add Category
+        </Button>
+      </DialogTrigger>
+
+      <DialogContent className="sm:max-w-[400px] w-full">
+        <DialogHeader>
+          <DialogTitle>Add New Category</DialogTitle>
+          <DialogDescription>
+            Create a new task category for better organization
+          </DialogDescription>
+        </DialogHeader>
+
+        {/* Form Fields */}
+        <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <Label htmlFor="category-name">Category Name *</Label>
+            <Input
+              id="category-name"
+              placeholder="Enter category name (e.g., Legal Research, Contract Review)"
+              className="w-full"
+              value={newCategoryData.name}
+              onChange={(e) =>
+                handleNewCategoryInputChange("name", e.target.value)
+              }
+              required
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="category-description">Description</Label>
+            <Textarea
+              id="category-description"
+              placeholder="Brief description of this category (optional)"
+              className="w-full"
+              value={newCategoryData.description}
+              onChange={(e) =>
+                handleNewCategoryInputChange("description", e.target.value)
+              }
+              rows={4}
+            />
+          </div>
+        </div>
+
+        {/* Modal Actions */}
+        <div className="flex justify-end gap-3 pt-4 border-t">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setIsCategoryModalOpen(false)}
+          >
+            Cancel
+          </Button>
+
+          <Button
+            type="button"
+            variant="outline"
+         
+          >
+           Submit
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  </div>
+</div>
+            </div>
+
+
+            <div className="space-y-2">
+  <Label htmlFor="taskCategory">Task Category *</Label>
+  <input
+    type="search"
+    id="taskCategory"
+    placeholder="Search or enter task category..."
+    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+    required
+  />
+</div>
+
+ 
 
             <div className="space-y-2">
               <Label htmlFor="description">Task Description *</Label>

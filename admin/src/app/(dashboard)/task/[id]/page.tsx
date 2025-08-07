@@ -30,7 +30,7 @@ import {
   Paperclip,
 } from "lucide-react";
 import { format } from "date-fns";
-import { Task, Comment } from "@/types";
+import { Task, Comment, TimeLog } from "@/types";
 import { useParams } from "next/navigation";
 import Image from "next/image";
 
@@ -47,18 +47,42 @@ export default function TaskDetails() {
     username: string;
     id: string;
   } | null>(null);
+  const [timeLogs, setTimeLogs] = useState<TimeLog[]>([]);
+  const [totalHours, setTotalHours] = useState<number>(0);
+  const [timeLogsLoading, setTimeLogsLoading] = useState(true);
 
   // Load user data on mount
   useEffect(() => {
-    const userStr = localStorage.getItem("user");
-    if (userStr) {
-      try {
-        const userData = JSON.parse(userStr);
-        setCurrentUser(userData);
-      } catch (err) {
-        console.error("Error parsing user data:", err);
+    const loadUserData = () => {
+      // Check for both "user" and "agent" keys to support both admin and agent logins
+      const userStr = localStorage.getItem("user") || localStorage.getItem("agent");
+      if (userStr) {
+        try {
+          const userData = JSON.parse(userStr);
+          console.log("Loaded user/agent data:", userData);
+          setCurrentUser(userData);
+        } catch (err) {
+          console.error("Error parsing user/agent data:", err);
+          // Clear corrupted data
+          localStorage.removeItem("user");
+          localStorage.removeItem("agent");
+        }
+      } else {
+        console.warn("No user or agent data found in localStorage");
       }
-    }
+    };
+
+    loadUserData();
+
+    // Listen for storage changes (in case user logs in/out in another tab)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === "user" || e.key === "agent") {
+        loadUserData();
+      }
+    };
+
+    window.addEventListener("storage", handleStorageChange);
+    return () => window.removeEventListener("storage", handleStorageChange);
   }, []);
   const params = useParams();
   const { id } = params;
@@ -86,12 +110,30 @@ export default function TaskDetails() {
       }
     };
 
-    const fetchComments = async () => {
-      setCommentsLoading(false);
+    const fetchTimeLogs = async () => {
+      if (id) {
+        setTimeLogsLoading(true);
+        try {
+          const response = await fetch(`/api/timelog?taskId=${id}`, { credentials: "include" });
+          if (response.ok) {
+            const data = await response.json();
+            setTimeLogs(data.timeLogs || []);
+            setTotalHours(data.totalHours || 0);
+          } else {
+            setTimeLogs([]);
+            setTotalHours(0);
+          }
+        } catch {
+          setTimeLogs([]);
+          setTotalHours(0);
+        } finally {
+          setTimeLogsLoading(false);
+        }
+      }
     };
 
     fetchTask();
-    fetchComments();
+    fetchTimeLogs();
   }, [id]);
 
   const getPriorityBadge = (priority: string) => {
@@ -113,14 +155,16 @@ export default function TaskDetails() {
     const colors = {
       "To Do": "bg-gray-100 text-gray-800 border-gray-200",
       "In Progress": "bg-blue-100 text-blue-800 border-blue-200",
-      Done: "bg-green-100 text-green-800 border-green-200",
+      Hold: "bg-orange-100 text-orange-800 border-orange-200",
+      Completed: "bg-green-100 text-green-800 border-green-200",
       Overdue: "bg-red-100 text-red-800 border-red-200",
     };
 
     const icons = {
       "To Do": <Clock className="w-3 h-3 mr-1" />,
       "In Progress": <Play className="w-3 h-3 mr-1" />,
-      Done: <CheckCircle className="w-3 h-3 mr-1" />,
+      Hold: <AlertTriangle className="w-3 h-3 mr-1" />,
+      Completed: <CheckCircle className="w-3 h-3 mr-1" />,
       Overdue: <AlertTriangle className="w-3 h-3 mr-1" />,
     };
 
@@ -130,6 +174,32 @@ export default function TaskDetails() {
         {status}
       </Badge>
     );
+  };
+
+  const calculateCompletionRate = () => {
+    if (!taskData) return 0;
+    
+    // If task has explicit progress field, use it
+    if (taskData.progress !== undefined && taskData.progress !== null) {
+      return Math.min(Math.max(taskData.progress, 0), 100);
+    }
+    
+    // Calculate based on status and checkboxes
+    const statusProgress = {
+      "To Do": 0,
+      "In Progress": 30,
+      "Hold": 50,
+      "Completed": 100,
+      "Overdue": 0
+    };
+    
+    let baseProgress = statusProgress[taskData.status as keyof typeof statusProgress] || 0;
+    
+    // Add progress for completed checkboxes
+    if (taskData.followUpRequired) baseProgress += 10;
+    if (taskData.completed) baseProgress += 15;
+    
+    return Math.min(baseProgress, 100);
   };
 
   const formatDateTime = (dateString: string | undefined) => {
@@ -149,7 +219,33 @@ export default function TaskDetails() {
 
     setSubmittingComment(true);
     try {
-      if (!currentUser?.id) {
+      // Debug: Log current user state
+      console.log("Current user state:", currentUser);
+      
+      // Get fresh user data from localStorage if currentUser is not set
+      let userId = currentUser?.id;
+      
+      if (!userId) {
+        // Check for both "user" and "agent" keys to support both admin and agent logins
+        const userStr = localStorage.getItem("user") || localStorage.getItem("agent");
+        console.log("Raw user/agent string from localStorage:", userStr);
+        if (userStr) {
+          try {
+            const userData = JSON.parse(userStr);
+            console.log("Parsed user/agent data:", userData);
+            userId = userData.id;
+            console.log("Retrieved user ID from localStorage:", userId);
+          } catch (err) {
+            console.error("Error parsing user/agent data:", err);
+            throw new Error("Failed to get user information");
+          }
+        }
+      }
+
+      console.log("Final userId to use:", userId);
+
+      if (!userId) {
+        console.error("No user ID found - checking localStorage keys:", Object.keys(localStorage));
         throw new Error("User not logged in");
       }
 
@@ -188,7 +284,7 @@ export default function TaskDetails() {
           body: JSON.stringify({
             content: newComment,
             taskId: id,
-            authorId: currentUser.id,
+            authorId: userId,
             ...attachmentData,
           }),
         });
@@ -360,8 +456,10 @@ export default function TaskDetails() {
                   <input
                     type="checkbox"
                     id="follow-up"
-                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                    defaultChecked={false}
+                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                    checked={taskData.followUpRequired || false}
+                    disabled={true}
+                    readOnly
                   />
                   <label
                     htmlFor="follow-up"
@@ -374,8 +472,10 @@ export default function TaskDetails() {
                   <input
                     type="checkbox"
                     id="check-status"
-                    className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
-                    defaultChecked={false}
+                    className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                    checked={taskData.completed || false}
+                    disabled={true}
+                    readOnly
                   />
                   <label
                     htmlFor="check-status"
@@ -413,7 +513,7 @@ export default function TaskDetails() {
           </TabsTrigger>
           <TabsTrigger value="timelog" className="flex items-center gap-2">
             <Clock className="h-4 w-4 hidden md:block" />
-            <p className="text-[12px] md:text-[14px]"> Time Log ({0}) </p>
+            <p className="text-[12px] md:text-[14px]"> Time Log ({timeLogs.length}) </p>
           </TabsTrigger>
         </TabsList>
 
@@ -439,6 +539,22 @@ export default function TaskDetails() {
                       </Label>
                       <div className="mt-1">
                         {getPriorityBadge(taskData.priority)}
+                      </div>
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium text-muted-foreground">
+                        Category
+                      </Label>
+                      <div className="mt-1">
+                        {taskData.category ? (
+                          <Badge 
+                            className="bg-blue-100 text-blue-800 border-blue-200 border"
+                          >
+                            {taskData.category.name}
+                          </Badge>
+                        ) : (
+                          <span className="text-sm text-muted-foreground">No category assigned</span>
+                        )}
                       </div>
                     </div>
                     <div>
@@ -523,9 +639,74 @@ export default function TaskDetails() {
                   <div className="space-y-2">
                     <div className="flex justify-between items-center">
                       <span className="text-sm font-medium">Completion</span>
-                      <span className="text-sm font-bold">0%</span>
+                      <span className="text-sm font-bold">{calculateCompletionRate()}%</span>
                     </div>
-                    <Progress value={0} className="h-3" />
+                    <Progress value={calculateCompletionRate()} className="h-3" />
+                  </div>
+                  
+                  {/* Progress Breakdown */}
+                  <div className="space-y-3 mt-4 pt-4 border-t">
+                    <div className="text-sm font-medium text-muted-foreground mb-2">
+                      Progress Breakdown
+                    </div>
+                    
+                    <div className="space-y-2">
+                      {/* Task Status Progress */}
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="flex items-center gap-2">
+                          {taskData.status === "Completed" ? (
+                            <CheckCircle className="h-3 w-3 text-green-600" />
+                          ) : taskData.status === "In Progress" ? (
+                            <Play className="h-3 w-3 text-blue-600" />
+                          ) : taskData.status === "Hold" ? (
+                            <AlertTriangle className="h-3 w-3 text-orange-600" />
+                          ) : (
+                            <Clock className="h-3 w-3 text-gray-600" />
+                          )}
+                          Task Status: {taskData.status}
+                        </span>
+                        <span className="font-medium">
+                          {(() => {
+                            const statusProgress = {
+                              "To Do": 0,
+                              "In Progress": 30,
+                              "Hold": 50,
+                              "Completed": 100,
+                              "Overdue": 0
+                            };
+                            return `${statusProgress[taskData.status as keyof typeof statusProgress] || 0}%`;
+                          })()}
+                        </span>
+                      </div>
+                      {/* Follow-up Required Progress */}
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="flex items-center gap-2">
+                          {taskData.followUpRequired ? (
+                            <CheckCircle className="h-3 w-3 text-green-600" />
+                          ) : (
+                            <Clock className="h-3 w-3 text-gray-400" />
+                          )}
+                          Follow-up Required
+                        </span>
+                        <span className={`font-medium ${taskData.followUpRequired ? 'text-green-600' : 'text-gray-400'}`}>
+                          {taskData.followUpRequired ? `+10%` : `0%`}
+                        </span>
+                      </div>
+                      {/* Status Check Completed Progress */}
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="flex items-center gap-2">
+                          {taskData.completed ? (
+                            <CheckCircle className="h-3 w-3 text-green-600" />
+                          ) : (
+                            <Clock className="h-3 w-3 text-gray-400" />
+                          )}
+                          Status Check Completed
+                        </span>
+                        <span className={`font-medium ${taskData.completed ? 'text-green-600' : 'text-gray-400'}`}>
+                          {taskData.completed ? `+15%` : `0%`}
+                        </span>
+                      </div>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -800,14 +981,37 @@ export default function TaskDetails() {
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
                 <span>Time Log</span>
+                <span className="text-xs text-muted-foreground">Total Hours: {totalHours}</span>
               </CardTitle>
               <CardDescription>Track time spent on this task.</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                <p className="text-muted-foreground">
-                  No time log entries yet.
-                </p>
+                {timeLogsLoading ? (
+                  <p className="text-muted-foreground">Loading time logs...</p>
+                ) : timeLogs.length === 0 ? (
+                  <p className="text-muted-foreground">No time log entries yet.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {timeLogs.map((log) => (
+                      <div key={log.id} className="flex items-center gap-4 p-3 bg-muted/30 rounded-lg border">
+                        <Avatar className="h-8 w-8">
+                          <AvatarFallback className="text-xs">
+                            {log.agent?.name?.split(" ").map((n: string) => n[0]).join("") || "A"}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium text-sm">{log.agent?.name || "Unknown Agent"}</span>
+                            <span className="text-xs text-muted-foreground">{formatDateTime(log.date)}</span>
+                          </div>
+                          <div className="text-sm text-muted-foreground">{log.description}</div>
+                        </div>
+                        <div className="font-bold text-blue-700">{log.hours}h</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>

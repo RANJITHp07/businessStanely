@@ -86,7 +86,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
     return (
       <div className="flex flex-col items-center w-full justify-center min-h-screen bg-white">
         <div className="animate-spin rounded-full h-[30px] w-[30px] md:h-20 md:w-20 border-4 border-gray-900 border-t-transparent"></div>
-        <p className="mt-4 text-gray-700  text-lg font-medium">Authenticating...</p>
+        <p className="mt-4 text-gray-700 text-lg font-medium">Authenticating...</p>
       </div>
     );
   }

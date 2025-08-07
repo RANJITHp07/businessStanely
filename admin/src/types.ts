@@ -1,3 +1,19 @@
+export interface TimeLog {
+  id: string;
+  date: string;
+  hours: number;
+  description: string;
+  createdAt: string;
+  updatedAt: string;
+  taskId: string;
+  agentId: string;
+  agent: {
+    id: string;
+    name: string;
+    email: string;
+    photo?: string;
+  };
+}
 export interface Agent {
   id: string;
   name: string;
@@ -45,12 +61,43 @@ export interface Task {
   status: string;
   priority: string;
   dueDate?: string;
+  progress?: number;
+  followUpRequired?: boolean;
+  completed?: boolean;
   createdAt: string;
   updatedAt: string;
   client?: Client;
   createdBy: Agent;
   assignedTo?: Agent;
+  category?: {
+    id: string;
+    name: string;
+    description?: string;
+    color: string;
+    status: string;
+  };
   comments?: Comment[];
+}
+
+export interface TaskCategory {
+  id: string;
+  name: string;
+  description?: string;
+  color: string;
+  status: "pending" | "approved";
+  createdAt: string;
+  updatedAt: string;
+  createdBy: string;
+  createdById: string;
+  approvedById?: string;
+  approvedBy?: string;
+  approvedAt?: string;
+  rejectedById?: string;
+  rejectedBy?: string;
+  rejectedAt?: string;
+  rejectionReason?: string;
+  taskCount?: number;
+  isOwner?: boolean;
 }
 
 export interface Comment {

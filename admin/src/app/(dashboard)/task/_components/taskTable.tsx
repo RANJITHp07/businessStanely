@@ -45,7 +45,6 @@ import {
   ChevronsRight,
   AlertCircle,
   Calendar,
-  ArrowUpDown,
 } from "lucide-react"
 import Link from "next/link"
 
@@ -53,7 +52,7 @@ import { Task } from "@/types"
 import { useEffect } from "react"
 
 const priorities = ["All Priorities", "Low", "Medium", "High"]
-const statuses = ["All Status", "To Do", "In Progress", "Done"]
+const statuses = ["All Status", "To Do", "In Progress", "Hold", "Completed"]
 
 export default function TasksTable() {
   const [tasks, setTasks] = useState<Task[] | null>(null)
@@ -61,7 +60,6 @@ export default function TasksTable() {
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedPriority, setSelectedPriority] = useState("All Priorities")
   const [selectedStatus, setSelectedStatus] = useState("All Status")
-  const [sortBy, setSortBy] = useState("a-z")
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(5)
   const [taskToDelete, setTaskToDelete] = useState<Task | null>(null)
@@ -110,14 +108,9 @@ export default function TasksTable() {
   }
 
   // Sort function
-  const sortTasks = (tasks: Task[], sortBy: string) => {
+  const sortTasks = (tasks: Task[]) => {
     return [...tasks].sort((a, b) => {
-      if (sortBy === "a-z") {
-        return a.title.localeCompare(b.title)
-      } else if (sortBy === "z-a") {
-        return b.title.localeCompare(a.title)
-      }
-      return 0
+      return a.title.localeCompare(b.title) // Default A-Z sorting
     })
   }
 
@@ -136,7 +129,7 @@ export default function TasksTable() {
   })
 
   // Apply sorting to filtered tasks
-  const sortedTasks = sortTasks(filteredTasks, sortBy)
+  const sortedTasks = sortTasks(filteredTasks)
 
   // Pagination logic
   const totalPages = Math.ceil(sortedTasks.length / itemsPerPage)

@@ -1,12 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
+import bcrypt from "bcryptjs";
 import prisma from "@/lib/prisma";
 import { uploadToS3 } from "@/lib/aws";
+import { sendAgentInviteEmail } from "@/lib/email";
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { specializations, subordinates, photo, ...agentData } = body;
+    const { specializations, subordinates, photo, password: providedPassword, ...agentData } = body;
+
+    // Generate a random password if not provided
+    const password = providedPassword || Math.random().toString(36).slice(-8);
+    const hashedPassword = await bcrypt.hash(password, 12);
 
     let photoS3Key = null;
 
@@ -27,7 +33,9 @@ export async function POST(req: NextRequest) {
 
     const data: Prisma.AgentCreateInput = {
       ...agentData,
+      password: hashedPassword, // Add the hashed password
       photo: photoS3Key,
+      status: "active", // Set default status
       ...(specializations?.length && {
         specializations: {
           set: specializations,
@@ -48,6 +56,20 @@ export async function POST(req: NextRequest) {
       },
     });
 
+    // Send email with credentials to the agent
+    try {
+      await sendAgentInviteEmail({
+        to: agentData.email,
+        userName: agentData.name,
+        password: password, // Send the plain text password
+      });
+      console.log("Agent invite email sent successfully");
+    } catch (emailError) {
+      console.error("Failed to send agent invite email:", emailError);
+      // Note: We don't fail the agent creation if email sending fails
+    }
+
+    // Return agent data (password is not included in the response by default)
     return NextResponse.json(newAgent, { status: 201 });
   } catch (error) {
     console.error("Error creating agent:", error);

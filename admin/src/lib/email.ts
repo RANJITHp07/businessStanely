@@ -27,6 +27,12 @@ interface SendAdminInviteEmailProps {
   password: string;
 }
 
+interface SendAgentInviteEmailProps {
+  to: string;
+  userName: string;
+  password: string;
+}
+
 export async function sendOTPEmail({ to, otp, userName }: SendOTPEmailProps) {
   try {
     const transporter = createTransporter();
@@ -343,6 +349,107 @@ export async function sendAdminInviteEmail({
     return { success: true, messageId: result.messageId };
   } catch (error) {
     console.error("Error sending admin invite email:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error",
+    };
+  }
+}
+
+export async function sendAgentInviteEmail({
+  to,
+  userName,
+  password,
+}: SendAgentInviteEmailProps) {
+  try {
+    const transporter = createTransporter();
+
+    const mailOptions = {
+      from: `"${process.env.COMPANY_NAME || "Business Stanley"}" <${
+        process.env.EMAIL_USER
+      }>`,
+      to: to,
+      subject: "Welcome to Business Stanley - Agent Account Created",
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Welcome to Business Stanley</title>
+        </head>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+            <h1 style="color: white; margin: 0; font-size: 28px;">Welcome to Business Stanley</h1>
+          </div>
+          
+          <div style="background: #f8f9fa; padding: 30px; border-radius: 0 0 10px 10px; border: 1px solid #e9ecef;">
+            <p style="font-size: 16px; margin-bottom: 20px;">
+              Hello ${userName},
+            </p>
+            
+            <p style="font-size: 16px; margin-bottom: 20px;">
+              Your agent account has been created in the Business Stanley management system. Here are your login credentials:
+            </p>
+
+            <div style="background: #ffffff; padding: 20px; border-radius: 5px; border: 1px solid #dee2e6; margin-bottom: 20px;">
+              <p style="margin: 5px 0;"><strong>Email:</strong> ${to}</p>
+              <p style="margin: 5px 0;"><strong>Password:</strong> ${password}</p>
+            </div>
+
+            <p style="font-size: 16px; margin-bottom: 20px;">
+              Please login to your agent portal using your email and the password above. For security purposes, we recommend changing your password after logging in.
+            </p>
+
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${
+                process.env.AGENT_PORTAL_URL || "http://localhost:3000"
+              }/login" style="background: #4c51bf; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-weight: bold;">
+                Login to Agent Portal
+              </a>
+            </div>
+
+            <p style="font-size: 14px; color: #6c757d; margin-top: 30px;">
+              For security reasons, please change your password after logging in for the first time.
+            </p>
+          </div>
+          
+          <div style="text-align: center; padding: 20px; color: #6c757d; font-size: 12px;">
+            <p style="margin: 0;">
+              © ${new Date().getFullYear()} Business Stanley. All rights reserved.
+            </p>
+          </div>
+        </body>
+        </html>
+      `,
+      text: `
+        Welcome to Business Stanley!
+        
+        Hello ${userName}!
+        
+        Your agent account has been created in the Business Stanley management system. Here are your login credentials:
+        
+        Email: ${to}
+        Password: ${password}
+        
+        Please login to your agent portal using your email and the password above. For security purposes, we recommend changing your password after logging in.
+        
+        Login now: ${process.env.AGENT_PORTAL_URL || "http://localhost:3000"}/login
+        
+        For security reasons, please change your password after logging in for the first time.
+        
+        Best regards,
+        The Business Stanley Team
+        
+        © ${new Date().getFullYear()} Business Stanley. All rights reserved.
+      `,
+    };
+
+    const result = await transporter.sendMail(mailOptions);
+    console.log("Agent invite email sent successfully:", result.messageId);
+    return { success: true, messageId: result.messageId };
+  } catch (error) {
+    console.error("Error sending agent invite email:", error);
     return {
       success: false,
       error: error instanceof Error ? error.message : "Unknown error",

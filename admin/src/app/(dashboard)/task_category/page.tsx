@@ -4,7 +4,6 @@ import { useState, useEffect } from "react"
 import Link from "next/link"
 import { toast } from "react-toastify"
 import {
-    ArrowUpDown,
     ChevronLeft,
     ChevronRight,
     ChevronsLeft,
@@ -80,8 +79,7 @@ interface TaskCategory {
 export default function TaskCategoryTable() {
     const [categories, setCategories] = useState<TaskCategory[]>([])
     const [searchTerm, setSearchTerm] = useState("")
-    const [sortBy, setSortBy] = useState("a-z")
-    const [sortByDate, setSortByDate] = useState("newest")
+    // Removed unused sortBy and sortByDate state
     const [currentPage, setCurrentPage] = useState(1)
     const [itemsPerPage, setItemsPerPage] = useState(5)
     const [categoryToDelete, setCategoryToDelete] = useState<TaskCategory | null>(null)
@@ -159,23 +157,15 @@ export default function TaskCategoryTable() {
         fetchCategories();
     }, [activeTab])
 
-    // Sort function
-    const sortCategories = (categories: TaskCategory[], sortBy: string, sortByDate: string) => {
+    // Sort function (default: a-z, newest)
+    const sortCategories = (categories: TaskCategory[]) => {
         return [...categories].sort((a, b) => {
-            if (sortBy === "a-z") {
-                return a.name.localeCompare(b.name)
-            } else if (sortBy === "z-a") {
-                return b.name.localeCompare(a.name)
-            }
-
-            if (sortByDate === "newest") {
-                return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-            } else if (sortByDate === "oldest") {
-                return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-            }
-
-            return 0
-        })
+            // Default: sort by name a-z
+            const nameCompare = a.name.localeCompare(b.name);
+            if (nameCompare !== 0) return nameCompare;
+            // Then by createdAt, newest first
+            return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        });
     }
 
     // Filter categories based on search and tab
@@ -191,7 +181,7 @@ export default function TaskCategoryTable() {
     })
 
     // Apply sorting to filtered categories
-    const sortedCategories = sortCategories(filteredCategories, sortBy, sortByDate)
+    const sortedCategories = sortCategories(filteredCategories)
 
     const resetFilters = () => {
         setSearchTerm("")
@@ -432,7 +422,7 @@ export default function TaskCategoryTable() {
                                                             <TableCell className="text-right">
                                                                 <DropdownMenu>
                                                                     <DropdownMenuTrigger asChild>
-                                                                        <Button variant="ghost" className="h-8 w-8 p-0">
+                                                                        <Button variant="ghost" className="h-8 w-8 p-0" onClick={(e) => e.stopPropagation()}>
                                                                             <span className="sr-only">Open menu</span>
                                                                             <MoreHorizontal className="h-4 w-4" />
                                                                         </Button>
@@ -440,7 +430,7 @@ export default function TaskCategoryTable() {
                                                                     <DropdownMenuContent align="end">
                                                                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
                                                                         <DropdownMenuItem asChild>
-                                                                            <Link href={`/task_category/${category.id}`}>
+                                                                            <Link href={`/task_category/${category.id}`} onClick={(e) => e.stopPropagation()}>
                                                                                 <Eye className="mr-2 h-4 w-4" />
                                                                                 View Details
                                                                             </Link>
@@ -448,7 +438,7 @@ export default function TaskCategoryTable() {
                                                                         {currentUserRole === "owner" && (
                                                                             <>
                                                                                 <DropdownMenuItem asChild>
-                                                                                    <Link href={`/task_category/${category.id}/edit`}>
+                                                                                    <Link href={`/task_category/${category.id}/edit`} onClick={(e) => e.stopPropagation()}>
                                                                                         <Edit className="mr-2 h-4 w-4" />
                                                                                         Edit Category
                                                                                     </Link>
@@ -456,7 +446,7 @@ export default function TaskCategoryTable() {
                                                                                 <DropdownMenuSeparator />
                                                                                 <DropdownMenuItem
                                                                                     className="text-destructive"
-                                                                                    onClick={() => setCategoryToDelete(category)}
+                                                                                    onClick={(e) => { e.stopPropagation(); setCategoryToDelete(category); }}
                                                                                 >
                                                                                     <Trash2 className="mr-2 h-4 w-4" />
                                                                                     Delete Category
@@ -607,7 +597,7 @@ export default function TaskCategoryTable() {
                                                     </TableRow>
                                                 ) : (
                                                     currentCategories.map((category) => (
-                                                        <TableRow key={category.id} className="cursor-pointer hover:bg-muted/50" onClick={() => router.push(`/category/${category.id}`)}>
+                                                        <TableRow key={category.id} className="cursor-pointer hover:bg-muted/50" onClick={() => router.push(`/task_category/${category.id}`)}>
                                                             <TableCell>
                                                                 <div className="flex items-center space-x-3">
                                                                     <Avatar className="h-10 w-10">
@@ -644,7 +634,7 @@ export default function TaskCategoryTable() {
                                                             <TableCell className="text-right">
                                                                 <DropdownMenu>
                                                                     <DropdownMenuTrigger asChild>
-                                                                        <Button variant="ghost" className="h-8 w-8 p-0">
+                                                                        <Button variant="ghost" className="h-8 w-8 p-0" onClick={(e) => e.stopPropagation()}>
                                                                             <span className="sr-only">Open menu</span>
                                                                             <MoreHorizontal className="h-4 w-4" />
                                                                         </Button>
@@ -652,14 +642,14 @@ export default function TaskCategoryTable() {
                                                                     <DropdownMenuContent align="end">
                                                                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
                                                                         <DropdownMenuItem asChild>
-                                                                            <Link href={`/task_category/${category.id}`}>
+                                                                            <Link href={`/task_category/${category.id}`} onClick={(e) => e.stopPropagation()}>
                                                                                 <Eye className="mr-2 h-4 w-4" />
                                                                                 View Details
                                                                             </Link>
                                                                         </DropdownMenuItem>
                                                                         {currentUserRole === "owner" && (
                                                                             <DropdownMenuItem asChild>
-                                                                                <Link href={`/task_category/approve/${category.id}`}>
+                                                                                <Link href={`/task_category/approve/${category.id}`} onClick={(e) => e.stopPropagation()}>
                                                                                     <CheckCircle className="mr-2 h-4 w-4" />
                                                                                     Approve/Reject Category
                                                                                 </Link>

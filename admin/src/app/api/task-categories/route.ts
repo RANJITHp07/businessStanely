@@ -57,8 +57,12 @@ export async function GET(req: NextRequest) {
     
     // Transform data for frontend
     const transformedCategories = await Promise.all(categories.map(async (category) => {
-      // Count tasks that belong to this category (placeholder for now)
-      const taskCount = 0; // We'll implement this later
+      // Count tasks that belong to this category
+      const taskCount = await prisma.task.count({
+        where: {
+          categoryId: category.id
+        }
+      });
       
       return {
         id: category.id,
@@ -114,17 +118,31 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Determine category status based on user role
+    // Owners can create approved categories, admins create pending categories
+    const status = currentAdmin.adminType === "owner" ? "approved" : "pending";
+    const approvedById = currentAdmin.adminType === "owner" ? currentAdmin.id : null;
+    const approvedAt = currentAdmin.adminType === "owner" ? new Date() : null;
+
     // Create new category in the database
     const newCategory = await prisma.taskCategory.create({
       data: {
         name,
         description: description || "",
         color: color || "blue",
-        status: "pending", // Always start as pending for approval flow
+        status,
         createdById: currentAdmin.id,
+        approvedById,
+        approvedAt,
       },
       include: {
         createdBy: {
+          select: {
+            id: true,
+            username: true,
+          }
+        },
+        approvedBy: {
           select: {
             id: true,
             username: true,
@@ -144,9 +162,9 @@ export async function POST(req: NextRequest) {
       updatedAt: newCategory.updatedAt.toISOString(),
       createdBy: newCategory.createdBy.username,
       createdById: newCategory.createdById,
-      approvedById: null,
-      approvedBy: null,
-      approvedAt: null,
+      approvedById: newCategory.approvedById,
+      approvedBy: newCategory.approvedBy?.username || null,
+      approvedAt: newCategory.approvedAt?.toISOString() || null,
       taskCount: 0,
     };
 

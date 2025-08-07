@@ -67,6 +67,11 @@ class RateLimiter {
     return Math.max(0, this.maxAttempts - entry.count);
   }
 
+  // Reset attempts for a specific identifier
+  reset(identifier: string): void {
+    this.attempts.delete(identifier);
+  }
+
   // Clean up expired entries (optional, for memory management)
   cleanup(): void {
     const now = Date.now();

@@ -309,7 +309,7 @@ export default function Dashboard() {
                 </div>
                 <div className="flex items-center space-x-2 text-xs mt-2">
                   <Badge className="bg-emerald-600/20 text-emerald-300 border-emerald-400/30">
-                    {dashboardStats.tasks.completed} Done
+                    {dashboardStats.tasks.completed} Completed
                   </Badge>
                   <Badge className="bg-blue-600/20 text-blue-300 border-blue-400/30">
                     {dashboardStats.tasks.inProgress} Active

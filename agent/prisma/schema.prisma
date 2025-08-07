@@ -15,7 +15,7 @@ model Agent {
   id                   String   @id @default(auto()) @map("_id") @db.ObjectId
   name                 String
   email                String   @unique
-  password             String   // Add password field for authentication
+  password             String   // Required password field
   phoneNumber          String
   secondaryPhoneNumber String?
   agentType            String
@@ -37,4 +37,160 @@ model Agent {
   superiorId    String?   @db.ObjectId
   superior      Agent?    @relation("AgentHierarchy", fields: [superiorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   subordinates  Agent[]   @relation("AgentHierarchy")
+  createdTasks  Task[]    @relation("CreatedTasks")
+  assignedTasks Task[]    @relation("AssignedTasks")
+  comments      Comment[] @relation("CommentAuthor")
+  timeLogs      TimeLog[] @relation("AgentTimeLogs")
+}
+
+model User {
+  id          String    @id @default(auto()) @map("_id") @db.ObjectId
+  username    String    @unique // Used for both login and display
+  email       String    @unique
+  password    String
+  adminType   String    @default("admin") // Either "owner" or "admin"
+  status      String    @default("active") // "active" or "inactive"
+  photo       String?
+  lastLogin   DateTime?
+  permissions String[]  @default([])
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  comments    Comment[] @relation("UserComments")
+
+  // Task Category relations
+  createdCategories  TaskCategory[] @relation()
+  approvedCategories TaskCategory[] @relation("CategoryApprovals")
+  rejectedCategories TaskCategory[] @relation("CategoryRejections")
+
+  // OTP fields for password reset
+  resetOtp      String?
+  otpExpiry     DateTime?
+  isOtpVerified Boolean   @default(false)
+}
+
+model Client {
+  id                     String   @id @default(auto()) @map("_id") @db.ObjectId
+  clientType             String
+  email                  String   @unique
+  phoneNumber            String
+  secondaryPhoneNumber   String?
+  address                String?
+  preferredCommunication String?
+  notes                  String?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+  tasks                  Task[]
+
+  // Individual Fields
+  firstName     String?
+  lastName      String?
+  gender        String?
+  dateOfBirth   DateTime?
+  idProofType   String?
+  idProofNumber String?
+
+  // Organization Fields
+  organizationName     String?
+  registrationNumber   String?
+  entityType           String?
+  incorporationDate    DateTime?
+  gstNumber            String?
+  authorizedPersonName String?
+  designation          String?
+  contactEmail         String?
+}
+
+model Task {
+  id          String    @id @default(auto()) @map("_id") @db.ObjectId
+  title       String
+  description String?
+  status      String    @default("To Do") // e.g., To Do, In Progress, Hold, Completed
+  priority    String    @default("Medium") // e.g., Low, Medium, High
+  dueDate     DateTime?
+  progress    Int?      @default(0) // Progress percentage (0-100)
+  followUpRequired Boolean @default(false)
+  completed   Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  clientId String? @db.ObjectId
+  client   Client? @relation(fields: [clientId], references: [id])
+
+  createdById String? @db.ObjectId
+  createdBy   Agent?  @relation("CreatedTasks", fields: [createdById], references: [id])
+
+  assignedToId String? @db.ObjectId
+  assignedTo   Agent?  @relation("AssignedTasks", fields: [assignedToId], references: [id])
+
+  categoryId String?      @db.ObjectId
+  category   TaskCategory? @relation(fields: [categoryId], references: [id])
+
+  comments Comment[]
+  timeLogs TimeLog[]
+}
+
+model TimeLog {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  date        DateTime
+  hours       Float    // Hours worked (can be decimal like 1.5, 2.75)
+  description String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  taskId String @db.ObjectId
+  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  // Agent who logged the time
+  agentId String @db.ObjectId
+  agent   Agent  @relation("AgentTimeLogs", fields: [agentId], references: [id])
+}
+
+model Comment {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // File attachment fields
+  attachmentName String?
+  attachmentUrl  String?
+  attachmentSize Int?
+  attachmentType String?
+
+  taskId String @db.ObjectId
+  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  // Author can be either a User or an Agent
+  authorId   String @db.ObjectId
+  authorType String @default("USER") // "USER" or "AGENT"
+  user       User?  @relation("UserComments", fields: [authorId], references: [id])
+  agent      Agent? @relation("CommentAuthor", fields: [authorId], references: [id])
+}
+
+model TaskCategory {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  name        String
+  description String?
+  color       String   @default("blue")
+  status      String   @default("pending") // "pending" or "approved"
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Creator information
+  createdById String @db.ObjectId
+  createdBy   User   @relation(fields: [createdById], references: [id])
+
+  // Approval information
+  approvedById String?   @db.ObjectId
+  approvedBy   User?     @relation("CategoryApprovals", fields: [approvedById], references: [id])
+  approvedAt   DateTime?
+
+  // Rejection information
+  rejectedById    String?   @db.ObjectId
+  rejectedBy      User?     @relation("CategoryRejections", fields: [rejectedById], references: [id])
+  rejectedAt      DateTime?
+  rejectionReason String?
+
+  // Tasks relation
+  tasks Task[]
 }

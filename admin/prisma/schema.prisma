@@ -69,6 +69,7 @@ model Agent {
   id                   String   @id @default(auto()) @map("_id") @db.ObjectId
   name                 String
   email                String   @unique
+  password             String   // Authentication password field
   phoneNumber          String
   secondaryPhoneNumber String?
   agentType            String
@@ -76,8 +77,15 @@ model Agent {
   jurisdiction         String
   specializations      String[]
   photo                String?
+  status               String   @default("active") // "active" or "inactive"
+  lastLogin            DateTime?
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
+
+  // OTP fields for password reset
+  resetOtp             String?
+  otpExpiry            DateTime?
+  isOtpVerified        Boolean  @default(false)
 
   // Team Management
   superiorId    String?   @db.ObjectId
@@ -86,15 +94,19 @@ model Agent {
   createdTasks  Task[]    @relation("CreatedTasks")
   assignedTasks Task[]    @relation("AssignedTasks")
   comments      Comment[] @relation("CommentAuthor")
+  timeLogs      TimeLog[] @relation("TimeLogAgent")
 }
 
 model Task {
   id          String    @id @default(auto()) @map("_id") @db.ObjectId
   title       String
   description String?
-  status      String    @default("To Do") // e.g., To Do, In Progress, Done
+  status      String    @default("To Do") // e.g., To Do, In Progress, Hold, Completed
   priority    String    @default("Medium") // e.g., Low, Medium, High
   dueDate     DateTime?
+  progress    Int?      @default(0) // Progress percentage (0-100)
+  followUpRequired Boolean @default(false)
+  completed   Boolean   @default(false)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
@@ -107,7 +119,11 @@ model Task {
   assignedToId String? @db.ObjectId
   assignedTo   Agent?  @relation("AssignedTasks", fields: [assignedToId], references: [id])
 
+  categoryId String?      @db.ObjectId
+  category   TaskCategory? @relation(fields: [categoryId], references: [id])
+
   comments Comment[]
+  timeLogs TimeLog[]
 }
 
 model Comment {
@@ -155,4 +171,22 @@ model TaskCategory {
   rejectedBy      User?     @relation("CategoryRejections", fields: [rejectedById], references: [id])
   rejectedAt      DateTime?
   rejectionReason String?
+
+  // Tasks relation
+  tasks Task[]
+}
+
+model TimeLog {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  date        DateTime
+  hours       Float
+  description String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  taskId String @db.ObjectId
+  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  agentId String @db.ObjectId
+  agent   Agent  @relation("TimeLogAgent", fields: [agentId], references: [id])
 }

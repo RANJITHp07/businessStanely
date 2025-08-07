@@ -189,7 +189,7 @@ export async function POST(req: NextRequest) {
     response.cookies.set({
       name: "agent-auth-token",
       value: token,
-      httpOnly: true,
+      httpOnly: false, // Allow JavaScript access for client-side auth checks
       secure: isProduction, // Set to true in production
       sameSite: "lax",
       maxAge: 24 * 60 * 60, // 24 hours in seconds

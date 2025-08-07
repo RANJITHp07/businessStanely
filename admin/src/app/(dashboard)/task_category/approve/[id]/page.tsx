@@ -223,8 +223,8 @@ export default function ApproveCategory({ params }: { params: Promise<{ id: stri
             
             // Show success message and redirect
             toast.success("Category approved successfully")
-            // Redirect back to category management
-            router.push('/task_category')
+            // Redirect to the category detail page to show the updated status
+            router.push(`/task_category/${resolvedParams.id}`)
         } catch (error) {
             console.error("Error approving category:", error)
             const errorMessage = error instanceof Error ? error.message : "Failed to approve category"
@@ -257,8 +257,8 @@ export default function ApproveCategory({ params }: { params: Promise<{ id: stri
             // Show success message and redirect
             toast.success("Category rejected successfully")
             setShowRejectDialog(false)
-            // Redirect back to category management
-            router.push('/task_category')
+            // Redirect to the category detail page to show the updated status
+            router.push(`/task_category/${resolvedParams.id}`)
         } catch (error) {
             console.error("Error rejecting category:", error)
             const errorMessage = error instanceof Error ? error.message : "Failed to reject category"

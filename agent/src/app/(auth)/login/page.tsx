@@ -115,15 +115,7 @@ export default function LoginPage() {
               >
                 Forgot your password?
               </Link>
-              <p className="text-sm text-black">
-                Don’t have an account?{" "}
-                <Link
-                  href="/signup"
-                  className="text-blue-600 hover:text-blue-500 hover:underline"
-                >
-                  Sign Up
-                </Link>
-              </p>
+
             </div>
           </CardContent>
         </form>

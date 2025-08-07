@@ -17,20 +17,31 @@ import { toast } from "react-toastify";
 import { Eye, EyeOff, Save, Shield } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
-interface User {
+interface Agent {
   id: string;
-  username: string;
+  name: string;
   email: string;
-  adminType?: "owner" | "admin";
+  agentType: string;
+  phoneNumber: string;
+  jurisdiction: string;
+  specializations: string[];
+  photo?: string;
+  status: string;
 }
 
-export default function AdminSettingsPage() {
-  // User state
-  const [user, setUser] = useState<User | null>(null);
-  const [username, setUsername] = useState("");
+export default function AgentSettingsPage() {
+  // Agent state
+  const [agent, setAgent] = useState<Agent | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isProfileLoading, setIsProfileLoading] = useState(false);
 
+  // Profile state
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [agentType, setAgentType] = useState("");
+  const [barAssociationId, setBarAssociationId] = useState("");
+  
   // Password state
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -40,27 +51,55 @@ export default function AdminSettingsPage() {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  // Load user data from localStorage on component mount
+  // Load agent data from localStorage on component mount
   useEffect(() => {
     const token = localStorage.getItem("token");
-    const userDataString = localStorage.getItem("user");
+    const agentDataString = localStorage.getItem("agent");
 
-    if (token && userDataString) {
+    if (token && agentDataString) {
       try {
-        const userData = JSON.parse(userDataString);
-        setUser(userData);
-        setUsername(userData.username);
+        const agentData = JSON.parse(agentDataString);
+        setAgent(agentData);
+        setName(agentData.name || "");
+        setEmail(agentData.email || "");
+        setPhoneNumber(agentData.phoneNumber || "");
+        setAgentType(agentData.agentType || "");
+        setBarAssociationId(agentData.barAssociationId || "");
         setIsLoading(false);
       } catch {
-        console.error("Error parsing user data");
+        console.error("Error parsing agent data");
         // Redirect to login if data is corrupted
         window.location.href = "/login";
       }
     } else {
-      // Redirect to login if no token or user data
-      window.location.href = "/login";
+      // If no localStorage data, fetch from API
+      fetchAgentProfile();
     }
   }, []);
+
+  const fetchAgentProfile = async () => {
+    try {
+      const response = await fetch("/api/auth/me");
+      
+      if (response.ok) {
+        const data = await response.json();
+        setAgent(data.agent);
+        setName(data.agent.name || "");
+        setEmail(data.agent.email || "");
+        setPhoneNumber(data.agent.phoneNumber || "");
+        setAgentType(data.agent.agentType || "");
+        setBarAssociationId(data.agent.barAssociationId || "");
+      } else {
+        // Redirect to login if unauthorized
+        window.location.href = "/login";
+      }
+    } catch (error) {
+      console.error("Error fetching agent profile:", error);
+      window.location.href = "/login";
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleProfileSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -74,13 +113,12 @@ export default function AdminSettingsPage() {
         return;
       }
 
-      const response = await fetch("http://localhost:3000/api/user/profile", {
+      const response = await fetch("/api/auth/me", {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ username }),
+        body: JSON.stringify({ name }),
       });
 
       const data = await response.json();
@@ -89,14 +127,14 @@ export default function AdminSettingsPage() {
         throw new Error(data.error || "Failed to update profile");
       }
 
-      // Update user data in localStorage
-      if (user) {
-        const updatedUser = { ...user, username };
-        localStorage.setItem("user", JSON.stringify(updatedUser));
-        setUser(updatedUser);
+      // Update agent data in localStorage
+      if (agent) {
+        const updatedAgent = { ...agent, name };
+        localStorage.setItem("agent", JSON.stringify(updatedAgent));
+        setAgent(updatedAgent);
       }
 
-      toast.success("Your username has been updated successfully.");
+      toast.success("Your name has been updated successfully.");
     } catch (error: unknown) {
       const errorMessage =
         error instanceof Error
@@ -131,7 +169,7 @@ export default function AdminSettingsPage() {
         return;
       }
 
-      const response = await fetch("/api/user/change-password", {
+      const response = await fetch("/api/agent/change-password", {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -185,9 +223,9 @@ export default function AdminSettingsPage() {
         <CardHeader className="flex flex-col space-y-2">
           <div className="flex items-center justify-between">
             <CardTitle className="text-2xl">Profile Settings</CardTitle>
-            {user?.adminType && (
-              <Badge variant={user.adminType === "owner" ? "destructive" : "secondary"}>
-                {user.adminType === "owner" ? "Owner" : "Admin"}
+            {agent?.agentType && (
+              <Badge variant="secondary">
+                {agent.agentType}
               </Badge>
             )}
           </div>
@@ -200,7 +238,7 @@ export default function AdminSettingsPage() {
               <Input
                 id="email"
                 type="email"
-                value={user?.email || ""}
+                value={agent?.email || ""}
                 disabled
                 className="bg-muted cursor-not-allowed"
               />
@@ -209,12 +247,12 @@ export default function AdminSettingsPage() {
               </p>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="username">Username</Label>
+              <Label htmlFor="name">Full Name</Label>
               <Input
-                id="username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="Enter your username"
+                id="name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Enter your full name"
                 required
               />
             </div>

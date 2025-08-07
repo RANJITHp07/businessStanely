@@ -6,21 +6,37 @@ import {
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
+// Validate environment variables
+const AWS_REGION = process.env.AWS_REGION || process.env.APP_AWS_REGION || "us-east-1";
+const AWS_ACCESS_KEY_ID = process.env.AWS_ACCESS_KEY_ID || process.env.APP_AWS_ACCESS_KEY_ID;
+const AWS_SECRET_ACCESS_KEY = process.env.AWS_SECRET_ACCESS_KEY || process.env.APP_AWS_SECRET_ACCESS_KEY;
+const BUCKET_NAME = process.env.AWS_S3_BUCKET || process.env.APP_AWS_S3_BUCKET_NAME;
+
+if (!AWS_ACCESS_KEY_ID || !AWS_SECRET_ACCESS_KEY || !BUCKET_NAME) {
+  console.error("Missing AWS configuration:", {
+    hasAccessKey: !!AWS_ACCESS_KEY_ID,
+    hasSecretKey: !!AWS_SECRET_ACCESS_KEY,
+    hasBucketName: !!BUCKET_NAME,
+  });
+}
+
 const s3Client = new S3Client({
-  region: process.env.APP_AWS_REGION || "us-east-1",
+  region: AWS_REGION,
   credentials: {
-    accessKeyId: process.env.APP_AWS_ACCESS_KEY_ID!,
-    secretAccessKey: process.env.APP_AWS_SECRET_ACCESS_KEY!,
+    accessKeyId: AWS_ACCESS_KEY_ID!,
+    secretAccessKey: AWS_SECRET_ACCESS_KEY!,
   },
 });
-
-const BUCKET_NAME = process.env.APP_AWS_S3_BUCKET_NAME!;
 
 export async function uploadToS3(
   file: Buffer,
   fileName: string,
   contentType: string
 ): Promise<string> {
+  if (!BUCKET_NAME) {
+    throw new Error("S3 bucket name not configured. Please set APP_AWS_S3_BUCKET_NAME environment variable.");
+  }
+
   const key = `uploads/${Date.now()}_${fileName}`;
 
   const command = new PutObjectCommand({

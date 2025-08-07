@@ -46,11 +46,19 @@ import {
   AlertCircle,
   Users,
   Plus,
+  Loader2,
 } from "lucide-react";
 import { format, isBefore, startOfDay } from "date-fns";
 import { cn } from "@/lib/utils";
 
 import { Client, Agent, Task } from "@/types";
+
+interface Category {
+  id: string;
+  name: string;
+  description?: string;
+  status: string;
+}
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "react-toastify";
 
@@ -79,9 +87,11 @@ export default function TaskForm() {
     priority: "",
     assignedToId: "",
     description: "",
+    categoryId: "",
   });
   const [clients, setClients] = useState<Client[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [dueDate, setDueDate] = useState<Date>();
   const [isEditMode, setIsEditMode] = useState(false);
@@ -95,10 +105,15 @@ export default function TaskForm() {
   const [showAgentSuggestions, setShowAgentSuggestions] = useState(false);
 
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
-const [newCategoryData, setNewCategoryData] = useState({
-  name: "",
-  description: "",
-});
+  const [newCategoryData, setNewCategoryData] = useState({
+    name: "",
+    description: "",
+  });
+  const [categorySearchQuery, setCategorySearchQuery] = useState("");
+  const [showCategorySuggestions, setShowCategorySuggestions] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isCreatingCategory, setIsCreatingCategory] = useState(false);
+  const [isCreatingClient, setIsCreatingClient] = useState(false);
 
 // Add this handler function
 const handleNewCategoryInputChange = (field: string, value: string) => {
@@ -114,6 +129,58 @@ const handleAddCategoryClick = () => {
   });
 };
 
+const handleCreateCategory = async () => {
+  if (!newCategoryData.name.trim()) {
+    toast.error("Category name is required");
+    return;
+  }
+
+  if (isCreatingCategory) {
+    return;
+  }
+
+  setIsCreatingCategory(true);
+
+  try {
+    const response = await fetch("/api/task-categories", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(newCategoryData),
+    });
+
+    if (response.ok) {
+      const newCategory = await response.json();
+      setCategories((prev) => [newCategory, ...prev]);
+      setFormData((prev) => ({ ...prev, categoryId: newCategory.id }));
+      setCategorySearchQuery(newCategory.name);
+      setIsCategoryModalOpen(false);
+      
+      // Show different success message based on category status
+      if (newCategory.status === "approved") {
+        toast.success("Category created and approved successfully!");
+      } else {
+        toast.success("Category created! It's pending approval and will be available once approved.");
+      }
+    } else {
+      const error = await response.json();
+      toast.error(error.error || "Failed to create category");
+    }
+  } catch (error) {
+    console.error("Error creating category:", error);
+    toast.error("Failed to create category");
+  } finally {
+    setIsCreatingCategory(false);
+  }
+};
+
+  // Add category filtering logic - only show approved categories for task selection
+  const filteredCategories = categories.filter((category) => {
+    return category.status === "approved" && 
+           category.name.toLowerCase().includes(categorySearchQuery.toLowerCase());
+  });
+
 
   // Add this filtering logic
   const filteredAgents = agents.filter((agent) => {
@@ -123,16 +190,19 @@ const handleAddCategoryClick = () => {
     );
   });
 
-  // Add click outside handler for agents (if not already added)
+  // Add click outside handler for agents and categories
   useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (!event.target.closest(".relative")) {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (!(event.target as Element)?.closest(".relative")) {
         setShowAgentSuggestions(false);
+        setShowCategorySuggestions(false);
+        setShowSuggestions(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+  
   // Add this filtering logic
   const filteredClients = clients.filter((client) => {
     const clientName =
@@ -141,17 +211,6 @@ const handleAddCategoryClick = () => {
         : client.organizationName || "";
     return clientName.toLowerCase().includes(searchQuery.toLowerCase());
   });
-
-  // Add click outside handler to close suggestions
-  useEffect(() => {
-    const handleClickOutside = (event) => {
-      if (!event.target.closest(".relative")) {
-        setShowSuggestions(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
   // New client form state
   const [newClientData, setNewClientData] = useState({
     firstName: "",
@@ -169,16 +228,19 @@ const handleAddCategoryClick = () => {
   useEffect(() => {
     const fetchClientsAndAgents = async () => {
       try {
-        const [clientsRes, agentsRes] = await Promise.all([
+        const [clientsRes, agentsRes, categoriesRes] = await Promise.all([
           fetch("/api/clients"),
           fetch("/api/agents"),
+          fetch("/api/task-categories?status=approved"),
         ]);
         const clientsData = await clientsRes.json();
         const agentsData = await agentsRes.json();
+        const categoriesData = await categoriesRes.json();
         setClients(clientsData);
         setAgents(agentsData);
+        setCategories(categoriesData);
       } catch (error) {
-        console.error("Failed to fetch clients or agents", error);
+        console.error("Failed to fetch clients, agents, or categories", error);
       }
     };
     fetchClientsAndAgents();
@@ -196,7 +258,11 @@ const handleAddCategoryClick = () => {
               priority: task.priority,
               assignedToId: task.assignedTo?.id || "",
               description: task.description || "",
+              categoryId: task.category?.id || "",
             });
+            if (task.category) {
+              setCategorySearchQuery(task.category.name);
+            }
             if (task.dueDate) {
               setDueDate(new Date(task.dueDate));
             }
@@ -244,6 +310,12 @@ const handleAddCategoryClick = () => {
   };
 
   const handleCreateClient = async () => {
+    if (isCreatingClient) {
+      return;
+    }
+
+    setIsCreatingClient(true);
+
     try {
       const clientData = {
         clientType: selectedClientType,
@@ -281,18 +353,60 @@ const handleAddCategoryClick = () => {
     } catch (error) {
       console.error("Error creating client:", error);
       toast.error("An unexpected error occurred while creating client");
+    } finally {
+      setIsCreatingClient(false);
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Prevent multiple submissions
+    if (isSubmitting) {
+      return;
+    }
+
     const url = isEditMode ? `/api/tasks/${id}` : "/api/tasks";
     const method = isEditMode ? "PUT" : "POST";
 
-    if (!isEditMode && agents.length === 0) {
-      alert("Cannot create a task without any agents in the system.");
+    // Validate required fields
+    if (!formData.title.trim()) {
+      toast.error("Task title is required");
       return;
     }
+
+    if (!formData.clientId) {
+      toast.error("Please select a client");
+      return;
+    }
+
+    if (!formData.assignedToId) {
+      toast.error("Please assign the task to an agent");
+      return;
+    }
+
+    if (!formData.priority) {
+      toast.error("Please select a priority level");
+      return;
+    }
+
+    if (!dueDate) {
+      toast.error("Due date is required");
+      return;
+    }
+
+    // Check if due date is in the past (only for new tasks)
+    if (!isEditMode && dueDate && isBefore(startOfDay(dueDate), startOfDay(new Date()))) {
+      toast.error("Due date cannot be in the past");
+      return;
+    }
+
+    if (!isEditMode && agents.length === 0) {
+      toast.error("Cannot create a task without any agents in the system.");
+      return;
+    }
+
+    setIsSubmitting(true);
 
     try {
       const response = await fetch(url, {
@@ -319,7 +433,9 @@ const handleAddCategoryClick = () => {
       }
     } catch (error) {
       console.error("Error submitting form:", error);
-      alert("An unexpected error occurred. Please try again.");
+      toast.error("An unexpected error occurred. Please try again.");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -381,6 +497,7 @@ const handleAddCategoryClick = () => {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-8">
+        <fieldset disabled={isSubmitting} className="space-y-8">
         {/* Task Basic Information */}
         <Card>
           <CardHeader>
@@ -463,16 +580,24 @@ const handleAddCategoryClick = () => {
             type="button"
             variant="outline"
             onClick={() => setIsCategoryModalOpen(false)}
+            disabled={isCreatingCategory}
           >
             Cancel
           </Button>
 
           <Button
             type="button"
-            variant="outline"
-         
+            onClick={handleCreateCategory}
+            disabled={!newCategoryData.name.trim() || isCreatingCategory}
           >
-           Submit
+            {isCreatingCategory ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Creating...
+              </>
+            ) : (
+              "Create Category"
+            )}
           </Button>
         </div>
       </DialogContent>
@@ -482,16 +607,80 @@ const handleAddCategoryClick = () => {
             </div>
 
 
-            <div className="space-y-2">
-  <Label htmlFor="taskCategory">Task Category *</Label>
-  <input
-    type="search"
-    id="taskCategory"
-    placeholder="Search or enter task category..."
-    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-    required
-  />
-</div>
+            <div className="space-y-2 relative">
+              <Label htmlFor="taskCategory">Task Category *</Label>
+              <div className="relative">
+                <Input
+                  id="taskCategory"
+                  type="text"
+                  placeholder="Type to search categories..."
+                  value={categorySearchQuery}
+                  onChange={(e) => {
+                    setCategorySearchQuery(e.target.value);
+                    if (e.target.value.trim()) {
+                      setShowCategorySuggestions(true);
+                    } else {
+                      setShowCategorySuggestions(false);
+                    }
+                  }}
+                  onFocus={() => {
+                    if (categorySearchQuery.trim()) {
+                      setShowCategorySuggestions(true);
+                    }
+                  }}
+                  className="w-full"
+                  required
+                />
+                
+                {/* Category Suggestions Dropdown - Only show when searching */}
+                {showCategorySuggestions &&
+                  categorySearchQuery.trim() &&
+                  filteredCategories.length > 0 && (
+                  <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto">
+                    {filteredCategories.map((category) => (
+                      <div
+                        key={category.id}
+                        className="flex items-center justify-between p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
+                        onClick={() => {
+                          setFormData((prev) => ({ ...prev, categoryId: category.id }));
+                          setCategorySearchQuery(category.name);
+                          setShowCategorySuggestions(false);
+                        }}
+                      >
+                        <div className="flex items-center gap-2">
+                          <div>
+                            <span className="font-medium">{category.name}</span>
+                            {category.description && (
+                              <div className="text-xs text-gray-500 mt-1">
+                                {category.description}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <Badge
+                          className={`text-xs ${
+                            category.status === "approved"
+                              ? "bg-green-100 text-green-800"
+                              : "bg-yellow-100 text-yellow-800"
+                          }`}
+                        >
+                          {category.status}
+                        </Badge>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                
+                {/* No results message - Only when searching */}
+                {showCategorySuggestions &&
+                  categorySearchQuery &&
+                  filteredCategories.length === 0 && (
+                  <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg p-3">
+                    <span className="text-gray-500">No categories found</span>
+                  </div>
+                )}
+              </div>
+            </div>
 
  
 
@@ -721,15 +910,23 @@ const handleAddCategoryClick = () => {
                     type="button"
                     variant="outline"
                     onClick={() => setIsModalOpen(false)}
+                    disabled={isCreatingClient}
                   >
                     Cancel
                   </Button>
                   <Button
                     type="button"
                     onClick={handleCreateClient}
-                    disabled={!isCreateClientFormValid()}
+                    disabled={!isCreateClientFormValid() || isCreatingClient}
                   >
-                    Create Client
+                    {isCreatingClient ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Creating...
+                      </>
+                    ) : (
+                      "Create Client"
+                    )}
                   </Button>
                 </div>
               </DialogContent>
@@ -1022,14 +1219,17 @@ const handleAddCategoryClick = () => {
 
             {/* Completion Date */}
             <div className="space-y-2">
-              <Label>Task Completion Date *</Label>
+              <Label className="flex items-center gap-1">
+                Task Completion Date 
+                <span className="text-red-500">*</span>
+              </Label>
               <Popover>
                 <PopoverTrigger asChild>
                   <Button
                     variant="outline"
                     className={cn(
                       "w-full justify-start text-left font-normal",
-                      !dueDate && "text-muted-foreground"
+                      !dueDate && "text-muted-foreground border-red-200 focus:border-red-500"
                     )}
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
@@ -1049,7 +1249,7 @@ const handleAddCategoryClick = () => {
                 </PopoverContent>
               </Popover>
               <p className="text-xs text-muted-foreground">
-                Choose the date when this task should be completed
+                Choose the date when this task should be completed (required)
               </p>
             </div>
 
@@ -1096,16 +1296,29 @@ const handleAddCategoryClick = () => {
             className="bg-[#f42b03] hover:bg-[#f42b03] shadow-none hover:shadow-lg transition-shadow duration-300 text-white hover:text-white cursor-pointer"
             type="button"
             variant="outline"
+            disabled={isSubmitting}
+            onClick={() => router.push("/task")}
           >
             Cancel
           </Button>
           <Button
             type="submit"
-            className=" cursor-pointer shadow-none hover:shadow-lg transition-shadow duration-300"
+            className="cursor-pointer shadow-none hover:shadow-lg transition-shadow duration-300"
+            disabled={isSubmitting}
           >
-            {isEditMode ? "Update Task" : "Create Task"}
+            {isSubmitting ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                {isEditMode ? "Updating..." : "Creating..."}
+              </>
+            ) : (
+              <>
+                {isEditMode ? "Update Task" : "Create Task"}
+              </>
+            )}
           </Button>
         </div>
+        </fieldset>
       </form>
     </div>
   );

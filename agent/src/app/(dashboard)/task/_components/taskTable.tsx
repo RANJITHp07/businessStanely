@@ -13,31 +13,17 @@ import { useRouter } from "next/navigation";
 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
-import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import {
   FileText,
-  Plus,
   Search,
   Filter,
   MoreHorizontal,
-  Edit,
-  Trash2,
   Eye,
   ChevronLeft,
   ChevronRight,
@@ -53,9 +39,10 @@ import { Task } from "@/types"
 import { useEffect } from "react"
 
 const priorities = ["All Priorities", "Low", "Medium", "High"]
-const statuses = ["All Status", "To Do", "In Progress", "Done"]
+const statuses = ["All Status", "To Do", "In Progress", "Hold", "Completed"]
 
 export default function TasksTable() {
+  const router = useRouter();
   const [tasks, setTasks] = useState<Task[] | null>(null)
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
@@ -64,7 +51,6 @@ export default function TasksTable() {
   const [sortBy, setSortBy] = useState("a-z")
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(5)
-  const [taskToDelete, setTaskToDelete] = useState<Task | null>(null)
 
   useEffect(() => {
     const fetchTasks = async () => {
@@ -72,7 +58,7 @@ export default function TasksTable() {
         const response = await fetch('/api/tasks');
         if (response.ok) {
           const data = await response.json();
-          setTasks(data);
+          setTasks(data.tasks || data); // Handle both formats
         } else {
           console.error("Failed to fetch tasks");
           setTasks([]); // Set to empty array on error
@@ -87,25 +73,6 @@ export default function TasksTable() {
 
     fetchTasks();
   }, []);
-
-  const handleDelete = async () => {
-    if (!taskToDelete) return
-
-    try {
-      const response = await fetch(`/api/tasks/${taskToDelete.id}`, {
-        method: 'DELETE',
-      });
-
-      if (response.ok) {
-        setTasks((tasks || []).filter((task) => task.id !== taskToDelete.id));
-        setTaskToDelete(null);
-      } else {
-        console.error("Failed to delete task");
-      }
-    } catch (error) {
-      console.error("Error deleting task:", error);
-    }
-  }
 
   // Sort function
   const sortTasks = (tasks: Task[], sortBy: string) => {
@@ -379,7 +346,6 @@ export default function TasksTable() {
                       </TableRow>
                     ) : (
                       currentTasks.map((task) => {
-                        const router = useRouter();
                         return (
                           <TableRow
                             key={task.id}
@@ -460,20 +426,6 @@ export default function TasksTable() {
                                       <Eye className="mr-2 h-4 w-4" />
                                       View Details
                                     </Link>
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem asChild>
-                                    <Link href={`/task/${task.id}/edit`}>
-                                      <Edit className="mr-2 h-4 w-4" />
-                                      Edit Task
-                                    </Link>
-                                  </DropdownMenuItem>
-                                  <DropdownMenuSeparator />
-                                  <DropdownMenuItem
-                                    className="text-destructive"
-                                    onClick={() => setTaskToDelete(task)}
-                                  >
-                                    <Trash2 className="mr-2 h-4 w-4" />
-                                    Delete Task
                                   </DropdownMenuItem>
                                 </DropdownMenuContent>
                               </DropdownMenu>
@@ -564,20 +516,6 @@ export default function TasksTable() {
 
 
       </Card>
-      <AlertDialog open={!!taskToDelete} onOpenChange={() => setTaskToDelete(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the task and remove its data from our servers.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete}>Delete</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   )
 }

@@ -50,7 +50,6 @@ import {
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
-  ArrowUpDown,
 } from "lucide-react";
 import Link from "next/link";
 import {
@@ -82,13 +81,12 @@ const jurisdictions = ["All Jurisdictions", "India", "USA", "UAE", "Others"];
 import { Agent } from "@/types";
 
 export default function AgentsTable() {
+  const router = useRouter();
   const [agents, setAgents] = useState<Agent[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedType, setSelectedType] = useState("All Types");
   const [selectedJurisdiction, setSelectedJurisdiction] =
     useState("All Jurisdictions");
-  const [sortBy, setSortBy] = useState("a-z");
-  const [sortByDate, setSortByDate] = useState("newest");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(5);
   const [agentToDelete, setAgentToDelete] = useState<Agent | null>(null);
@@ -116,22 +114,9 @@ export default function AgentsTable() {
   }, []);
 
   // Sort function
-  const sortAgents = (agents: Agent[], sortBy: string, sortByDate: string) => {
+  const sortAgents = (agents: Agent[]) => {
     return [...agents].sort((a, b) => {
-      if (sortBy === "a-z") {
-        return a.name.localeCompare(b.name);
-      } else if (sortBy === "z-a") {
-        return b.name.localeCompare(a.name);
-      }
-      
-      // Date sorting (assuming agents have a createdAt field)
-      // if (sortByDate === "newest") {
-      //   return new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime();
-      // } else if (sortByDate === "oldest") {
-      //   return new Date(a.createdAt || 0).getTime() - new Date(b.createdAt || 0).getTime();
-      // }
-      
-      return 0;
+      return a.name.localeCompare(b.name); // Default A-Z sorting
     });
   }
 
@@ -155,7 +140,7 @@ export default function AgentsTable() {
   });
 
   // Apply sorting to filtered agents
-  const sortedAgents = sortAgents(filteredAgents, sortBy, sortByDate);
+  const sortedAgents = sortAgents(filteredAgents);
 
   const resetFilters = () => {
     setSearchTerm("");
@@ -403,7 +388,6 @@ export default function AgentsTable() {
     </TableRow>
   ) : (
     currentAgents.map((agent) => {
-      const router = useRouter();
       return (
         <TableRow
           key={agent.id}

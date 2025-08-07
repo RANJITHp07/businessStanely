@@ -317,8 +317,7 @@ export default function AgentDetails() {
                       {
                         agentTasks.filter(
                           (task) =>
-                            task.status === "Completed" ||
-                            task.status === "Done"
+                            task.status === "Completed"
                         ).length
                       }
                     </div>
@@ -332,8 +331,7 @@ export default function AgentDetails() {
                         ? Math.round(
                             (agentTasks.filter(
                               (task) =>
-                                task.status === "Completed" ||
-                                task.status === "Done"
+                                task.status === "Completed"
                             ).length /
                               agentTasks.length) *
                               100
@@ -472,8 +470,7 @@ export default function AgentDetails() {
                         {
                           agentTasks.filter(
                             (task) =>
-                              task.status === "Completed" ||
-                              task.status === "Done"
+                              task.status === "Completed"
                           ).length
                         }
                       </span>
@@ -517,8 +514,7 @@ export default function AgentDetails() {
                           ? Math.round(
                               (agentTasks.filter(
                                 (task) =>
-                                  task.status === "Completed" ||
-                                  task.status === "Done"
+                                  task.status === "Completed"
                               ).length /
                                 agentTasks.length) *
                                 100

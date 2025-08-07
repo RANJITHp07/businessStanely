@@ -66,9 +66,7 @@ export async function GET() {
     });
     const completedTasks = await prisma.task.count({
       where: {
-        status: {
-          in: ["Completed", "Done"]
-        }
+        status: "Completed"
       }
     });
 
@@ -78,7 +76,7 @@ export async function GET() {
           lt: now
         },
         status: {
-          notIn: ["Completed", "Done"]
+          notIn: ["Completed"]
         }
       }
     });

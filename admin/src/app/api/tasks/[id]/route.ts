@@ -13,6 +13,7 @@ export async function GET(
         client: true,
         createdBy: true,
         assignedTo: true,
+        category: true, // Re-enabled category
         comments: {
           include: {
             user: {
@@ -34,6 +35,21 @@ export async function GET(
           },
           orderBy: {
             createdAt: "desc",
+          },
+        },
+        timeLogs: {
+          include: {
+            agent: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                photo: true,
+              },
+            },
+          },
+          orderBy: {
+            date: "desc",
           },
         },
       },

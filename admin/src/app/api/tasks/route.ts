@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from '@prisma/client';
 import prisma from '@/lib/prisma';
+import { getCurrentAdmin } from "@/lib/auth";
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { title, description, status, priority, dueDate, clientId, createdById, assignedToId } = body;
+    const { title, description, status, priority, dueDate, clientId, createdById, assignedToId, categoryId } = body;
 
     if (!title || !createdById) {
       return NextResponse.json({ error: "Title and createdById are required" }, { status: 400 });
@@ -21,6 +22,13 @@ export async function POST(req: NextRequest) {
         clientId,
         createdById,
         assignedToId,
+        categoryId: categoryId || undefined,
+      },
+      include: {
+        client: true,
+        createdBy: true,
+        assignedTo: true,
+        category: true,
       },
     });
 
@@ -36,6 +44,16 @@ export async function POST(req: NextRequest) {
 
 export async function GET(req: NextRequest) {
   try {
+    // Get the current admin user
+    const currentAdmin = await getCurrentAdmin(req);
+    
+    if (!currentAdmin) {
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 }
+      );
+    }
+
     const { searchParams } = new URL(req.url);
     const assignedToId = searchParams.get('assignedToId');
     const clientId = searchParams.get('clientId');
@@ -52,11 +70,8 @@ export async function GET(req: NextRequest) {
       whereClause.clientId = clientId;
     }
     
-    // Note: categoryId is not directly available in the Task model yet
-    // For now, we'll return empty array when categoryId is requested
     if (categoryId) {
-      // Return empty array for now since there's no category relation
-      return NextResponse.json([]);
+      whereClause.categoryId = categoryId;
     }
 
     const tasks = await prisma.task.findMany({
@@ -65,6 +80,7 @@ export async function GET(req: NextRequest) {
         client: true,
         createdBy: true,
         assignedTo: true,
+        category: true,
       },
       orderBy: {
         createdAt: 'desc'
@@ -73,6 +89,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(tasks);
   } catch (error) {
     console.error("Error fetching tasks:", error);
-    return NextResponse.json({ error: "Failed to fetch tasks" }, { status: 500 });
+    const errorMessage = error instanceof Error ? error.message : "Internal server error";
+    return NextResponse.json({ error: "Failed to fetch tasks", details: errorMessage }, { status: 500 });
   }
 }

@@ -55,7 +55,8 @@ export default function TaskDetails() {
   useEffect(() => {
     const loadUserData = () => {
       // Check for both "user" and "agent" keys to support both admin and agent logins
-      const userStr = localStorage.getItem("user") || localStorage.getItem("agent");
+      const userStr =
+        localStorage.getItem("user") || localStorage.getItem("agent");
       if (userStr) {
         try {
           const userData = JSON.parse(userStr);
@@ -114,7 +115,9 @@ export default function TaskDetails() {
       if (id) {
         setTimeLogsLoading(true);
         try {
-          const response = await fetch(`/api/timelog?taskId=${id}`, { credentials: "include" });
+          const response = await fetch(`/api/timelog?taskId=${id}`, {
+            credentials: "include",
+          });
           if (response.ok) {
             const data = await response.json();
             setTimeLogs(data.timeLogs || []);
@@ -178,33 +181,71 @@ export default function TaskDetails() {
 
   const calculateCompletionRate = () => {
     if (!taskData) return 0;
-    
+
     // If task has explicit progress field, use it
     if (taskData.progress !== undefined && taskData.progress !== null) {
       return Math.min(Math.max(taskData.progress, 0), 100);
     }
-    
+
     // Calculate based on status and checkboxes
     const statusProgress = {
       "To Do": 0,
       "In Progress": 30,
-      "Hold": 50,
-      "Completed": 100,
-      "Overdue": 0
+      Hold: 50,
+      Completed: 100,
+      Overdue: 0,
     };
-    
-    let baseProgress = statusProgress[taskData.status as keyof typeof statusProgress] || 0;
-    
+
+    let baseProgress =
+      statusProgress[taskData.status as keyof typeof statusProgress] || 0;
+
     // Add progress for completed checkboxes
     if (taskData.followUpRequired) baseProgress += 10;
     if (taskData.completed) baseProgress += 15;
-    
+
     return Math.min(baseProgress, 100);
   };
 
-  const formatDateTime = (dateString: string | undefined) => {
+  // Parse dd/mm/yyyy HH:mm:ss or ISO string
+  const parseDateString = (dateString: string) => {
+    if (!dateString) return null;
+    // If ISO, just use Date
+    if (/\d{4}-\d{2}-\d{2}/.test(dateString)) return new Date(dateString);
+    // If dd/mm/yyyy
+    const match = dateString.match(
+      /(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{2}):(\d{2}):(\d{2}))?/
+    );
+    if (match) {
+      const [, dd, mm, yyyy, hh = "00", min = "00", ss = "00"] = match;
+      // Swap dd and mm if month > 12 (to handle user error), but default is dd/mm/yyyy
+      return new Date(
+        Number(yyyy),
+        Number(mm) - 1,
+        Number(dd),
+        Number(hh),
+        Number(min),
+        Number(ss)
+      );
+    }
+    // fallback
+    return new Date(dateString);
+  };
+
+  // Format date and time in IST
+  const formatDateTime = (
+    dateString: string | undefined,
+    showTime: boolean = false
+  ) => {
     if (!dateString) return "N/A";
-    return format(new Date(dateString), "MMM dd, yyyy 'at' h:mm a");
+    const parsed = parseDateString(dateString);
+    if (!parsed || isNaN(parsed.getTime())) return dateString;
+    // Convert to IST
+    const utc = parsed.getTime() + parsed.getTimezoneOffset() * 60000;
+    const istDate = new Date(utc + 5.5 * 60 * 60000);
+    if (showTime) {
+      return format(istDate, "do MMMM yyyy, hh:mm a");
+    }
+    return format(istDate, "do MMMM yyyy");
   };
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -221,13 +262,14 @@ export default function TaskDetails() {
     try {
       // Debug: Log current user state
       console.log("Current user state:", currentUser);
-      
+
       // Get fresh user data from localStorage if currentUser is not set
       let userId = currentUser?.id;
-      
+
       if (!userId) {
         // Check for both "user" and "agent" keys to support both admin and agent logins
-        const userStr = localStorage.getItem("user") || localStorage.getItem("agent");
+        const userStr =
+          localStorage.getItem("user") || localStorage.getItem("agent");
         console.log("Raw user/agent string from localStorage:", userStr);
         if (userStr) {
           try {
@@ -245,7 +287,10 @@ export default function TaskDetails() {
       console.log("Final userId to use:", userId);
 
       if (!userId) {
-        console.error("No user ID found - checking localStorage keys:", Object.keys(localStorage));
+        console.error(
+          "No user ID found - checking localStorage keys:",
+          Object.keys(localStorage)
+        );
         throw new Error("User not logged in");
       }
 
@@ -513,7 +558,10 @@ export default function TaskDetails() {
           </TabsTrigger>
           <TabsTrigger value="timelog" className="flex items-center gap-2">
             <Clock className="h-4 w-4 hidden md:block" />
-            <p className="text-[12px] md:text-[14px]"> Time Log ({timeLogs.length}) </p>
+            <p className="text-[12px] md:text-[14px]">
+              {" "}
+              Time Log ({timeLogs.length}){" "}
+            </p>
           </TabsTrigger>
         </TabsList>
 
@@ -547,13 +595,13 @@ export default function TaskDetails() {
                       </Label>
                       <div className="mt-1">
                         {taskData.category ? (
-                          <Badge 
-                            className="bg-blue-100 text-blue-800 border-blue-200 border"
-                          >
+                          <Badge className="bg-blue-100 text-blue-800 border-blue-200 border">
                             {taskData.category.name}
                           </Badge>
                         ) : (
-                          <span className="text-sm text-muted-foreground">No category assigned</span>
+                          <span className="text-sm text-muted-foreground">
+                            No category assigned
+                          </span>
                         )}
                       </div>
                     </div>
@@ -639,17 +687,22 @@ export default function TaskDetails() {
                   <div className="space-y-2">
                     <div className="flex justify-between items-center">
                       <span className="text-sm font-medium">Completion</span>
-                      <span className="text-sm font-bold">{calculateCompletionRate()}%</span>
+                      <span className="text-sm font-bold">
+                        {calculateCompletionRate()}%
+                      </span>
                     </div>
-                    <Progress value={calculateCompletionRate()} className="h-3" />
+                    <Progress
+                      value={calculateCompletionRate()}
+                      className="h-3"
+                    />
                   </div>
-                  
+
                   {/* Progress Breakdown */}
                   <div className="space-y-3 mt-4 pt-4 border-t">
                     <div className="text-sm font-medium text-muted-foreground mb-2">
                       Progress Breakdown
                     </div>
-                    
+
                     <div className="space-y-2">
                       {/* Task Status Progress */}
                       <div className="flex justify-between items-center text-xs">
@@ -670,11 +723,15 @@ export default function TaskDetails() {
                             const statusProgress = {
                               "To Do": 0,
                               "In Progress": 30,
-                              "Hold": 50,
-                              "Completed": 100,
-                              "Overdue": 0
+                              Hold: 50,
+                              Completed: 100,
+                              Overdue: 0,
                             };
-                            return `${statusProgress[taskData.status as keyof typeof statusProgress] || 0}%`;
+                            return `${
+                              statusProgress[
+                                taskData.status as keyof typeof statusProgress
+                              ] || 0
+                            }%`;
                           })()}
                         </span>
                       </div>
@@ -688,7 +745,13 @@ export default function TaskDetails() {
                           )}
                           Follow-up Required
                         </span>
-                        <span className={`font-medium ${taskData.followUpRequired ? 'text-green-600' : 'text-gray-400'}`}>
+                        <span
+                          className={`font-medium ${
+                            taskData.followUpRequired
+                              ? "text-green-600"
+                              : "text-gray-400"
+                          }`}
+                        >
                           {taskData.followUpRequired ? `+10%` : `0%`}
                         </span>
                       </div>
@@ -702,7 +765,13 @@ export default function TaskDetails() {
                           )}
                           Status Check Completed
                         </span>
-                        <span className={`font-medium ${taskData.completed ? 'text-green-600' : 'text-gray-400'}`}>
+                        <span
+                          className={`font-medium ${
+                            taskData.completed
+                              ? "text-green-600"
+                              : "text-gray-400"
+                          }`}
+                        >
                           {taskData.completed ? `+15%` : `0%`}
                         </span>
                       </div>
@@ -806,6 +875,7 @@ export default function TaskDetails() {
                         )}
                       </div>
                       <Button
+                        type="button"
                         onClick={handleAddComment}
                         disabled={!newComment.trim() || submittingComment}
                       >
@@ -981,7 +1051,9 @@ export default function TaskDetails() {
             <CardHeader>
               <CardTitle className="flex items-center justify-between">
                 <span>Time Log</span>
-                <span className="text-xs text-muted-foreground">Total Hours: {totalHours}</span>
+                <span className="text-xs text-muted-foreground">
+                  Total Hours: {totalHours}
+                </span>
               </CardTitle>
               <CardDescription>Track time spent on this task.</CardDescription>
             </CardHeader>
@@ -990,24 +1062,63 @@ export default function TaskDetails() {
                 {timeLogsLoading ? (
                   <p className="text-muted-foreground">Loading time logs...</p>
                 ) : timeLogs.length === 0 ? (
-                  <p className="text-muted-foreground">No time log entries yet.</p>
+                  <p className="text-muted-foreground">
+                    No time log entries yet.
+                  </p>
                 ) : (
                   <div className="space-y-3">
                     {timeLogs.map((log) => (
-                      <div key={log.id} className="flex items-center gap-4 p-3 bg-muted/30 rounded-lg border">
+                      <div
+                        key={log.id}
+                        className="flex items-center gap-4 p-3 bg-muted/30 rounded-lg border"
+                      >
                         <Avatar className="h-8 w-8">
                           <AvatarFallback className="text-xs">
-                            {log.agent?.name?.split(" ").map((n: string) => n[0]).join("") || "A"}
+                            {log.agent?.name
+                              ?.split(" ")
+                              .map((n: string) => n[0])
+                              .join("") || "A"}
                           </AvatarFallback>
                         </Avatar>
                         <div className="flex-1">
                           <div className="flex items-center gap-2">
-                            <span className="font-medium text-sm">{log.agent?.name || "Unknown Agent"}</span>
-                            <span className="text-xs text-muted-foreground">{formatDateTime(log.date)}</span>
+                            <span className="font-medium text-sm">
+                              {log.agent?.name || "Unknown Agent"}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              {(() => {
+                                const parsedCreated = parseDateString(
+                                  log.createdAt
+                                );
+                                if (
+                                  parsedCreated &&
+                                  !isNaN(parsedCreated.getTime())
+                                ) {
+                                  // Convert UTC to IST
+                                  const utc =
+                                    parsedCreated.getTime() +
+                                    parsedCreated.getTimezoneOffset() * 60000;
+                                  const istDate = new Date(
+                                    utc + 5.5 * 60 * 60000
+                                  );
+                                  const datePart = format(
+                                    istDate,
+                                    "dd, MMM, yyyy"
+                                  );
+                                  const timePart = format(istDate, "hh:mm a");
+                                  return `${datePart} at ${timePart}`;
+                                }
+                                return "N/A";
+                              })()}
+                            </span>
                           </div>
-                          <div className="text-sm text-muted-foreground">{log.description}</div>
+                          <div className="text-sm text-muted-foreground">
+                            {log.description}
+                          </div>
                         </div>
-                        <div className="font-bold text-blue-700">{log.hours}h</div>
+                        <div className="font-bold text-blue-700">
+                          {log.hours}h
+                        </div>
                       </div>
                     ))}
                   </div>

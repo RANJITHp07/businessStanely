@@ -353,7 +353,7 @@ export default function TaskDetails() {
           prevTask
             ? {
                 ...prevTask,
-                comments: [newCommentData, ...prevTask.comments],
+                comments: [newCommentData, ...(prevTask.comments || [])],
               }
             : prevTask
         );
@@ -375,7 +375,11 @@ export default function TaskDetails() {
     if (!task) return;
     const prevTask = { ...task };
     // Optimistically update UI
-    setTask({ ...task, status: newStatus, completed: newStatus === "Completed" });
+    setTask({
+      ...task,
+      status: newStatus,
+      completed: newStatus === "Completed",
+    });
     try {
       const response = await fetch(`/api/tasks/${task.id}`, {
         method: "PUT",
@@ -418,7 +422,13 @@ export default function TaskDetails() {
   };
 
   // Use a single argument object for debounce compatibility
-  const updateProgress = async ({ newProgress, prevTask }: { newProgress: number; prevTask: typeof task }) => {
+  const updateProgress = async ({
+    newProgress,
+    prevTask,
+  }: {
+    newProgress: number;
+    prevTask: typeof task;
+  }) => {
     if (!task) return;
     try {
       const response = await fetch(`/api/tasks/${task.id}`, {

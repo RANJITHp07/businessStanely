@@ -45,11 +45,21 @@ export interface Task {
   status: string;
   priority: string;
   dueDate?: string;
+  progress?: number;
+  followUpRequired?: boolean;
+  completed?: boolean;
   createdAt: string;
   updatedAt: string;
   client?: Client;
   createdBy: Agent;
   assignedTo?: Agent;
+  category?: {
+    id: string;
+    name: string;
+    description?: string;
+    color: string;
+    status: string;
+  };
   comments?: Comment[];
 }
 

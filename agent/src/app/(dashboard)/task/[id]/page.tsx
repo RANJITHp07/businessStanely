@@ -370,9 +370,12 @@ export default function TaskDetails() {
     }
   };
 
+  // Optimistic UI update for status
   const handleStatusChange = async (newStatus: string) => {
     if (!task) return;
-
+    const prevTask = { ...task };
+    // Optimistically update UI
+    setTask({ ...task, status: newStatus, completed: newStatus === "Completed" });
     try {
       const response = await fetch(`/api/tasks/${task.id}`, {
         method: "PUT",
@@ -384,21 +387,39 @@ export default function TaskDetails() {
           completed: newStatus === "Completed",
         }),
       });
-
       if (response.ok) {
         const data = await response.json();
         setTask(data.task);
       } else {
+        setTask(prevTask); // revert
         console.error("Failed to update task status");
       }
     } catch (error) {
+      setTask(prevTask); // revert
       console.error("Error updating task status:", error);
     }
   };
 
-  const handleProgressChange = async (newProgress: number) => {
-    if (!task) return;
+  // Debounce utility
+  function debounce<A>(func: (arg: A) => void, wait: number) {
+    let timeout: ReturnType<typeof setTimeout>;
+    return (arg: A) => {
+      clearTimeout(timeout);
+      timeout = setTimeout(() => func(arg), wait);
+    };
+  }
 
+  // Optimistic UI update for progress with debounce
+  const handleProgressChange = (newProgress: number) => {
+    if (!task) return;
+    const prevTask = { ...task };
+    setTask({ ...task, progress: newProgress });
+    debouncedUpdateProgress({ newProgress, prevTask });
+  };
+
+  // Use a single argument object for debounce compatibility
+  const updateProgress = async ({ newProgress, prevTask }: { newProgress: number; prevTask: typeof task }) => {
+    if (!task) return;
     try {
       const response = await fetch(`/api/tasks/${task.id}`, {
         method: "PUT",
@@ -409,17 +430,21 @@ export default function TaskDetails() {
           progress: newProgress,
         }),
       });
-
       if (response.ok) {
         const data = await response.json();
         setTask(data.task);
       } else {
+        setTask(prevTask); // revert
         console.error("Failed to update task progress");
       }
     } catch (error) {
+      setTask(prevTask); // revert
       console.error("Error updating task progress:", error);
     }
   };
+
+  // Debounced version to avoid excessive API calls
+  const debouncedUpdateProgress = debounce(updateProgress, 500);
 
   const handleFollowUpChange = async (checked: boolean) => {
     if (!task) return;

@@ -204,25 +204,6 @@ export default function TaskDetails() {
     fetchTimeLogs();
   }, [taskId]);
 
-  const fetchTaskDetails = async () => {
-    try {
-      setLoading(true);
-      const response = await fetch(`/api/tasks/${taskId}`);
-
-      if (!response.ok) {
-        throw new Error("Failed to fetch task details");
-      }
-
-      const data = await response.json();
-      setTask(data.task);
-    } catch (error) {
-      console.error("Error fetching task:", error);
-      setError("Failed to load task details");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const fetchTimeLogs = async () => {
     try {
       const response = await fetch(`/api/timelog?taskId=${taskId}`);
@@ -374,11 +355,13 @@ export default function TaskDetails() {
   const handleStatusChange = async (newStatus: string) => {
     if (!task) return;
     const prevTask = { ...task };
-    // Optimistically update UI
+    // If status is Completed, set progress to 100%
+    const isCompleted = newStatus === "Completed";
     setTask({
       ...task,
       status: newStatus,
-      completed: newStatus === "Completed",
+      completed: isCompleted,
+      progress: isCompleted ? 100 : task.progress,
     });
     try {
       const response = await fetch(`/api/tasks/${task.id}`, {
@@ -388,7 +371,8 @@ export default function TaskDetails() {
         },
         body: JSON.stringify({
           status: newStatus,
-          completed: newStatus === "Completed",
+          completed: isCompleted,
+          progress: isCompleted ? 100 : task.progress,
         }),
       });
       if (response.ok) {
@@ -483,7 +467,15 @@ export default function TaskDetails() {
 
   const handleCompletedChange = async (checked: boolean) => {
     if (!task) return;
-
+    const prevTask = { ...task };
+    // If checked, set status to Completed and progress to 100%
+    const isCompleted = checked;
+    setTask({
+      ...task,
+      completed: isCompleted,
+      status: isCompleted ? "Completed" : "In Progress",
+      progress: isCompleted ? 100 : task.progress,
+    });
     try {
       const response = await fetch(`/api/tasks/${task.id}`, {
         method: "PUT",
@@ -491,8 +483,9 @@ export default function TaskDetails() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          completed: checked,
-          status: checked ? "Completed" : "In Progress",
+          completed: isCompleted,
+          status: isCompleted ? "Completed" : "In Progress",
+          progress: isCompleted ? 100 : task.progress,
         }),
       });
 
@@ -500,9 +493,11 @@ export default function TaskDetails() {
         const data = await response.json();
         setTask(data.task);
       } else {
+        setTask(prevTask); // revert
         console.error("Failed to update task completion status");
       }
     } catch (error) {
+      setTask(prevTask); // revert
       console.error("Error updating task completion status:", error);
     }
   };

@@ -2,13 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentAgent } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 
-interface TaskUpdateData {
-  status?: string;
-  progress?: number;
-  followUpRequired?: boolean;
-  completed?: boolean;
-  updatedAt: Date;
-}
+
 
 interface TaskWithFields {
   categoryId?: string;
@@ -68,6 +62,14 @@ export async function GET(
             id: true,
             name: true,
             email: true,
+            subordinates: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                photo: true,
+              },
+            },
           },
         },
         comments: {
@@ -177,31 +179,33 @@ export async function PUT(
       );
     }
 
-    // Only allow updating certain fields for agents
-    const updateData: TaskUpdateData = {
-      updatedAt: new Date()
+
+    // Allow updating assignedToId for reassignment
+    const updateData: Partial<{
+      status: string;
+      progress: number;
+      followUpRequired: boolean;
+      completed: boolean;
+      assignedToId: string;
+      updatedAt: Date;
+    }> = {
+      updatedAt: new Date(),
     };
-    
-    // Always allow status updates
     if (body.status !== undefined) {
       updateData.status = body.status;
     }
-    
-    // Try to update other fields, but handle gracefully if they don't exist
     if (body.progress !== undefined) {
       updateData.progress = body.progress;
     }
-    
     if (body.followUpRequired !== undefined) {
       updateData.followUpRequired = body.followUpRequired;
     }
-    
     if (body.completed !== undefined) {
       updateData.completed = body.completed;
     }
-
-    // Always update the timestamp
-    updateData.updatedAt = new Date();
+    if (body.assignedToId !== undefined) {
+      updateData.assignedToId = body.assignedToId;
+    }
 
     const updatedTask = await prisma.task.update({
       where: { id: taskId },

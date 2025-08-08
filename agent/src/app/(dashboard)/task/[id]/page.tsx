@@ -1,9 +1,16 @@
 "use client";
+import { Search } from "lucide-react";
+interface TeamMember {
+  id: string;
+  name: string;
+  email: string;
+  photo?: string;
+}
 
 import type React from "react";
 
 import { useState, useEffect } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
@@ -16,7 +23,7 @@ import {
 } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
@@ -47,6 +54,7 @@ import {
   Phone,
   Mail,
   Timer,
+  Users,
 } from "lucide-react";
 import { format } from "date-fns";
 
@@ -129,7 +137,13 @@ interface TimeLogData {
 }
 
 export default function TaskDetails() {
+  // Assignment (Reassign) states
+  const [showAssignSearch, setShowAssignSearch] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+
   const params = useParams();
+  const router = useRouter();
   const taskId = params.id as string;
 
   const [task, setTask] = useState<Task | null>(null);
@@ -139,6 +153,51 @@ export default function TaskDetails() {
   const [newComment, setNewComment] = useState("");
   const [submittingComment, setSubmittingComment] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+
+  // Use subordinates from assignedTo if available (from API)
+  // Type guard for subordinates
+  function hasSubordinates(
+    obj: unknown
+  ): obj is { subordinates: TeamMember[] } {
+    return (
+      typeof obj === "object" &&
+      obj !== null &&
+      Array.isArray((obj as { subordinates?: unknown }).subordinates)
+    );
+  }
+
+  useEffect(() => {
+    if (task && task.assignedTo && hasSubordinates(task.assignedTo)) {
+      setTeamMembers(task.assignedTo.subordinates);
+    } else {
+      setTeamMembers([]);
+    }
+  }, [task]);
+
+  // Filtered members for search: only show results when searching
+  const filteredMembers = searchQuery.trim()
+    ? teamMembers.filter((member) =>
+        member.name.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : [];
+
+  // Assign task to selected member
+  const assignTask = async (memberId: string) => {
+    if (!task) return;
+    try {
+      const res = await fetch(`/api/tasks/${task.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ assignedToId: memberId }),
+      });
+      if (res.ok) {
+        // After reassignment, redirect to task list since this agent will lose access
+        router.push("/task");
+      }
+    } catch {
+      // Optionally show error
+    }
+  };
 
   // Time log states
   const [timeLogsData, setTimeLogsData] = useState<TimeLogData[]>([]);
@@ -780,23 +839,65 @@ export default function TaskDetails() {
                       </div>
                     </div>
                   </div>
-
                   {/* Assignment */}
                   <div className="space-y-2">
                     <Label>Assigned To</Label>
                     <div className="flex items-center gap-3">
-                      <Avatar>
-                        <AvatarFallback>
-                          {task.assignedTo?.name
-                            ?.split(" ")
-                            .map((n) => n[0])
-                            .join("") || "U"}
-                        </AvatarFallback>
-                      </Avatar>
                       <span className="font-medium">
                         {task.assignedTo?.name || "Unassigned"}
                       </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowAssignSearch(!showAssignSearch)}
+                      >
+                        <Users className="h-4 w-4 mr-2" />
+                        Reassign
+                      </Button>
                     </div>
+
+                    {showAssignSearch && (
+                      <div className="mt-3 p-3 border rounded-lg bg-gray-50">
+                        <div className="relative mb-3">
+                          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                          <Input
+                            placeholder="Search team members..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="pl-10"
+                          />
+                        </div>
+                        <div className="space-y-2 max-h-40 overflow-y-auto">
+                          {filteredMembers.map((member) => (
+                            <div
+                              key={member.id}
+                              className="flex items-center justify-between p-2 hover:bg-white rounded cursor-pointer"
+                              onClick={() => assignTask(member.id)}
+                            >
+                              <div className="flex items-center gap-2">
+                                <Avatar className="h-6 w-6">
+                                  {member.photo ? (
+                                    <AvatarImage src={member.photo} />
+                                  ) : null}
+                                  <AvatarFallback className="text-xs">
+                                    {member.name
+                                      .split(" ")
+                                      .map((n) => n[0])
+                                      .join("")}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <div>
+                                  <div className="text-sm font-medium">
+                                    {member.name}
+                                  </div>
+                                  {/* No role field, so nothing here */}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </CardContent>
               </Card>

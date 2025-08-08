@@ -175,10 +175,9 @@ const handleCreateCategory = async () => {
   }
 };
 
-  // Add category filtering logic - only show approved categories for task selection
+  // Show all categories for task selection, regardless of status
   const filteredCategories = categories.filter((category) => {
-    return category.status === "approved" && 
-           category.name.toLowerCase().includes(categorySearchQuery.toLowerCase());
+    return category.name.toLowerCase().includes(categorySearchQuery.toLowerCase());
   });
 
 
@@ -231,7 +230,7 @@ const handleCreateCategory = async () => {
         const [clientsRes, agentsRes, categoriesRes] = await Promise.all([
           fetch("/api/clients"),
           fetch("/api/agents"),
-          fetch("/api/task-categories?status=approved"),
+          fetch("/api/task-categories"), // fetch all categories, not just approved
         ]);
         const clientsData = await clientsRes.json();
         const agentsData = await agentsRes.json();

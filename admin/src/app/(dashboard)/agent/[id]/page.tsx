@@ -464,29 +464,31 @@ export default function AgentDetails() {
                         {agentTasks.length}
                       </span>
                     </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm font-medium">Completed</span>
-                      <span className="text-lg font-bold text-green-600">
-                        {
-                          agentTasks.filter(
-                            (task) =>
-                              task.status === "Completed"
-                          ).length
-                        }
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm font-medium">Pending</span>
-                      <span className="text-lg font-bold text-orange-600">
-                        {
-                          agentTasks.filter(
-                            (task) =>
-                              task.status === "To Do" ||
-                              task.status === "Pending"
-                          ).length
-                        }
-                      </span>
-                    </div>
+                    {/* Dynamically show all status counts */}
+                    {[
+                      "Completed",
+                      "To Do",
+                      "In Progress",
+                      "Hold"
+                    ].map((status) => (
+                      <div className="flex justify-between items-center" key={status}>
+                        <span className="text-sm font-medium">{status}</span>
+                        <span className={
+                          `text-lg font-bold ` +
+                          (status === "Completed"
+                            ? "text-green-600"
+                            : status === "To Do"
+                            ? "text-orange-600"
+                            : status === "In Progress"
+                            ? "text-blue-600"
+                            : status === "Hold"
+                            ? "text-gray-500"
+                            : "text-gray-800")
+                        }>
+                          {agentTasks.filter((task) => task.status === status).length}
+                        </span>
+                      </div>
+                    ))}
                   </div>
                   <div className="space-y-2">
                     <div className="flex justify-between items-center">

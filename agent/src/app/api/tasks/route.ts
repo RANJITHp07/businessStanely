@@ -1,15 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentAgent } from "@/lib/auth";
-import prisma from "@/lib/prisma";
 
-interface TaskWhereInput {
-  OR: Array<{
-    createdById?: string;
-    assignedToId?: string;
-  }>;
-  status?: string;
-  priority?: string;
-}
+import { Prisma } from '@prisma/client';
+import prisma from "@/lib/prisma";
 
 interface TaskWithAdditionalFields {
   progress?: number | null;
@@ -35,12 +28,21 @@ export async function GET(req: NextRequest) {
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "10");
 
-    // Build filter object
-    const where: TaskWhereInput = {
+
+    // Build filter object and only approved category
+    const where: Prisma.TaskWhereInput = {
       OR: [
         { createdById: agent.id },
         { assignedToId: agent.id },
       ],
+      AND: [
+        {
+          OR: [
+            { category: null },
+            { category: { status: 'approved' } }
+          ]
+        }
+      ]
     };
 
     if (status) {
@@ -61,6 +63,7 @@ export async function GET(req: NextRequest) {
         client: true,
         createdBy: true,
         assignedTo: true,
+        category: true,
         comments: {
           include: {
             user: true,
@@ -99,7 +102,7 @@ export async function GET(req: NextRequest) {
           : task.client.organizationName,
         type: task.client.clientType,
       } : null,
-      category: null, // Will be fetched separately if needed
+      category: task.category, 
       createdBy: task.createdBy,
       assignedTo: task.assignedTo,
       commentsCount: task.comments.length,

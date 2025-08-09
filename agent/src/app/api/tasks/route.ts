@@ -29,12 +29,9 @@ export async function GET(req: NextRequest) {
     const limit = parseInt(searchParams.get("limit") || "10");
 
 
-    // Build filter object and only approved category
+    // Only show tasks assigned to this agent
     const where: Prisma.TaskWhereInput = {
-      OR: [
-        { createdById: agent.id },
-        { assignedToId: agent.id },
-      ],
+      assignedToId: agent.id,
       AND: [
         {
           OR: [

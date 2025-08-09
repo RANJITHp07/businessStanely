@@ -72,20 +72,18 @@ export async function GET(req: NextRequest) {
     const clientId = searchParams.get("clientId");
     const categoryId = searchParams.get("categoryId");
 
-    // Build the where clause to only show tasks with approved categories
-    const whereClause: Prisma.TaskWhereInput = {
-      AND: [
-        { category: { status: "approved" } },
-      ],
-    };
+    // Build the where clause: if filtering by categoryId, allow any status; otherwise, only approved
+    let whereClause: Prisma.TaskWhereInput;
+    if (categoryId) {
+      whereClause = { categoryId };
+    } else {
+      whereClause = { AND: [ { category: { status: "approved" } } ] };
+    }
     if (assignedToId) {
       whereClause.assignedToId = assignedToId;
     }
     if (clientId) {
       whereClause.clientId = clientId;
-    }
-    if (categoryId) {
-      whereClause.categoryId = categoryId;
     }
     const tasks = await prisma.task.findMany({
       where: whereClause,

@@ -33,7 +33,6 @@ import {
     ChevronRight,
     ChevronsLeft,
     ChevronsRight,
-    ArrowUpDown,
     Calendar,
     User,
     Clock,
@@ -109,8 +108,8 @@ export default function CategoryDetail({ params }: { params: Promise<{ id: strin
     const resolvedParams = params instanceof Promise ? use(params) : params
     const [category, setCategory] = useState<TaskCategory | null>(null)
     const [tasks, setTasks] = useState<Task[]>([])
-    const [sortBy, setSortBy] = useState("a-z")
-    const [sortByDate, setSortByDate] = useState("newest")
+    const [sortBy] = useState("a-z")
+    const [sortByDate] = useState("newest")
     const [currentPage, setCurrentPage] = useState(1)
     const [itemsPerPage, setItemsPerPage] = useState(5)
     const [loading, setLoading] = useState(true)

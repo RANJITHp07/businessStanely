@@ -9,7 +9,7 @@ interface TeamMember {
 
 import type React from "react";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -147,6 +147,8 @@ export default function TaskDetails() {
   const taskId = params.id as string;
 
   const [task, setTask] = useState<Task | null>(null);
+  // For optimistic UI
+  const taskRef = useRef<Task | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("details");
@@ -456,52 +458,85 @@ export default function TaskDetails() {
     };
   }
 
-  // Optimistic UI update for progress with debounce
-  const handleProgressChange = (newProgress: number) => {
+
+  // Local state for progress input for smooth UX
+  const [progressInput, setProgressInput] = useState<string>("");
+  useEffect(() => {
+    if (task) {
+      setProgressInput(task.progress && task.progress > 0 ? String(task.progress) : "");
+    }
+  }, [task?.progress]);
+
+  // Clamp value between 0 and 100
+  const clampProgress = (val: number) => Math.max(0, Math.min(100, val));
+
+  // Debounced update for progress
+  const debounceTimeout = useRef<NodeJS.Timeout | null>(null);
+  const lastProgressSent = useRef<number | null>(null);
+
+  const updateProgressBackend = async (newProgress: number) => {
     if (!task) return;
     const prevTask = { ...task };
     setTask({ ...task, progress: newProgress });
-    debouncedUpdateProgress({ newProgress, prevTask });
-  };
-
-  // Use a single argument object for debounce compatibility
-  const updateProgress = async ({
-    newProgress,
-    prevTask,
-  }: {
-    newProgress: number;
-    prevTask: typeof task;
-  }) => {
-    if (!task) return;
     try {
       const response = await fetch(`/api/tasks/${task.id}`, {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          progress: newProgress,
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ progress: newProgress }),
       });
       if (response.ok) {
         const data = await response.json();
         setTask(data.task);
       } else {
         setTask(prevTask); // revert
-        console.error("Failed to update task progress");
       }
-    } catch (error) {
+    } catch {
       setTask(prevTask); // revert
-      console.error("Error updating task progress:", error);
     }
   };
 
-  // Debounced version to avoid excessive API calls
-  const debouncedUpdateProgress = debounce(updateProgress, 500);
+  const handleProgressInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    if (/^\d{0,3}$/.test(val)) {
+      setProgressInput(val);
+      // Debounce backend update
+      if (debounceTimeout.current) clearTimeout(debounceTimeout.current);
+      debounceTimeout.current = setTimeout(() => {
+        let newProgress = parseInt(val, 10);
+        if (isNaN(newProgress)) newProgress = 0;
+        newProgress = clampProgress(newProgress);
+        if (task && newProgress !== task.progress && newProgress !== lastProgressSent.current) {
+          lastProgressSent.current = newProgress;
+          updateProgressBackend(newProgress);
+        }
+      }, 600);
+    }
+  };
+
+  const handleProgressInputBlur = () => {
+    if (!task) return;
+    let newProgress = parseInt(progressInput, 10);
+    if (isNaN(newProgress)) newProgress = 0;
+    newProgress = clampProgress(newProgress);
+    if (newProgress !== task.progress) {
+      lastProgressSent.current = newProgress;
+      updateProgressBackend(newProgress);
+    } else {
+      setProgressInput(task.progress && task.progress > 0 ? String(task.progress) : "");
+    }
+  };
+
+  const handleProgressInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") {
+      (e.target as HTMLInputElement).blur();
+    }
+  };
 
   const handleFollowUpChange = async (checked: boolean) => {
     if (!task) return;
-
+    // Optimistic update
+    taskRef.current = task;
+    setTask({ ...task, followUpRequired: checked });
     try {
       const response = await fetch(`/api/tasks/${task.id}`, {
         method: "PUT",
@@ -512,22 +547,24 @@ export default function TaskDetails() {
           followUpRequired: checked,
         }),
       });
-
       if (response.ok) {
         const data = await response.json();
         setTask(data.task);
       } else {
+        // Revert on error
+        setTask(taskRef.current);
         console.error("Failed to update follow-up status");
       }
     } catch (error) {
+      setTask(taskRef.current);
       console.error("Error updating follow-up status:", error);
     }
   };
 
   const handleCompletedChange = async (checked: boolean) => {
     if (!task) return;
-    const prevTask = { ...task };
-    // If checked, set status to Completed and progress to 100%
+    // Optimistic update
+    taskRef.current = task;
     const isCompleted = checked;
     setTask({
       ...task,
@@ -547,16 +584,15 @@ export default function TaskDetails() {
           progress: isCompleted ? 100 : task.progress,
         }),
       });
-
       if (response.ok) {
         const data = await response.json();
         setTask(data.task);
       } else {
-        setTask(prevTask); // revert
+        setTask(taskRef.current);
         console.error("Failed to update task completion status");
       }
     } catch (error) {
-      setTask(prevTask); // revert
+      setTask(taskRef.current);
       console.error("Error updating task completion status:", error);
     }
   };
@@ -825,15 +861,16 @@ export default function TaskDetails() {
                       <div className="space-y-2">
                         <Progress value={task.progress} className="w-full" />
                         <Input
-                          type="number"
+                          type="text"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
                           min="0"
                           max="100"
-                          value={task.progress}
-                          onChange={(e) =>
-                            handleProgressChange(
-                              Number.parseInt(e.target.value) || 0
-                            )
-                          }
+                          value={progressInput}
+                          placeholder=""
+                          onChange={handleProgressInputChange}
+                          onBlur={handleProgressInputBlur}
+                          onKeyDown={handleProgressInputKeyDown}
                           className="w-full"
                         />
                       </div>

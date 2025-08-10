@@ -1,29 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentAgent } from "@/lib/auth";
-import { uploadToS3 } from "@/lib/aws";
-import { writeFile, mkdir } from "fs/promises";
-import path from "path";
 
-// Check if AWS is configured
-const isS3Configured = () => {
-  return !!(
-    (process.env.AWS_ACCESS_KEY_ID || process.env.APP_AWS_ACCESS_KEY_ID) &&
-    (process.env.AWS_SECRET_ACCESS_KEY || process.env.APP_AWS_SECRET_ACCESS_KEY) &&
-    (process.env.AWS_S3_BUCKET || process.env.APP_AWS_S3_BUCKET_NAME)
-  );
-};
+import { uploadToS3 } from "@/lib/aws";
 
 export async function POST(request: NextRequest) {
   try {
-    const agent = await getCurrentAgent(request);
-
-    if (!agent) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
-    }
-
     const data = await request.formData();
     const file: File | null = data.get("file") as unknown as File;
 
@@ -38,10 +18,7 @@ export async function POST(request: NextRequest) {
       "image/webp",
       "application/pdf",
       "text/plain",
-      "application/msword",
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     ];
-    
     if (!allowedTypes.includes(file.type)) {
       return NextResponse.json(
         { error: "File type not allowed" },
@@ -61,32 +38,9 @@ export async function POST(request: NextRequest) {
     const buffer = Buffer.from(bytes);
 
     const originalName = file.name.replace(/[^a-zA-Z0-9.-]/g, "_");
-    
+
     try {
-      let fileUrl: string;
-      
-      if (isS3Configured()) {
-        // Use S3 upload
-        const s3Key = await uploadToS3(buffer, originalName, file.type);
-        fileUrl = s3Key;
-      } else {
-        // Use local storage as fallback
-        const timestamp = Date.now();
-        const filename = `${timestamp}_${originalName}`;
-        const uploadDir = path.join(process.cwd(), "public", "uploads");
-        
-        // Ensure upload directory exists
-        try {
-          await mkdir(uploadDir, { recursive: true });
-        } catch {
-          // Directory might already exist
-        }
-        
-        const filepath = path.join(uploadDir, filename);
-        await writeFile(filepath, buffer);
-        
-        fileUrl = `/uploads/${filename}`;
-      }
+      const s3Key = await uploadToS3(buffer, originalName, file.type);
 
       return NextResponse.json({
         message: "File uploaded successfully",
@@ -94,12 +48,12 @@ export async function POST(request: NextRequest) {
         originalName: file.name,
         size: file.size,
         type: file.type,
-        url: fileUrl,
+        url: s3Key, // Store the S3 key instead of full URL
       });
     } catch (error) {
-      console.error("Error uploading file:", error);
+      console.error("Error uploading to S3:", error);
       return NextResponse.json(
-        { error: "Failed to upload file." },
+        { error: "Failed to upload file to S3." },
         { status: 500 }
       );
     }

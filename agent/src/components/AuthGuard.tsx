@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import AuthSessionTimeout from "@/components/AuthSessionTimeout";
 import { useRouter } from "next/navigation";
 
 interface AuthGuardProps {
@@ -97,5 +98,8 @@ export function AuthGuard({ children }: AuthGuardProps) {
     return null;
   }
 
-  return <>{children}</>;
+  return <>
+    <AuthSessionTimeout />
+    {children}
+  </>;
 }

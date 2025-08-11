@@ -153,7 +153,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Generate JWT token
+    // Generate JWT token with 8 hour expiry
     const token = jwt.sign(
       {
         agentId: agent.id,
@@ -162,7 +162,7 @@ export async function POST(req: NextRequest) {
         agentType: agent.agentType,
       },
       process.env.JWT_SECRET,
-      { expiresIn: "24h" }
+      { expiresIn: "8h" }
     );
 
     // Create response
@@ -192,7 +192,7 @@ export async function POST(req: NextRequest) {
       httpOnly: false, // Allow JavaScript access for client-side auth checks
       secure: isProduction, // Set to true in production
       sameSite: "lax",
-      maxAge: 24 * 60 * 60, // 24 hours in seconds
+      maxAge: 8 * 60 * 60, // 8 hours in seconds
       path: "/", // Ensure cookie is available for all paths
     });
 

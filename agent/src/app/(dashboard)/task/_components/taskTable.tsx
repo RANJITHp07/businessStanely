@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Loader2 } from "lucide-react";
+import { Loader2, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import {
@@ -204,6 +204,12 @@ export default function TasksTable() {
               Manage and track all legal tasks and assignments
             </p>
           </div>
+          <Link href="/task/create" className="flex justify-end">
+            <Button className=" mt-[20px] md:mt-none   bg-[#003459] hover:bg-[#003459] text-white rounded-lg px-4 py-2 flex items-center gap-2 cursor-pointer shadow-none hover:shadow-md transition-shadow duration-300">
+              <Plus className="h-4 w-4" />
+              Create Task
+            </Button>
+          </Link>
         </div>
 
         {/* Filters */}

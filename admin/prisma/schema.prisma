@@ -23,7 +23,7 @@ model User {
   comments    Comment[] @relation("UserComments")
 
   // Task Category relations
-  createdCategories  TaskCategory[] @relation()
+  createdCategories  TaskCategory[] @relation("UserCreatedCategories")
   approvedCategories TaskCategory[] @relation("CategoryApprovals")
   rejectedCategories TaskCategory[] @relation("CategoryRejections")
 
@@ -95,6 +95,9 @@ model Agent {
   assignedTasks Task[]    @relation("AssignedTasks")
   comments      Comment[] @relation("CommentAuthor")
   timeLogs      TimeLog[] @relation("TimeLogAgent")
+
+  // TaskCategory agent-created relation
+  createdCategories TaskCategory[] @relation("AgentCreatedCategories")
 }
 
 model Task {
@@ -157,9 +160,11 @@ model TaskCategory {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  // Creator information
-  createdById String @db.ObjectId
-  createdBy   User   @relation(fields: [createdById], references: [id])
+  // Creator information (polymorphic: agent or user)
+  createdByUserId   String? @db.ObjectId
+  createdByUser     User?   @relation("UserCreatedCategories", fields: [createdByUserId], references: [id])
+  createdByAgentId  String? @db.ObjectId
+  createdByAgent    Agent?  @relation("AgentCreatedCategories", fields: [createdByAgentId], references: [id])
 
   // Approval information
   approvedById String?   @db.ObjectId

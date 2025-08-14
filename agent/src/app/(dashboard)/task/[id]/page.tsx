@@ -449,14 +449,7 @@ export default function TaskDetails() {
     }
   };
 
-  // Debounce utility
-  function debounce<A>(func: (arg: A) => void, wait: number) {
-    let timeout: ReturnType<typeof setTimeout>;
-    return (arg: A) => {
-      clearTimeout(timeout);
-      timeout = setTimeout(() => func(arg), wait);
-    };
-  }
+
 
 
   // Local state for progress input for smooth UX

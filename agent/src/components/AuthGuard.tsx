@@ -31,8 +31,8 @@ export function AuthGuard({ children }: AuthGuardProps) {
       // List of protected routes
       const protectedRoutes = [
         "/dashboard",
-        "/agent",
-        "/client",
+        "/team",
+        "/timesheet",
         "/task",
         "/setting",
       ];
@@ -63,8 +63,8 @@ export function AuthGuard({ children }: AuthGuardProps) {
         const currentPath = window.location.pathname;
         const protectedRoutes = [
           "/dashboard",
-          "/agent",
-          "/client",
+          "/team",
+          "/timesheet",
           "/task",
           "/setting",
         ];

@@ -6,9 +6,9 @@ import {
   LogOut,
   Settings,
   UserRoundPen,
-  UserSearch,
   Boxes,
-  ShieldUser
+  ClipboardList,
+  UserSearch
 } from "lucide-react";
 import { useState } from "react";
 import Link from "next/link";
@@ -55,7 +55,17 @@ const items = [
     icon: ClipboardCheck,
   },
   {
+    title: "Client",
+    url: "/client",
+    icon: UserSearch,
+  },
+  {
     title: "Time sheet",
+    url: "/time-sheet",
+    icon: ClipboardList,
+  },
+  {
+    title: "Task Categories",
     url: "/task_category",
     icon: Boxes,
   },

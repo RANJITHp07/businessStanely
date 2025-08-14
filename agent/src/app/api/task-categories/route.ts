@@ -1,14 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentAdmin } from "@/lib/auth";
+import { getCurrentAgent } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 
 // GET /api/task-categories - Get all task categories
 export async function GET(req: NextRequest) {
   try {
-    // Get the current admin user
-    const currentAdmin = await getCurrentAdmin(req);
-    
-    if (!currentAdmin) {
+    // Get the current agent user
+    const currentAgent = await getCurrentAgent(req);
+    if (!currentAgent) {
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 401 }
@@ -33,10 +32,10 @@ export async function GET(req: NextRequest) {
     const categories = await prisma.taskCategory.findMany({
       where,
       include: {
-        createdByUser: {
+        createdByAgent: {
           select: {
             id: true,
-            username: true,
+            name: true,
             email: true
           }
         },
@@ -72,13 +71,13 @@ export async function GET(req: NextRequest) {
         status: category.status,
         createdAt: category.createdAt.toISOString(),
         updatedAt: category.updatedAt.toISOString(),
-        createdBy: category.createdByUser?.username || null,
-        createdById: category.createdByUserId,
+        createdBy: category.createdByAgent?.name || null,
+        createdById: category.createdByAgentId,
         approvedById: category.approvedById || null,
         approvedBy: category.approvedBy?.username || null,
         approvedAt: category.approvedAt?.toISOString() || null,
         taskCount: taskCount,
-        isOwner: currentAdmin.adminType === "owner",
+        isOwner: false,
       };
     }));
 
@@ -96,10 +95,9 @@ export async function GET(req: NextRequest) {
 // POST /api/task-categories - Create a new task category
 export async function POST(req: NextRequest) {
   try {
-    // Get the current admin user
-    const currentAdmin = await getCurrentAdmin(req);
-    
-    if (!currentAdmin) {
+    // Get the current agent user
+    const currentAgent = await getCurrentAgent(req);
+    if (!currentAgent) {
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 401 }
@@ -118,28 +116,22 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Determine category status based on user role
-    // Owners can create approved categories, admins create pending categories
-    const status = currentAdmin.adminType === "owner" ? "approved" : "pending";
-    const approvedById = currentAdmin.adminType === "owner" ? currentAdmin.id : null;
-    const approvedAt = currentAdmin.adminType === "owner" ? new Date() : null;
-
-    // Create new category in the database
+    // All agent-created categories are pending and not approved
     const newCategory = await prisma.taskCategory.create({
       data: {
         name,
         description: description || "",
         color: color || "blue",
-        status,
-        createdByUserId: currentAdmin.id,
-        approvedById,
-        approvedAt,
+        status: "pending",
+        createdByAgentId: currentAgent.id,
+        approvedById: null,
+        approvedAt: null,
       },
       include: {
-        createdByUser: {
+        createdByAgent: {
           select: {
             id: true,
-            username: true,
+            name: true,
           }
         },
         approvedBy: {
@@ -160,8 +152,8 @@ export async function POST(req: NextRequest) {
       status: newCategory.status,
       createdAt: newCategory.createdAt.toISOString(),
       updatedAt: newCategory.updatedAt.toISOString(),
-      createdBy: newCategory.createdByUser?.username || null,
-      createdById: newCategory.createdByUserId,
+      createdBy: newCategory.createdByAgent?.name || null,
+      createdById: newCategory.createdByAgentId,
       approvedById: newCategory.approvedById,
       approvedBy: newCategory.approvedBy?.username || null,
       approvedAt: newCategory.approvedAt?.toISOString() || null,

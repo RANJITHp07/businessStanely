@@ -23,24 +23,32 @@ export async function GET(req: NextRequest) {
 
     // Get URL search params for filtering
     const { searchParams } = new URL(req.url);
+
     const status = searchParams.get("status");
     const priority = searchParams.get("priority");
+    const categoryId = searchParams.get("categoryId");
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "10");
 
 
-    // Only show tasks assigned to this agent
-    const where: Prisma.TaskWhereInput = {
-      assignedToId: agent.id,
-      AND: [
-        {
-          OR: [
-            { category: null },
-            { category: { status: 'approved' } }
-          ]
-        }
-      ]
-    };
+    // If categoryId is present, return all tasks for that category (regardless of assignment)
+    // Otherwise, only show tasks assigned to this agent
+    let where: Prisma.TaskWhereInput;
+    if (categoryId) {
+      where = { categoryId };
+    } else {
+      where = {
+        assignedToId: agent.id,
+        AND: [
+          {
+            OR: [
+              { category: null },
+              { category: { status: 'approved' } }
+            ]
+          }
+        ]
+      };
+    }
 
     if (status) {
       where.status = status;

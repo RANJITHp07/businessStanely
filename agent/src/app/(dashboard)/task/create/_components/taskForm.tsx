@@ -80,7 +80,11 @@ const taskPriorities = [
   },
 ];
 
-export default function TaskForm() {
+type TaskFormProps = {
+  id?: string;
+};
+
+export default function TaskForm({ id }: TaskFormProps) {
   const [formData, setFormData] = useState({
     title: "",
     clientId: "",
@@ -91,6 +95,7 @@ export default function TaskForm() {
   });
   const [clients, setClients] = useState<Client[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
+  const [currentAgent, setCurrentAgent] = useState<Agent | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [dueDate, setDueDate] = useState<Date>();
@@ -220,23 +225,23 @@ const handleCreateCategory = async () => {
     phoneNumber: "",
   });
 
-  const params = useParams();
   const router = useRouter();
-  const { id } = params;
 
   useEffect(() => {
     const fetchClientsAndAgents = async () => {
       try {
-        const [clientsRes, agentsRes, categoriesRes] = await Promise.all([
+        const [clientsRes, teamRes, categoriesRes] = await Promise.all([
           fetch("/api/clients"),
-          fetch("/api/agents"),
-          fetch("/api/task-categories"), // fetch all categories, not just approved
+          fetch("/api/team-members"),
+          fetch("/api/task-categories"),
         ]);
         const clientsData = await clientsRes.json();
-        const agentsData = await agentsRes.json();
-        const categoriesData = await categoriesRes.json();
+        const teamMembers = await teamRes.json();
+        // Optionally, fetch self from session or a dedicated endpoint if available
+        // For now, only show team members (do not include all agents)
         setClients(clientsData);
-        setAgents(agentsData);
+        setAgents(teamMembers);
+        const categoriesData = await categoriesRes.json();
         setCategories(categoriesData);
       } catch (error) {
         console.error("Failed to fetch clients, agents, or categories", error);
@@ -250,7 +255,9 @@ const handleCreateCategory = async () => {
         try {
           const response = await fetch(`/api/tasks/${id}`);
           if (response.ok) {
-            const task: Task = await response.json();
+            // The agent API returns { task: { ... } }
+            const data = await response.json();
+            const task: Task = data.task || data;
             setFormData({
               title: task.title,
               clientId: task.client?.id || "",

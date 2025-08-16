@@ -30,7 +30,7 @@ export async function GET(
     const category = await prisma.taskCategory.findUnique({
       where: { id },
       include: {
-        createdBy: {
+        createdByUser: {
           select: {
             id: true,
             username: true,
@@ -75,7 +75,7 @@ export async function GET(
     const formattedCategory = {
       ...category,
       taskCount,
-      createdBy: category.createdBy?.username || "Unknown",
+      createdByUser: category.createdByUser?.username || "Unknown",
       isOwner  // Add flag to indicate if user has owner permissions
     };
 
@@ -145,7 +145,7 @@ export async function PUT(
         color: color || "blue",
       },
       include: {
-        createdBy: {
+        createdByUser: {
           select: {
             id: true,
             username: true,

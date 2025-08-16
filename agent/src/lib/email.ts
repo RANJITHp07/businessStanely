@@ -32,7 +32,7 @@ export async function sendOTPEmail({ to, otp, userName }: SendOTPEmailProps) {
     const transporter = createTransporter();
 
     const mailOptions = {
-      from: `"${process.env.COMPANY_NAME || "Business Stanley"}" <${
+      from: `"${process.env.COMPANY_NAME || "Legal Stanley"}" <${
         process.env.EMAIL_USER
       }>`,
       to: to,
@@ -81,20 +81,20 @@ export async function sendOTPEmail({ to, otp, userName }: SendOTPEmailProps) {
             
             <p style="font-size: 16px; margin-top: 20px;">
               Best regards,<br>
-              <strong>Business Stanley Team</strong>
+              <strong>Legal Stanley Team</strong>
             </p>
           </div>
           
           <div style="text-align: center; padding: 20px; color: #6c757d; font-size: 12px;">
             <p style="margin: 0;">
-              © ${new Date().getFullYear()} Business Stanley. All rights reserved.
+              © ${new Date().getFullYear()} Legal Stanley. All rights reserved.
             </p>
           </div>
         </body>
         </html>
       `,
       text: `
-        Business Stanley - Password Reset OTP
+        Legal Stanley - Password Reset OTP
         
         ${userName ? `Hello ${userName},` : "Hello,"}
         
@@ -107,9 +107,9 @@ export async function sendOTPEmail({ to, otp, userName }: SendOTPEmailProps) {
         If you didn't request this password reset, please ignore this email and consider changing your password as a precaution.
         
         Best regards,
-        Business Stanley Team
+        Legal Stanley Team
         
-        © ${new Date().getFullYear()} Business Stanley. All rights reserved.
+        © ${new Date().getFullYear()} Legal Stanley. All rights reserved.
       `,
     };
 
@@ -133,22 +133,22 @@ export async function sendWelcomeEmail({
     const transporter = createTransporter();
 
     const mailOptions = {
-      from: `"${process.env.COMPANY_NAME || "Business Stanley"}" <${
+      from: `"${process.env.COMPANY_NAME || "Legal Stanley"}" <${
         process.env.EMAIL_USER
       }>`,
       to: to,
-      subject: "Welcome to Business Stanley!",
+      subject: "Welcome to Legal Stanley!",
       html: `
         <!DOCTYPE html>
         <html>
         <head>
           <meta charset="utf-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>Welcome to Business Stanley</title>
+          <title>Welcome to Legal Stanley</title>
         </head>
         <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
           <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-            <h1 style="color: white; margin: 0; font-size: 28px;">Welcome to Business Stanley!</h1>
+            <h1 style="color: white; margin: 0; font-size: 28px;">Welcome to Legal Stanley!</h1>
           </div>
           
           <div style="background: #f8f9fa; padding: 30px; border-radius: 0 0 10px 10px; border: 1px solid #e9ecef;">
@@ -157,7 +157,7 @@ export async function sendWelcomeEmail({
             </p>
             
             <p style="font-size: 16px; margin-bottom: 20px;">
-              Thank you for joining Business Stanley! We're excited to have you on board and can't wait to help you streamline your business operations.
+              Thank you for joining Legal Stanley! We're excited to have you on board and can't wait to help you streamline your business operations.
             </p>
             
             <div style="background: #e7f3ff; border-radius: 8px; padding: 25px; margin: 25px 0;">
@@ -194,13 +194,13 @@ export async function sendWelcomeEmail({
             
             <p style="font-size: 16px; margin-top: 25px;">
               Welcome aboard!<br>
-              <strong>The Business Stanley Team</strong>
+              <strong>The Legal Stanley Team</strong>
             </p>
           </div>
           
           <div style="text-align: center; padding: 20px; color: #6c757d; font-size: 12px;">
             <p style="margin: 0;">
-              © ${new Date().getFullYear()} Business Stanley. All rights reserved.
+              © ${new Date().getFullYear()} Legal Stanley. All rights reserved.
             </p>
             <p style="margin: 5px 0 0 0;">
               Follow us on social media for updates and tips!
@@ -210,11 +210,11 @@ export async function sendWelcomeEmail({
         </html>
       `,
       text: `
-        Welcome to Business Stanley!
+        Welcome to Legal Stanley!
         
         Hello ${userName}!
         
-        Thank you for joining Business Stanley! We're excited to have you on board and can't wait to help you streamline your business operations.
+        Thank you for joining Legal Stanley! We're excited to have you on board and can't wait to help you streamline your business operations.
         
         What's Next?
         - Complete your profile setup
@@ -230,9 +230,9 @@ export async function sendWelcomeEmail({
         If you have any questions or need assistance getting started, our support team is here to help. Simply reply to this email or contact us through the help center.
         
         Welcome aboard!
-        The Business Stanley Team
+        The Legal Stanley Team
         
-        © ${new Date().getFullYear()} Business Stanley. All rights reserved.
+        © ${new Date().getFullYear()} Legal Stanley. All rights reserved.
         Follow us on social media for updates and tips!
       `,
     };
@@ -258,22 +258,22 @@ export async function sendAdminInviteEmail({
     const transporter = createTransporter();
 
     const mailOptions = {
-      from: `"${process.env.COMPANY_NAME || "Business Stanley"}" <${
+      from: `"${process.env.COMPANY_NAME || "Legal Stanley"}" <${
         process.env.EMAIL_USER
       }>`,
       to: to,
-      subject: "Welcome to Business Stanley - Admin Account Created",
+      subject: "Welcome to Legal Stanley - Admin Account Created",
       html: `
         <!DOCTYPE html>
         <html>
         <head>
           <meta charset="utf-8">
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>Welcome to Business Stanley</title>
+          <title>Welcome to Legal Stanley</title>
         </head>
         <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
           <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-            <h1 style="color: white; margin: 0; font-size: 28px;">Welcome to Business Stanley</h1>
+            <h1 style="color: white; margin: 0; font-size: 28px;">Welcome to Legal Stanley</h1>
           </div>
           
           <div style="background: #f8f9fa; padding: 30px; border-radius: 0 0 10px 10px; border: 1px solid #e9ecef;">
@@ -282,7 +282,7 @@ export async function sendAdminInviteEmail({
             </p>
             
             <p style="font-size: 16px; margin-bottom: 20px;">
-              Your admin account has been created in the Business Stanley management system. Here are your login credentials:
+              Your admin account has been created in the Legal Stanley management system. Here are your login credentials:
             </p>
 
             <div style="background: #ffffff; padding: 20px; border-radius: 5px; border: 1px solid #dee2e6; margin-bottom: 20px;">
@@ -309,18 +309,18 @@ export async function sendAdminInviteEmail({
           
           <div style="text-align: center; padding: 20px; color: #6c757d; font-size: 12px;">
             <p style="margin: 0;">
-              © ${new Date().getFullYear()} Business Stanley. All rights reserved.
+              © ${new Date().getFullYear()} Legal Stanley. All rights reserved.
             </p>
           </div>
         </body>
         </html>
       `,
       text: `
-        Welcome to Business Stanley!
+        Welcome to Legal Stanley!
         
         Hello ${userName}!
         
-        Your admin account has been created in the Business Stanley management system. Here are your login credentials:
+        Your admin account has been created in the Legal Stanley management system. Here are your login credentials:
         
         Email: ${to}
         Password: ${password}
@@ -332,9 +332,9 @@ export async function sendAdminInviteEmail({
         For security reasons, please change your password immediately after logging in.
         
         Best regards,
-        The Business Stanley Team
+        The Legal Stanley Team
         
-        © ${new Date().getFullYear()} Business Stanley. All rights reserved.
+        © ${new Date().getFullYear()} Legal Stanley. All rights reserved.
       `,
     };
 

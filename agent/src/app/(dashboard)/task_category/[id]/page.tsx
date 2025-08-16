@@ -134,11 +134,11 @@ export default function CategoryDetail({ params }: { params: Promise<{ id: strin
                 const tasksResponse = await fetch(`/api/tasks?categoryId=${categoryId}`)
 
                 if (tasksResponse.ok) {
-                    const tasksData = await tasksResponse.json()
-                    setTasks(tasksData)
+                    const tasksData = await tasksResponse.json();
+                    setTasks(tasksData.tasks || []);
                 } else {
-                    console.error("Error fetching tasks:", await tasksResponse.text())
-                    setTasks([])
+                    console.error("Error fetching tasks:", await tasksResponse.text());
+                    setTasks([]);
                 }
             } catch (error) {
                 console.error("Error fetching data:", error)

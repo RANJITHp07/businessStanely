@@ -1,3 +1,42 @@
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const agent = await getCurrentAgent(req);
+    if (!agent) {
+      return NextResponse.json(
+        { error: "Unauthorized" },
+        { status: 401 }
+      );
+    }
+    const { id: taskId } = params;
+    // Only allow delete if agent is creator or assigned
+    const existingTask = await prisma.task.findFirst({
+      where: {
+        id: taskId,
+        OR: [
+          { createdById: agent.id },
+          { assignedToId: agent.id },
+        ],
+      },
+    });
+    if (!existingTask) {
+      return NextResponse.json(
+        { error: "Task not found or not authorized" },
+        { status: 404 }
+      );
+    }
+    await prisma.task.delete({ where: { id: taskId } });
+    return new NextResponse(null, { status: 204 });
+  } catch (error) {
+    console.error(`Error deleting task ${params.id}:`, error);
+    return NextResponse.json(
+      { error: "Failed to delete task" },
+      { status: 500 }
+    );
+  }
+}
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentAgent } from "@/lib/auth";
 import prisma from "@/lib/prisma";
@@ -180,32 +219,12 @@ export async function PUT(
     }
 
 
-    // Allow updating assignedToId for reassignment
-    const updateData: Partial<{
-      status: string;
-      progress: number;
-      followUpRequired: boolean;
-      completed: boolean;
-      assignedToId: string;
-      updatedAt: Date;
-    }> = {
+
+    // Allow updating all relevant fields (spread body)
+    const updateData = {
+      ...body,
       updatedAt: new Date(),
     };
-    if (body.status !== undefined) {
-      updateData.status = body.status;
-    }
-    if (body.progress !== undefined) {
-      updateData.progress = body.progress;
-    }
-    if (body.followUpRequired !== undefined) {
-      updateData.followUpRequired = body.followUpRequired;
-    }
-    if (body.completed !== undefined) {
-      updateData.completed = body.completed;
-    }
-    if (body.assignedToId !== undefined) {
-      updateData.assignedToId = body.assignedToId;
-    }
 
     const updatedTask = await prisma.task.update({
       where: { id: taskId },

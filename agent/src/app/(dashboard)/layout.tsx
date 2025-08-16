@@ -22,7 +22,7 @@ export default function RootLayout({
               <Navigator />
               <div className="flex justify-between items-center flex-1 pr-4">
                 <h1 className="text-[25px] block md:hidden">
-                  Business Stanely
+                  Legal Stanley
                 </h1>
                 <SidebarTrigger />
               </div>

@@ -156,6 +156,7 @@ export async function POST(req: NextRequest) {
       dueDate,
       clientId,
       assignedToId,
+      categoryId,
     } = body;
 
     // Validate required fields
@@ -177,6 +178,7 @@ export async function POST(req: NextRequest) {
         clientId: clientId || null,
         createdById: agent.id,
         assignedToId: assignedToId || agent.id,
+        categoryId: categoryId || null,
       },
       include: {
         client: {

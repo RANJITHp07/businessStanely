@@ -44,9 +44,9 @@ export async function PUT(
         approvedAt: new Date(),
       },
       include: {
-        createdBy: {
+        createdByAgent: {
           select: {
-            username: true,
+            name: true,
             id: true
           }
         },

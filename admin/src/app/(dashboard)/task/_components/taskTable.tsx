@@ -129,7 +129,7 @@ export default function TasksTable() {
   })
 
   // Apply sorting to filtered tasks
-  const sortedTasks = sortTasks(filteredTasks)
+  const sortedTasks = filteredTasks
 
   // Pagination logic
   const totalPages = Math.ceil(sortedTasks.length / itemsPerPage)

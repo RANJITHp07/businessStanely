@@ -154,7 +154,7 @@ export default function TasksTable() {
   });
 
   // Apply sorting to filtered tasks
-  const sortedTasks = sortTasks(filteredTasks, sortBy);
+  const sortedTasks = filteredTasks;
 
   // Pagination logic
   const totalPages = Math.ceil(sortedTasks.length / itemsPerPage);
@@ -216,27 +216,27 @@ export default function TasksTable() {
   //     return <p>Loading...</p>;
   // }
 
-    return (
-      <>
-        <div className="container mx-auto p-6 max-w-7xl">
-          <div className="mb-8">
-            <div className="flex  flex-col md:flex-row  justify-between md:items-center  mb-6 md:mb-4">
-              <div>
-                <h1 className="text-3xl font-bold">Task Management</h1>
-                <p className="text-muted-foreground mt-2">
-                  Manage and track all legal tasks and assignments
-                </p>
-              </div>
-              <Link href="/task/create" className="flex justify-end">
-                <Button className=" mt-[20px] md:mt-none   bg-[#003459] hover:bg-[#003459] text-white rounded-lg px-4 py-2 flex items-center gap-2 cursor-pointer shadow-none hover:shadow-md transition-shadow duration-300">
-                  <Plus className="h-4 w-4" />
-                  Create Task
-                </Button>
-              </Link>
+  return (
+    <>
+      <div className="container mx-auto p-6 max-w-7xl">
+        <div className="mb-8">
+          <div className="flex  flex-col md:flex-row  justify-between md:items-center  mb-6 md:mb-4">
+            <div>
+              <h1 className="text-3xl font-bold">Task Management</h1>
+              <p className="text-muted-foreground mt-2">
+                Manage and track all legal tasks and assignments
+              </p>
             </div>
+            <Link href="/task/create" className="flex justify-end">
+              <Button className=" mt-[20px] md:mt-none   text-white rounded-lg px-4 py-2 flex items-center gap-2 cursor-pointer shadow-none hover:shadow-md transition-shadow duration-300">
+                <Plus className="h-4 w-4" />
+                Create Task
+              </Button>
+            </Link>
+          </div>
 
-            {/* Filters */}
-            {/* <CardHeader>
+          {/* Filters */}
+          {/* <CardHeader>
                             <CardTitle className="flex items-center gap-2">
                                 <Filter className="h-5 w-5" />
                                 Filters & Search
@@ -244,111 +244,111 @@ export default function TasksTable() {
                             <CardDescription>Filter and search through your tasks</CardDescription>
                         </CardHeader> */}
 
-            <Card>
-              {loading ? (
-                <CardContent>
-                  <div className="h-[200px] w-full bg-gray-200 rounded-2xl mb-4"></div>
+          <Card>
+            {loading ? (
+              <CardContent>
+                <div className="h-[200px] w-full bg-gray-200 rounded-2xl mb-4"></div>
 
-                  <div className="flex justify-between gap-4">
-                    <div className="h-5 w-1/2 bg-gray-200 rounded-xl mb-3"></div>
-                    <div className="h-5 w-1/2 bg-gray-200 rounded-xl mb-3"></div>
+                <div className="flex justify-between gap-4">
+                  <div className="h-5 w-1/2 bg-gray-200 rounded-xl mb-3"></div>
+                  <div className="h-5 w-1/2 bg-gray-200 rounded-xl mb-3"></div>
+                </div>
+              </CardContent>
+            ) : (
+              <>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Filter className="h-5 w-5" />
+                    Filters & Search
+                  </CardTitle>
+                  <CardDescription>
+                    Filter and search through your tasks
+                  </CardDescription>
+                </CardHeader>
+
+                <CardContent className="space-y-4">
+                  {/* Search */}
+                  <div className="flex items-center gap-4">
+                    <div className="flex-1">
+                      <Label htmlFor="search">Search Tasks</Label>
+                      <div className="relative my-2">
+                        <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          id="search"
+                          placeholder="Search by task name, client, agent, or description..."
+                          value={searchTerm}
+                          onChange={(e) => setSearchTerm(e.target.value)}
+                          className="pl-10"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Filter Controls */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Priority</Label>
+                      <Select
+                        value={selectedPriority}
+                        onValueChange={setSelectedPriority}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {priorities.map((priority) => (
+                            <SelectItem key={priority} value={priority}>
+                              {priority}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Status</Label>
+                      <Select
+                        value={selectedStatus}
+                        onValueChange={setSelectedStatus}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {statuses.map((status) => (
+                            <SelectItem key={status} value={status}>
+                              {status}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  {/* Results Summary */}
+                  <div className="flex items-center justify-end gap-2 text-sm text-muted-foreground">
+                    <Button
+                      onClick={resetFilter}
+                      className="cursor-pointer hover:text-white text-white bg-[#f42b03] hover:bg-[#f42b03] rounded-lg px-4 py-2 shadow-none hover:shadow-lg transition-shadow duration-300"
+                      variant="outline"
+                    >
+                      Clear
+                    </Button>
                   </div>
                 </CardContent>
-              ) : (
-                <>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Filter className="h-5 w-5" />
-                      Filters & Search
-                    </CardTitle>
-                    <CardDescription>
-                      Filter and search through your tasks
-                    </CardDescription>
-                  </CardHeader>
+              </>
+            )}
+          </Card>
+        </div>
 
-                  <CardContent className="space-y-4">
-                    {/* Search */}
-                    <div className="flex items-center gap-4">
-                      <div className="flex-1">
-                        <Label htmlFor="search">Search Tasks</Label>
-                        <div className="relative my-2">
-                          <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                          <Input
-                            id="search"
-                            placeholder="Search by task name, client, agent, or description..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="pl-10"
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Filter Controls */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label>Priority</Label>
-                        <Select
-                          value={selectedPriority}
-                          onValueChange={setSelectedPriority}
-                        >
-                          <SelectTrigger className="w-full">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {priorities.map((priority) => (
-                              <SelectItem key={priority} value={priority}>
-                                {priority}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label>Status</Label>
-                        <Select
-                          value={selectedStatus}
-                          onValueChange={setSelectedStatus}
-                        >
-                          <SelectTrigger className="w-full">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {statuses.map((status) => (
-                              <SelectItem key={status} value={status}>
-                                {status}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-
-                    {/* Results Summary */}
-                    <div className="flex items-center justify-end gap-2 text-sm text-muted-foreground">
-                      <Button
-                        onClick={resetFilter}
-                        className="cursor-pointer hover:text-white text-white bg-[#f42b03] hover:bg-[#f42b03] rounded-lg px-4 py-2 shadow-none hover:shadow-lg transition-shadow duration-300"
-                        variant="outline"
-                      >
-                        Clear
-                      </Button>
-                    </div>
-                  </CardContent>
-                </>
-              )}
-            </Card>
-          </div>
-
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="flex items-center gap-2">
-                  <FileText className="h-5 w-5" />
-                  Tasks ({sortedTasks.length})
-                </CardTitle>
-                <div className="flex items-center gap-2">
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5" />
+                Tasks ({sortedTasks.length})
+              </CardTitle>
+              {/* <div className="flex items-center gap-2">
                   <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
                   <Select value={sortBy} onValueChange={setSortBy}>
                     <SelectTrigger className="w-32">
@@ -378,287 +378,286 @@ export default function TasksTable() {
                       <SelectItem value="oldest">Oldest</SelectItem>
                     </SelectContent>
                   </Select>
-                </div>
-              </div>
-            </CardHeader>
+                </div> */}
+            </div>
+          </CardHeader>
 
-            {loading ? (
-              <div className="flex justify-center items-center py-8">
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-              </div>
-            ) : (
-              <>
-                <CardContent>
-                  <div className="rounded-md border">
-                    <Table>
-                      <TableHeader>
+          {loading ? (
+            <div className="flex justify-center items-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : (
+            <>
+              <CardContent>
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Task</TableHead>
+                        <TableHead>Client</TableHead>
+                        <TableHead>Assigned To</TableHead>
+                        <TableHead>Priority</TableHead>
+                        <TableHead>Due Date</TableHead>
+                        <TableHead>Progress</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+
+                    <TableBody>
+                      {currentTasks.length === 0 ? (
                         <TableRow>
-                          <TableHead>Task</TableHead>
-                          <TableHead>Client</TableHead>
-                          <TableHead>Assigned To</TableHead>
-                          <TableHead>Priority</TableHead>
-                          <TableHead>Due Date</TableHead>
-                          <TableHead>Progress</TableHead>
-                          <TableHead className="text-right">Actions</TableHead>
+                          <TableCell
+                            colSpan={8}
+                            className="text-center py-8 text-muted-foreground"
+                          >
+                            No tasks found matching your criteria.
+                          </TableCell>
                         </TableRow>
-                      </TableHeader>
-
-                      <TableBody>
-                        {currentTasks.length === 0 ? (
-                          <TableRow>
-                            <TableCell
-                              colSpan={8}
-                              className="text-center py-8 text-muted-foreground"
-                            >
-                              No tasks found matching your criteria.
-                            </TableCell>
-                          </TableRow>
-                        ) : (
-                          currentTasks.map((task) => {
-                            return (
-                              <TableRow
-                                key={task.id}
-                                onClick={() => router.push(`/task/${task.id}`)}
-                                className={`cursor-pointer hover:bg-muted/50 ${
-                                  isOverdue(task.dueDate, task.status)
-                                    ? "bg-red-50"
-                                    : ""
+                      ) : (
+                        currentTasks.map((task) => {
+                          return (
+                            <TableRow
+                              key={task.id}
+                              onClick={() => router.push(`/task/${task.id}`)}
+                              className={`cursor-pointer hover:bg-muted/50 ${isOverdue(task.dueDate, task.status)
+                                ? "bg-red-50"
+                                : ""
                                 }`}
-                              >
-                                <TableCell>
-                                  <div className="space-y-1">
-                                    <div className="font-medium">{task.title}</div>
-                                    {/* Show approved category only */}
-                                    {task.category &&
-                                      task.category.status === "approved" && (
-                                        <div className="text-xs mt-1">
-                                          <span className="inline-block px-2 py-1 rounded bg-blue-100 text-blue-800 border border-blue-200">
-                                            {task.category.name}
-                                          </span>
-                                        </div>
-                                      )}
-                                  </div>
-                                </TableCell>
-                                <TableCell>
-                                  <div className="space-y-1">
-                                    <div className="font-medium">
-                                      {task.client
-                                        ? task.client.clientType === "individual"
-                                          ? `${task.client.firstName} ${task.client.lastName}`
-                                          : task.client.organizationName
-                                        : "N/A"}
-                                    </div>
-                                    <div className="text-sm text-muted-foreground">
-                                      {task.client?.email}
-                                    </div>
-                                  </div>
-                                </TableCell>
-                                <TableCell>
-                                  <div className="flex items-center space-x-2">
-                                    <Avatar className="h-8 w-8">
-                                      <AvatarFallback className="text-xs">
-                                        {task.assignedTo?.name
-                                          .toUpperCase()
-                                          .split(" ")
-                                          .map((n) => n[0])
-                                          .join("")}
-                                      </AvatarFallback>
-                                    </Avatar>
-                                    <div>
-                                      <div className="font-medium text-sm">
-                                        {task.assignedTo?.name}
+                            >
+                              <TableCell>
+                                <div className="space-y-1">
+                                  <div className="font-medium">{task.title}</div>
+                                  {/* Show approved category only */}
+                                  {task.category &&
+                                    task.category.status === "approved" && (
+                                      <div className="text-xs mt-1">
+                                        <span className="inline-block px-2 py-1 rounded bg-blue-100 text-blue-800 border border-blue-200">
+                                          {task.category.name}
+                                        </span>
                                       </div>
-                                      <div className="text-xs text-muted-foreground">
-                                        {task.assignedTo?.agentType}
-                                      </div>
+                                    )}
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <div className="space-y-1">
+                                  <div className="font-medium">
+                                    {task.client
+                                      ? task.client.clientType === "individual"
+                                        ? `${task.client.firstName} ${task.client.lastName}`
+                                        : task.client.organizationName
+                                      : "N/A"}
+                                  </div>
+                                  <div className="text-sm text-muted-foreground">
+                                    {task.client?.email}
+                                  </div>
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center space-x-2">
+                                  <Avatar className="h-8 w-8">
+                                    <AvatarFallback className="text-xs">
+                                      {task.assignedTo?.name
+                                        .toUpperCase()
+                                        .split(" ")
+                                        .map((n) => n[0])
+                                        .join("")}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                  <div>
+                                    <div className="font-medium text-sm">
+                                      {task.assignedTo?.name}
+                                    </div>
+                                    <div className="text-xs text-muted-foreground">
+                                      {task.assignedTo?.agentType}
                                     </div>
                                   </div>
-                                </TableCell>
-                                <TableCell>
-                                  {getPriorityBadge(task.priority)}
-                                </TableCell>
-                                <TableCell>
-                                  <div className="flex items-center gap-1">
-                                    <Calendar className="h-4 w-4 text-muted-foreground" />
-                                    <span
-                                      className={
-                                        isOverdue(task.dueDate, task.status)
-                                          ? "text-red-600 font-medium"
-                                          : ""
-                                      }
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                {getPriorityBadge(task.priority)}
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center gap-1">
+                                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                                  <span
+                                    className={
+                                      isOverdue(task.dueDate, task.status)
+                                        ? "text-red-600 font-medium"
+                                        : ""
+                                    }
+                                  >
+                                    {task.dueDate
+                                      ? formatDate(task.dueDate)
+                                      : "N/A"}
+                                  </span>
+                                </div>
+                                {task.dueDate &&
+                                  isOverdue(task.dueDate, task.status) && (
+                                    <Badge
+                                      variant="destructive"
+                                      className="text-xs mt-1"
                                     >
-                                      {task.dueDate
-                                        ? formatDate(task.dueDate)
-                                        : "N/A"}
+                                      Overdue
+                                    </Badge>
+                                  )}
+                              </TableCell>
+                              <TableCell>
+                                <div className="space-y-2">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-sm font-medium">
+                                      {task.status}
                                     </span>
                                   </div>
-                                  {task.dueDate &&
-                                    isOverdue(task.dueDate, task.status) && (
-                                      <Badge
-                                        variant="destructive"
-                                        className="text-xs mt-1"
-                                      >
-                                        Overdue
-                                      </Badge>
-                                    )}
-                                </TableCell>
-                                <TableCell>
-                                  <div className="space-y-2">
-                                    <div className="flex items-center justify-between">
-                                      <span className="text-sm font-medium">
-                                        {task.status}
-                                      </span>
-                                    </div>
-                                  </div>
-                                </TableCell>
-                                <TableCell
-                                  className="text-right"
-                                  onClick={(e) => e.stopPropagation()}
-                                >
-                                  <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                      <Button
-                                        variant="ghost"
-                                        className="h-8 w-8 p-0"
-                                      >
-                                        <span className="sr-only">Open menu</span>
-                                        <MoreHorizontal className="h-4 w-4" />
-                                      </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end">
-                                      <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                      <DropdownMenuItem asChild>
-                                        <Link href={`/task/${task.id}`}>
-                                          <Eye className="mr-2 h-4 w-4" />
-                                          View Details
-                                        </Link>
-                                      </DropdownMenuItem>
-                                      <DropdownMenuItem asChild>
-                                        <Link href={`/task/${task.id}/edit`}>
-                                          <Edit className="mr-2 h-4 w-4" />
-                                          Edit Task
-                                        </Link>
-                                      </DropdownMenuItem>
-                                      <DropdownMenuSeparator />
-                                      <DropdownMenuItem
-                                        onClick={() => setTaskToDelete(task)}
-                                        className="text-red-600 focus:text-red-600"
-                                      >
-                                        <Trash2 className="mr-2 h-4 w-4" />
-                                        Delete Task
-                                      </DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                  </DropdownMenu>
-                                </TableCell>
-                              </TableRow>
-                            );
-                          })
-                        )}
-                      </TableBody>
-                    </Table>
-                  </div>
-
-                  {/* Pagination */}
-                  {totalPages > 1 && (
-                    <div className="flex items-center justify-between space-x-2 py-4">
-                      <div className="text-sm text-muted-foreground">
-                        Page {currentPage} of {totalPages}
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Select
-                          value={itemsPerPage.toString()}
-                          onValueChange={handleItemsPerPageChange}
-                        >
-                          <SelectTrigger className="w-24">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {[5, 10, 20, 50].map((value) => (
-                              <SelectItem key={value} value={value.toString()}>
-                                {value} / page
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handlePageChange(1)}
-                          disabled={currentPage === 1}
-                        >
-                          <ChevronsLeft className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handlePageChange(currentPage - 1)}
-                          disabled={currentPage === 1}
-                        >
-                          <ChevronLeft className="h-4 w-4" />
-                        </Button>
-
-                        {/* Page Numbers */}
-                        {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                          const pageNumber =
-                            Math.max(1, Math.min(totalPages - 4, currentPage - 2)) +
-                            i;
-                          if (pageNumber <= totalPages) {
-                            return (
-                              <Button
-                                key={pageNumber}
-                                variant={
-                                  currentPage === pageNumber ? "default" : "outline"
-                                }
-                                size="sm"
-                                onClick={() => handlePageChange(pageNumber)}
+                                </div>
+                              </TableCell>
+                              <TableCell
+                                className="text-right"
+                                onClick={(e) => e.stopPropagation()}
                               >
-                                {pageNumber}
-                              </Button>
-                            );
-                          }
-                          return null;
-                        })}
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      className="h-8 w-8 p-0"
+                                    >
+                                      <span className="sr-only">Open menu</span>
+                                      <MoreHorizontal className="h-4 w-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                    <DropdownMenuItem asChild>
+                                      <Link href={`/task/${task.id}`}>
+                                        <Eye className="mr-2 h-4 w-4" />
+                                        View Details
+                                      </Link>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem asChild>
+                                      <Link href={`/task/${task.id}/edit`}>
+                                        <Edit className="mr-2 h-4 w-4" />
+                                        Edit Task
+                                      </Link>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem
+                                      onClick={() => setTaskToDelete(task)}
+                                      className="text-red-600 focus:text-red-600"
+                                    >
+                                      <Trash2 className="mr-2 h-4 w-4" />
+                                      Delete Task
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
 
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handlePageChange(currentPage + 1)}
-                          disabled={currentPage === totalPages}
-                        >
-                          <ChevronRight className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handlePageChange(totalPages)}
-                          disabled={currentPage === totalPages}
-                        >
-                          <ChevronsRight className="h-4 w-4" />
-                        </Button>
-                      </div>
+                {/* Pagination */}
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-between space-x-2 py-4">
+                    <div className="text-sm text-muted-foreground">
+                      Page {currentPage} of {totalPages}
                     </div>
-                  )}
-                </CardContent>
-              </>
-            )}
-          </Card>
-        </div>
-        <AlertDialog open={!!taskToDelete} onOpenChange={() => setTaskToDelete(null)}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-              <AlertDialogDescription>
-                This action cannot be undone. This will permanently delete the task and remove its data from our servers.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
-                Delete
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      </>
-    );
+                    <div className="flex items-center space-x-2">
+                      <Select
+                        value={itemsPerPage.toString()}
+                        onValueChange={handleItemsPerPageChange}
+                      >
+                        <SelectTrigger className="w-24">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {[5, 10, 20, 50].map((value) => (
+                            <SelectItem key={value} value={value.toString()}>
+                              {value} / page
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handlePageChange(1)}
+                        disabled={currentPage === 1}
+                      >
+                        <ChevronsLeft className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handlePageChange(currentPage - 1)}
+                        disabled={currentPage === 1}
+                      >
+                        <ChevronLeft className="h-4 w-4" />
+                      </Button>
+
+                      {/* Page Numbers */}
+                      {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                        const pageNumber =
+                          Math.max(1, Math.min(totalPages - 4, currentPage - 2)) +
+                          i;
+                        if (pageNumber <= totalPages) {
+                          return (
+                            <Button
+                              key={pageNumber}
+                              variant={
+                                currentPage === pageNumber ? "default" : "outline"
+                              }
+                              size="sm"
+                              onClick={() => handlePageChange(pageNumber)}
+                            >
+                              {pageNumber}
+                            </Button>
+                          );
+                        }
+                        return null;
+                      })}
+
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handlePageChange(currentPage + 1)}
+                        disabled={currentPage === totalPages}
+                      >
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handlePageChange(totalPages)}
+                        disabled={currentPage === totalPages}
+                      >
+                        <ChevronsRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </>
+          )}
+        </Card>
+      </div>
+      <AlertDialog open={!!taskToDelete} onOpenChange={() => setTaskToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the task and remove its data from our servers.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
 }

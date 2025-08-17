@@ -228,20 +228,30 @@ const handleCreateCategory = async () => {
   const router = useRouter();
 
   useEffect(() => {
+
     const fetchClientsAndAgents = async () => {
       try {
-        const [clientsRes, teamRes, categoriesRes] = await Promise.all([
+        const [clientsRes, teamRes, categoriesRes, selfRes] = await Promise.all([
           fetch("/api/clients"),
           fetch("/api/team-members"),
           fetch("/api/task-categories"),
+          fetch("/api/agents/me") // Add endpoint to get current agent
         ]);
         const clientsData = await clientsRes.json();
         const teamMembers = await teamRes.json();
-        // Optionally, fetch self from session or a dedicated endpoint if available
-        // For now, only show team members (do not include all agents)
-        setClients(clientsData);
-        setAgents(teamMembers);
         const categoriesData = await categoriesRes.json();
+        let selfAgent = null;
+        if (selfRes.ok) {
+          selfAgent = await selfRes.json();
+        }
+        setClients(clientsData);
+        // Add current agent to the team list if not already present
+        let allAgents = teamMembers;
+        if (selfAgent && !teamMembers.some((a: Agent) => a.id === selfAgent.id)) {
+          allAgents = [selfAgent, ...teamMembers];
+        }
+        setAgents(allAgents);
+        setCurrentAgent(selfAgent);
         setCategories(categoriesData);
       } catch (error) {
         console.error("Failed to fetch clients, agents, or categories", error);

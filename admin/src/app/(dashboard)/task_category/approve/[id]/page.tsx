@@ -258,7 +258,7 @@ export default function ApproveCategory({ params }: { params: Promise<{ id: stri
             toast.success("Category rejected successfully")
             setShowRejectDialog(false)
             // Redirect to the category detail page to show the updated status
-            router.push(`/task_category/${resolvedParams.id}`)
+            router.push(`/task_category`)
         } catch (error) {
             console.error("Error rejecting category:", error)
             const errorMessage = error instanceof Error ? error.message : "Failed to reject category"

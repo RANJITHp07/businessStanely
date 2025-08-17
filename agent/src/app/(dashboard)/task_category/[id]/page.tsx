@@ -174,7 +174,7 @@ export default function CategoryDetail({ params }: { params: Promise<{ id: strin
     }
 
     // Apply sorting to tasks
-    const sortedTasks = sortTasks(tasks, sortBy, sortByDate)
+    const sortedTasks = tasks
 
     // Pagination logic
     const totalPages = Math.ceil(sortedTasks.length / itemsPerPage)

@@ -10,11 +10,10 @@ import {
 } from "@/components/ui/card";
 import { Agent } from "@/types";
 
-export default function EditAgentPage({
-  params: { id },
-}: {
-  params: { id: string };
-}) {
+import React from "react";
+
+export default function EditAgentPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = React.use(params);
   const [agent, setAgent] = useState<Agent | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -35,7 +34,6 @@ export default function EditAgentPage({
         setLoading(false);
       }
     };
-
     fetchAgent();
   }, [id]);
 

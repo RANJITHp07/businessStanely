@@ -13,9 +13,9 @@ export async function GET(request: Request) {
       );
     }
 
-    // Check if an admin with this email already exists
-    const existingAdmin = await prisma.user.findUnique({
-      where: { email },
+    // Always check emails in lowercase for case-insensitive uniqueness
+    const existingAdmin = await prisma.user.findFirst({
+      where: { email: { equals: email.toLowerCase(), mode: "insensitive" } },
       select: { id: true },
     });
 

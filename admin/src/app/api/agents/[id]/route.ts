@@ -36,9 +36,14 @@ export async function PUT(
     const body = await req.json();
     const { email, specializations, subordinates, photo, ...agentData } = body;
 
-    const existingAgent = await prisma.agent.findUnique({
-      where: { email },
-    });
+
+    // Always store and check emails in lowercase for case-insensitive uniqueness
+  const emailToCheck = email ? email.toLowerCase() : undefined;
+    const existingAgent = emailToCheck
+      ? await prisma.agent.findFirst({
+          where: { email: { equals: emailToCheck, mode: "insensitive" } },
+        })
+      : undefined;
 
     if (existingAgent && existingAgent.id !== params.id) {
       return NextResponse.json(
@@ -76,11 +81,12 @@ export async function PUT(
       }
     }
 
+
     const updatedAgent = await prisma.agent.update({
       where: { id: params.id },
       data: {
         ...agentData,
-        email,
+        email: emailToCheck,
         photo: photoS3Key,
         specializations,
         ...(subordinates && {

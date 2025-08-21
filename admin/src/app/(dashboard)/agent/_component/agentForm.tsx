@@ -43,6 +43,7 @@ const agentTypes = [
 // Define agent hierarchy - each agent can manage agents below them in the hierarchy
 const agentHierarchy: { [key: string]: string[] } = {
   Owner: [
+    "Owner",
     "Partner",
     "CEO",
     "Senior Manager",
@@ -54,6 +55,7 @@ const agentHierarchy: { [key: string]: string[] } = {
     "Intern",
   ],
   Partner: [
+    "Partner",
     "CEO",
     "Senior Manager",
     "Manager",
@@ -64,6 +66,7 @@ const agentHierarchy: { [key: string]: string[] } = {
     "Intern",
   ],
   CEO: [
+    "CEO",
     "Senior Manager",
     "Manager",
     "Senior Executive",
@@ -73,6 +76,7 @@ const agentHierarchy: { [key: string]: string[] } = {
     "Intern",
   ],
   "Senior Manager": [
+    "Senior Manager",
     "Manager",
     "Senior Executive",
     "Executive",
@@ -81,17 +85,38 @@ const agentHierarchy: { [key: string]: string[] } = {
     "Intern",
   ],
   Manager: [
+    "Manager",
     "Senior Executive",
     "Executive",
     "Junior Executive",
     "Trainee",
     "Intern",
   ],
-  "Senior Executive": ["Executive", "Junior Executive", "Trainee", "Intern"],
-  Executive: ["Junior Executive", "Trainee", "Intern"],
-  "Junior Executive": ["Trainee", "Intern"],
-  Trainee: ["Intern"],
-  Intern: [],
+  "Senior Executive": [
+    "Senior Executive",
+    "Executive",
+    "Junior Executive",
+    "Trainee",
+    "Intern"
+  ],
+  Executive: [
+    "Executive",
+    "Junior Executive",
+    "Trainee",
+    "Intern"
+  ],
+  "Junior Executive": [
+    "Junior Executive",
+    "Trainee",
+    "Intern"
+  ],
+  Trainee: [
+    "Trainee",
+    "Intern"
+  ],
+  Intern: [
+    "Intern"
+  ],
 };
 
 const specializations = [

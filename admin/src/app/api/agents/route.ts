@@ -31,6 +31,12 @@ export async function POST(req: NextRequest) {
       }
     }
 
+
+    // Always store emails in lowercase for case-insensitive uniqueness
+    if (agentData.email) {
+      agentData.email = agentData.email.toLowerCase();
+    }
+
     const data: Prisma.AgentCreateInput = {
       ...agentData,
       password: hashedPassword, // Add the hashed password

@@ -138,14 +138,20 @@ export async function PUT(
       ...(hashedPassword && { password: hashedPassword }),
     };
 
-    // Check for duplicates with the merged data
+
+    // Always store and check emails in lowercase for case-insensitive uniqueness
+    if (updateData.email) {
+      updateData.email = updateData.email.toLowerCase();
+    }
+
+    // Check for duplicates with the merged data (case-insensitive for email)
     const [existingUsername, existingEmail] = await Promise.all([
       prisma.user.findUnique({
         where: { username: updateData.username },
         select: { id: true },
       }),
-      prisma.user.findUnique({
-        where: { email: updateData.email },
+      prisma.user.findFirst({
+        where: { email: { equals: updateData.email, mode: "insensitive" } },
         select: { id: true },
       }),
     ]);
@@ -158,7 +164,7 @@ export async function PUT(
       );
     }
 
-    // Check for duplicate email
+    // Check for duplicate email (case-insensitive)
     if (existingEmail && existingEmail.id !== id) {
       return NextResponse.json(
         { error: "Email already exists" },

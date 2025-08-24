@@ -123,7 +123,7 @@ export default function ApproveCategory({ params }: { params: Promise<{ id: stri
     const [sortBy, setSortBy] = useState("a-z")
     const [sortByDate, setSortByDate] = useState("newest")
     const [currentPage, setCurrentPage] = useState(1)
-    const [itemsPerPage, setItemsPerPage] = useState(5)
+    const [itemsPerPage, setItemsPerPage] = useState(15)
     const [loading, setLoading] = useState(true)
     const [approving, setApproving] = useState(false)
     const [rejecting, setRejecting] = useState(false)

@@ -72,7 +72,7 @@ export default function TasksTable() {
   const [selectedStatus, setSelectedStatus] = useState("All Status");
   const [sortBy, setSortBy] = useState("a-z");
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(5);
+  const [itemsPerPage, setItemsPerPage] = useState(15);
   const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
 
   const handleDelete = async () => {

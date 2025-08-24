@@ -111,7 +111,7 @@ export default function CategoryDetail({ params }: { params: Promise<{ id: strin
     const [sortBy] = useState("a-z")
     const [sortByDate] = useState("newest")
     const [currentPage, setCurrentPage] = useState(1)
-    const [itemsPerPage, setItemsPerPage] = useState(5)
+    const [itemsPerPage, setItemsPerPage] = useState(15)
     const [loading, setLoading] = useState(true)
     // We only need the loading state for this view page
     // Other states were needed for approve page but not here

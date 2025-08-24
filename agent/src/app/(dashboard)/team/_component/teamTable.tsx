@@ -65,7 +65,7 @@ export default function TeamsTable() {
   const [selectedJurisdiction, setSelectedJurisdiction] =
     useState("All Jurisdictions");
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(15);
+  const [itemsPerPage, setItemsPerPage] = useState(20);
   // Removed teamToDelete state
   const [loading, setLoading] = useState(true);
 

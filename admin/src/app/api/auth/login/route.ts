@@ -97,9 +97,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Find user by email
-    const user = await prisma.user.findUnique({
-      where: { email },
+    // Find user by email (case-insensitive)
+    const user = await prisma.user.findFirst({
+      where: {
+        email: { equals: email, mode: 'insensitive' },
+      },
     });
 
     if (!user) {

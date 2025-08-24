@@ -68,7 +68,7 @@ export default function ClientsTable() {
     const [sortBy, setSortBy] = useState("a-z")
     const [sortByDate, setSortByDate] = useState("newest")
     const [currentPage, setCurrentPage] = useState(1)
-    const [itemsPerPage, setItemsPerPage] = useState(15)
+    const [itemsPerPage, setItemsPerPage] = useState(20)
     const [clientToDelete, setClientToDelete] = useState<Client | null>(null)
     const [loading, setLoading] = useState(true)
 

@@ -96,9 +96,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Find agent by email
-    const agent = await prisma.agent.findUnique({
-      where: { email },
+    // Find agent by email (case-insensitive)
+    const agent = await prisma.agent.findFirst({
+      where: {
+        email: { equals: email, mode: 'insensitive' },
+      },
     });
 
     if (!agent) {

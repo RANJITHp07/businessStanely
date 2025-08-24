@@ -89,7 +89,7 @@ export default function AgentsTable() {
   const [selectedJurisdiction, setSelectedJurisdiction] =
     useState("All Jurisdictions");
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(15);
+  const [itemsPerPage, setItemsPerPage] = useState(20);
   const [agentToDelete, setAgentToDelete] = useState<Agent | null>(null);
   const [loading, setLoading] = useState(true)
 

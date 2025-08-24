@@ -779,7 +779,7 @@ export default function TaskDetails() {
                     htmlFor="check-status"
                     className="text-sm font-medium cursor-pointer"
                   >
-                    Status Check Completed
+                    Status Check
                   </Label>
                 </div>
                 <div className="text-xs text-muted-foreground md:ml-auto">

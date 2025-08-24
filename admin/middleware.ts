@@ -35,11 +35,13 @@ export async function middleware(request: NextRequest) {
   const isProtectedRoute = protectedRoutes.some(route => pathname.startsWith(route))
   const isPublicRoute = publicRoutes.some(route => pathname.startsWith(route))
 
-  // If protected and not valid, redirect to login
+  // If protected and not valid, redirect to login and clear cookie
   if (isProtectedRoute && !validUser) {
     const loginUrl = new URL('/login', request.url)
     loginUrl.searchParams.set('redirect', pathname)
-    return NextResponse.redirect(loginUrl)
+    const response = NextResponse.redirect(loginUrl)
+    response.cookies.set('auth-token', '', { maxAge: 0, path: '/' }) // Clear cookie
+    return response
   }
 
   // If public and valid, redirect to dashboard
@@ -52,6 +54,7 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!api|_next/static|_next/image|favicon.ico|public).*)',
+    '/((?!_next/static|_next/image|favicon.ico|public).*)',
+    '/api/:path*',
   ],
 }

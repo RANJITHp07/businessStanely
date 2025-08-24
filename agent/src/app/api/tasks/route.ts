@@ -24,11 +24,9 @@ export async function GET(req: NextRequest) {
     // Get URL search params for filtering
     const { searchParams } = new URL(req.url);
 
-    const status = searchParams.get("status");
-    const priority = searchParams.get("priority");
-    const categoryId = searchParams.get("categoryId");
-    const page = parseInt(searchParams.get("page") || "1");
-    const limit = parseInt(searchParams.get("limit") || "10");
+  const status = searchParams.get("status");
+  const priority = searchParams.get("priority");
+  const categoryId = searchParams.get("categoryId");
 
 
     // If categoryId is present, return all tasks for that category (regardless of assignment)
@@ -58,10 +56,7 @@ export async function GET(req: NextRequest) {
       where.priority = priority;
     }
 
-    // Get total count for pagination
-    const totalTasks = await prisma.task.count({ where });
-
-    // Fetch tasks with pagination
+    // Fetch all tasks (no pagination)
     const tasks = await prisma.task.findMany({
       where,
       include: {
@@ -77,14 +72,11 @@ export async function GET(req: NextRequest) {
           orderBy: {
             createdAt: "desc",
           },
-          take: 3, // Only get latest 3 comments for list view
         },
       },
       orderBy: {
         createdAt: "desc",
       },
-      skip: (page - 1) * limit,
-      take: limit,
     });
 
     // Format tasks for frontend
@@ -116,13 +108,6 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       tasks: formattedTasks,
-      pagination: {
-        currentPage: page,
-        totalPages: Math.ceil(totalTasks / limit),
-        totalTasks,
-        hasNextPage: page * limit < totalTasks,
-        hasPreviousPage: page > 1,
-      },
     });
 
   } catch (error) {

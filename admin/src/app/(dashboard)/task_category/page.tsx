@@ -81,7 +81,7 @@ export default function TaskCategoryTable() {
     const [searchTerm, setSearchTerm] = useState("")
     // Removed unused sortBy and sortByDate state
     const [currentPage, setCurrentPage] = useState(1)
-    const [itemsPerPage, setItemsPerPage] = useState(5)
+    const [itemsPerPage, setItemsPerPage] = useState(15)
     const [categoryToDelete, setCategoryToDelete] = useState<TaskCategory | null>(null)
     const [loading, setLoading] = useState(true)
     const [activeTab, setActiveTab] = useState("approved")

@@ -61,7 +61,7 @@ export default function TasksTable() {
   const [selectedPriority, setSelectedPriority] = useState("All Priorities")
   const [selectedStatus, setSelectedStatus] = useState("All Status")
   const [currentPage, setCurrentPage] = useState(1)
-  const [itemsPerPage, setItemsPerPage] = useState(5)
+  const [itemsPerPage, setItemsPerPage] = useState(15)
   const [taskToDelete, setTaskToDelete] = useState<Task | null>(null)
 
   const router = useRouter();
@@ -114,19 +114,19 @@ export default function TasksTable() {
     })
   }
 
-  // Filter tasks based on search and filters
+  // Filter tasks based on search and filters only (backend already filters approved tasks)
   const filteredTasks = (tasks || []).filter((task) => {
     const matchesSearch =
       task.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (task.client && (task.client.clientType === 'individual' ? `${task.client.firstName} ${task.client.lastName}` : task.client.organizationName)?.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (task.assignedTo && task.assignedTo.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (task.description && task.description.toLowerCase().includes(searchTerm.toLowerCase()))
+      (task.description && task.description.toLowerCase().includes(searchTerm.toLowerCase()));
 
-    const matchesPriority = selectedPriority === "All Priorities" || task.priority.toLowerCase() === selectedPriority.toLowerCase()
-    const matchesStatus = selectedStatus === "All Status" || task.status === selectedStatus
+    const matchesPriority = selectedPriority === "All Priorities" || task.priority.toLowerCase() === selectedPriority.toLowerCase();
+    const matchesStatus = selectedStatus === "All Status" || task.status === selectedStatus;
 
-    return matchesSearch && matchesPriority && matchesStatus
-  })
+    return matchesSearch && matchesPriority && matchesStatus;
+  });
 
   // Apply sorting to filtered tasks
   const sortedTasks = filteredTasks
@@ -390,6 +390,14 @@ export default function TasksTable() {
                             <TableCell>
                               <div className="space-y-1">
                                 <div className="font-medium">{task.title}</div>
+                                {/* Show approved category only */}
+                                {task.category && task.category.status === 'approved' && (
+                                  <div className="text-xs mt-1">
+                                    <span className="inline-block px-2 py-1 rounded bg-blue-100 text-blue-800 border border-blue-200">
+                                      {task.category.name}
+                                    </span>
+                                  </div>
+                                )}
                               </div>
                             </TableCell>
                             <TableCell>

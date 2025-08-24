@@ -68,7 +68,7 @@ export default function AdminsTable() {
     const [sortBy, setSortBy] = useState("a-z")
     const [sortByDate, setSortByDate] = useState("newest")
     const [currentPage, setCurrentPage] = useState(1)
-    const [itemsPerPage, setItemsPerPage] = useState(15)
+    const [itemsPerPage, setItemsPerPage] = useState(20)
     const [adminToDelete, setAdminToDelete] = useState<Admin | null>(null)
     const [loading, setLoading] = useState(true)
     const [currentUserRole, setCurrentUserRole] = useState<string>("")

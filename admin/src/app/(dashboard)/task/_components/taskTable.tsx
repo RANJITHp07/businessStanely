@@ -62,7 +62,7 @@ export default function TasksTable() {
   const [selectedPriority, setSelectedPriority] = useState("All Priorities")
   const [selectedStatus, setSelectedStatus] = useState("All Status")
   const [currentPage, setCurrentPage] = useState(1)
-  const [itemsPerPage, setItemsPerPage] = useState(15)
+  const [itemsPerPage, setItemsPerPage] = useState(20)
   const [taskToDelete, setTaskToDelete] = useState<Task | null>(null)
 
   const router = useRouter();

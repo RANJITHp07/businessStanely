@@ -7,6 +7,7 @@ export interface JWTPayload {
   userId: string;
   username: string;
   email: string;
+  sessionToken?: string;
 }
 
 // Admin user interface
@@ -31,11 +32,30 @@ export async function verifyAuth(req: NextRequest): Promise<JWTPayload | null> {
       return null;
     }
 
-    // Verify JWT token
-    const decoded = jwt.verify(
-      token,
-      process.env.JWT_SECRET || "fallback-secret"
-    ) as JWTPayload;
+    // Verify JWT token (will throw if expired or invalid)
+    let decoded: JWTPayload;
+    try {
+      decoded = jwt.verify(
+        token,
+        process.env.JWT_SECRET || "fallback-secret"
+      ) as JWTPayload;
+    } catch (err) {
+      // Explicitly log and return null for expired/invalid tokens
+      console.error("JWT verification failed (expired or invalid):", err);
+      return null;
+    }
+
+    // Single-session enforcement: check sessionToken in DB
+    if (decoded.userId && decoded.sessionToken) {
+      const user = await prisma.user.findUnique({
+        where: { id: decoded.userId },
+        select: { currentSessionToken: true },
+      });
+      if (!user || user.currentSessionToken !== decoded.sessionToken) {
+        console.error("Session token mismatch or missing in DB. Forcing logout.");
+        return null;
+      }
+    }
 
     return decoded;
   } catch (error) {

@@ -1,7 +1,31 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import jwt from "jsonwebtoken";
+import prisma from "@/lib/prisma";
 
-export async function POST() {
+export async function POST(req: NextRequest) {
   try {
+    // Get token from cookies
+    const token = req.cookies.get("agent-auth-token")?.value;
+    let agentId: string | null = null;
+    if (token && process.env.JWT_SECRET) {
+      try {
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        if (typeof decoded === "object" && decoded && "agentId" in decoded) {
+          agentId = decoded.agentId as string;
+        }
+      } catch {
+        // Ignore invalid/expired token
+      }
+    }
+
+    // Clear currentSessionToken in DB if agentId is found
+    if (agentId) {
+      await prisma.agent.update({
+        where: { id: agentId },
+        data: { currentSessionToken: null },
+      });
+    }
+
     // Create response
     const response = NextResponse.json({
       message: "Logged out successfully",

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import prisma from "@/lib/prisma";
+import crypto from "crypto";
 
 // Create a separate rate limiter for login attempts (more strict)
 class LoginRateLimiter {
@@ -98,9 +99,7 @@ export async function POST(req: NextRequest) {
 
     // Find user by email
     const user = await prisma.user.findUnique({
-      where: {
-        email
-      },
+      where: { email },
     });
 
     if (!user) {
@@ -110,6 +109,16 @@ export async function POST(req: NextRequest) {
             "Incorrect email or password. Please check your credentials and try again.",
         },
         { status: 401 }
+      );
+    }
+
+    // Enforce single-session: block login if user is already logged in elsewhere
+    if (user.currentSessionToken) {
+      return NextResponse.json(
+        {
+          error: "User is already logged in elsewhere. Please log out from other devices first.",
+        },
+        { status: 403 }
       );
     }
 
@@ -137,12 +146,20 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Generate JWT token
+    // Generate a new session token and store in DB
+    const sessionToken = crypto.randomUUID();
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { currentSessionToken: sessionToken },
+    });
+
+    // Generate JWT token with sessionToken
     const token = jwt.sign(
       {
         userId: user.id,
         username: user.username,
         email: user.email,
+        sessionToken,
       },
       process.env.JWT_SECRET,
       { expiresIn: "24h" }

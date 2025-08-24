@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
+import { fetchWithAuth } from "@/lib/fetchWithAuth";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 import {
@@ -95,7 +96,7 @@ export default function AgentsTable() {
   useEffect(() => {
     const fetchAgents = async () => {
       try {
-        const response = await fetch("/api/agents");
+  const response = await fetchWithAuth("/api/agents");
         if (response.ok) {
           const data = await response.json();
           setAgents(data);
@@ -167,7 +168,7 @@ export default function AgentsTable() {
     if (!agentToDelete) return;
 
     try {
-      const response = await fetch(`/api/agents/${agentToDelete.id}`, {
+      const response = await fetchWithAuth(`/api/agents/${agentToDelete.id}`, {
         method: "DELETE",
       });
 

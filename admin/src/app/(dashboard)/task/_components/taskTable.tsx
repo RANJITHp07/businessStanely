@@ -1,5 +1,6 @@
 "use client"
 import { useState } from "react"
+import { fetchWithAuth } from "@/lib/fetchWithAuth"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -69,7 +70,7 @@ export default function TasksTable() {
   useEffect(() => {
     const fetchTasks = async () => {
       try {
-        const response = await fetch('/api/tasks');
+  const response = await fetchWithAuth('/api/tasks');
         if (response.ok) {
           const data = await response.json();
           setTasks(data);
@@ -92,7 +93,7 @@ export default function TasksTable() {
     if (!taskToDelete) return
 
     try {
-      const response = await fetch(`/api/tasks/${taskToDelete.id}`, {
+      const response = await fetchWithAuth(`/api/tasks/${taskToDelete.id}`, {
         method: 'DELETE',
       });
 

@@ -6,6 +6,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 import Navigator from "@/components/navigator";
 import { ToastContainer } from "react-toastify";
 import { AuthGuard } from "@/components/AuthGuard";
+import AuthSessionTimeout from "@/components/AuthSessionTimeout";
 
 export default function RootLayout({
   children,
@@ -14,6 +15,7 @@ export default function RootLayout({
 }>) {
   return (
     <AuthGuard>
+      <AuthSessionTimeout />
       <div className={`overflow-auto flex w-full`}>
         <SidebarProvider>
           <AppSidebar />

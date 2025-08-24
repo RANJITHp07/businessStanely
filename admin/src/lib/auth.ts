@@ -31,11 +31,18 @@ export async function verifyAuth(req: NextRequest): Promise<JWTPayload | null> {
       return null;
     }
 
-    // Verify JWT token
-    const decoded = jwt.verify(
-      token,
-      process.env.JWT_SECRET || "fallback-secret"
-    ) as JWTPayload;
+    // Verify JWT token (will throw if expired or invalid)
+    let decoded: JWTPayload;
+    try {
+      decoded = jwt.verify(
+        token,
+        process.env.JWT_SECRET || "fallback-secret"
+      ) as JWTPayload;
+    } catch (err) {
+      // Explicitly log and return null for expired/invalid tokens
+      console.error("JWT verification failed (expired or invalid):", err);
+      return null;
+    }
 
     return decoded;
   } catch (error) {

@@ -98,9 +98,7 @@ export async function POST(req: NextRequest) {
 
     // Find agent by email
     const agent = await prisma.agent.findUnique({
-      where: {
-        email,
-      },
+      where: { email },
     });
 
     if (!agent) {
@@ -110,6 +108,16 @@ export async function POST(req: NextRequest) {
             "Incorrect email or password. Please check your credentials and try again.",
         },
         { status: 401 }
+      );
+    }
+
+    // Enforce single-session: block login if agent is already logged in elsewhere
+    if (agent.currentSessionToken) {
+      return NextResponse.json(
+        {
+          error: "Agent is already logged in elsewhere. Please log out from other devices first.",
+        },
+        { status: 403 }
       );
     }
 
@@ -138,10 +146,12 @@ export async function POST(req: NextRequest) {
     // Reset rate limiter on successful login
     loginRateLimiter.reset(identifier);
 
-    // Update last login
+    // Generate a new session token and store in DB
+    const crypto = await import('crypto');
+    const sessionToken = crypto.randomUUID();
     await prisma.agent.update({
       where: { id: agent.id },
-      data: { lastLogin: new Date() },
+      data: { currentSessionToken: sessionToken, lastLogin: new Date() },
     });
 
     // Check if JWT_SECRET is set
@@ -153,13 +163,14 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Generate JWT token with 8 hour expiry
+    // Generate JWT token with sessionToken and 8 hour expiry
     const token = jwt.sign(
       {
         agentId: agent.id,
         name: agent.name,
         email: agent.email,
         agentType: agent.agentType,
+        sessionToken,
       },
       process.env.JWT_SECRET,
       { expiresIn: "8h" }

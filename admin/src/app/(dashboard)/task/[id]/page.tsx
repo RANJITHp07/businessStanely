@@ -526,7 +526,7 @@ export default function TaskDetails() {
                     htmlFor="check-status"
                     className="text-sm font-medium cursor-pointer"
                   >
-                    Status Check Completed
+                    Status Check
                   </label>
                 </div>
                 <div className="text-xs text-muted-foreground md:ml-auto">
@@ -763,7 +763,7 @@ export default function TaskDetails() {
                           ) : (
                             <Clock className="h-3 w-3 text-gray-400" />
                           )}
-                          Status Check Completed
+                          Status Check
                         </span>
                         <span
                           className={`font-medium ${

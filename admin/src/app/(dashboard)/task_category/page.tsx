@@ -182,7 +182,7 @@ export default function TaskCategoryTable() {
     })
 
     // Apply sorting to filtered categories
-    const sortedCategories = sortCategories(filteredCategories)
+    const sortedCategories = filteredCategories
 
     const resetFilters = () => {
         setSearchTerm("")

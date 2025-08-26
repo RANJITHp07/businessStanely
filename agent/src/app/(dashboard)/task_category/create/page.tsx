@@ -1,4 +1,5 @@
 'use client'
+import { fetchWithAuth } from "@/lib/fetchWithAuth";
 import React, { useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -43,7 +44,7 @@ function Create({ admin, initialData }: CreateProps) {
             const isEditing = !!admin?.id
 
             // Call API to create/update category
-            const response = await fetch(
+            const response = await fetchWithAuth(
                 isEditing ? `/api/task-categories/${admin.id}` : '/api/task-categories', 
                 {
                     method: isEditing ? 'PUT' : 'POST',

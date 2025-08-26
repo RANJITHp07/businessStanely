@@ -1,5 +1,6 @@
 "use client";
 
+import { fetchWithAuth } from "@/lib/fetchWithAuth";
 import type React from "react";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
@@ -79,7 +80,7 @@ export default function AgentSettingsPage() {
 
   const fetchAgentProfile = async () => {
     try {
-      const response = await fetch("/api/auth/me");
+  const response = await fetchWithAuth("/api/auth/me");
       
       if (response.ok) {
         const data = await response.json();
@@ -113,7 +114,7 @@ export default function AgentSettingsPage() {
         return;
       }
 
-      const response = await fetch("/api/auth/me", {
+  const response = await fetchWithAuth("/api/auth/me", {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -169,7 +170,7 @@ export default function AgentSettingsPage() {
         return;
       }
 
-      const response = await fetch("/api/agent/change-password", {
+  const response = await fetchWithAuth("/api/agent/change-password", {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",

@@ -1,4 +1,5 @@
 "use client"
+import { fetchWithAuth } from "@/lib/fetchWithAuth";
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -77,7 +78,7 @@ export default function ClientsTable() {
     useEffect(() => {
         const fetchClients = async () => {
             try {
-                const response = await fetch('/api/clients');
+                const response = await fetchWithAuth('/api/clients');
                 if (response.ok) {
                     const data = await response.json();
                     setClients(data);
@@ -162,7 +163,7 @@ export default function ClientsTable() {
         if (!clientToDelete) return
 
         try {
-            const response = await fetch(`/api/clients/${clientToDelete.id}`, {
+            const response = await fetchWithAuth(`/api/clients/${clientToDelete.id}`, {
                 method: 'DELETE',
             });
 

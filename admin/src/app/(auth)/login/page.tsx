@@ -30,6 +30,8 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [forceLoginLoading, setForceLoginLoading] = useState(false);
+  const [showForceLogin, setShowForceLogin] = useState(false);
   const [fieldErrors, setFieldErrors] = useState({
     email: "",
     password: "",
@@ -41,9 +43,10 @@ export default function LoginPage() {
     }
   };
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent, force = false) => {
     e.preventDefault();
     setFieldErrors({ email: "", password: "" });
+    setShowForceLogin(false);
 
     if (!password || !email) {
       const errorMessage = "Please fill in all required fields";
@@ -51,7 +54,8 @@ export default function LoginPage() {
       return;
     }
 
-    setIsLoading(true);
+    if (force) setForceLoginLoading(true);
+    else setIsLoading(true);
 
     try {
       const response = await fetch("/api/auth/login", {
@@ -62,12 +66,17 @@ export default function LoginPage() {
         body: JSON.stringify({
           email: email.trim() || undefined,
           password,
+          force,
         }),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
+        if (data.error === "already_logged_in") {
+          setShowForceLogin(true);
+          throw new Error(data.message || "User is already logged in elsewhere.");
+        }
         const errorMessage = data.error || "Login failed. Please try again.";
         setFieldErrors({
           email: "Please check your credentials",
@@ -89,6 +98,7 @@ export default function LoginPage() {
       toast(errorMessage);
     } finally {
       setIsLoading(false);
+      setForceLoginLoading(false);
     }
   };
 
@@ -108,7 +118,7 @@ export default function LoginPage() {
             Enter your credentials to access your account
           </CardDescription>
         </CardHeader>
-        <form onSubmit={handleLogin}>
+        <form onSubmit={(e) => handleLogin(e)}>
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
@@ -193,6 +203,17 @@ export default function LoginPage() {
                 </span>
               )}
             </Button>
+            {showForceLogin && (
+              <Button
+                type="button"
+                className="w-full mt-2"
+                variant="destructive"
+                disabled={forceLoginLoading}
+                onClick={(e) => handleLogin(e, true)}
+              >
+                {forceLoginLoading ? "Forcing login..." : "Force Login (Logout other session)"}
+              </Button>
+            )}
             <div className="text-center space-y-2">
               <Link
                 href="/forgot-password"

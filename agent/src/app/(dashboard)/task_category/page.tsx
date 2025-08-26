@@ -1,5 +1,6 @@
 "use client"
 
+import { fetchWithAuth } from "@/lib/fetchWithAuth";
 import { useState, useEffect } from "react"
 import Link from "next/link"
 import { toast } from "react-toastify"
@@ -113,7 +114,7 @@ export default function TaskCategoryTable() {
     useEffect(() => {
         const fetchAllCategories = async () => {
             try {
-                const response = await fetch(`/api/task-categories`);
+                const response = await fetchWithAuth(`/api/task-categories`);
 
                 if (!response.ok) {
                     throw new Error('Failed to fetch all categories');
@@ -135,7 +136,7 @@ export default function TaskCategoryTable() {
                 setLoading(true);
                 // Fetch categories from API based on active tab
                 const status = activeTab === 'approved' ? 'approved' : 'pending';
-                const response = await fetch(`/api/task-categories?status=${status}`);
+                const response = await fetchWithAuth(`/api/task-categories?status=${status}`);
 
                 if (!response.ok) {
                     throw new Error('Failed to fetch categories');
@@ -206,7 +207,7 @@ export default function TaskCategoryTable() {
         if (!categoryToDelete) return
         try {
             // Call API to delete category
-            const response = await fetch(`/api/task-categories/${categoryToDelete.id}`, {
+            const response = await fetchWithAuth(`/api/task-categories/${categoryToDelete.id}`, {
                 method: 'DELETE',
             })
 

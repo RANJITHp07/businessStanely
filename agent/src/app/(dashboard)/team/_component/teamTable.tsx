@@ -1,5 +1,6 @@
 "use client";
 import { useState, useEffect } from "react";
+import { fetchWithAuth } from "@/lib/fetchWithAuth";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 import {
@@ -72,7 +73,7 @@ export default function TeamsTable() {
   useEffect(() => {
     const fetchTeams = async () => {
       try {
-        const response = await fetch("/api/team-members");
+  const response = await fetchWithAuth("/api/team-members");
         if (response.ok) {
           const data = await response.json();
           setTeams(data);

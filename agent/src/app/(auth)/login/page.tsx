@@ -22,25 +22,47 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [forceLoginLoading, setForceLoginLoading] = useState(false);
   const [error, setError] = useState("");
+  const [showForceLogin, setShowForceLogin] = useState(false);
 
   const { login } = useAuth();
   const router = useRouter();
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent, force = false) => {
     e.preventDefault();
-    setIsLoading(true);
     setError("");
+    setShowForceLogin(false);
+    if (force) setForceLoginLoading(true);
+    else setIsLoading(true);
 
-    const result = await login(email, password);
-
-    if (result.success) {
+    // Custom login logic to support force login
+    try {
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password, force }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        if (data.error === "already_logged_in") {
+          setShowForceLogin(true);
+          setError(data.message || "User is already logged in elsewhere.");
+          return;
+        }
+        setError(data.error || "Login failed");
+        return;
+      }
+      // Store authentication data
+      localStorage.setItem("agent", JSON.stringify(data.agent));
+      localStorage.setItem("token", data.token);
       router.push("/dashboard");
-    } else {
-      setError(result.error || "Login failed");
+    } catch (err) {
+      setError("Login failed. Please try again.");
+    } finally {
+      setIsLoading(false);
+      setForceLoginLoading(false);
     }
-
-    setIsLoading(false);
   };
 
   return (
@@ -55,12 +77,23 @@ export default function LoginPage() {
             Enter your credentials to access your agent account
           </CardDescription>
         </CardHeader>
-        <form onSubmit={handleSubmit}>
+  <form onSubmit={(e) => handleLogin(e)}>
           <CardContent className="space-y-4">
             {error && (
               <div className="p-3 text-sm text-red-500 bg-red-50 rounded-md">
                 {error}
               </div>
+            )}
+            {showForceLogin && (
+              <Button
+                type="button"
+                className="w-full mt-2"
+                variant="destructive"
+                disabled={forceLoginLoading}
+                onClick={(e) => handleLogin(e, true)}
+              >
+                {forceLoginLoading ? "Forcing login..." : "Force Login (Logout other session)"}
+              </Button>
             )}
             <div className="space-y-2">
               <Label className="text-black" htmlFor="email">Email</Label>

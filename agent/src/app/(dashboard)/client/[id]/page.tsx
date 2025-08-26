@@ -1,4 +1,5 @@
 "use client"
+import { fetchWithAuth } from "@/lib/fetchWithAuth";
 
 import { useState, useEffect } from 'react';
 import { notFound, useParams } from 'next/navigation';
@@ -22,7 +23,7 @@ export default function ClientDetailsPage() {
         if (!id) return;
         const fetchClient = async () => {
             try {
-                const response = await fetch(`/api/clients/${id}`);
+                const response = await fetchWithAuth(`/api/clients/${id}`);
                 if (response.ok) {
                     const data = await response.json();
                     setClient(data);

@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import { fetchWithAuth } from "@/lib/fetchWithAuth";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -78,7 +79,7 @@ export default function TasksTable() {
   const handleDelete = async () => {
     if (!taskToDelete) return;
     try {
-      const response = await fetch(`/api/tasks/${taskToDelete.id}`, {
+      const response = await fetchWithAuth(`/api/tasks/${taskToDelete.id}`, {
         method: "DELETE",
       });
       if (response.ok) {
@@ -95,7 +96,7 @@ export default function TasksTable() {
   useEffect(() => {
     const fetchTasks = async () => {
       try {
-        const response = await fetch("/api/tasks");
+        const response = await fetchWithAuth("/api/tasks");
         if (response.ok) {
           const data = await response.json();
           setTasks(data.tasks || data); // Handle both formats

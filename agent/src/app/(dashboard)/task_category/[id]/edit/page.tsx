@@ -1,5 +1,6 @@
 'use client'
 
+import { fetchWithAuth } from "@/lib/fetchWithAuth";
 import React, { useEffect, useState, use } from 'react'
 import { toast } from "react-toastify"
 import { useRouter } from "next/navigation"
@@ -25,7 +26,7 @@ export default function EditCategory({ params }: { params: Promise<{ id: string 
     useEffect(() => {
         const fetchCategory = async () => {
             try {
-                const response = await fetch(`/api/task-categories/${resolvedParams.id}`)
+                const response = await fetchWithAuth(`/api/task-categories/${resolvedParams.id}`)
                 if (!response.ok) {
                     throw new Error('Category not found')
                 }

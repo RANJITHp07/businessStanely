@@ -1,5 +1,6 @@
 "use client"
 
+import { fetchWithAuth } from "@/lib/fetchWithAuth";
 import { useState, useEffect } from "react"
 import { use } from "react"
 import { toast } from "react-toastify"
@@ -121,7 +122,7 @@ export default function CategoryDetail({ params }: { params: Promise<{ id: strin
             try {
                 // Fetch category from API
                 const categoryId = resolvedParams.id
-                const categoryResponse = await fetch(`/api/task-categories/${categoryId}`)
+                const categoryResponse = await fetchWithAuth(`/api/task-categories/${categoryId}`)
 
                 if (!categoryResponse.ok) {
                     throw new Error('Failed to fetch category')
@@ -131,7 +132,7 @@ export default function CategoryDetail({ params }: { params: Promise<{ id: strin
                 setCategory(categoryData)
 
                 // Fetch tasks associated with this category
-                const tasksResponse = await fetch(`/api/tasks?categoryId=${categoryId}`)
+                const tasksResponse = await fetchWithAuth(`/api/tasks?categoryId=${categoryId}`)
 
                 if (tasksResponse.ok) {
                     const tasksData = await tasksResponse.json();

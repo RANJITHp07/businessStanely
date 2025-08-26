@@ -2,26 +2,32 @@ import { NextRequest } from "next/server";
 import jwt from "jsonwebtoken";
 import prisma from "./prisma";
 
-export interface AgentPayload {
+
+export interface AgentJWTPayload {
   agentId: string;
   name: string;
   email: string;
   agentType: string;
+  sessionToken?: string;
 }
 
 export async function getCurrentAgent(req: NextRequest) {
   try {
     // Get token from cookie
     const token = req.cookies.get("agent-auth-token")?.value;
-    
     if (!token) {
       return null;
     }
 
     // Verify token
-    const payload = jwt.verify(token, process.env.JWT_SECRET!) as AgentPayload;
-    
-    // Get agent from database
+    let payload: AgentJWTPayload;
+    try {
+      payload = jwt.verify(token, process.env.JWT_SECRET!) as AgentJWTPayload;
+    } catch (err) {
+      return null;
+    }
+
+    // Get agent from database (include currentSessionToken)
     const agent = await prisma.agent.findUnique({
       where: { id: payload.agentId },
       select: {
@@ -34,14 +40,19 @@ export async function getCurrentAgent(req: NextRequest) {
         jurisdiction: true,
         specializations: true,
         photo: true,
+        currentSessionToken: true,
       },
     });
 
-    if (!agent || agent.status !== "active") {
+    // Single-session enforcement: check sessionToken in DB
+    if (!agent || agent.status !== "active" || !payload.sessionToken || agent.currentSessionToken !== payload.sessionToken) {
       return null;
     }
 
-    return agent;
+  // Remove currentSessionToken from returned object (ignore unused var warning)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { currentSessionToken, ...agentData } = agent;
+  return agentData;
   } catch (error) {
     console.error("Error getting current agent:", error);
     return null;

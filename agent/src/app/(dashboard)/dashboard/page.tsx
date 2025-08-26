@@ -1,5 +1,6 @@
 "use client";
 
+import { fetchWithAuth } from "@/lib/fetchWithAuth";
 import { useState, useEffect } from "react";
 import {
   Card,
@@ -139,7 +140,7 @@ export default function Dashboard() {
   useEffect(() => {
     const fetchDashboardStats = async () => {
       try {
-        const response = await fetch("/api/dashboard");
+  const response = await fetchWithAuth("/api/dashboard");
         if (response.ok) {
           const data = await response.json();
           setDashboardStats(data);

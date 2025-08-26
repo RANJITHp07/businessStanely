@@ -68,8 +68,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const body = await req.json();
-    const { email, password } = body;
+  const body = await req.json();
+  const { email, password, force } = body;
 
     // Basic validation - just check if credentials are provided
     if (!password || !email) {
@@ -114,11 +114,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Enforce single-session: block login if user is already logged in elsewhere
-    if (user.currentSessionToken) {
+    // Enforce single-session: block login if user is already logged in elsewhere, unless force is true
+    if (user.currentSessionToken && !force) {
       return NextResponse.json(
         {
-          error: "User is already logged in elsewhere. Please log out from other devices first.",
+          error: "already_logged_in",
+          message: "User is already logged in elsewhere. Please log out from other devices first.",
         },
         { status: 403 }
       );

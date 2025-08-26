@@ -1,6 +1,7 @@
 "use client"
 
 import type React from "react"
+import { fetchWithAuth } from "@/lib/fetchWithAuth";
 
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
@@ -99,7 +100,7 @@ export default function ClientForm({ client }: ClientFormProps) {
         const method = client ? "PUT" : "POST";
 
         try {
-            const response = await fetch(url, {
+            const response = await fetchWithAuth(url, {
                 method: method,
                 headers: {
                     "Content-Type": "application/json",

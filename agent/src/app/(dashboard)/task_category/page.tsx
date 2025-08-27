@@ -174,12 +174,12 @@ export default function TaskCategoryTable() {
         const matchesSearch =
             category.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
             category.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            category.createdBy.toLowerCase().includes(searchTerm.toLowerCase())
+            (category.createdBy?.toLowerCase() || "").includes(searchTerm.toLowerCase());
 
-        const matchesTab = category.status === activeTab
+        const matchesTab = category.status === activeTab;
 
-        return matchesSearch && matchesTab
-    })
+        return matchesSearch && matchesTab;
+    });
 
     // Apply sorting to filtered categories
     const sortedCategories = filteredCategories

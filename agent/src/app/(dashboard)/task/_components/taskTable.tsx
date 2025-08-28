@@ -396,7 +396,7 @@ export default function TasksTable() {
                         <TableRow>
                           <TableHead>Task</TableHead>
                           <TableHead>Client</TableHead>
-                          <TableHead>Assigned To</TableHead>
+                          <TableHead>Ownership to</TableHead>
                           <TableHead>Priority</TableHead>
                           <TableHead>Due Date</TableHead>
                           <TableHead>Progress</TableHead>

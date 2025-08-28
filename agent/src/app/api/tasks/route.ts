@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
 
 
     // If categoryId is present, return all tasks for that category (regardless of assignment)
-    // Otherwise, only show tasks assigned to this agent
+    // Otherwise, only show tasks Ownership to this agent
     let where: Prisma.TaskWhereInput;
     if (categoryId) {
       where = { categoryId };

@@ -538,7 +538,7 @@ export default function AgentDetails() {
             <CardHeader>
               <CardTitle>Assigned Tasks</CardTitle>
               <CardDescription>
-                All tasks currently assigned to {agent.name}
+                All tasks currently Ownership to {agent.name}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -549,7 +549,7 @@ export default function AgentDetails() {
               ) : agentTasks.length === 0 ? (
                 <div className="text-center py-8">
                   <p className="text-muted-foreground">
-                    No tasks assigned to this agent.
+                    No tasks Ownership to this agent.
                   </p>
                 </div>
               ) : (

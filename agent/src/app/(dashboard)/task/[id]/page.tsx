@@ -743,7 +743,7 @@ export default function TaskDetails() {
                 <div className="flex items-center gap-2 text-sm">
                   <User className="h-4 w-4 text-gray-500" />
                   <span className="text-gray-600">
-                    Assigned to {task.assignedTo?.name || "Unassigned"}
+                    Ownership to {task.assignedTo?.name || "Unassigned"}
                   </span>
                 </div>
                 <div className="flex items-center gap-2 text-sm">
@@ -871,7 +871,7 @@ export default function TaskDetails() {
                   </div>
                   {/* Assignment */}
                   <div className="space-y-2">
-                    <Label>Assigned To</Label>
+                    <Label>Ownership to</Label>
                     <div className="flex items-center gap-3">
                       <span className="font-medium">
                         {task.assignedTo?.name || "Unassigned"}

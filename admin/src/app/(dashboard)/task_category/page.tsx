@@ -749,7 +749,7 @@ export default function TaskCategoryTable() {
                         <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                         <AlertDialogDescription>
                             This action cannot be undone. This will permanently delete the task category and may affect existing tasks
-                            assigned to this category.
+                            Ownership to this category.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>

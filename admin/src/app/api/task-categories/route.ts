@@ -37,6 +37,14 @@ export async function GET(req: NextRequest) {
           select: {
             id: true,
             username: true,
+            email: true,
+            adminType: true,
+          }
+        },
+        createdByAgent: {
+          select: {
+            id: true,
+            name: true,
             email: true
           }
         },
@@ -63,7 +71,19 @@ export async function GET(req: NextRequest) {
           categoryId: category.id
         }
       });
-      
+      // Determine creator name and type
+      let creatorName = null;
+      let creatorType = null;
+      let creatorRole = null;
+      if (category.createdByUser) {
+        creatorName = category.createdByUser.username;
+        creatorType = "user";
+        creatorRole = category.createdByUser.adminType; // "owner" or "admin"
+      } else if (category.createdByAgent) {
+        creatorName = category.createdByAgent.name;
+        creatorType = "agent";
+        creatorRole = null;
+      }
       return {
         id: category.id,
         name: category.name,
@@ -72,8 +92,10 @@ export async function GET(req: NextRequest) {
         status: category.status,
         createdAt: category.createdAt.toISOString(),
         updatedAt: category.updatedAt.toISOString(),
-        createdBy: category.createdByUser?.username || null,
-        createdById: category.createdByUserId,
+        createdBy: creatorName,
+        createdByType: creatorType,
+        createdByRole: creatorRole,
+        createdById: category.createdByUserId || category.createdByAgentId,
         approvedById: category.approvedById || null,
         approvedBy: category.approvedBy?.username || null,
         approvedAt: category.approvedAt?.toISOString() || null,

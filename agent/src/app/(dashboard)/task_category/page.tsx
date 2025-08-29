@@ -53,27 +53,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { useRouter } from "next/navigation"
 
-// Define the TaskCategory interface
-interface TaskCategory {
-    id: string
-    name: string
-    description: string
-    color: string
-    status: "approved" | "pending"
-    taskCount: number
-    createdAt: string
-    updatedAt: string
-    createdBy: string
-    createdById: string
-    approvedBy?: string | null
-    approvedById?: string | null
-    approvedAt?: string | null
-    rejectedBy?: string | null
-    rejectedById?: string | null
-    rejectedAt?: string | null
-    rejectionReason?: string | null
-    photo?: string
-}
+import { TaskCategory } from "@/types";
 
 // We'll use the API data instead of mock data
 
@@ -173,7 +153,7 @@ export default function TaskCategoryTable() {
     const filteredCategories = categories.filter((category) => {
         const matchesSearch =
             category.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            category.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (category.description?.toLowerCase() || "").includes(searchTerm.toLowerCase()) ||
             (category.createdBy?.toLowerCase() || "").includes(searchTerm.toLowerCase());
 
         const matchesTab = category.status === activeTab;
@@ -409,8 +389,8 @@ export default function TaskCategoryTable() {
                                                             </TableCell>
                                                             <TableCell>
                                                                 <div className="max-w-xs">
-                                                                    <p className="text-sm truncate" title={category.description}>
-                                                                        {category.description}
+                                                                    <p className="text-sm truncate" title={category.description || ""}>
+                                                                        {category.description || ""}
                                                                     </p>
                                                                 </div>
                                                             </TableCell>
@@ -418,7 +398,18 @@ export default function TaskCategoryTable() {
                                                                 <Badge variant="outline">{category.taskCount} tasks</Badge>
                                                             </TableCell>
                                                             <TableCell>
-                                                                <div className="text-sm">{category.createdBy}</div>
+                                                                <div className="text-sm">
+                                                                    {category.createdBy || "Unknown"}
+                                                                    {category.createdByType === "agent" && (
+                                                                        <span className="ml-1 text-xs text-blue-600">(Agent)</span>
+                                                                    )}
+                                                                    {category.createdByType === "user" && category.createdByRole === "owner" && (
+                                                                        <span className="ml-1 text-xs text-purple-600">(Owner)</span>
+                                                                    )}
+                                                                    {category.createdByType === "user" && category.createdByRole === "admin" && (
+                                                                        <span className="ml-1 text-xs text-green-600">(Admin)</span>
+                                                                    )}
+                                                                </div>
                                                             </TableCell>
                                                             <TableCell className="text-right">
                                                                 <DropdownMenu>
@@ -630,7 +621,18 @@ export default function TaskCategoryTable() {
                                                             </TableCell>
                                                             <TableCell>{getStatusBadge(category.status)}</TableCell>
                                                             <TableCell>
-                                                                <div className="text-sm">{category.createdBy}</div>
+                                                                <div className="text-sm">
+                                                                    {category.createdBy || "Unknown"}
+                                                                    {category.createdByType === "agent" && (
+                                                                        <span className="ml-1 text-xs text-blue-600">(Agent)</span>
+                                                                    )}
+                                                                    {category.createdByType === "user" && category.createdByRole === "owner" && (
+                                                                        <span className="ml-1 text-xs text-purple-600">(Owner)</span>
+                                                                    )}
+                                                                    {category.createdByType === "user" && category.createdByRole === "admin" && (
+                                                                        <span className="ml-1 text-xs text-green-600">(Admin)</span>
+                                                                    )}
+                                                                </div>
                                                             </TableCell>
                                                             <TableCell className="text-right">
                                                                 <DropdownMenu>

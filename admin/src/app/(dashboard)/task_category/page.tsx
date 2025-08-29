@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import { fetchWithAuth } from "@/lib/fetchWithAuth"
 import Link from "next/link"
 import { toast } from "react-toastify"
+import { TaskCategory } from "@/types"
 import {
     ChevronLeft,
     ChevronRight,
@@ -53,29 +54,6 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { useRouter } from "next/navigation"
 
-// Define the TaskCategory interface
-interface TaskCategory {
-    id: string
-    name: string
-    description: string
-    color: string
-    status: "approved" | "pending"
-    taskCount: number
-    createdAt: string
-    updatedAt: string
-    createdBy: string
-    createdById: string
-    approvedBy?: string | null
-    approvedById?: string | null
-    approvedAt?: string | null
-    rejectedBy?: string | null
-    rejectedById?: string | null
-    rejectedAt?: string | null
-    rejectionReason?: string | null
-    photo?: string
-}
-
-// We'll use the API data instead of mock data
 
 export default function TaskCategoryTable() {
     const [categories, setCategories] = useState<TaskCategory[]>([])
@@ -158,22 +136,12 @@ export default function TaskCategoryTable() {
         fetchCategories();
     }, [activeTab])
 
-    // Sort function (default: a-z, newest)
-    const sortCategories = (categories: TaskCategory[]) => {
-        return [...categories].sort((a, b) => {
-            // Default: sort by name a-z
-            const nameCompare = a.name.localeCompare(b.name);
-            if (nameCompare !== 0) return nameCompare;
-            // Then by createdAt, newest first
-            return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-        });
-    }
 
     // Filter categories based on search and tab
     const filteredCategories = categories.filter((category) => {
         const matchesSearch =
             category.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            category.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (category.description?.toLowerCase() || "").includes(searchTerm.toLowerCase()) ||
             (category.createdBy?.toLowerCase() || "").includes(searchTerm.toLowerCase());
 
         const matchesTab = category.status === activeTab;
@@ -418,7 +386,18 @@ export default function TaskCategoryTable() {
                                                                 <Badge variant="outline">{category.taskCount} tasks</Badge>
                                                             </TableCell>
                                                             <TableCell>
-                                                                <div className="text-sm">{category.createdBy}</div>
+                                                                <div className="text-sm">
+                                                                    {category.createdBy || "Unknown"}
+                                                                    {category.createdByType === "agent" && (
+                                                                        <span className="ml-1 text-xs text-blue-600">(Agent)</span>
+                                                                    )}
+                                                                    {category.createdByType === "user" && category.createdByRole === "owner" && (
+                                                                        <span className="ml-1 text-xs text-purple-600">(Owner)</span>
+                                                                    )}
+                                                                    {category.createdByType === "user" && category.createdByRole === "admin" && (
+                                                                        <span className="ml-1 text-xs text-green-600">(Admin)</span>
+                                                                    )}
+                                                                </div>
                                                             </TableCell>
                                                             <TableCell className="text-right">
                                                                 <DropdownMenu>
@@ -598,7 +577,7 @@ export default function TaskCategoryTable() {
                                                     </TableRow>
                                                 ) : (
                                                     currentCategories.map((category) => (
-                                                        <TableRow key={category.id} className="cursor-pointer hover:bg-muted/50" onClick={() => router.push(`/task_category/${category.id}`)}>
+                                                        <TableRow key={category.id} className="cursor-pointer hover:bg-muted/50" onClick={() => router.push(`/task_category/approve/${category.id}`)}>
                                                             <TableCell>
                                                                 <div className="flex items-center space-x-3">
                                                                     <Avatar className="h-10 w-10">
@@ -630,7 +609,18 @@ export default function TaskCategoryTable() {
                                                             </TableCell>
                                                             <TableCell>{getStatusBadge(category.status)}</TableCell>
                                                             <TableCell>
-                                                                <div className="text-sm">{category.createdBy}</div>
+                                                                <div className="text-sm">
+                                                                    {category.createdBy || "Unknown"}
+                                                                    {category.createdByType === "agent" && (
+                                                                        <span className="ml-1 text-xs text-blue-600">(Agent)</span>
+                                                                    )}
+                                                                    {category.createdByType === "user" && category.createdByRole === "owner" && (
+                                                                        <span className="ml-1 text-xs text-purple-600">(Owner)</span>
+                                                                    )}
+                                                                    {category.createdByType === "user" && category.createdByRole === "admin" && (
+                                                                        <span className="ml-1 text-xs text-green-600">(Admin)</span>
+                                                                    )}
+                                                                </div>
                                                             </TableCell>
                                                             <TableCell className="text-right">
                                                                 <DropdownMenu>

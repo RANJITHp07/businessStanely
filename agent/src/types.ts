@@ -1,3 +1,26 @@
+export interface TaskCategory {
+  id: string;
+  name: string;
+  description?: string;
+  color: string;
+  status: "pending" | "approved";
+  createdAt: string;
+  updatedAt: string;
+  createdBy: string | null;
+  createdByType?: "user" | "agent" | null;
+  createdByRole?: "owner" | "admin" | null;
+  createdById: string | null;
+  approvedById?: string;
+  approvedBy?: string;
+  approvedAt?: string;
+  rejectedById?: string;
+  rejectedBy?: string;
+  rejectedAt?: string;
+  rejectionReason?: string;
+  taskCount?: number;
+  isOwner?: boolean;
+  photo?: string;
+}
 export interface Agent {
   id: string;
   name: string;

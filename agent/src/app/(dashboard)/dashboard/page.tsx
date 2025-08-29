@@ -126,7 +126,7 @@ const recentActivities = [
   {
     id: 4,
     type: "agent_assigned",
-    description: "Emily Davis assigned to new case",
+    description: "Emily Davis Ownership to new case",
     time: "8 hours ago",
     icon: Users,
     color: "text-purple-600",

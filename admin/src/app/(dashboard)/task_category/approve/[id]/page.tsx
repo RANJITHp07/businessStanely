@@ -463,7 +463,7 @@ export default function ApproveCategory({ params }: { params: Promise<{ id: stri
                                         <TableHeader>
                                             <TableRow>
                                                 <TableHead>Task</TableHead>
-                                                <TableHead>Assigned To</TableHead>
+                                                <TableHead>Ownership to</TableHead>
                                                 <TableHead>Priority</TableHead>
                                                 <TableHead>Due Date</TableHead>
                                                 <TableHead>Progress</TableHead>

@@ -1267,7 +1267,7 @@ const handleCreateCategory = async () => {
                   </Avatar>
                   <div>
                     <h4 className="font-medium text-green-900">
-                      Assigned to:{" "}
+                      Ownership to:{" "}
                       {agents.find((a) => a.id === formData.assignedToId)?.name}
                     </h4>
                     <p className="text-sm text-green-600">

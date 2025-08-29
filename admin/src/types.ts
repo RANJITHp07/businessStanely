@@ -87,8 +87,10 @@ export interface TaskCategory {
   status: "pending" | "approved";
   createdAt: string;
   updatedAt: string;
-  createdBy: string;
-  createdById: string;
+  createdBy: string | null;
+  createdByType?: "user" | "agent" | null;
+  createdByRole?: "owner" | "admin" | null;
+  createdById: string | null;
   approvedById?: string;
   approvedBy?: string;
   approvedAt?: string;
@@ -98,6 +100,7 @@ export interface TaskCategory {
   rejectionReason?: string;
   taskCount?: number;
   isOwner?: boolean;
+  photo?: string;
 }
 
 export interface Comment {

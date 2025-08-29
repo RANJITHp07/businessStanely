@@ -389,7 +389,7 @@ export default function CategoryDetail({ params }: { params: Promise<{ id: strin
                                         <TableHeader>
                                             <TableRow>
                                                 <TableHead>Task</TableHead>
-                                                <TableHead>Assigned To</TableHead>
+                                                <TableHead>Ownership to</TableHead>
                                                 <TableHead>Priority</TableHead>
                                                 <TableHead>Due Date</TableHead>
                                                 <TableHead>Progress</TableHead>

@@ -26,7 +26,7 @@ export async function GET(
       );
     }
 
-    // Find the category in database with creator information
+    // Find the category in database with creator information (user or agent)
     const category = await prisma.taskCategory.findUnique({
       where: { id },
       include: {
@@ -34,6 +34,15 @@ export async function GET(
           select: {
             id: true,
             username: true,
+            email: true,
+            adminType: true,
+            photo: true,
+          }
+        },
+        createdByAgent: {
+          select: {
+            id: true,
+            name: true,
             email: true,
             photo: true,
           }
@@ -64,19 +73,58 @@ export async function GET(
       );
     }
     
-    // Add isOwner flag to indicate if the current user can perform owner actions
-    const isOwner = currentAdmin.adminType === "owner";
-    
     // Count tasks associated with this category
-    // Note: We don't seem to have a direct relation between Task and TaskCategory in the schema
-    // Using a placeholder count for now - this should be updated with the correct relation field
-    const taskCount = 0; // We'll need to update this when the Task-Category relation is established
-    
+    const taskCount = await prisma.task.count({ where: { categoryId: id } });
+
+    // Determine creator name, type, and role
+    let creatorName = null;
+    let creatorType = null;
+    let creatorRole = null;
+    let creatorId = null;
+    if (category.createdByUser) {
+      creatorName = category.createdByUser.username;
+      creatorType = "user";
+      creatorRole = category.createdByUser.adminType; // "owner" or "admin"
+      creatorId = category.createdByUser.id;
+    } else if (category.createdByAgent) {
+      creatorName = category.createdByAgent.name;
+      creatorType = "agent";
+      creatorRole = null;
+      creatorId = category.createdByAgent.id;
+    }
+
+    // Use the creator's photo if available, fallback to null
+    let photo = null;
+    if (category.createdByUser && category.createdByUser.photo) {
+      photo = category.createdByUser.photo;
+    } else if (category.createdByAgent && category.createdByAgent.photo) {
+      photo = category.createdByAgent.photo;
+    } else {
+      photo = null;
+    }
+
     const formattedCategory = {
-      ...category,
-      taskCount,
-      createdByUser: category.createdByUser?.username || "Unknown",
-      isOwner  // Add flag to indicate if user has owner permissions
+      id: category.id,
+      name: category.name,
+      description: category.description || "",
+      color: category.color,
+      status: category.status,
+      createdAt: category.createdAt,
+      updatedAt: category.updatedAt,
+      createdBy: creatorName || "Unknown",
+      createdByType: creatorType,
+      createdByRole: creatorRole,
+      createdById: creatorId,
+      approvedById: category.approvedById || null,
+      approvedBy: category.approvedBy?.username || null,
+      approvedAt: category.approvedAt || null,
+      rejectedById: category.rejectedById || null,
+      rejectedBy: category.rejectedBy?.username || null,
+      rejectedAt: category.rejectedAt || null,
+      rejectionReason: category.rejectionReason || null,
+      taskCount: taskCount,
+      isOwner: currentAdmin.adminType === "owner",
+      photo,
     };
 
     return NextResponse.json(formattedCategory);

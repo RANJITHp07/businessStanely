@@ -59,6 +59,7 @@ export interface Client {
   authorizedPersonName: string | null;
   designation: string | null;
   contactEmail: string | null;
+  name?: string; // Added for API compatibility
 }
 
 export interface Task {

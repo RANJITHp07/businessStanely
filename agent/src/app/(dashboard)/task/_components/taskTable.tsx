@@ -20,7 +20,20 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Loader2, Plus, MoreHorizontal, Edit, Trash2, Eye, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, AlertCircle, Calendar } from "lucide-react";
+import {
+  Loader2,
+  Plus,
+  MoreHorizontal,
+  Edit,
+  Trash2,
+  Eye,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  AlertCircle,
+  Calendar,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import {
@@ -49,17 +62,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  FileText,
-  Search,
-  Filter,
-  ArrowUpDown,
-} from "lucide-react";
+import { FileText, Search, Filter, ArrowUpDown } from "lucide-react";
 import Link from "next/link";
 
 import { Task } from "@/types";
 import { useEffect } from "react";
-
 
 const priorities = ["All Priorities", "Low", "Medium", "High"];
 const statuses = ["All Status", "To Do", "In Progress", "Hold", "Completed"];
@@ -420,14 +427,17 @@ export default function TasksTable() {
                             <TableRow
                               key={task.id}
                               onClick={() => router.push(`/task/${task.id}`)}
-                              className={`cursor-pointer hover:bg-muted/50 ${isOverdue(task.dueDate, task.status)
-                                ? "bg-red-50"
-                                : ""
-                                }`}
+                              className={`cursor-pointer hover:bg-muted/50 ${
+                                isOverdue(task.dueDate, task.status)
+                                  ? "bg-red-50"
+                                  : ""
+                              }`}
                             >
                               <TableCell>
                                 <div className="space-y-1">
-                                  <div className="font-medium">{task.title}</div>
+                                  <div className="font-medium">
+                                    {task.title}
+                                  </div>
                                   {/* Show approved category only */}
                                   {task.category &&
                                     task.category.status === "approved" && (
@@ -443,9 +453,7 @@ export default function TasksTable() {
                                 <div className="space-y-1">
                                   <div className="font-medium">
                                     {task.client
-                                      ? task.client.clientType === "individual"
-                                        ? `${task.client.firstName} ${task.client.lastName}`
-                                        : task.client.organizationName
+                                      ? task.client.name || "N/A"
                                       : "N/A"}
                                   </div>
                                   <div className="text-sm text-muted-foreground">
@@ -526,7 +534,9 @@ export default function TasksTable() {
                                     </Button>
                                   </DropdownMenuTrigger>
                                   <DropdownMenuContent align="end">
-                                    <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                    <DropdownMenuLabel>
+                                      Actions
+                                    </DropdownMenuLabel>
                                     <DropdownMenuItem asChild>
                                       <Link href={`/task/${task.id}`}>
                                         <Eye className="mr-2 h-4 w-4" />
@@ -598,26 +608,33 @@ export default function TasksTable() {
                       </Button>
 
                       {/* Page Numbers */}
-                      {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                        const pageNumber =
-                          Math.max(1, Math.min(totalPages - 4, currentPage - 2)) +
-                          i;
-                        if (pageNumber <= totalPages) {
-                          return (
-                            <Button
-                              key={pageNumber}
-                              variant={
-                                currentPage === pageNumber ? "default" : "outline"
-                              }
-                              size="sm"
-                              onClick={() => handlePageChange(pageNumber)}
-                            >
-                              {pageNumber}
-                            </Button>
-                          );
+                      {Array.from(
+                        { length: Math.min(5, totalPages) },
+                        (_, i) => {
+                          const pageNumber =
+                            Math.max(
+                              1,
+                              Math.min(totalPages - 4, currentPage - 2)
+                            ) + i;
+                          if (pageNumber <= totalPages) {
+                            return (
+                              <Button
+                                key={pageNumber}
+                                variant={
+                                  currentPage === pageNumber
+                                    ? "default"
+                                    : "outline"
+                                }
+                                size="sm"
+                                onClick={() => handlePageChange(pageNumber)}
+                              >
+                                {pageNumber}
+                              </Button>
+                            );
+                          }
+                          return null;
                         }
-                        return null;
-                      })}
+                      )}
 
                       <Button
                         variant="outline"
@@ -643,17 +660,24 @@ export default function TasksTable() {
           )}
         </Card>
       </div>
-      <AlertDialog open={!!taskToDelete} onOpenChange={() => setTaskToDelete(null)}>
+      <AlertDialog
+        open={!!taskToDelete}
+        onOpenChange={() => setTaskToDelete(null)}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the task and remove its data from our servers.
+              This action cannot be undone. This will permanently delete the
+              task and remove its data from our servers.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
+            <AlertDialogAction
+              onClick={handleDelete}
+              className="bg-red-600 hover:bg-red-700"
+            >
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>

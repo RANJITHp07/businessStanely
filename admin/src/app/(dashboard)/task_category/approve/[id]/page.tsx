@@ -136,17 +136,17 @@ export default function ApproveCategory({ params }: { params: Promise<{ id: stri
                 // Fetch category from API
                 const categoryId = resolvedParams.id
                 const categoryResponse = await fetch(`/api/task-categories/${categoryId}`)
-                
+
                 if (!categoryResponse.ok) {
                     throw new Error('Failed to fetch category')
                 }
-                
+
                 const categoryData = await categoryResponse.json()
                 setCategory(categoryData)
-                
+
                 // Fetch tasks associated with this category
                 const tasksResponse = await fetch(`/api/tasks?categoryId=${categoryId}`)
-                
+
                 if (tasksResponse.ok) {
                     const tasksData = await tasksResponse.json()
                     setTasks(tasksData)
@@ -213,14 +213,14 @@ export default function ApproveCategory({ params }: { params: Promise<{ id: stri
             const response = await fetch(`/api/task-categories/${resolvedParams.id}/approve`, {
                 method: 'PUT',
             })
-            
+
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}))
                 throw new Error(errorData.error || 'Failed to approve category')
             }
-            
+
             await response.json()
-            
+
             // Show success message and redirect
             toast.success("Category approved successfully")
             // Redirect to the category detail page to show the updated status
@@ -246,19 +246,19 @@ export default function ApproveCategory({ params }: { params: Promise<{ id: stri
                 },
                 body: JSON.stringify({ rejectionReason }),
             })
-            
+
             if (!response.ok) {
                 const errorData = await response.json().catch(() => ({}))
                 throw new Error(errorData.error || 'Failed to reject category')
             }
-            
+
             await response.json()
-            
+
             // Show success message and redirect
             toast.success("Category rejected successfully")
             setShowRejectDialog(false)
             // Redirect to the category detail page to show the updated status
-            router.push(`/task_category/${resolvedParams.id}`)
+            router.push(`/task_category`)
         } catch (error) {
             console.error("Error rejecting category:", error)
             const errorMessage = error instanceof Error ? error.message : "Failed to reject category"
@@ -295,7 +295,7 @@ export default function ApproveCategory({ params }: { params: Promise<{ id: stri
             <div className="container mx-auto p-6 max-w-7xl">
                 <div className="text-center py-20">
                     <p className="text-muted-foreground text-xl mb-4">Category not found</p>
-                    <Button 
+                    <Button
                         onClick={() => router.push('/task_category')}
                         variant="outline"
                     >
@@ -342,10 +342,10 @@ export default function ApproveCategory({ params }: { params: Promise<{ id: stri
                                     <div className="flex-1">
                                         <div className="flex items-center gap-3 mb-2">
                                             <h2 className="text-2xl font-semibold">{category.name}</h2>
-                                            <Badge 
-                                                variant="secondary" 
-                                                className={category.status === "approved" 
-                                                    ? "bg-green-100 text-green-800" 
+                                            <Badge
+                                                variant="secondary"
+                                                className={category.status === "approved"
+                                                    ? "bg-green-100 text-green-800"
                                                     : "bg-yellow-100 text-yellow-800"
                                                 }
                                             >
@@ -418,7 +418,7 @@ export default function ApproveCategory({ params }: { params: Promise<{ id: stri
                                 <FileText className="h-5 w-5" />
                                 Category Tasks ({tasks?.length || 0})
                             </CardTitle>
-                            <div className="flex items-center gap-2">
+                            {/* <div className="flex items-center gap-2">
                                 <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
                                 <Select value={sortBy} onValueChange={setSortBy}>
                                     <SelectTrigger className="w-32">
@@ -448,7 +448,7 @@ export default function ApproveCategory({ params }: { params: Promise<{ id: stri
                                         <SelectItem value="oldest">Oldest</SelectItem>
                                     </SelectContent>
                                 </Select>
-                            </div>
+                            </div> */}
                         </div>
                     </CardHeader>
                     {loading ? (
@@ -495,7 +495,7 @@ export default function ApproveCategory({ params }: { params: Promise<{ id: stri
                                                             <div className="flex items-center space-x-2">
                                                                 <Avatar className="h-8 w-8">
                                                                     <AvatarFallback className="text-xs">
-                                                                        {typeof task.assignedTo === 'string' 
+                                                                        {typeof task.assignedTo === 'string'
                                                                             ? task.assignedTo
                                                                                 .toUpperCase()
                                                                                 .split(" ")
@@ -506,8 +506,8 @@ export default function ApproveCategory({ params }: { params: Promise<{ id: stri
                                                                 </Avatar>
                                                                 <div>
                                                                     <div className="font-medium text-sm">
-                                                                        {typeof task.assignedTo === 'string' 
-                                                                            ? task.assignedTo 
+                                                                        {typeof task.assignedTo === 'string'
+                                                                            ? task.assignedTo
                                                                             : task.assignedTo?.name || 'Unassigned'}
                                                                     </div>
                                                                     <div className="text-xs text-muted-foreground">

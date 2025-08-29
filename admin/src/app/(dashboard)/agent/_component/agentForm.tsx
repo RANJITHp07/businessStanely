@@ -130,6 +130,8 @@ const specializations = [
   "GST",
   "Individual Tax",
   "Corporate Tax",
+  "Litigation",
+  "Drafting, Vetting and Reviewing",
   "Other Laws",
 ];
 
@@ -522,7 +524,7 @@ export default function AgentForm({ agent }: AgentFormProps) {
                       checked={
                         specialization === "All"
                           ? selectedSpecializations.length ===
-                            allSpecializations.length
+                          allSpecializations.length
                           : selectedSpecializations.includes(specialization)
                       }
                       onCheckedChange={(checked) =>
@@ -534,9 +536,8 @@ export default function AgentForm({ agent }: AgentFormProps) {
                     />
                     <Label
                       htmlFor={specialization}
-                      className={`text-sm ${
-                        specialization === "All" ? "font-medium" : "font-normal"
-                      }`}
+                      className={`text-sm ${specialization === "All" ? "font-medium" : "font-normal"
+                        }`}
                     >
                       {specialization === "All"
                         ? "Select All Specializations"
@@ -690,19 +691,18 @@ export default function AgentForm({ agent }: AgentFormProps) {
                         {agentSearch
                           ? "No agents found matching your search."
                           : getAvailableAgents().length === 0
-                          ? "No agents available for this hierarchy level."
-                          : "No agents available."}
+                            ? "No agents available for this hierarchy level."
+                            : "No agents available."}
                       </p>
                     ) : (
                       <div className="space-y-2 max-h-64 overflow-y-auto">
                         {filteredAgents.map((availableAgent) => (
                           <div
                             key={availableAgent.id}
-                            className={`flex items-center justify-between p-3 border rounded-lg transition-colors ${
-                              selectedSubordinates.includes(availableAgent.id)
-                                ? "bg-gray-50 border-gray-300"
-                                : "hover:bg-gray-50"
-                            }`}
+                            className={`flex items-center justify-between p-3 border rounded-lg transition-colors ${selectedSubordinates.includes(availableAgent.id)
+                              ? "bg-gray-50 border-gray-300"
+                              : "hover:bg-gray-50"
+                              }`}
                           >
                             <div className="flex items-center space-x-3">
                               <Checkbox
@@ -742,13 +742,13 @@ export default function AgentForm({ agent }: AgentFormProps) {
                             {selectedSubordinates.includes(
                               availableAgent.id
                             ) && (
-                              <Badge
-                                variant="secondary"
-                                className="bg-blue-100 text-blue-800"
-                              >
-                                Selected
-                              </Badge>
-                            )}
+                                <Badge
+                                  variant="secondary"
+                                  className="bg-blue-100 text-blue-800"
+                                >
+                                  Selected
+                                </Badge>
+                              )}
                           </div>
                         ))}
                       </div>

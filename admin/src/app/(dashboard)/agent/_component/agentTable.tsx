@@ -108,7 +108,7 @@ export default function AgentsTable() {
       }
       finally {
         setLoading(false);
-    }
+      }
     };
 
     fetchAgents();
@@ -141,7 +141,7 @@ export default function AgentsTable() {
   });
 
   // Apply sorting to filtered agents
-  const sortedAgents = sortAgents(filteredAgents);
+  const sortedAgents = filteredAgents;
 
   const resetFilters = () => {
     setSearchTerm("");
@@ -239,80 +239,80 @@ export default function AgentsTable() {
               Filter and search through your agents
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4"> 
-          {loading ? (
-        <>
-         <div className="h-[200px] w-full bg-gray-200 rounded-2xl mb-4"></div>
-             <div className="flex justify-between gap-4">
-               <div className="h-5 w-1/2 bg-gray-200 rounded-xl mb-3"></div>
-               <div className="h-5 w-1/2 bg-gray-200 rounded-xl mb-3"></div>
-             </div></>    
-          ) : (  <>       {/* Search */}
-            <div className="flex items-center gap-4">
-              <div className="flex-1">
-                <Label htmlFor="search">Search Agents</Label>
-                <div className="relative my-1">
-                  <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="search"
-                    placeholder="Search by name, email, or specialization..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10"
-                  />
+          <CardContent className="space-y-4">
+            {loading ? (
+              <>
+                <div className="h-[200px] w-full bg-gray-200 rounded-2xl mb-4"></div>
+                <div className="flex justify-between gap-4">
+                  <div className="h-5 w-1/2 bg-gray-200 rounded-xl mb-3"></div>
+                  <div className="h-5 w-1/2 bg-gray-200 rounded-xl mb-3"></div>
+                </div></>
+            ) : (<>       {/* Search */}
+              <div className="flex items-center gap-4">
+                <div className="flex-1">
+                  <Label htmlFor="search">Search Agents</Label>
+                  <div className="relative my-1">
+                    <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="search"
+                      placeholder="Search by name, email, or specialization..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
 
-            {/* Filter Controls */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Agent Type</Label>
-                <Select value={selectedType} onValueChange={setSelectedType}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {agentTypes.map((type) => (
-                      <SelectItem key={type} value={type}>
-                        {type}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              {/* Filter Controls */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Agent Type</Label>
+                  <Select value={selectedType} onValueChange={setSelectedType}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {agentTypes.map((type) => (
+                        <SelectItem key={type} value={type}>
+                          {type}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Jurisdiction</Label>
+                  <Select
+                    value={selectedJurisdiction}
+                    onValueChange={setSelectedJurisdiction}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {jurisdictions.map((jurisdiction) => (
+                        <SelectItem key={jurisdiction} value={jurisdiction}>
+                          {jurisdiction}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
-              <div className="space-y-2">
-                <Label>Jurisdiction</Label>
-                <Select
-                  value={selectedJurisdiction}
-                  onValueChange={setSelectedJurisdiction}
+              {/* Results Summary */}
+              <div className="flex items-center justify-end gap-2 text-sm text-muted-foreground">
+                <Button
+                  className="cursor-pointer hover:text-white text-white bg-[#f42b03] hover:bg-[#f42b03] rounded-lg px-4 py-2 shadow-none hover:shadow-lg transition-shadow duration-300"
+                  variant="outline"
+                  onClick={resetFilters}
                 >
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {jurisdictions.map((jurisdiction) => (
-                      <SelectItem key={jurisdiction} value={jurisdiction}>
-                        {jurisdiction}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
+                  Clear
+                </Button>
+              </div> </>)}
 
-            {/* Results Summary */}
-            <div className="flex items-center justify-end gap-2 text-sm text-muted-foreground">
-              <Button
-                className="cursor-pointer hover:text-white text-white bg-[#f42b03] hover:bg-[#f42b03] rounded-lg px-4 py-2 shadow-none hover:shadow-lg transition-shadow duration-300"
-                variant="outline"
-                onClick={resetFilters}
-              >
-                Clear
-              </Button>
-            </div> </> )}
-     
           </CardContent>
         </Card>
       </div>
@@ -360,210 +360,210 @@ export default function AgentsTable() {
         </CardHeader>
 
 
-{loading ?(<div className="flex justify-center items-center py-8">
-  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-</div>
-)  : (  <>
-  <CardContent>
-          <div className="rounded-md border">
-            <Table>
-            <TableHeader>
-  <TableRow isHeader>
-    <TableHead>Agent</TableHead>
-    <TableHead>Type</TableHead>
-    <TableHead>Specializations</TableHead>
-    <TableHead>Jurisdiction</TableHead>
-    <TableHead className="text-right">Actions</TableHead>
-  </TableRow>
-</TableHeader>
+        {loading ? (<div className="flex justify-center items-center py-8">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
+        ) : (<>
+          <CardContent>
+            <div className="rounded-md border">
+              <Table>
+                <TableHeader>
+                  <TableRow isHeader>
+                    <TableHead>Agent</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Specializations</TableHead>
+                    <TableHead>Jurisdiction</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
 
-<TableBody>
-  {currentAgents.length === 0 ? (
-    <TableRow>
-      <TableCell
-        colSpan={5}
-        className="text-center py-8 text-muted-foreground"
-      >
-        No agents found matching your criteria.
-      </TableCell>
-    </TableRow>
-  ) : (
-    currentAgents.map((agent) => {
-      return (
-        <TableRow
-          key={agent.id}
-          onClick={() => router.push(`/agent/${agent.id}`)}
-          className="cursor-pointer hover:bg-muted/50"
-        >
-          <TableCell>
-            <div className="flex items-center space-x-3">
-              <Avatar className="h-10 w-10">
-                <AvatarImage src={agent.photo || ""} />
-                <AvatarFallback>
-                  {agent.name
-                    .toUpperCase()
-                    .split(" ")
-                    .map((n) => n[0])
-                    .join("")}
-                </AvatarFallback>
-              </Avatar>
-              <div>
-                <div className="font-medium">
-                  {agent.name.charAt(0).toUpperCase() + agent.name.slice(1)}
-                </div>
-                <div className="text-sm text-muted-foreground">
-                  {agent.email}
-                </div>
-              </div>
-            </div>
-          </TableCell>
-          <TableCell>{getAgentTypeBadge(agent.agentType)}</TableCell>
-          <TableCell>
-            <div className="flex flex-wrap gap-1">
-              {agent.specializations.slice(0, 2).map((spec) => (
-                <Badge key={spec} variant="outline" className="text-xs">
-                  {spec}
-                </Badge>
-              ))}
-              {agent.specializations.length > 2 && (
-                <Badge variant="outline" className="text-xs">
-                  +{agent.specializations.length - 2}
-                </Badge>
-              )}
-            </div>
-          </TableCell>
-          <TableCell>{agent.jurisdiction}</TableCell>
-          <TableCell
-            className="text-right"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" className="h-8 w-8 p-0">
-                  <span className="sr-only">Open menu</span>
-                  <MoreHorizontal className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                <DropdownMenuItem asChild>
-                  <Link href={`/agent/${agent.id}`}>
-                    <Eye className="mr-2 h-4 w-4" />
-                    View Details
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href={`/agent/${agent.id}/edit`}>
-                    <Edit className="mr-2 h-4 w-4" />
-                    Edit Agent
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  className="text-destructive"
-                  onClick={() => setAgentToDelete(agent)}
-                >
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Delete Agent
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </TableCell>
-        </TableRow>
-      );
-    })
-  )}
-</TableBody>
-
-
-            </Table>
-          </div>
-
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between space-x-2 py-4">
-              <div className="text-sm text-muted-foreground">
-                Page {currentPage} of {totalPages}
-              </div>
-              <div className="flex items-center space-x-2">
-                <Select
-                  value={itemsPerPage.toString()}
-                  onValueChange={handleItemsPerPageChange}
-                >
-                  <SelectTrigger className="w-24">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {[5, 10, 20, 50].map((value) => (
-                      <SelectItem key={value} value={value.toString()}>
-                        {value} / page
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handlePageChange(1)}
-                  disabled={currentPage === 1}
-                >
-                  <ChevronsLeft className="h-4 w-4 " />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handlePageChange(currentPage - 1)}
-                  disabled={currentPage === 1}
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-
-                {/* Page Numbers */}
-                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                  const pageNumber =
-                    Math.max(1, Math.min(totalPages - 4, currentPage - 2)) + i;
-                  if (pageNumber <= totalPages) {
-                    return (
-                      <Button
-                        key={pageNumber}
-                        variant={
-                          currentPage === pageNumber ? "default" : "outline"
-                        }
-                        size="sm"
-                        onClick={() => handlePageChange(pageNumber)}
+                <TableBody>
+                  {currentAgents.length === 0 ? (
+                    <TableRow>
+                      <TableCell
+                        colSpan={5}
+                        className="text-center py-8 text-muted-foreground"
                       >
-                        {pageNumber}
-                      </Button>
-                    );
-                  }
-                  return null;
-                })}
+                        No agents found matching your criteria.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    currentAgents.map((agent) => {
+                      return (
+                        <TableRow
+                          key={agent.id}
+                          onClick={() => router.push(`/agent/${agent.id}`)}
+                          className="cursor-pointer hover:bg-muted/50"
+                        >
+                          <TableCell>
+                            <div className="flex items-center space-x-3">
+                              <Avatar className="h-10 w-10">
+                                <AvatarImage src={agent.photo || ""} />
+                                <AvatarFallback>
+                                  {agent.name
+                                    .toUpperCase()
+                                    .split(" ")
+                                    .map((n) => n[0])
+                                    .join("")}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div>
+                                <div className="font-medium">
+                                  {agent.name.charAt(0).toUpperCase() + agent.name.slice(1)}
+                                </div>
+                                <div className="text-sm text-muted-foreground">
+                                  {agent.email}
+                                </div>
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>{getAgentTypeBadge(agent.agentType)}</TableCell>
+                          <TableCell>
+                            <div className="flex flex-wrap gap-1">
+                              {agent.specializations.slice(0, 2).map((spec) => (
+                                <Badge key={spec} variant="outline" className="text-xs">
+                                  {spec}
+                                </Badge>
+                              ))}
+                              {agent.specializations.length > 2 && (
+                                <Badge variant="outline" className="text-xs">
+                                  +{agent.specializations.length - 2}
+                                </Badge>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>{agent.jurisdiction}</TableCell>
+                          <TableCell
+                            className="text-right"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" className="h-8 w-8 p-0">
+                                  <span className="sr-only">Open menu</span>
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                <DropdownMenuItem asChild>
+                                  <Link href={`/agent/${agent.id}`}>
+                                    <Eye className="mr-2 h-4 w-4" />
+                                    View Details
+                                  </Link>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem asChild>
+                                  <Link href={`/agent/${agent.id}/edit`}>
+                                    <Edit className="mr-2 h-4 w-4" />
+                                    Edit Agent
+                                  </Link>
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  className="text-destructive"
+                                  onClick={() => setAgentToDelete(agent)}
+                                >
+                                  <Trash2 className="mr-2 h-4 w-4" />
+                                  Delete Agent
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  )}
+                </TableBody>
 
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handlePageChange(currentPage + 1)}
-                  disabled={currentPage === totalPages}
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handlePageChange(totalPages)}
-                  disabled={currentPage === totalPages}
-                >
-                  <ChevronsRight className="h-4 w-4" />
-                </Button>
-              </div>
+
+              </Table>
             </div>
-          )}
-        </CardContent>
 
-</>   ) }
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between space-x-2 py-4">
+                <div className="text-sm text-muted-foreground">
+                  Page {currentPage} of {totalPages}
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Select
+                    value={itemsPerPage.toString()}
+                    onValueChange={handleItemsPerPageChange}
+                  >
+                    <SelectTrigger className="w-24">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {[5, 10, 20, 50].map((value) => (
+                        <SelectItem key={value} value={value.toString()}>
+                          {value} / page
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(1)}
+                    disabled={currentPage === 1}
+                  >
+                    <ChevronsLeft className="h-4 w-4 " />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={currentPage === 1}
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+
+                  {/* Page Numbers */}
+                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                    const pageNumber =
+                      Math.max(1, Math.min(totalPages - 4, currentPage - 2)) + i;
+                    if (pageNumber <= totalPages) {
+                      return (
+                        <Button
+                          key={pageNumber}
+                          variant={
+                            currentPage === pageNumber ? "default" : "outline"
+                          }
+                          size="sm"
+                          onClick={() => handlePageChange(pageNumber)}
+                        >
+                          {pageNumber}
+                        </Button>
+                      );
+                    }
+                    return null;
+                  })}
+
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={currentPage === totalPages}
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handlePageChange(totalPages)}
+                    disabled={currentPage === totalPages}
+                  >
+                    <ChevronsRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
+          </CardContent>
+
+        </>)}
 
 
-   
+
 
 
 

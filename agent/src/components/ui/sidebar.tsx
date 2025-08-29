@@ -167,10 +167,10 @@ function Sidebar({
 
   if (collapsible === "none") {
     return (
-      <div style={{backgroundColor:"#003459"}}
+      <div style={{ backgroundColor: "#002FFF" }}
         data-slot="sidebar"
         className={cn(
-          "text-sidebar-foreground flex h-full w-(--sidebar-width) flex-col", 
+          "text-sidebar-foreground flex h-full w-(--sidebar-width) flex-col",
           className
         )}
         {...props}
@@ -187,7 +187,7 @@ function Sidebar({
           data-sidebar="sidebar"
           data-slot="sidebar"
           data-mobile="true"
-          
+
           className="bg-sidebar text-sidebar-foreground w-(--sidebar-width) p-0 [&>button]:hidden"
           style={
             {
@@ -200,7 +200,7 @@ function Sidebar({
             <SheetTitle>Sidebar</SheetTitle>
             <SheetDescription>Displays the mobile sidebar.</SheetDescription>
           </SheetHeader>
-          <div className="flex h-full w-full flex-col bg-[#003459]" >{children}</div>
+          <div className="flex h-full w-full flex-col bg-[#002FFF]" >{children}</div>
         </SheetContent>
       </Sheet>
     )
@@ -246,7 +246,7 @@ function Sidebar({
           data-sidebar="sidebar"
           data-slot="sidebar-inner"
           className="bg-sidebar group-data-[variant=floating]:border-sidebar-border flex h-full w-full flex-col group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:shadow-sm"
-          style={{backgroundColor:"#003459"}}
+          style={{ backgroundColor: "#002FFF" }}
         >
           {children}
         </div>
@@ -268,13 +268,13 @@ function SidebarTrigger({
       data-slot="sidebar-trigger"
       variant="ghost"
       size="icon"
-      className={cn("size-7" , className)}
+      className={cn("size-7", className)}
       onClick={(event) => {
         onClick?.(event)
         toggleSidebar()
       }}
       {...props}
-    > 
+    >
       <PanelLeftIcon size={20} className="md:hidden !h-[25px] !w-[25px] " />
       <span className="sr-only ">Toggle Sidebar</span>
     </Button>
@@ -466,7 +466,7 @@ function SidebarMenu({ className, ...props }: React.ComponentProps<"ul">) {
 
 function SidebarMenuItem({ className, ...props }: React.ComponentProps<"li">) {
   return (
-    <li 
+    <li
       data-slot="sidebar-menu-item"
       data-sidebar="menu-item"
       className={cn("group/menu-item text-white  relative", className)}
@@ -571,7 +571,7 @@ function SidebarMenuAction({
         "peer-data-[size=lg]/menu-button:top-2.5",
         "group-data-[collapsible=icon]:hidden",
         showOnHover &&
-          "peer-data-[active=true]/menu-button:text-sidebar-accent-foreground group-focus-within/menu-item:opacity-100 group-hover/menu-item:opacity-100 data-[state=open]:opacity-100 md:opacity-0",
+        "peer-data-[active=true]/menu-button:text-sidebar-accent-foreground group-focus-within/menu-item:opacity-100 group-hover/menu-item:opacity-100 data-[state=open]:opacity-100 md:opacity-0",
         className
       )}
       {...props}

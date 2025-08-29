@@ -52,6 +52,8 @@ export interface TaskCategory {
     updatedAt: string
     createdBy: string
     createdById: string
+    createdByType?: "user" | "agent" | null;
+    createdByRole?: "owner" | "admin" | null;
     approvedBy?: string | null
     approvedById?: string | null
     approvedAt?: string | null
@@ -265,6 +267,24 @@ export default function CategoryDetail({ params }: { params: Promise<{ id: strin
         )
     }
 
+    // Helper to render the creator label (name + (Owner/Admin/Agent))
+    const renderCreatedBy = () => {
+        if (!category.createdBy) return "Unknown";
+        return (
+            <span>
+                {category.createdBy}
+                {category.createdByType === "agent" && (
+                    <span className="ml-1 text-xs text-blue-600">(Agent)</span>
+                )}
+                {category.createdByType === "user" && category.createdByRole === "owner" && (
+                    <span className="ml-1 text-xs text-purple-600">(Owner)</span>
+                )}
+                {category.createdByType === "user" && category.createdByRole === "admin" && (
+                    <span className="ml-1 text-xs text-green-600">(Admin)</span>
+                )}
+            </span>
+        );
+    };
     return (
         <div className="container mx-auto p-6 max-w-7xl">
             <div className="mb-8">
@@ -315,7 +335,7 @@ export default function CategoryDetail({ params }: { params: Promise<{ id: strin
                                         <div className="grid grid-cols-2 gap-4 text-sm">
                                             <div className="flex items-center gap-2">
                                                 <User className="h-4 w-4 text-muted-foreground" />
-                                                <span>Created by: {category.createdBy}</span>
+                                                <span>Created by: {renderCreatedBy()}</span>
                                             </div>
                                             <div className="flex items-center gap-2">
                                                 <Calendar className="h-4 w-4 text-muted-foreground" />

@@ -25,10 +25,19 @@ export async function GET(
       );
     }
 
-    // Find the category in database with creator information
+    // Find the category in database with creator information (user or agent)
     const category = await prisma.taskCategory.findUnique({
       where: { id },
       include: {
+        createdByUser: {
+          select: {
+            id: true,
+            username: true,
+            email: true,
+            adminType: true,
+            photo: true,
+          }
+        },
         createdByAgent: {
           select: {
             id: true,
@@ -65,12 +74,55 @@ export async function GET(
     
     // Count tasks associated with this category
     const taskCount = await prisma.task.count({ where: { categoryId: id } });
+
+    // Determine creator name, type, and role
+    let creatorName = null;
+    let creatorType = null;
+    let creatorRole = null;
+    let creatorId = null;
+    if (category.createdByUser) {
+      creatorName = category.createdByUser.username;
+      creatorType = "user";
+      creatorRole = category.createdByUser.adminType; // "owner" or "admin"
+      creatorId = category.createdByUserId;
+    } else if (category.createdByAgent) {
+      creatorName = category.createdByAgent.name;
+      creatorType = "agent";
+      creatorRole = null;
+      creatorId = category.createdByAgentId;
+    }
+
+    // Use the creator's photo if available, fallback to null
+    let photo = null;
+    if (category.createdByUser && category.createdByUser.photo) {
+      photo = category.createdByUser.photo;
+    } else if (category.createdByAgent && category.createdByAgent.photo) {
+      photo = category.createdByAgent.photo;
+    } else {
+      photo = null;
+    }
     const formattedCategory = {
-      ...category,
-      taskCount,
-      createdBy: category.createdByAgent?.name || "Unknown",
-      createdById: category.createdByAgentId,
-      isOwner: false
+      id: category.id,
+      name: category.name,
+      description: category.description || "",
+      color: category.color,
+      status: category.status,
+      createdAt: category.createdAt,
+      updatedAt: category.updatedAt,
+      createdBy: creatorName || "Unknown",
+      createdByType: creatorType,
+      createdByRole: creatorRole,
+      createdById: creatorId,
+      approvedById: category.approvedById || null,
+      approvedBy: category.approvedBy?.username || null,
+      approvedAt: category.approvedAt || null,
+      rejectedById: category.rejectedById || null,
+      rejectedBy: category.rejectedBy?.username || null,
+      rejectedAt: category.rejectedAt || null,
+      rejectionReason: category.rejectionReason || null,
+      taskCount: taskCount,
+      isOwner: creatorRole === "owner",
+      photo,
     };
     return NextResponse.json(formattedCategory);
   } catch (error) {

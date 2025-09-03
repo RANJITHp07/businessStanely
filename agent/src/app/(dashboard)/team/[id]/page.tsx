@@ -61,7 +61,7 @@ export default function AgentDetails() {
 
   useEffect(() => {
     if (!id) return;
-    const fetchTeamMember = async () => {
+    const fetchTeamMemberAndTasks = async () => {
       try {
         const response = await fetch(`/api/team/${id}`);
         if (response.ok) {
@@ -70,6 +70,18 @@ export default function AgentDetails() {
           // Set team members from the member's subordinates
           if (data.subordinates) {
             setTeamMembers(data.subordinates);
+          }
+          // Now fetch tasks for this agent
+          try {
+            const tasksResponse = await fetch(`/api/tasks?assignedToId=${id}`);
+            if (tasksResponse.ok) {
+              const tasksData = await tasksResponse.json();
+              setAgentTasks(tasksData.tasks || []);
+            }
+          } catch (error) {
+            console.error("Error fetching team member tasks:", error);
+          } finally {
+            setTasksLoading(false);
           }
         } else {
           notFound();
@@ -81,23 +93,7 @@ export default function AgentDetails() {
         setLoading(false);
       }
     };
-
-    const fetchAgentTasks = async () => {
-      try {
-        const response = await fetch(`/api/tasks?assignedToId=${id}`);
-        if (response.ok) {
-          const data = await response.json();
-          setAgentTasks(data.tasks || []);
-        }
-      } catch (error) {
-        console.error("Error fetching team member tasks:", error);
-      } finally {
-        setTasksLoading(false);
-      }
-    };
-
-    fetchTeamMember();
-    fetchAgentTasks();
+    fetchTeamMemberAndTasks();
   }, [id]);
 
   const getPriorityBadge = (priority: string) => {

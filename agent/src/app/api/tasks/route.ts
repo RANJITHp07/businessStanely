@@ -30,10 +30,24 @@ export async function GET(req: NextRequest) {
 
 
     // If categoryId is present, return all tasks for that category (regardless of assignment)
+    // If assignedToId is present, return all tasks for that agent
     // Otherwise, only show tasks Ownership to this agent
     let where: Prisma.TaskWhereInput;
+    const assignedToId = searchParams.get("assignedToId");
     if (categoryId) {
       where = { categoryId };
+    } else if (assignedToId) {
+      where = {
+        assignedToId,
+        AND: [
+          {
+            OR: [
+              { category: null },
+              { category: { status: 'approved' } }
+            ]
+          }
+        ]
+      };
     } else {
       where = {
         assignedToId: agent.id,

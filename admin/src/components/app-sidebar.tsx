@@ -64,6 +64,11 @@ const items = [
     url: "/task_category",
     icon: Boxes,
   },
+    {
+    title: "Retainership",
+    url: "/retainership",
+    icon: Boxes,
+  },
   {
     title: "Admin",
     url: "/admin",

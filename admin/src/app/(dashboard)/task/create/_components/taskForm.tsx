@@ -51,7 +51,7 @@ import {
 import { format, isBefore, startOfDay } from "date-fns";
 import { cn } from "@/lib/utils";
 
-import { Client, Agent, Task } from "@/types";
+import { Client, Agent, Task, Retainership } from "@/types";
 
 interface Category {
   id: string;
@@ -115,71 +115,84 @@ export default function TaskForm() {
   const [isCreatingCategory, setIsCreatingCategory] = useState(false);
   const [isCreatingClient, setIsCreatingClient] = useState(false);
 
-// Add this handler function
-const handleNewCategoryInputChange = (field: string, value: string) => {
-  setNewCategoryData((prev) => ({ ...prev, [field]: value }));
-};
+  const [retainershipSearchQuery, setRetainershipSearchQuery] = useState("");
+  const [showRetainershipSuggestions, setShowRetainershipSuggestions] = useState(false);
+  const [retainershipList, setRetainershipList] = useState<Retainership[]>([]);
+  const [isRetainershipModalOpen, setIsRetainershipModalOpen] = useState(false);
+  const [isCreatingRetainership, setIsCreatingRetainership] = useState(false);
 
-const handleAddCategoryClick = () => {
-  setIsCategoryModalOpen(true);
-  // Reset form data when opening modal
-  setNewCategoryData({
+  // Added state for new retainership data
+  const [newRetainershipData, setNewRetainershipData] = useState({
     name: "",
     description: "",
   });
-};
 
-const handleCreateCategory = async () => {
-  if (!newCategoryData.name.trim()) {
-    toast.error("Category name is required");
-    return;
-  }
+  // Add this handler function
+  const handleNewCategoryInputChange = (field: string, value: string) => {
+    setNewCategoryData((prev) => ({ ...prev, [field]: value }));
+  };
 
-  if (isCreatingCategory) {
-    return;
-  }
-
-  setIsCreatingCategory(true);
-
-  try {
-    const response = await fetch("/api/task-categories", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(newCategoryData),
+  const handleAddCategoryClick = () => {
+    setIsCategoryModalOpen(true);
+    // Reset form data when opening modal
+    setNewCategoryData({
+      name: "",
+      description: "",
     });
+  };
 
-    if (response.ok) {
-      const newCategory = await response.json();
-      setCategories((prev) => [newCategory, ...prev]);
-      setFormData((prev) => ({ ...prev, categoryId: newCategory.id }));
-      setCategorySearchQuery(newCategory.name);
-      setIsCategoryModalOpen(false);
-      
-      // Show different success message based on category status
-      if (newCategory.status === "approved") {
-        toast.success("Category created and approved successfully!");
-      } else {
-        toast.success("Category created! It's pending approval and will be available once approved.");
-      }
-    } else {
-      const error = await response.json();
-      toast.error(error.error || "Failed to create category");
+  const handleCreateCategory = async () => {
+    if (!newCategoryData.name.trim()) {
+      toast.error("Category name is required");
+      return;
     }
-  } catch (error) {
-    console.error("Error creating category:", error);
-    toast.error("Failed to create category");
-  } finally {
-    setIsCreatingCategory(false);
-  }
-};
+
+    if (isCreatingCategory) {
+      return;
+    }
+
+    setIsCreatingCategory(true);
+
+    try {
+      const response = await fetch("/api/task-categories", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(newCategoryData),
+      });
+
+      if (response.ok) {
+        const newCategory = await response.json();
+        setCategories((prev) => [newCategory, ...prev]);
+        setFormData((prev) => ({ ...prev, categoryId: newCategory.id }));
+        setCategorySearchQuery(newCategory.name);
+        setIsCategoryModalOpen(false);
+
+        // Show different success message based on category status
+        if (newCategory.status === "approved") {
+          toast.success("Category created and approved successfully!");
+        } else {
+          toast.success(
+            "Category created! It's pending approval and will be available once approved."
+          );
+        }
+      } else {
+        const error = await response.json();
+        toast.error(error.error || "Failed to create category");
+      }
+    } catch (error) {
+      console.error("Error creating category:", error);
+      toast.error("Failed to create category");
+    } finally {
+      setIsCreatingCategory(false);
+    }
+  };
 
   // Show all categories for task selection, regardless of status
   const filteredCategories = categories.filter((category) => {
     return category.name.toLowerCase().includes(categorySearchQuery.toLowerCase());
   });
-
 
   // Add this filtering logic
   const filteredAgents = agents.filter((agent) => {
@@ -196,12 +209,13 @@ const handleCreateCategory = async () => {
         setShowAgentSuggestions(false);
         setShowCategorySuggestions(false);
         setShowSuggestions(false);
+        setShowRetainershipSuggestions(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
-  
+
   // Add this filtering logic
   const filteredClients = clients.filter((client) => {
     const clientName =
@@ -359,7 +373,7 @@ const handleCreateCategory = async () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Prevent multiple submissions
     if (isSubmitting) {
       return;
@@ -395,7 +409,11 @@ const handleCreateCategory = async () => {
     }
 
     // Check if due date is in the past (only for new tasks)
-    if (!isEditMode && dueDate && isBefore(startOfDay(dueDate), startOfDay(new Date()))) {
+    if (
+      !isEditMode &&
+      dueDate &&
+      isBefore(startOfDay(dueDate), startOfDay(new Date()))
+    ) {
       toast.error("Due date cannot be in the past");
       return;
     }
@@ -482,6 +500,85 @@ const handleCreateCategory = async () => {
     }
   };
 
+  // Filtered retainerships based on search query
+  const filteredRetainerships = retainershipList.filter((retainership) => {
+    return (
+      retainership.name
+        .toLowerCase()
+        .includes(retainershipSearchQuery.toLowerCase()) ||
+      retainership.description
+        ?.toLowerCase()
+        .includes(retainershipSearchQuery.toLowerCase())
+    );
+  });
+
+  // Fetch retainerships (for demo purposes, using static data)
+  useEffect(() => {
+    const fetchRetainerships = async () => {
+      try {
+        const response = await fetch("/api/retainerships");
+        if (response.ok) {
+          const data = await response.json();
+          setRetainershipList(data);
+        }
+      } catch (error) {
+        console.error("Failed to fetch retainerships", error);
+      }
+    };
+
+    fetchRetainerships();
+  }, []);
+
+  // Add a button and modal for creating a new retainership
+  const handleAddRetainershipClick = () => {
+    setIsRetainershipModalOpen(true);
+    // Reset form data when opening modal
+    setNewRetainershipData({
+      name: "",
+      description: "",
+    });
+  };
+
+  const handleCreateRetainership = async () => {
+    if (!newRetainershipData.name.trim()) {
+      toast.error("Retainership name is required");
+      return;
+    }
+
+    if (isCreatingRetainership) {
+      return;
+    }
+
+    setIsCreatingRetainership(true);
+
+    try {
+      const response = await fetch("/api/retainerships", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(newRetainershipData),
+      });
+
+      if (response.ok) {
+        const newRetainership = await response.json();
+        setRetainershipList((prev) => [newRetainership, ...prev]);
+        setFormData((prev) => ({ ...prev, retainershipId: newRetainership.id }));
+        setRetainershipSearchQuery(newRetainership.name);
+        setIsRetainershipModalOpen(false);
+        toast.success("Retainership created successfully!");
+      } else {
+        const error = await response.json();
+        toast.error(error.error || "Failed to create retainership");
+      }
+    } catch (error) {
+      console.error("Error creating retainership:", error);
+      toast.error("Failed to create retainership");
+    } finally {
+      setIsCreatingRetainership(false);
+    }
+  };
+
   return (
     <div className="container mx-auto p-6 max-w-7xl">
       <div className="mb-8">
@@ -497,826 +594,997 @@ const handleCreateCategory = async () => {
 
       <form onSubmit={handleSubmit} className="space-y-8">
         <fieldset disabled={isSubmitting} className="space-y-8">
-        {/* Task Basic Information */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5" />
-              Task Information
-            </CardTitle>
-            <CardDescription>Enter the basic task details</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="space-y-2">
-              <Label htmlFor="task-name">Task Name *</Label>
-              <Input
-                id="task-name"
-                placeholder="Enter task name (e.g., Contract Review, Legal Research)"
-                value={formData.title}
-                onChange={(e) => handleInputChange("title", e.target.value)}
-                required
-              />
-            </div>
-
-            <div>
-            <div className="w-full">
-  {/* Top-right Add Button */}
-  <div className="flex justify-end mb-4">
-    <Dialog open={isCategoryModalOpen} onOpenChange={setIsCategoryModalOpen}>
-      <DialogTrigger asChild>
-        <Button
-          type="button"
-          onClick={handleAddCategoryClick}
-          className="h-10"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Add Category
-        </Button>
-      </DialogTrigger>
-
-      <DialogContent className="sm:max-w-[400px] w-full">
-        <DialogHeader>
-          <DialogTitle>Add New Category</DialogTitle>
-          <DialogDescription>
-            Create a new task category for better organization
-          </DialogDescription>
-        </DialogHeader>
-
-        {/* Form Fields */}
-        <div className="space-y-4 py-4">
-          <div className="space-y-2">
-            <Label htmlFor="category-name">Category Name *</Label>
-            <Input
-              id="category-name"
-              placeholder="Enter category name (e.g., Legal Research, Contract Review)"
-              className="w-full"
-              value={newCategoryData.name}
-              onChange={(e) =>
-                handleNewCategoryInputChange("name", e.target.value)
-              }
-              required
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="category-description">Description</Label>
-            <Textarea
-              id="category-description"
-              placeholder="Brief description of this category (optional)"
-              className="w-full"
-              value={newCategoryData.description}
-              onChange={(e) =>
-                handleNewCategoryInputChange("description", e.target.value)
-              }
-              rows={4}
-            />
-          </div>
-        </div>
-
-        {/* Modal Actions */}
-        <div className="flex justify-end gap-3 pt-4 border-t">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => setIsCategoryModalOpen(false)}
-            disabled={isCreatingCategory}
-          >
-            Cancel
-          </Button>
-
-          <Button
-            type="button"
-            onClick={handleCreateCategory}
-            disabled={!newCategoryData.name.trim() || isCreatingCategory}
-          >
-            {isCreatingCategory ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Creating...
-              </>
-            ) : (
-              "Create Category"
-            )}
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
-  </div>
-</div>
-            </div>
-
-
-            <div className="space-y-2 relative">
-              <Label htmlFor="taskCategory">Task Category *</Label>
-              <div className="relative">
+          {/* Task Basic Information */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5" />
+                Task Information
+              </CardTitle>
+              <CardDescription>Enter the basic task details</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-2">
+                <Label htmlFor="task-name">Task Name *</Label>
                 <Input
-                  id="taskCategory"
-                  type="text"
-                  placeholder="Type to search categories..."
-                  value={categorySearchQuery}
-                  onChange={(e) => {
-                    setCategorySearchQuery(e.target.value);
-                    if (e.target.value.trim()) {
-                      setShowCategorySuggestions(true);
-                    } else {
-                      setShowCategorySuggestions(false);
-                    }
-                  }}
-                  onFocus={() => {
-                    if (categorySearchQuery.trim()) {
-                      setShowCategorySuggestions(true);
-                    }
-                  }}
-                  className="w-full"
+                  id="task-name"
+                  placeholder="Enter task name (e.g., Contract Review, Legal Research)"
+                  value={formData.title}
+                  onChange={(e) => handleInputChange("title", e.target.value)}
                   required
                 />
-                
-                {/* Category Suggestions Dropdown - Only show when searching */}
-                {showCategorySuggestions &&
-                  categorySearchQuery.trim() &&
-                  filteredCategories.length > 0 && (
-                  <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto">
-                    {filteredCategories.map((category) => (
-                      <div
-                        key={category.id}
-                        className="flex items-center justify-between p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
-                        onClick={() => {
-                          setFormData((prev) => ({ ...prev, categoryId: category.id }));
-                          setCategorySearchQuery(category.name);
-                          setShowCategorySuggestions(false);
-                        }}
-                      >
-                        <div className="flex items-center gap-2">
-                          <div>
-                            <span className="font-medium">{category.name}</span>
-                            {category.description && (
-                              <div className="text-xs text-gray-500 mt-1">
-                                {category.description}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                        <Badge
-                          className={`text-xs ${
-                            category.status === "approved"
-                              ? "bg-green-100 text-green-800"
-                              : "bg-yellow-100 text-yellow-800"
-                          }`}
-                        >
-                          {category.status}
-                        </Badge>
-                      </div>
-                    ))}
-                  </div>
-                )}
-                
-                {/* No results message - Only when searching */}
-                {showCategorySuggestions &&
-                  categorySearchQuery &&
-                  filteredCategories.length === 0 && (
-                  <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg p-3">
-                    <span className="text-gray-500">No categories found</span>
-                  </div>
-                )}
               </div>
-            </div>
 
- 
-
-            <div className="space-y-2">
-              <Label htmlFor="description">Task Description *</Label>
-              <Textarea
-                id="description"
-                placeholder="Describe the task in detail, including any specific requirements or instructions..."
-                value={formData.description}
-                onChange={(e) =>
-                  handleInputChange("description", e.target.value)
-                }
-                rows={4}
-                required
-              />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Client Information */}
-        <Card>
-          <CardHeader className="flex items-center justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                <User className="h-5 w-5" />
-                Client Information
-              </CardTitle>
-              <CardDescription>
-                Select client and their contact details will be auto-filled
-              </CardDescription>
-            </div>
-
-            <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-              <DialogTrigger asChild>
-                <Button type="button" onClick={handleAddClientClick}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Client
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-[500px] max-h-[80vh] overflow-y-auto">
-                <DialogHeader>
-                  <DialogTitle>Add New Client</DialogTitle>
-                  <DialogDescription>
-                    Select the client type and fill in the details
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4 py-4">
-                  {/* Client Type Selection */}
-                  <div className="space-y-2">
-                    <Label htmlFor="client-type">Client Type *</Label>
-                    <Select
-                      value={selectedClientType}
-                      onValueChange={setSelectedClientType}
+              <div>
+                <div className="w-full">
+                  {/* Top-right Add Button */}
+                  <div className="flex justify-end mb-4">
+                    <Dialog
+                      open={isCategoryModalOpen}
+                      onOpenChange={setIsCategoryModalOpen}
                     >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Choose client type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="individual">
-                          <div className="flex items-center gap-2">
-                            <User className="h-4 w-4" />
-                            Individual
+                      <DialogTrigger asChild>
+                        <Button
+                          type="button"
+                          onClick={handleAddCategoryClick}
+                          className="h-10"
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          Add Category
+                        </Button>
+                      </DialogTrigger>
+
+                      <DialogContent className="sm:max-w-[400px] w-full">
+                        <DialogHeader>
+                          <DialogTitle>Add New Category</DialogTitle>
+                          <DialogDescription>
+                            Create a new task category for better organization
+                          </DialogDescription>
+                        </DialogHeader>
+
+                        {/* Form Fields */}
+                        <div className="space-y-4 py-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="category-name">Category Name *</Label>
+                            <Input
+                              id="category-name"
+                              placeholder="Enter category name (e.g., Legal Research, Contract Review)"
+                              className="w-full"
+                              value={newCategoryData.name}
+                              onChange={(e) =>
+                                handleNewCategoryInputChange("name", e.target.value)
+                              }
+                              required
+                            />
                           </div>
-                        </SelectItem>
-                        <SelectItem value="organization">
-                          <div className="flex items-center gap-2">
-                            <Users className="h-4 w-4" />
-                            Organization
+
+                          <div className="space-y-2">
+                            <Label htmlFor="category-description">Description</Label>
+                            <Textarea
+                              id="category-description"
+                              placeholder="Brief description of this category (optional)"
+                              className="w-full"
+                              value={newCategoryData.description}
+                              onChange={(e) =>
+                                handleNewCategoryInputChange("description", e.target.value)
+                              }
+                              rows={4}
+                            />
                           </div>
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
+                        </div>
+
+                        {/* Modal Actions */}
+                        <div className="flex justify-end gap-3 pt-4 border-t">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setIsCategoryModalOpen(false)}
+                            disabled={isCreatingCategory}
+                          >
+                            Cancel
+                          </Button>
+
+                          <Button
+                            type="button"
+                            onClick={handleCreateCategory}
+                            disabled={!newCategoryData.name.trim() || isCreatingCategory}
+                          >
+                            {isCreatingCategory ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Creating...
+                              </>
+                            ) : (
+                              "Create Category"
+                            )}
+                          </Button>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
                   </div>
-
-                  {/* Individual Form Fields */}
-                  {selectedClientType === "individual" && (
-                    <>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="firstName">First Name *</Label>
-                          <Input
-                            id="firstName"
-                            placeholder="Enter first name"
-                            value={newClientData.firstName}
-                            onChange={(e) =>
-                              handleNewClientInputChange(
-                                "firstName",
-                                e.target.value
-                              )
-                            }
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="lastName">Last Name *</Label>
-                          <Input
-                            id="lastName"
-                            placeholder="Enter last name"
-                            value={newClientData.lastName}
-                            onChange={(e) =>
-                              handleNewClientInputChange(
-                                "lastName",
-                                e.target.value
-                              )
-                            }
-                          />
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="email">Email *</Label>
-                        <div className="relative">
-                          <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                          <Input
-                            id="email"
-                            type="email"
-                            placeholder="Enter email address"
-                            value={newClientData.email}
-                            onChange={(e) =>
-                              handleNewClientInputChange(
-                                "email",
-                                e.target.value
-                              )
-                            }
-                            className="pl-10"
-                          />
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="phoneNumber">Phone Number *</Label>
-                        <div className="relative">
-                          <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                          <Input
-                            id="phoneNumber"
-                            placeholder="Enter phone number"
-                            value={newClientData.phoneNumber}
-                            onChange={(e) =>
-                              handleNewClientInputChange(
-                                "phoneNumber",
-                                e.target.value
-                              )
-                            }
-                            className="pl-10"
-                          />
-                        </div>
-                      </div>
-                    </>
-                  )}
-
-                  {/* Organization Form Fields */}
-                  {selectedClientType === "organization" && (
-                    <>
-                      <div className="space-y-2">
-                        <Label htmlFor="organizationName">
-                          Organization Name *
-                        </Label>
-                        <Input
-                          id="organizationName"
-                          placeholder="Enter organization name"
-                          value={newClientData.organizationName}
-                          onChange={(e) =>
-                            handleNewClientInputChange(
-                              "organizationName",
-                              e.target.value
-                            )
-                          }
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="authorizedPersonName">
-                          Authorized Person *
-                        </Label>
-                        <Input
-                          id="authorizedPersonName"
-                          placeholder="Enter authorized person name"
-                          value={newClientData.authorizedPersonName}
-                          onChange={(e) =>
-                            handleNewClientInputChange(
-                              "authorizedPersonName",
-                              e.target.value
-                            )
-                          }
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="email">Email *</Label>
-                        <div className="relative">
-                          <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                          <Input
-                            id="email"
-                            type="email"
-                            placeholder="Enter email address"
-                            value={newClientData.email}
-                            onChange={(e) =>
-                              handleNewClientInputChange(
-                                "email",
-                                e.target.value
-                              )
-                            }
-                            className="pl-10"
-                          />
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="phoneNumber">Phone Number *</Label>
-                        <div className="relative">
-                          <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                          <Input
-                            id="phoneNumber"
-                            placeholder="Enter phone number"
-                            value={newClientData.phoneNumber}
-                            onChange={(e) =>
-                              handleNewClientInputChange(
-                                "phoneNumber",
-                                e.target.value
-                              )
-                            }
-                            className="pl-10"
-                          />
-                        </div>
-                      </div>
-                    </>
-                  )}
                 </div>
+              </div>
 
-                {/* Modal Actions */}
-                <div className="flex justify-end gap-3 pt-4 border-t">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setIsModalOpen(false)}
-                    disabled={isCreatingClient}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    type="button"
-                    onClick={handleCreateClient}
-                    disabled={!isCreateClientFormValid() || isCreatingClient}
-                  >
-                    {isCreatingClient ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Creating...
-                      </>
-                    ) : (
-                      "Create Client"
-                    )}
-                  </Button>
-                </div>
-              </DialogContent>
-            </Dialog>
-          </CardHeader>
+              <div className="space-y-2 relative">
+                <Label htmlFor="taskCategory">Task Category *</Label>
+                <div className="relative">
+                  <Input
+                    id="taskCategory"
+                    type="text"
+                    placeholder="Type to search categories..."
+                    value={categorySearchQuery}
+                    onChange={(e) => {
+                      setCategorySearchQuery(e.target.value);
+                      if (e.target.value.trim()) {
+                        setShowCategorySuggestions(true);
+                      } else {
+                        setShowCategorySuggestions(false);
+                      }
+                    }}
+                    onFocus={() => {
+                      if (categorySearchQuery.trim()) {
+                        setShowCategorySuggestions(true);
+                      }
+                    }}
+                    className="w-full"
+                    required
+                  />
 
-          <CardContent className="space-y-6">
-            <div className="space-y-2">
-              <Label htmlFor="client">Select Client *</Label>
-              <div className="relative">
-                <Input
-                  id="client"
-                  type="text"
-                  placeholder="Type to search clients..."
-                  value={searchQuery}
-                  onChange={(e) => {
-                    setSearchQuery(e.target.value);
-                    if (e.target.value.trim()) {
-                      setShowSuggestions(true);
-                    } else {
-                      setShowSuggestions(false);
-                    }
-                  }}
-                  onFocus={() => {
-                    if (searchQuery.trim()) {
-                      setShowSuggestions(true);
-                    }
-                  }}
-                  className="w-full"
-                />
-
-                {showSuggestions &&
-                  searchQuery.trim() &&
-                  filteredClients.length > 0 && (
+                  {/* Category Suggestions Dropdown - Only show when searching */}
+                  {showCategorySuggestions &&
+                    categorySearchQuery.trim() &&
+                    filteredCategories.length > 0 && (
                     <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto">
-                      {filteredClients.map((client) => (
+                      {filteredCategories.map((category) => (
                         <div
-                          key={client.id}
+                          key={category.id}
                           className="flex items-center justify-between p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
                           onClick={() => {
-                            const clientName =
-                              client.clientType === "individual"
-                                ? `${client.firstName || ""} ${
-                                    client.lastName || ""
-                                  }`.trim()
-                                : client.organizationName || "";
-                            setSearchQuery(clientName);
-                            handleInputChange("clientId", client.id);
-                            setShowSuggestions(false);
+                            setFormData((prev) => ({ ...prev, categoryId: category.id }));
+                            setCategorySearchQuery(category.name);
+                            setShowCategorySuggestions(false);
                           }}
                         >
                           <div className="flex items-center gap-2">
-                            <Avatar className="h-6 w-6">
-                              <AvatarFallback className="text-xs">
-                                {(client.clientType === "individual"
-                                  ? `${client.firstName || ""} ${
-                                      client.lastName || ""
-                                    }`
-                                  : client.organizationName || ""
-                                )
-                                  ?.split(" ")
-                                  .filter((n) => n.length > 0)
-                                  .map((n) => n[0])
-                                  .join("")}
-                              </AvatarFallback>
-                            </Avatar>
                             <div>
-                              <span className="font-medium">
-                                {client.clientType === "individual"
-                                  ? `${client.firstName || ""} ${
-                                      client.lastName || ""
-                                    }`.trim()
-                                  : client.organizationName || ""}
-                              </span>
+                              <span className="font-medium">{category.name}</span>
+                              {category.description && (
+                                <div className="text-xs text-gray-500 mt-1">
+                                  {category.description}
+                                </div>
+                              )}
                             </div>
                           </div>
-                          {getClientTypeBadge(client.clientType)}
+                          <Badge
+                            className={`text-xs ${
+                              category.status === "approved"
+                                ? "bg-green-100 text-green-800"
+                                : "bg-yellow-100 text-yellow-800"
+                            }`}
+                          >
+                            {category.status}
+                          </Badge>
                         </div>
                       ))}
                     </div>
                   )}
 
-                {showSuggestions &&
-                  searchQuery &&
-                  filteredClients.length === 0 && (
+                  {/* No results message - Only when searching */}
+                  {showCategorySuggestions &&
+                    categorySearchQuery &&
+                    filteredCategories.length === 0 && (
                     <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg p-3">
-                      <span className="text-gray-500">No clients found</span>
+                      <span className="text-gray-500">No categories found</span>
                     </div>
                   )}
-              </div>
-            </div>
-
-            {/* Auto-filled Contact Information */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="contact-number">Contact Number *</Label>
-                <div className="relative">
-                  <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="contact-number"
-                    placeholder="Contact number will auto-fill"
-                    value={selectedClient?.phoneNumber || ""}
-                    readOnly
-                    className="pl-10"
-                    required
-                  />
                 </div>
-                {selectedClient && (
-                  <p className="text-xs text-muted-foreground">
-                    Auto-filled from{" "}
-                    {selectedClient.clientType === "individual"
-                      ? `${selectedClient.firstName} ${selectedClient.lastName}`
-                      : selectedClient.organizationName}
-                  </p>
-                )}
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="email-id">Email ID *</Label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="email-id"
-                    type="email"
-                    placeholder="Email will auto-fill"
-                    value={selectedClient?.email || ""}
-                    readOnly
-                    className="pl-10"
-                    required
-                  />
-                </div>
-                {selectedClient && (
-                  <p className="text-xs text-muted-foreground">
-                    Auto-filled from{" "}
-                    {selectedClient.clientType === "individual"
-                      ? `${selectedClient.firstName} ${selectedClient.lastName}`
-                      : selectedClient.organizationName}
-                  </p>
-                )}
-              </div>
-            </div>
-
-            {/* Selected Client Preview */}
-            {selectedClient && (
-              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <div className="flex items-center gap-3">
-                  <Avatar className="h-10 w-10">
-                    <AvatarFallback className="bg-blue-100 text-blue-600">
-                      {(selectedClient.clientType === "individual"
-                        ? `${selectedClient.firstName} ${selectedClient.lastName}`
-                        : selectedClient.organizationName
-                      )
-                        ?.split(" ")
-                        .map((n) => n[0])
-                        .join("")}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 mx-2">
-                    <h4 className="font-medium text-blue-900">
-                      {selectedClient.clientType === "individual"
-                        ? `${selectedClient.firstName} ${selectedClient.lastName}`
-                        : selectedClient.organizationName}
-                    </h4>
-                    {/* <p className="text-sm text-blue-600">Contact: {selectedClient.authorizedPersonName || 'N/A'}</p> */}
-                  </div>
-                  {getClientTypeBadge(selectedClient.clientType)}
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Task Priority, Assignment & Completion Date */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5" />
-              Priority, Assignment & Schedule
-            </CardTitle>
-            <CardDescription>
-              Set task priority, assign to an agent, and set completion date
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="priority">Task Priority *</Label>
-                <Select
-                  value={formData.priority}
-                  onValueChange={(value) =>
-                    handleInputChange("priority", value)
+                <Label htmlFor="description">Task Description *</Label>
+                <Textarea
+                  id="description"
+                  placeholder="Describe the task in detail, including any specific requirements or instructions..."
+                  value={formData.description}
+                  onChange={(e) =>
+                    handleInputChange("description", e.target.value)
                   }
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select priority level" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {taskPriorities.map((priority) => (
-                      <SelectItem key={priority.value} value={priority.value}>
-                        <div className="flex items-center gap-2">
-                          <AlertCircle className="w-4 h-4" />
-                          {priority.label}
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {formData.priority && (
-                  <div className="mt-2">
-                    {getPriorityBadge(formData.priority)}
-                  </div>
-                )}
+                  rows={4}
+                  required
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Client Information */}
+          <Card>
+            <CardHeader className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <User className="h-5 w-5" />
+                  Client Information
+                </CardTitle>
+                <CardDescription>
+                  Select client and their contact details will be auto-filled
+                </CardDescription>
               </div>
 
+              <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+                <DialogTrigger asChild>
+                  <Button type="button" onClick={handleAddClientClick}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Client
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-[500px] max-h-[80vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>Add New Client</DialogTitle>
+                    <DialogDescription>
+                      Select the client type and fill in the details
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    {/* Client Type Selection */}
+                    <div className="space-y-2">
+                      <Label htmlFor="client-type">Client Type *</Label>
+                      <Select
+                        value={selectedClientType}
+                        onValueChange={setSelectedClientType}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Choose client type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="individual">
+                            <div className="flex items-center gap-2">
+                              <User className="h-4 w-4" />
+                              Individual
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="organization">
+                            <div className="flex items-center gap-2">
+                              <Users className="h-4 w-4" />
+                              Organization
+                            </div>
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Individual Form Fields */}
+                    {selectedClientType === "individual" && (
+                      <>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="firstName">First Name *</Label>
+                            <Input
+                              id="firstName"
+                              placeholder="Enter first name"
+                              value={newClientData.firstName}
+                              onChange={(e) =>
+                                handleNewClientInputChange(
+                                  "firstName",
+                                  e.target.value
+                                )
+                              }
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="lastName">Last Name *</Label>
+                            <Input
+                              id="lastName"
+                              placeholder="Enter last name"
+                              value={newClientData.lastName}
+                              onChange={(e) =>
+                                handleNewClientInputChange(
+                                  "lastName",
+                                  e.target.value
+                                )
+                              }
+                            />
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="email">Email *</Label>
+                          <div className="relative">
+                            <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                            <Input
+                              id="email"
+                              type="email"
+                              placeholder="Enter email address"
+                              value={newClientData.email}
+                              onChange={(e) =>
+                                handleNewClientInputChange(
+                                  "email",
+                                  e.target.value
+                                )
+                              }
+                              className="pl-10"
+                            />
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="phoneNumber">Phone Number *</Label>
+                          <div className="relative">
+                            <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                            <Input
+                              id="phoneNumber"
+                              placeholder="Enter phone number"
+                              value={newClientData.phoneNumber}
+                              onChange={(e) =>
+                                handleNewClientInputChange(
+                                  "phoneNumber",
+                                  e.target.value
+                                )
+                              }
+                              className="pl-10"
+                            />
+                          </div>
+                        </div>
+                      </>
+                    )}
+
+                    {/* Organization Form Fields */}
+                    {selectedClientType === "organization" && (
+                      <>
+                        <div className="space-y-2">
+                          <Label htmlFor="organizationName">
+                            Organization Name *
+                          </Label>
+                          <Input
+                            id="organizationName"
+                            placeholder="Enter organization name"
+                            value={newClientData.organizationName}
+                            onChange={(e) =>
+                              handleNewClientInputChange(
+                                "organizationName",
+                                e.target.value
+                              )
+                            }
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="authorizedPersonName">
+                            Authorized Person *
+                          </Label>
+                          <Input
+                            id="authorizedPersonName"
+                            placeholder="Enter authorized person name"
+                            value={newClientData.authorizedPersonName}
+                            onChange={(e) =>
+                              handleNewClientInputChange(
+                                "authorizedPersonName",
+                                e.target.value
+                              )
+                            }
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="email">Email *</Label>
+                          <div className="relative">
+                            <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                            <Input
+                              id="email"
+                              type="email"
+                              placeholder="Enter email address"
+                              value={newClientData.email}
+                              onChange={(e) =>
+                                handleNewClientInputChange(
+                                  "email",
+                                  e.target.value
+                                )
+                              }
+                              className="pl-10"
+                            />
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="phoneNumber">Phone Number *</Label>
+                          <div className="relative">
+                            <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                            <Input
+                              id="phoneNumber"
+                              placeholder="Enter phone number"
+                              value={newClientData.phoneNumber}
+                              onChange={(e) =>
+                                handleNewClientInputChange(
+                                  "phoneNumber",
+                                  e.target.value
+                                )
+                              }
+                              className="pl-10"
+                            />
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Modal Actions */}
+                  <div className="flex justify-end gap-3 pt-4 border-t">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setIsModalOpen(false)}
+                      disabled={isCreatingClient}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      type="button"
+                      onClick={handleCreateClient}
+                      disabled={!isCreateClientFormValid() || isCreatingClient}
+                    >
+                      {isCreatingClient ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Creating...
+                        </>
+                      ) : (
+                        "Create Client"
+                      )}
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </CardHeader>
+
+            <CardContent className="space-y-6">
               <div className="space-y-2">
-                <Label htmlFor="assigned-agent">Assign Task To *</Label>
+                <Label htmlFor="client">Select Client *</Label>
                 <div className="relative">
                   <Input
-                    id="assigned-agent"
+                    id="client"
                     type="text"
-                    placeholder="Type to search agents..."
-                    value={agentSearchQuery}
+                    placeholder="Type to search clients..."
+                    value={searchQuery}
                     onChange={(e) => {
-                      setAgentSearchQuery(e.target.value);
+                      setSearchQuery(e.target.value);
                       if (e.target.value.trim()) {
-                        setShowAgentSuggestions(true);
+                        setShowSuggestions(true);
                       } else {
-                        setShowAgentSuggestions(false);
+                        setShowSuggestions(false);
                       }
                     }}
                     onFocus={() => {
-                      if (agentSearchQuery.trim()) {
-                        setShowAgentSuggestions(true);
+                      if (searchQuery.trim()) {
+                        setShowSuggestions(true);
                       }
                     }}
                     className="w-full"
                   />
 
-                  {showAgentSuggestions &&
-                    agentSearchQuery.trim() &&
-                    filteredAgents.length > 0 && (
+                  {showSuggestions &&
+                    searchQuery.trim() &&
+                    filteredClients.length > 0 && (
                       <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto">
-                        {filteredAgents.map((agent) => (
+                        {filteredClients.map((client) => (
                           <div
-                            key={agent.id}
-                            className="flex items-center gap-2 p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
+                            key={client.id}
+                            className="flex items-center justify-between p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
                             onClick={() => {
-                              const agentName =
-                                agent.name.charAt(0).toUpperCase() +
-                                agent.name.slice(1);
-                              setAgentSearchQuery(agentName);
-                              handleInputChange("assignedToId", agent.id);
-                              setShowAgentSuggestions(false);
+                              const clientName =
+                                client.clientType === "individual"
+                                  ? `${client.firstName || ""} ${
+                                      client.lastName || ""
+                                    }`.trim()
+                                  : client.organizationName || "";
+                              setSearchQuery(clientName);
+                              handleInputChange("clientId", client.id);
+                              setShowSuggestions(false);
                             }}
                           >
-                            <Avatar className="h-6 w-6">
-                              <AvatarFallback className="text-xs">
-                                {agent.name
-                                  .toUpperCase()
-                                  .split(" ")
-                                  .filter((n) => n.length > 0)
-                                  .map((n) => n[0])
-                                  .join("")}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div>
-                              <span className="font-medium">
-                                {agent.name.charAt(0).toUpperCase() +
-                                  agent.name.slice(1)}
-                              </span>
-                              <span className="text-sm text-muted-foreground ml-2">
-                                ({agent.agentType})
-                              </span>
+                            <div className="flex items-center gap-2">
+                              <Avatar className="h-6 w-6">
+                                <AvatarFallback className="text-xs">
+                                  {(client.clientType === "individual"
+                                    ? `${client.firstName || ""} ${
+                                        client.lastName || ""
+                                      }`
+                                    : client.organizationName || ""
+                                  )
+                                    ?.split(" ")
+                                    .filter((n) => n.length > 0)
+                                    .map((n) => n[0])
+                                    .join("")}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div>
+                                <span className="font-medium">
+                                  {client.clientType === "individual"
+                                    ? `${client.firstName || ""} ${
+                                        client.lastName || ""
+                                      }`.trim()
+                                    : client.organizationName || ""}
+                                </span>
+                              </div>
                             </div>
+                            {getClientTypeBadge(client.clientType)}
                           </div>
                         ))}
                       </div>
                     )}
 
-                  {showAgentSuggestions &&
-                    agentSearchQuery.trim() &&
-                    filteredAgents.length === 0 && (
-                      <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg p-3">
-                        <span className="text-gray-500">No agents found</span>
-                      </div>
-                    )}
+                  {showSuggestions &&
+                    searchQuery &&
+                    filteredClients.length === 0 && (
+                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg p-3">
+                      <span className="text-gray-500">No clients found</span>
+                    </div>
+                  )}
                 </div>
               </div>
-            </div>
 
-            {/* Completion Date */}
-            <div className="space-y-2">
-              <Label className="flex items-center gap-1">
-                Task Completion Date 
-                <span className="text-red-500">*</span>
-              </Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn(
-                      "w-full justify-start text-left font-normal",
-                      !dueDate && "text-muted-foreground border-red-200 focus:border-red-500"
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {dueDate
-                      ? format(dueDate, "PPP")
-                      : "Select completion date"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
-                  <Calendar
-                    mode="single"
-                    selected={dueDate}
-                    onSelect={setDueDate}
-                    fromDate={new Date()}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-              <p className="text-xs text-muted-foreground">
-                Choose the date when this task should be completed (required)
-              </p>
-            </div>
-
-            {/* Assignment Preview */}
-            {formData.assignedToId && (
-              <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-                <div className="flex items-center gap-3">
-                  <Avatar className="h-10 w-10">
-                    <AvatarFallback className="bg-green-100 text-green-600">
-                      {agents
-                        .find((a) => a.id === formData.assignedToId)
-                        ?.name.split(" ")
-                        .map((n) => n[0])
-                        .join("")}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <h4 className="font-medium text-green-900">
-                      Ownership to:{" "}
-                      {agents.find((a) => a.id === formData.assignedToId)?.name}
-                    </h4>
-                    <p className="text-sm text-green-600">
-                      Role:{" "}
-                      {
-                        agents.find((a) => a.id === formData.assignedToId)
-                          ?.agentType
-                      }
+              {/* Auto-filled Contact Information */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="contact-number">Contact Number *</Label>
+                  <div className="relative">
+                    <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="contact-number"
+                      placeholder="Contact number will auto-fill"
+                      value={selectedClient?.phoneNumber || ""}
+                      readOnly
+                      className="pl-10"
+                      required
+                    />
+                  </div>
+                  {selectedClient && (
+                    <p className="text-xs text-muted-foreground">
+                      Auto-filled from{" "}
+                      {selectedClient.clientType === "individual"
+                        ? `${selectedClient.firstName} ${selectedClient.lastName}`
+                        : selectedClient.organizationName}
                     </p>
-                    {dueDate && (
-                      <p className="text-sm text-green-600">
-                        Due: {format(dueDate, "EEEE, MMMM do, yyyy")}
-                      </p>
-                    )}
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="email-id">Email ID *</Label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      id="email-id"
+                      type="email"
+                      placeholder="Email will auto-fill"
+                      value={selectedClient?.email || ""}
+                      readOnly
+                      className="pl-10"
+                      required
+                    />
+                  </div>
+                  {selectedClient && (
+                    <p className="text-xs text-muted-foreground">
+                      Auto-filled from{" "}
+                      {selectedClient.clientType === "individual"
+                        ? `${selectedClient.firstName} ${selectedClient.lastName}`
+                        : selectedClient.organizationName}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* Selected Client Preview */}
+              {selectedClient && (
+                <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <Avatar className="h-10 w-10">
+                      <AvatarFallback className="bg-blue-100 text-blue-600">
+                        {(selectedClient.clientType === "individual"
+                          ? `${selectedClient.firstName} ${selectedClient.lastName}`
+                          : selectedClient.organizationName
+                        )
+                          ?.split(" ")
+                          .map((n) => n[0])
+                          .join("")}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 mx-2">
+                      <h4 className="font-medium text-blue-900">
+                        {selectedClient.clientType === "individual"
+                          ? `${selectedClient.firstName} ${selectedClient.lastName}`
+                          : selectedClient.organizationName}
+                      </h4>
+                      {/* <p className="text-sm text-blue-600">Contact: {selectedClient.authorizedPersonName || 'N/A'}</p> */}
+                    </div>
+                    {getClientTypeBadge(selectedClient.clientType)}
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Task Priority, Assignment & Completion Date */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Users className="h-5 w-5" />
+                Priority, Assignment & Schedule
+              </CardTitle>
+              <CardDescription>
+                Set task priority, assign to an agent, and set completion date
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="priority">Task Priority *</Label>
+                  <Select
+                    value={formData.priority}
+                    onValueChange={(value) =>
+                      handleInputChange("priority", value)
+                    }
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select priority level" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {taskPriorities.map((priority) => (
+                        <SelectItem key={priority.value} value={priority.value}>
+                          <div className="flex items-center gap-2">
+                            <AlertCircle className="w-4 h-4" />
+                            {priority.label}
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {formData.priority && (
+                    <div className="mt-2">
+                      {getPriorityBadge(formData.priority)}
+                    </div>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="assigned-agent">Assign Task To *</Label>
+                  <div className="relative">
+                    <Input
+                      id="assigned-agent"
+                      type="text"
+                      placeholder="Type to search agents..."
+                      value={agentSearchQuery}
+                      onChange={(e) => {
+                        setAgentSearchQuery(e.target.value);
+                        if (e.target.value.trim()) {
+                          setShowAgentSuggestions(true);
+                        } else {
+                          setShowAgentSuggestions(false);
+                        }
+                      }}
+                      onFocus={() => {
+                        if (agentSearchQuery.trim()) {
+                          setShowAgentSuggestions(true);
+                        }
+                      }}
+                      className="w-full"
+                    />
+
+                    {showAgentSuggestions &&
+                      agentSearchQuery.trim() &&
+                      filteredAgents.length > 0 && (
+                        <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto">
+                          {filteredAgents.map((agent) => (
+                            <div
+                              key={agent.id}
+                              className="flex items-center gap-2 p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
+                              onClick={() => {
+                                const agentName =
+                                  agent.name.charAt(0).toUpperCase() +
+                                  agent.name.slice(1);
+                                setAgentSearchQuery(agentName);
+                                handleInputChange("assignedToId", agent.id);
+                                setShowAgentSuggestions(false);
+                              }}
+                            >
+                              <Avatar className="h-6 w-6">
+                                <AvatarFallback className="text-xs">
+                                  {agent.name
+                                    .toUpperCase()
+                                    .split(" ")
+                                    .filter((n) => n.length > 0)
+                                    .map((n) => n[0])
+                                    .join("")}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div>
+                                <span className="font-medium">
+                                  {agent.name.charAt(0).toUpperCase() +
+                                    agent.name.slice(1)}
+                                </span>
+                                <span className="text-sm text-muted-foreground ml-2">
+                                  ({agent.agentType})
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                    {showAgentSuggestions &&
+                      agentSearchQuery.trim() &&
+                      filteredAgents.length === 0 && (
+                        <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg p-3">
+                          <span className="text-gray-500">No agents found</span>
+                        </div>
+                      )}
                   </div>
                 </div>
               </div>
-            )}
-          </CardContent>
-        </Card>
 
-        {/* Submit Buttons */}
-        <div className="flex justify-end gap-4">
-          <Button
-            className="bg-[#f42b03] hover:bg-[#f42b03] shadow-none hover:shadow-lg transition-shadow duration-300 text-white hover:text-white cursor-pointer"
-            type="button"
-            variant="outline"
-            disabled={isSubmitting}
-            onClick={() => router.push("/task")}
-          >
-            Cancel
-          </Button>
-          <Button
-            type="submit"
-            className="cursor-pointer shadow-none hover:shadow-lg transition-shadow duration-300"
-            disabled={isSubmitting}
-          >
-            {isSubmitting ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                {isEditMode ? "Updating..." : "Creating..."}
-              </>
-            ) : (
-              <>
-                {isEditMode ? "Update Task" : "Create Task"}
-              </>
-            )}
-          </Button>
-        </div>
+              {/* Completion Date */}
+              <div className="space-y-2">
+                <Label className="flex items-center gap-1">
+                  Task Completion Date
+                  <span className="text-red-500">*</span>
+                </Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !dueDate &&
+                          "text-muted-foreground border-red-200 focus:border-red-500"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {dueDate ? format(dueDate, "PPP") : "Select completion date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={dueDate}
+                      onSelect={setDueDate}
+                      fromDate={new Date()}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+                <p className="text-xs text-muted-foreground">
+                  Choose the date when this task should be completed (required)
+                </p>
+              </div>
+
+              {/* Assignment Preview */}
+              {formData.assignedToId && (
+                <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <Avatar className="h-10 w-10">
+                      <AvatarFallback className="bg-green-100 text-green-600">
+                        {agents
+                          .find((a) => a.id === formData.assignedToId)
+                          ?.name.split(" ")
+                          .map((n) => n[0])
+                          .join("")}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <h4 className="font-medium text-green-900">
+                        Ownership to:{" "}
+                        {agents.find((a) => a.id === formData.assignedToId)?.name}
+                      </h4>
+                      <p className="text-sm text-green-600">
+                        Role:{" "}
+                        {
+                          agents.find((a) => a.id === formData.assignedToId)
+                            ?.agentType
+                        }
+                      </p>
+                      {dueDate && (
+                        <p className="text-sm text-green-600">
+                          Due: {format(dueDate, "EEEE, MMMM do, yyyy")}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Retainership Information - New Section */}
+          <Card>
+            <CardHeader className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="h-5 w-5" />
+                  Retainership Information
+                </CardTitle>
+                <CardDescription>
+                  Optionally, select a retainership for this task
+                </CardDescription>
+              </div>
+
+              <Dialog
+                open={isRetainershipModalOpen}
+                onOpenChange={setIsRetainershipModalOpen}
+              >
+                <DialogTrigger asChild>
+                  <Button
+                    type="button"
+                    onClick={handleAddRetainershipClick}
+                    className="h-10"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Retainership
+                  </Button>
+                </DialogTrigger>
+
+                <DialogContent className="sm:max-w-[400px] w-full">
+                  <DialogHeader>
+                    <DialogTitle>Add New Retainership</DialogTitle>
+                    <DialogDescription>
+                      Create a new retainership for long-term tasks or clients
+                    </DialogDescription>
+                  </DialogHeader>
+
+                  {/* Form Fields */}
+                  <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="retainership-name">Retainership Name *</Label>
+                      <Input
+                        id="retainership-name"
+                        placeholder="Enter retainership name (e.g., Gold Plan, Silver Plan)"
+                        className="w-full"
+                        value={newRetainershipData.name}
+                        onChange={(e) =>
+                          setNewRetainershipData({
+                            ...newRetainershipData,
+                            name: e.target.value,
+                          })
+                        }
+                        required
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="retainership-description">Description</Label>
+                      <Textarea
+                        id="retainership-description"
+                        placeholder="Brief description of this retainership (optional)"
+                        className="w-full"
+                        value={newRetainershipData.description}
+                        onChange={(e) =>
+                          setNewRetainershipData({
+                            ...newRetainershipData,
+                            description: e.target.value,
+                          })
+                        }
+                        rows={4}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Modal Actions */}
+                  <div className="flex justify-end gap-3 pt-4 border-t">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setIsRetainershipModalOpen(false)}
+                      disabled={isCreatingRetainership}
+                    >
+                      Cancel
+                    </Button>
+
+                    <Button
+                      type="button"
+                      onClick={handleCreateRetainership}
+                      disabled={!newRetainershipData.name.trim() || isCreatingRetainership}
+                    >
+                      {isCreatingRetainership ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Creating...
+                        </>
+                      ) : (
+                        "Create Retainership"
+                      )}
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </CardHeader>
+
+            <CardContent className="space-y-6">
+              <div className="space-y-2">
+                <Label htmlFor="retainership">Retainership *</Label>
+                <div className="relative">
+                  <Input
+                    id="retainership"
+                    type="text"
+                    placeholder="Type to search retainerships..."
+                    value={retainershipSearchQuery}
+                    onChange={(e) => {
+                      setRetainershipSearchQuery(e.target.value);
+                      if (e.target.value.trim()) {
+                        setShowRetainershipSuggestions(true);
+                      } else {
+                        setShowRetainershipSuggestions(false);
+                      }
+                    }}
+                    onFocus={() => {
+                      if (retainershipSearchQuery.trim()) {
+                        setShowRetainershipSuggestions(true);
+                      }
+                    }}
+                    className="w-full"
+                    required
+                  />
+
+                  {/* Retainership Suggestions Dropdown - Only show when searching */}
+                  {showRetainershipSuggestions &&
+                    retainershipSearchQuery.trim() &&
+                    filteredRetainerships.length > 0 && (
+                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto">
+                      {filteredRetainerships.map((retainership) => (
+                        <div
+                          key={retainership.id}
+                          className="flex items-center justify-between p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
+                          onClick={() => {
+                            setFormData((prev) => ({ ...prev, retainershipId: retainership.id }));
+                            setRetainershipSearchQuery(retainership.name);
+                            setShowRetainershipSuggestions(false);
+                          }}
+                        >
+                          <div className="flex items-center gap-2">
+                            <div>
+                              <span className="font-medium">{retainership.name}</span>
+                              {retainership.description && (
+                                <div className="text-xs text-gray-500 mt-1">
+                                  {retainership.description}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* No results message - Only when searching */}
+                  {showRetainershipSuggestions &&
+                    retainershipSearchQuery &&
+                    filteredRetainerships.length === 0 && (
+                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg p-3">
+                      <span className="text-gray-500">No retainerships found</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Submit Buttons */}
+          <div className="flex justify-end gap-4">
+            <Button
+              className="bg-[#f42b03] hover:bg-[#f42b03] shadow-none hover:shadow-lg transition-shadow duration-300 text-white hover:text-white cursor-pointer"
+              type="button"
+              variant="outline"
+              disabled={isSubmitting}
+              onClick={() => router.push("/task")}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              className="cursor-pointer shadow-none hover:shadow-lg transition-shadow duration-300"
+              disabled={isSubmitting}
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  {isEditMode ? "Updating..." : "Creating..."}
+                </>
+              ) : (
+                <>
+                  {isEditMode ? "Update Task" : "Create Task"}
+                </>
+              )}
+            </Button>
+          </div>
         </fieldset>
       </form>
     </div>

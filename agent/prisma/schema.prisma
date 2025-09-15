@@ -45,6 +45,9 @@ model Agent {
   // TaskCategory agent-created relation
   createdCategories TaskCategory[] @relation("AgentCreatedCategories")
 
+  // Retainership agent-created relation
+  createdRetainerships Retainership[] @relation("AgentCreatedRetainerships")
+
   // Single-session enforcement
   currentSessionToken String?
 }
@@ -67,6 +70,11 @@ model User {
   createdCategories  TaskCategory[] @relation("UserCreatedCategories")
   approvedCategories TaskCategory[] @relation("CategoryApprovals")
   rejectedCategories TaskCategory[] @relation("CategoryRejections")
+
+  // Retainership relations
+  createdRetainerships  Retainership[] @relation("UserCreatedRetainerships")
+  approvedRetainerships Retainership[] @relation("RetainershipApprovals")
+  rejectedRetainerships Retainership[] @relation("RetainershipRejections")
 
   // OTP fields for password reset
   resetOtp      String?
@@ -133,6 +141,9 @@ model Task {
 
   categoryId String?      @db.ObjectId
   category   TaskCategory? @relation(fields: [categoryId], references: [id])
+
+  retainershipId String? @db.ObjectId
+  retainership   Retainership? @relation("RetainershipTasks", fields: [retainershipId], references: [id])
 
   comments Comment[]
   timeLogs TimeLog[]
@@ -204,4 +215,34 @@ model TaskCategory {
 
   // Tasks relation
   tasks Task[]
+}
+
+model Retainership {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  name        String
+  description String?
+  color       String   @default("blue")
+  status      String   @default("pending") // "pending" or "approved"
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Creator information (polymorphic: agent or user)
+  createdByUserId   String? @db.ObjectId
+  createdByUser     User?   @relation("UserCreatedRetainerships", fields: [createdByUserId], references: [id])
+  createdByAgentId  String? @db.ObjectId
+  createdByAgent    Agent?  @relation("AgentCreatedRetainerships", fields: [createdByAgentId], references: [id])
+
+  // Approval information
+  approvedById String?   @db.ObjectId
+  approvedBy   User?     @relation("RetainershipApprovals", fields: [approvedById], references: [id])
+  approvedAt   DateTime?
+
+  // Rejection information
+  rejectedById    String?   @db.ObjectId
+  rejectedBy      User?     @relation("RetainershipRejections", fields: [rejectedById], references: [id])
+  rejectedAt      DateTime?
+  rejectionReason String?
+
+  // Tasks relation
+  tasks Task[] @relation("RetainershipTasks")
 }

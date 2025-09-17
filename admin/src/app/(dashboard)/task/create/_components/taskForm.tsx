@@ -1511,7 +1511,6 @@ export default function TaskForm() {
                       }
                     }}
                     className="w-full"
-                    required
                   />
 
                   {/* Retainership Suggestions Dropdown - Only show when searching */}

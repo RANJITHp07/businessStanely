@@ -1529,7 +1529,6 @@ export default function TaskForm({ id }: TaskFormProps) {
                       }
                     }}
                     className="w-full"
-                    required
                   />
 
                   {showRetainershipSuggestions &&

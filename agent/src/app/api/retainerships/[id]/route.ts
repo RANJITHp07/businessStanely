@@ -37,7 +37,7 @@ export async function GET(
             email: true,
             adminType: true,
             photo: true,
-          }
+          },
         },
         createdByAgent: {
           select: {
@@ -45,55 +45,36 @@ export async function GET(
             name: true,
             email: true,
             photo: true,
-          }
+          },
         },
         approvedBy: {
           select: {
             id: true,
             username: true,
-            email: true,
-            photo: true,
-          }
+          },
         },
         rejectedBy: {
           select: {
             id: true,
             username: true,
-            email: true,
-            photo: true,
-          }
+          },
         },
-      }
+        legislation: {
+          select: {
+            id: true,
+            title: true,
+            description: true,
+            assignedAgent: true,
+          },
+        },
+      },
     });
-    
+
     if (!retainership) {
       return NextResponse.json(
         { error: "Retainership not found" },
         { status: 404 }
       );
-    }
-    
-    // Count tasks associated with this retainership
-    const taskCount = await prisma.task.count({ where: { retainershipId: id } });
-
-    // Determine creator name, type, and role
-    let creatorName = null;
-    let creatorType = null;
-    let creatorRole = null;
-    let creatorId = null;
-    if (retainership.createdByAgent) {
-      creatorName = retainership.createdByAgent.name;
-      creatorType = "agent";
-      creatorRole = null;
-      creatorId = retainership.createdByAgent.id;
-    }
-
-    // Use the creator's photo if available, fallback to null
-    let photo = null;
-    if (retainership.createdByAgent && retainership.createdByAgent.photo) {
-      photo = retainership.createdByAgent.photo;
-    } else {
-      photo = null;
     }
 
     const formattedRetainership = {
@@ -102,21 +83,16 @@ export async function GET(
       description: retainership.description || "",
       color: retainership.color,
       status: retainership.status,
-      createdAt: retainership.createdAt,
-      updatedAt: retainership.updatedAt,
-      createdBy: creatorName || "Unknown",
-      createdByType: creatorType,
-      createdByRole: creatorRole,
-      createdById: creatorId,
-      approvedById: retainership.approvedById || null,
-      approvedBy: retainership.approvedBy?.username || null,
-      approvedAt: retainership.approvedAt || null,
-      rejectedById: retainership.rejectedById || null,
-      rejectedBy: retainership.rejectedBy?.username || null,
-      rejectedAt: retainership.rejectedAt || null,
+      createdAt: retainership.createdAt.toISOString(),
+      updatedAt: retainership.updatedAt.toISOString(),
       rejectionReason: retainership.rejectionReason || null,
-      taskCount: taskCount,
-      photo,
+      createdBy: retainership.createdByUser?.username || retainership.createdByAgent?.name || "Unknown",
+      legislation: retainership.legislation.map((leg: { id: string; title: string; description: string | null; assignedAgent: string }) => ({
+        id: leg.id,
+        title: leg.title,
+        description: leg.description,
+        assignedAgent: leg.assignedAgent,
+      })),
     };
 
     return NextResponse.json(formattedRetainership);

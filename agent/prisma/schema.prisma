@@ -245,4 +245,20 @@ model Retainership {
 
   // Tasks relation
   tasks Task[] @relation("RetainershipTasks")
+
+  // Relation to Legislation
+  legislation Legislation[]
+}
+
+model Legislation {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  title         String
+  description   String?
+  assignedAgent String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relation to Retainership
+  retainershipId String   @db.ObjectId
+  retainership   Retainership @relation(fields: [retainershipId], references: [id], onDelete: Cascade)
 }

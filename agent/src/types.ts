@@ -112,8 +112,7 @@ export interface Comment {
   };
 }
 
-export interface Retainership
- {
+export interface Retainership {
   id: string;
   name: string;
   description?: string;
@@ -135,4 +134,10 @@ export interface Retainership
   taskCount?: number;
   isOwner?: boolean;
   photo?: string;
+  legislation: {
+    id: string;
+    title: string; 
+    description?: string;
+    assignedAgent?: string;
+  }[];
 }

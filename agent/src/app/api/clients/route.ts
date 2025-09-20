@@ -44,7 +44,14 @@ export async function GET() {
         createdAt: 'desc',
       },
     });
-    return NextResponse.json(clients);
+
+    // Add a computed `name` field for each client
+    const clientsWithName = clients.map((client) => ({
+      ...client,
+      name: client.organizationName || `${client.firstName || ''} ${client.lastName || ''}`.trim(),
+    }));
+
+    return NextResponse.json(clientsWithName);
   } catch (error) {
     console.error("Error fetching clients:", error);
     return NextResponse.json({ error: "Failed to fetch clients" }, { status: 500 });

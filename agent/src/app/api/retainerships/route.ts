@@ -127,7 +127,7 @@ export async function POST(req: NextRequest) {
 
     // Parse request body
     const body = await req.json();
-    const { name, description, color } = body;
+    const { name, description, color, legislation } = body;
 
     // Validate required fields
     if (!name) {
@@ -137,7 +137,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // All agent-created retainerships are pending and not approved
+    // Create the retainership
     const newRetainership = await prisma.retainership.create({
       data: {
         name,
@@ -147,44 +147,58 @@ export async function POST(req: NextRequest) {
         createdByAgentId: currentAgent.id,
         approvedById: null,
         approvedAt: null,
+        legislation: {
+          create: legislation?.map((leg: { title: string; description: string; assignedAgent: string }) => ({
+            title: leg.title, // Corrected from `name` to `title`
+            description: leg.description,
+            assignedAgent: leg.assignedAgent
+          })),
+        },
       },
+    });
+
+    // Fetch the created retainership with related data
+    const fetchedRetainership = await prisma.retainership.findUnique({
+      where: { id: newRetainership.id },
       include: {
         createdByAgent: {
           select: {
             id: true,
             name: true,
-          }
+          },
         },
         approvedBy: {
           select: {
             id: true,
             username: true,
-          }
-        }
-      }
+          },
+        },
+        legislation: true,
+      },
     });
 
     // Transform data for frontend
     const transformedRetainership = {
-      id: newRetainership.id,
-      name: newRetainership.name,
-      description: newRetainership.description || "",
-      color: newRetainership.color,
-      status: newRetainership.status,
-      createdAt: newRetainership.createdAt.toISOString(),
-      updatedAt: newRetainership.updatedAt.toISOString(),
-      createdBy: newRetainership.createdByAgent?.name || null,
-      createdById: newRetainership.createdByAgentId,
-      approvedById: newRetainership.approvedById,
-      approvedBy: newRetainership.approvedBy?.username || null,
-      approvedAt: newRetainership.approvedAt?.toISOString() || null,
+      id: fetchedRetainership?.id,
+      name: fetchedRetainership?.name,
+      description: fetchedRetainership?.description || "",
+      color: fetchedRetainership?.color,
+      status: fetchedRetainership?.status,
+      createdAt: fetchedRetainership?.createdAt.toISOString(),
+      updatedAt: fetchedRetainership?.updatedAt.toISOString(),
+      createdBy: fetchedRetainership?.createdByAgent?.name || null,
+      createdById: fetchedRetainership?.createdByAgentId,
+      approvedById: fetchedRetainership?.approvedById,
+      approvedBy: fetchedRetainership?.approvedBy?.username || null,
+      approvedAt: fetchedRetainership?.approvedAt?.toISOString() || null,
+      legislation: fetchedRetainership?.legislation,
       taskCount: 0,
     };
 
     return NextResponse.json(transformedRetainership, { status: 201 });
   } catch (error) {
     console.error("Error creating retainership:", error);
-    
+
     // Check for unique constraint violations - Prisma error
     if (error instanceof Error && 'code' in error && error.code === 'P2002') {
       return NextResponse.json(
@@ -192,7 +206,7 @@ export async function POST(req: NextRequest) {
         { status: 409 }
       );
     }
-    
+
     const errorMessage = error instanceof Error ? error.message : "Internal server error";
     return NextResponse.json(
       { error: errorMessage },

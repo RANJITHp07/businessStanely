@@ -50,7 +50,14 @@ export async function GET() {
         createdAt: 'desc',
       },
     });
-    return NextResponse.json(clients);
+
+    // Add a `name` field prioritizing `organizationName` for organizations
+    const clientsWithName = clients.map(client => ({
+      ...client,
+      name: client.organizationName || `${client.firstName || ''} ${client.lastName || ''}`.trim() || 'Unknown Name',
+    }));
+
+    return NextResponse.json(clientsWithName);
   } catch (error) {
     console.error("Error fetching clients:", error);
     return NextResponse.json({ error: "Failed to fetch clients" }, { status: 500 });

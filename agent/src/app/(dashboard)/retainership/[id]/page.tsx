@@ -246,7 +246,7 @@ export default function RetainershipDetail({ params }: { params: Promise<{ id: s
                                             <TableRow key={legislation.id}>
                                                 <TableCell>{legislation.title}</TableCell>
                                                 <TableCell>{legislation.description}</TableCell>
-                                                <TableCell>{legislation.assignedAgent}</TableCell>
+                                                <TableCell>{legislation.assignedAgent?.name || "Unknown"}</TableCell>
                                             </TableRow>
                                         ))
                                     )}

@@ -129,6 +129,9 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { name, description, color, legislation } = body;
 
+    console.log("Incoming request body:", req.body);
+    console.log("Legislation data:", legislation);
+
     // Validate required fields
     if (!name) {
       return NextResponse.json(
@@ -136,6 +139,25 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
+
+    // Resolve assignedAgent to assignedAgentId using findFirst
+    const resolvedLegislation = await Promise.all(
+      legislation?.map(async (leg: { title: string; description: string; assignedAgent: string }) => {
+        const agent = await prisma.agent.findFirst({
+          where: { name: leg.assignedAgent }, // Use findFirst for non-unique fields
+        });
+
+        if (!agent) {
+          throw new Error(`Agent with name '${leg.assignedAgent}' not found`);
+        }
+
+        return {
+          title: leg.title,
+          description: leg.description,
+          assignedAgentId: agent.id, // Use the resolved ObjectID
+        };
+      })
+    );
 
     // Create the retainership
     const newRetainership = await prisma.retainership.create({
@@ -148,18 +170,9 @@ export async function POST(req: NextRequest) {
         approvedById: null,
         approvedAt: null,
         legislation: {
-          create: legislation?.map((leg: { title: string; description: string; assignedAgent: string }) => ({
-            title: leg.title, // Corrected from `name` to `title`
-            description: leg.description,
-            assignedAgent: leg.assignedAgent
-          })),
+          create: resolvedLegislation,
         },
       },
-    });
-
-    // Fetch the created retainership with related data
-    const fetchedRetainership = await prisma.retainership.findUnique({
-      where: { id: newRetainership.id },
       include: {
         createdByAgent: {
           select: {
@@ -173,25 +186,40 @@ export async function POST(req: NextRequest) {
             username: true,
           },
         },
-        legislation: true,
+        legislation: {
+          include: {
+            assignedAgent: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+              },
+            },
+          },
+        },
       },
     });
 
     // Transform data for frontend
     const transformedRetainership = {
-      id: fetchedRetainership?.id,
-      name: fetchedRetainership?.name,
-      description: fetchedRetainership?.description || "",
-      color: fetchedRetainership?.color,
-      status: fetchedRetainership?.status,
-      createdAt: fetchedRetainership?.createdAt.toISOString(),
-      updatedAt: fetchedRetainership?.updatedAt.toISOString(),
-      createdBy: fetchedRetainership?.createdByAgent?.name || null,
-      createdById: fetchedRetainership?.createdByAgentId,
-      approvedById: fetchedRetainership?.approvedById,
-      approvedBy: fetchedRetainership?.approvedBy?.username || null,
-      approvedAt: fetchedRetainership?.approvedAt?.toISOString() || null,
-      legislation: fetchedRetainership?.legislation,
+      id: newRetainership.id,
+      name: newRetainership.name,
+      description: newRetainership.description || "",
+      color: newRetainership.color,
+      status: newRetainership.status,
+      createdAt: newRetainership.createdAt.toISOString(),
+      updatedAt: newRetainership.updatedAt.toISOString(),
+      createdBy: newRetainership.createdByAgent?.name || null,
+      createdById: newRetainership.createdByAgentId,
+      approvedById: newRetainership.approvedById,
+      approvedBy: newRetainership.approvedBy?.username || null,
+      approvedAt: newRetainership.approvedAt?.toISOString() || null,
+      legislation: newRetainership.legislation.map((leg) => ({
+        id: leg.id,
+        title: leg.title,
+        description: leg.description,
+        assignedAgent: leg.assignedAgent?.name || "Unknown", // Include assignedAgent name
+      })),
       taskCount: 0,
     };
 

@@ -101,10 +101,19 @@ export interface TaskCategory {
   taskCount?: number;
   isOwner?: boolean;
   photo?: string;
+  createdByUser?: {
+    id: string;
+    username: string;
+    email: string;
+  };
+  createdByAgent?: {
+    id: string;
+    name: string;
+    email: string;
+  };
 }
 
-export interface Retainership
- {
+export interface Retainership {
   id: string;
   name: string;
   description?: string;
@@ -126,6 +135,22 @@ export interface Retainership
   taskCount?: number;
   isOwner?: boolean;
   photo?: string;
+  createdByUser?: {
+    id: string;
+    username: string;
+    email: string;
+  };
+  createdByAgent?: {
+    id: string;
+    name: string;
+    email: string;
+  };
+  legislation: {
+    id: string;
+    title: string;
+    description?: string;
+    assignedAgent?: string;
+  }[];
 }
 
 export interface Comment {

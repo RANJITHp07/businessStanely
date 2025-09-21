@@ -26,34 +26,23 @@ export async function GET(
       );
     }
 
+    // Add debugging logs to inspect fetched legislation data
+    console.log("Fetching retainership with ID:", id);
+
     // Find the retainership in database with creator information (user or agent)
+    // Include legislation relation in the query
     const retainership = await prisma.retainership.findUnique({
       where: { id },
       include: {
-        createdByUser: {
-          select: {
-            id: true,
-            username: true,
-            email: true,
-            adminType: true,
-            photo: true,
-          }
-        },
-        createdByAgent: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            photo: true,
-          }
-        },
+        createdByUser: true,
+        createdByAgent: true,
         approvedBy: {
           select: {
             id: true,
             username: true,
             email: true,
             photo: true,
-          }
+          },
         },
         rejectedBy: {
           select: {
@@ -61,10 +50,24 @@ export async function GET(
             username: true,
             email: true,
             photo: true,
-          }
+          },
+        },
+        legislation: {
+          include: {
+            assignedAgent: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+              },
+            },
+          },
         },
       }
     });
+
+    // Log the fetched retainership data
+    console.log("Fetched retainership details:", JSON.stringify(retainership, null, 2));
     
     if (!retainership) {
       return NextResponse.json(
@@ -115,6 +118,16 @@ export async function GET(
       createdByType: creatorType,
       createdByRole: creatorRole,
       createdById: creatorId,
+      createdByUser: retainership.createdByUser ? {
+        id: retainership.createdByUser.id,
+        username: retainership.createdByUser.username,
+        email: retainership.createdByUser.email,
+      } : null,
+      createdByAgent: retainership.createdByAgent ? {
+        id: retainership.createdByAgent.id,
+        name: retainership.createdByAgent.name,
+        email: retainership.createdByAgent.email,
+      } : null,
       approvedById: retainership.approvedById || null,
       approvedBy: retainership.approvedBy?.username || null,
       approvedAt: retainership.approvedAt || null,
@@ -125,7 +138,16 @@ export async function GET(
       taskCount: taskCount,
       isOwner: currentAdmin.adminType === "owner",
       photo,
+      legislation: retainership.legislation.map((leg) => ({
+        id: leg.id,
+        title: leg.title,
+        description: leg.description,
+        assignedAgent: leg.assignedAgent?.name || "Unknown",
+      })),
     };
+
+    // Add debugging logs to inspect legislation details
+    console.log("Legislation details fetched from database:", retainership.legislation);
 
     return NextResponse.json(formattedRetainership);
   } catch (error) {

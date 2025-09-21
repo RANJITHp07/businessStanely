@@ -1,13 +1,15 @@
 'use client'
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { User } from "lucide-react"
+import { User, Search, Plus, X } from "lucide-react"
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { useRouter } from "next/navigation"
 import { toast } from "react-toastify"
+import { Badge } from '@/components/ui/badge'
+import { fetchWithAuth } from '@/lib/fetchWithAuth'
 
 interface CreateProps {
     admin?: {
@@ -21,13 +23,71 @@ interface CreateProps {
     };
 }
 
+interface Client {
+    id: string;
+    name: string;
+    email: string;
+}
+
+interface Agent {
+    id: string;
+    name: string;
+    email: string;
+}
+
+interface LegislationItem {
+    id: string;
+    title: string;
+    description: string;
+    assignedAgent: string;
+}
+
 function Create({ admin, initialData }: CreateProps) {
     const [formData, setFormData] = useState({
         name: initialData?.name || "",
         description: initialData?.description || "",
     })
+    const [clientSearch, setClientSearch] = useState('');
+    const [showClientDropdown, setShowClientDropdown] = useState(false);
+    const [clients, setClients] = useState<Client[]>([]);
+    const [agents, setAgents] = useState<Agent[]>([]);
+    const [agentSearches, setAgentSearches] = useState<Record<string, string>>({});
+    const [showAgentDropdowns, setShowAgentDropdowns] = useState<Record<string, boolean>>({});
+    const [legislationItems, setLegislationItems] = useState<LegislationItem[]>([]);
     const [isSubmitting, setIsSubmitting] = useState(false)
     const router = useRouter()
+
+    // Fetch clients and agents from the API
+    useEffect(() => {
+        const fetchClientsAndAgents = async () => {
+            try {
+                const [clientsResponse, agentsResponse] = await Promise.all([
+                    fetchWithAuth('/api/clients'),
+                    fetchWithAuth('/api/agents'),
+                ]);
+
+                if (!clientsResponse.ok || !agentsResponse.ok) {
+                    throw new Error('Failed to fetch data');
+                }
+
+                const clientsData: Client[] = await clientsResponse.json();
+                const agentsData: Agent[] = await agentsResponse.json();
+
+                setClients(clientsData);
+                setAgents(agentsData);
+            } catch (err) {
+                toast.error(err instanceof Error ? err.message : 'An error occurred');
+            }
+        };
+
+        fetchClientsAndAgents();
+    }, []);
+
+    // Filter clients based on search input
+    const filteredClients = clients.filter(client =>
+        (client.name?.toLowerCase().includes(clientSearch.toLowerCase()) ||
+         client.email?.toLowerCase().includes(clientSearch.toLowerCase()))
+    );
 
     // Handle form submission
     const handleSubmit = async (e: React.FormEvent) => {
@@ -37,10 +97,21 @@ function Create({ admin, initialData }: CreateProps) {
             return
         }
 
+        // Add debug log to confirm redirect
         try {
-            setIsSubmitting(true)
+            setIsSubmitting(true);
             // Determine if we're creating or updating
             const isEditing = !!admin?.id
+
+            // Update the payload to use agent IDs instead of names for assignedAgent
+            const payload = {
+                ...formData,
+                legislation: legislationItems.map(item => ({
+                    title: item.title,
+                    description: item.description,
+                    assignedAgent: item.assignedAgent, // Ensure this is the agent ID
+                })),
+            };
 
             // Call API to create/update retainership
             const response = await fetch(
@@ -50,7 +121,7 @@ function Create({ admin, initialData }: CreateProps) {
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify(formData),
+                    body: JSON.stringify(payload),
                 }
             )
             
@@ -60,7 +131,7 @@ function Create({ admin, initialData }: CreateProps) {
             }
             
             toast.success(`Retainership ${isEditing ? 'updated' : 'created'} successfully!`)
-            // Use router for better navigation
+            console.log('Redirecting to /retainership'); // Debug log
             router.push('/retainership')
         } catch (error) {
             console.error("Error creating retainership:", error)
@@ -70,6 +141,61 @@ function Create({ admin, initialData }: CreateProps) {
             setIsSubmitting(false)
         }
     }
+
+    // Handle client selection from dropdown
+    const handleClientSelect = (client: Client) => {
+        setFormData((prev) => ({ ...prev, clientId: client.id }));
+        setClientSearch(client.name);
+        setShowClientDropdown(false);
+    };
+
+    // Add a new legislation item
+    const addLegislationItem = () => {
+        setLegislationItems((prev) => [
+            ...prev,
+            { id: Date.now().toString(), title: '', description: '', assignedAgent: '' },
+        ]);
+    };
+
+    // Remove a legislation item
+    const removeLegislationItem = (id: string) => {
+        setLegislationItems((prev) => prev.filter((item) => item.id !== id));
+    };
+
+    // Update a legislation item
+    const updateLegislationItem = (id: string, field: 'title' | 'description', value: string) => {
+        setLegislationItems((prev) =>
+            prev.map((item) => (item.id === id ? { ...item, [field]: value } : item))
+        );
+    };
+
+    // Handle agent search in legislation items
+    const handleAgentSearch = (itemId: string, query: string) => {
+        setAgentSearches((prev) => ({ ...prev, [itemId]: query }));
+        setShowAgentDropdowns((prev) => ({ ...prev, [itemId]: true }));
+    };
+
+    // Update getFilteredAgents to return an empty array if the search query is empty
+    const getFilteredAgents = (itemId: string) => {
+        const query = agentSearches[itemId]?.toLowerCase() || '';
+        if (!query) return []; // Return an empty array if the search query is empty
+        return agents.filter(agent =>
+            agent.name.toLowerCase().includes(query)
+        );
+    };
+
+    // Handle agent selection for a legislation item
+    const handleAgentSelect = (itemId: string, agent: Agent) => {
+        const updatedLegislationItems = legislationItems.map(item => {
+            if (item.id === itemId) {
+                return { ...item, assignedAgent: agent.id };
+            }
+            return item;
+        });
+        setLegislationItems(updatedLegislationItems);
+        setAgentSearches((prev) => ({ ...prev, [itemId]: agent.name }));
+        setShowAgentDropdowns((prev) => ({ ...prev, [itemId]: false }));
+    };
 
     return (
         <div className="container mx-auto p-6 max-w-7xl">
@@ -115,6 +241,128 @@ function Create({ admin, initialData }: CreateProps) {
                                 />
                             </div>
                         </div>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Client Information</CardTitle>
+                        <CardDescription>Select a client for this retainership</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                        <div className="space-y-2">
+                            <Label htmlFor="client-search">Client</Label>
+                            <div className="relative">
+                                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                                <Input
+                                    id="client-search"
+                                    value={clientSearch}
+                                    onChange={(e) => {
+                                        setClientSearch(e.target.value);
+                                        setShowClientDropdown(true);
+                                    }}
+                                    onFocus={() => setShowClientDropdown(true)}
+                                    placeholder="Search for a client..."
+                                    className="pl-10"
+                                    required
+                                />
+                                {showClientDropdown && clientSearch && filteredClients.length > 0 && (
+                                    <div className="absolute z-10 w-full mt-1 bg-background border border-border rounded-md shadow-lg max-h-60 overflow-auto">
+                                        {filteredClients.map((client) => (
+                                            <div
+                                                key={client.id}
+                                                className="px-4 py-3 hover:bg-muted cursor-pointer border-b border-border last:border-b-0"
+                                                onClick={() => handleClientSelect(client)}
+                                            >
+                                                <div className="font-medium">{client.name || 'Unknown Name'}</div>
+                                                <div className="text-sm text-muted-foreground">{client.email}</div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader>
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <CardTitle>Legislation Subcategories</CardTitle>
+                                <CardDescription>Add specific legislation areas and assign agents</CardDescription>
+                            </div>
+                            <Button type="button" variant="outline" size="sm" onClick={addLegislationItem}>
+                                <Plus className="h-4 w-4 mr-2" />
+                                Add Legislation
+                            </Button>
+                        </div>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        {legislationItems.length === 0 ? (
+                            <div className="text-center py-8 text-muted-foreground">
+                                <p>No legislation items added yet.</p>
+                                <p className="text-sm">Click &quot;Add Legislation&quot; to get started.</p>
+                            </div>
+                        ) : (
+                            legislationItems.map((item, index) => (
+                                <Card key={item.id} className="relative">
+                                    <CardHeader className="pb-4">
+                                        <div className="flex items-center justify-between">
+                                            <Badge variant="secondary">Legislation {index + 1}</Badge>
+                                            <Button type="button" variant="ghost" size="sm" onClick={() => removeLegislationItem(item.id)}>
+                                                <X className="h-4 w-4" />
+                                            </Button>
+                                        </div>
+                                    </CardHeader>
+                                    <CardContent className="space-y-4">
+                                        <div className="space-y-2">
+                                            <Label>Legislation Title</Label>
+                                            <Input
+                                                value={item.title}
+                                                onChange={(e) => updateLegislationItem(item.id, 'title', e.target.value)}
+                                                placeholder="Enter legislation title"
+                                            />
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <Label>Description</Label>
+                                            <Textarea
+                                                value={item.description}
+                                                onChange={(e) => updateLegislationItem(item.id, 'description', e.target.value)}
+                                                placeholder="Describe the legislation requirements"
+                                                rows={3}
+                                            />
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <Label>Assigned Agent</Label>
+                                            <div className="relative">
+                                                <Input
+                                                    value={agentSearches[item.id] || item.assignedAgent}
+                                                    onChange={(e) => handleAgentSearch(item.id, e.target.value)}
+                                                    onFocus={() => setShowAgentDropdowns((prev) => ({ ...prev, [item.id]: true }))}
+                                                    placeholder="Type agent name or select from list..."
+                                                    className="pr-10"
+                                                />
+                                                {showAgentDropdowns[item.id] && getFilteredAgents(item.id).length > 0 && (
+                                                    <div className="absolute z-10 w-full mt-1 bg-background border border-border rounded-md shadow-lg max-h-60 overflow-auto">
+                                                        {getFilteredAgents(item.id).map((agent) => (
+                                                            <div
+                                                                key={agent.id}
+                                                                className="px-4 py-3 hover:bg-muted cursor-pointer border-b border-border last:border-b-0"
+                                                                onClick={() => handleAgentSelect(item.id, agent)}
+                                                            >
+                                                                <div className="font-medium">{agent.name}</div>
+                                                                <div className="text-sm text-muted-foreground">{agent.email}</div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            ))
+                        )}
                     </CardContent>
                 </Card>
                 <div className="flex justify-end gap-4">

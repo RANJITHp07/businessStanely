@@ -20,6 +20,16 @@ export interface TaskCategory {
   taskCount?: number;
   isOwner?: boolean;
   photo?: string;
+  createdByUser?: {
+    id: string;
+    username: string;
+    email: string;
+  };
+  createdByAgent?: {
+    id: string;
+    name: string;
+    email: string;
+  };
 }
 export interface Agent {
   id: string;
@@ -138,6 +148,20 @@ export interface Retainership {
     id: string;
     title: string; 
     description?: string;
-    assignedAgent?: string;
+    assignedAgent?: {
+      id: string;
+      name: string;
+      email: string;
+    };
   }[];
+  createdByUser?: {
+    id: string;
+    username: string;
+    email: string;
+  };
+  createdByAgent?: {
+    id: string;
+    name: string;
+    email: string;
+  };
 }

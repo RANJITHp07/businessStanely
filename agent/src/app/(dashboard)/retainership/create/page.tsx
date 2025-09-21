@@ -75,18 +75,16 @@ function Create({ admin, initialData }: CreateProps) {
 
     // Handle form submission
     const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault()
+        e.preventDefault();
         if (!formData.name) {
-            toast.error("Retainership name is required")
-            return
+            toast.error("Retainership title (name) is required");
+            return;
         }
 
         try {
-            setIsSubmitting(true)
-            // Determine if we're creating or updating
-            const isEditing = !!admin?.id
+            setIsSubmitting(true);
+            const isEditing = !!admin?.id;
 
-            // Call API to create/update retainership
             const response = await fetch(
                 isEditing ? `/api/retainerships/${admin.id}` : '/api/retainerships', 
                 {
@@ -96,6 +94,7 @@ function Create({ admin, initialData }: CreateProps) {
                     },
                     body: JSON.stringify({
                         ...formData,
+                        clientId: formData.clientId,
                         legislation: legislationItems.map(item => ({
                             title: item.title,
                             description: item.description,
@@ -103,22 +102,22 @@ function Create({ admin, initialData }: CreateProps) {
                         })),
                     }),
                 }
-            )
-            
+            );
+
             if (!response.ok) {
-                const errorData = await response.json()
-                throw new Error(errorData.error || `Failed to ${isEditing ? 'update' : 'create'} retainership`)
+                const errorData = await response.json();
+                console.error("API Error:", errorData);
+                throw new Error(errorData.error || `Failed to ${isEditing ? 'update' : 'create'} retainership`);
             }
-            
-            toast.success(`Retainership ${isEditing ? 'updated' : 'created'} successfully!`)
-            // Use router for better navigation
-            router.push('/retainership')
+
+            toast.success(`Retainership ${isEditing ? 'updated' : 'created'} successfully!`);
+            router.push('/retainership');
         } catch (error) {
-            console.error("Error creating retainership:", error)
-            const errorMessage = error instanceof Error ? error.message : "Failed to create retainership"
-            toast.error(errorMessage)
+            console.error("Error creating retainership:", error);
+            const errorMessage = error instanceof Error ? error.message : "Failed to create retainership";
+            toast.error(errorMessage);
         } finally {
-            setIsSubmitting(false)
+            setIsSubmitting(false);
         }
     }
 
@@ -256,27 +255,25 @@ function Create({ admin, initialData }: CreateProps) {
                         <CardDescription>Basic details about the retainership</CardDescription>
                     </CardHeader>
                     <CardContent>
-                        <div >
-                            <div className="space-y-2">
-                                <Label htmlFor="username">Retainership *</Label>
-                                <Input
-                                    id="username"
-                                    value={formData.name}
-                                    onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
-                                    placeholder="Enter retainership name"
-                                    required
-                                />
-                            </div>
-                            <div className="space-y-2 mt-3">
-                                <Label htmlFor="description">Description</Label>
-                                <Textarea
-                                    id="description"
-                                    value={formData.description}
-                                    onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
-                                    placeholder="Enter retainership description (optional)"
-                                    rows={4}
-                                />
-                            </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="username">Retainership *</Label>
+                            <Input
+                                id="username"
+                                value={formData.name}
+                                onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
+                                placeholder="Enter retainership name"
+                                required
+                            />
+                        </div>
+                        <div className="space-y-2 mt-3">
+                            <Label htmlFor="description">Description</Label>
+                            <Textarea
+                                id="description"
+                                value={formData.description}
+                                onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
+                                placeholder="Enter retainership description (optional)"
+                                rows={4}
+                            />
                         </div>
                     </CardContent>
                 </Card>

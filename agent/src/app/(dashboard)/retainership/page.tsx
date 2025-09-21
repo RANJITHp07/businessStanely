@@ -4,7 +4,6 @@ import { useState, useEffect } from "react"
 import { fetchWithAuth } from "@/lib/fetchWithAuth"
 import Link from "next/link"
 import { toast } from "react-toastify"
-import { Retainership } from "@/types"
 import {
     ChevronLeft,
     ChevronRight,
@@ -55,13 +54,34 @@ import {
 import { useRouter } from "next/navigation"
 
 
+// Updated the `DashboardRetainership` interface to include client details
+interface DashboardRetainership {
+    id: string;
+    name: string;
+    description: string;
+    status: string;
+    createdAt: string;
+    updatedAt: string;
+    createdBy: {
+        type: "User" | "Agent" | "Unknown";
+        name: string;
+    };
+    client?: {
+        id: string;
+        name: string;
+        email: string;
+    };
+    photo?: string;
+    taskCount?: number;
+}
+
 export default function RetainershipTable() {
-    const [retainerships, setRetainerships] = useState<Retainership[]>([])
+    const [retainerships, setRetainerships] = useState<DashboardRetainership[]>([])
     const [searchTerm, setSearchTerm] = useState("")
     // Removed unused sortBy and sortByDate state
     const [currentPage, setCurrentPage] = useState(1)
     const [itemsPerPage, setItemsPerPage] = useState(20)
-    const [retainershipToDelete, setRetainershipToDelete] = useState<Retainership | null>(null)
+    const [retainershipToDelete, setRetainershipToDelete] = useState<DashboardRetainership | null>(null)
     const [loading, setLoading] = useState(true)
     const [activeTab, setActiveTab] = useState("approved")
     const [currentUserRole, setCurrentUserRole] = useState<string>("")
@@ -86,7 +106,7 @@ export default function RetainershipTable() {
     }, [activeTab])
 
     // State to store all retainerships for counting
-    const [allRetainerships, setAllRetainerships] = useState<Retainership[]>([]);
+    const [allRetainerships, setAllRetainerships] = useState<DashboardRetainership[]>([]);
 
     // Fetch all retainerships for counting tabs
     useEffect(() => {
@@ -99,15 +119,16 @@ export default function RetainershipTable() {
                 }
 
                 const data = await response.json();
-                setAllRetainerships(data);
+                setAllRetainerships(data || []); // Ensure default empty array
             } catch (error) {
                 console.error("Error fetching all retainerships:", error);
-                setAllRetainerships([]);
+                setAllRetainerships([]); // Default to empty array on error
             }
         };
         fetchAllRetainerships();
     }, []);
 
+    // Added debugging logs to inspect API response and filtering logic
     useEffect(() => {
         const fetchRetainerships = async () => {
             try {
@@ -121,28 +142,27 @@ export default function RetainershipTable() {
                 }
 
                 const data = await response.json();
-                setRetainerships(data);
+                setRetainerships(data || []); // Ensure default empty array
             } catch (error) {
-                console.error("Error fetching retainerships:", error);
-                // Show empty state instead of mock data
-                setRetainerships([]);
+                console.error("Error fetching retainerships:", error)
+                setRetainerships([]) // Default to empty array on error
                 if (error instanceof Error) {
-                    toast.error(error.message);
+                    toast.error(error.message)
                 }
             } finally {
-                setLoading(false);
+                setLoading(false)
             }
-        };
-        fetchRetainerships();
+        }
+        fetchRetainerships()
     }, [activeTab])
 
-
-    // Filter retainerships based on search and tab
-    const filteredRetainerships = retainerships.filter((retainership) => {
+    // Updated filtering logic to normalize status field for case-insensitive comparison
+    const filteredRetainerships = (retainerships || []).filter((retainership) => {
         const matchesSearch =
-            retainership.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            !searchTerm || // Skip search filtering if searchTerm is empty
+            (retainership.name?.toLowerCase() || "").includes(searchTerm.toLowerCase()) ||
             (retainership.description?.toLowerCase() || "").includes(searchTerm.toLowerCase()) ||
-            (retainership.createdBy?.toLowerCase() || "").includes(searchTerm.toLowerCase());
+            (retainership.createdBy?.name?.toLowerCase() || "").includes(searchTerm.toLowerCase());
 
         const matchesTab = retainership.status === activeTab;
 
@@ -160,7 +180,8 @@ export default function RetainershipTable() {
     const totalPages = Math.ceil(sortedRetainerships.length / itemsPerPage)
     const startIndex = (currentPage - 1) * itemsPerPage
     const endIndex = startIndex + itemsPerPage
-    const currentRetainerships = sortedRetainerships.slice(startIndex, endIndex)
+    // Explicitly type the retainership object in the component
+    const currentRetainerships: DashboardRetainership[] = sortedRetainerships.slice(startIndex, endIndex)
 
     const handlePageChange = (page: number) => {
         setCurrentPage(page)
@@ -211,6 +232,28 @@ export default function RetainershipTable() {
     // Get counts for tabs from allRetainerships to always show correct counts
     const approvedCount = allRetainerships.filter((cat) => cat.status === "approved").length
     const pendingCount = allRetainerships.filter((cat) => cat.status === "pending").length
+
+    // Update the CreatedBy type to include "Unknown" as a valid type
+    type CreatedBy = {
+        id?: string; // Optional
+        name: string;
+        type: "User" | "Agent" | "Unknown"; // Added "Unknown"
+    };
+
+    const renderCreatedBy = (createdBy: { id?: string; name: string; type: "User" | "Agent" | "Unknown" } | null) => {
+        if (!createdBy || createdBy.type === "Unknown") return "Unknown";
+        return (
+            <>
+                {createdBy.name}
+                {createdBy.type === "Agent" && (
+                    <span className="ml-1 text-xs text-blue-600">(Agent)</span>
+                )}
+                {createdBy.type === "User" && (
+                    <span className="ml-1 text-xs text-purple-600">(User)</span>
+                )}
+            </>
+        );
+    };
 
     return (
         <div className="container mx-auto p-6 max-w-7xl">
@@ -339,6 +382,7 @@ export default function RetainershipTable() {
                                                     <TableHead>Retainership</TableHead>
                                                     <TableHead>Description</TableHead>
                                                     <TableHead>Tasks</TableHead>
+                                                    <TableHead>Client</TableHead>
                                                     <TableHead>Created By</TableHead>
                                                     <TableHead className="text-right">Actions</TableHead>
                                                 </TableRow>
@@ -358,8 +402,7 @@ export default function RetainershipTable() {
                                                                     <Avatar className="h-10 w-10">
                                                                         <AvatarImage src={retainership.photo || ""} />
                                                                         <AvatarFallback>
-                                                                            {retainership.name
-                                                                                .toUpperCase()
+                                                                            {(retainership.name?.toUpperCase() || "Unknown")
                                                                                 .split(" ")
                                                                                 .map((n) => n[0])
                                                                                 .join("")}
@@ -387,16 +430,12 @@ export default function RetainershipTable() {
                                                             </TableCell>
                                                             <TableCell>
                                                                 <div className="text-sm">
-                                                                    {retainership.createdBy || "Unknown"}
-                                                                    {retainership.createdByType === "agent" && (
-                                                                        <span className="ml-1 text-xs text-blue-600">(Agent)</span>
-                                                                    )}
-                                                                    {retainership.createdByType === "user" && retainership.createdByRole === "owner" && (
-                                                                        <span className="ml-1 text-xs text-purple-600">(Owner)</span>
-                                                                    )}
-                                                                    {retainership.createdByType === "user" && retainership.createdByRole === "admin" && (
-                                                                        <span className="ml-1 text-xs text-green-600">(Admin)</span>
-                                                                    )}
+                                                                    {retainership.client?.name || "Unknown"} ({retainership.client?.email || "No Email"})
+                                                                </div>
+                                                            </TableCell>
+                                                            <TableCell>
+                                                                <div className="text-sm">
+                                                                    {renderCreatedBy(retainership.createdBy)}
                                                                 </div>
                                                             </TableCell>
                                                             <TableCell className="text-right">
@@ -564,6 +603,7 @@ export default function RetainershipTable() {
                                                     <TableHead>Retainership</TableHead>
                                                     <TableHead>Description</TableHead>
                                                     <TableHead>Status</TableHead>
+                                                    <TableHead>Client</TableHead>
                                                     <TableHead>Created By</TableHead>
                                                     <TableHead className="text-right">Actions</TableHead>
                                                 </TableRow>
@@ -577,14 +617,13 @@ export default function RetainershipTable() {
                                                     </TableRow>
                                                 ) : (
                                                     currentRetainerships.map((retainership) => (
-                                                        <TableRow key={retainership.id} className="cursor-pointer hover:bg-muted/50" onClick={() => router.push(`/retainership/approve/${retainership.id}`)}>
+                                                        <TableRow key={retainership.id} className="cursor-pointer hover:bg-muted/50" onClick={() => router.push(`/retainership/${retainership.id}`)}>
                                                             <TableCell>
                                                                 <div className="flex items-center space-x-3">
                                                                     <Avatar className="h-10 w-10">
                                                                         <AvatarImage src={retainership.photo || ""} />
                                                                         <AvatarFallback>
-                                                                            {retainership.name
-                                                                                .toUpperCase()
+                                                                            {(retainership.name?.toUpperCase() || "Unknown")
                                                                                 .split(" ")
                                                                                 .map((n) => n[0])
                                                                                 .join("")}
@@ -610,16 +649,12 @@ export default function RetainershipTable() {
                                                             <TableCell>{getStatusBadge(retainership.status)}</TableCell>
                                                             <TableCell>
                                                                 <div className="text-sm">
-                                                                    {retainership.createdBy || "Unknown"}
-                                                                    {retainership.createdByType === "agent" && (
-                                                                        <span className="ml-1 text-xs text-blue-600">(Agent)</span>
-                                                                    )}
-                                                                    {retainership.createdByType === "user" && retainership.createdByRole === "owner" && (
-                                                                        <span className="ml-1 text-xs text-purple-600">(Owner)</span>
-                                                                    )}
-                                                                    {retainership.createdByType === "user" && retainership.createdByRole === "admin" && (
-                                                                        <span className="ml-1 text-xs text-green-600">(Admin)</span>
-                                                                    )}
+                                                                    {retainership.client?.name || "Unknown"} ({retainership.client?.email || "No Email"})
+                                                                </div>
+                                                            </TableCell>
+                                                            <TableCell>
+                                                                <div className="text-sm">
+                                                                    {renderCreatedBy(retainership.createdBy)}
                                                                 </div>
                                                             </TableCell>
                                                             <TableCell className="text-right">

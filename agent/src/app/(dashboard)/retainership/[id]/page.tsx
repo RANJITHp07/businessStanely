@@ -3,6 +3,8 @@
 import { useState, useEffect } from "react"
 import { use } from "react"
 import { toast } from "react-toastify"
+import { useRouter } from "next/navigation";
+import { fetchWithAuth } from "@/lib/fetchWithAuth"; // Import fetchWithAuth for authenticated requests
 
 // UI Components
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -10,6 +12,13 @@ import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 // Icons
 import {
@@ -18,10 +27,14 @@ import {
     Clock,
     Tag,
     Calendar,
+    MoreHorizontal,
+    Eye,
+    PlusCircle
 } from "lucide-react"
 
 // Importing Retainership, Task, and UserInfo types from the types file
-import { Retainership, Task } from "@/types";
+import { Retainership } from "@/types"; // Removed unused Task import
+import { Button } from "@/components/ui/button";
 
 export default function RetainershipDetail({ params }: { params: Promise<{ id: string }> | { id: string } }) {
     // Helper to render the creator label (name + (Owner/Admin/Agent))
@@ -45,37 +58,29 @@ export default function RetainershipDetail({ params }: { params: Promise<{ id: s
 
     const resolvedParams = params instanceof Promise ? use(params) : params;
     const [retainership, setRetainership] = useState<Retainership | null>(null);
-    const [tasks, setTasks] = useState<Task[]>([]);
     const [loading, setLoading] = useState(true);
+    const router = useRouter();
 
     useEffect(() => {
         const fetchData = async () => {
             try {
                 const retainershipId = resolvedParams.id;
-                const retainershipResponse = await fetch(`/api/retainerships/${retainershipId}`);
+                const retainershipResponse = await fetchWithAuth(`/api/retainerships/${retainershipId}`);
 
                 if (!retainershipResponse.ok) {
                     throw new Error("Failed to fetch retainership");
                 }
 
                 const retainershipData = await retainershipResponse.json();
+
+                // Legislations are already part of retainershipData, no need to fetch separately
                 setRetainership(retainershipData);
 
-                const tasksResponse = await fetch(`/api/tasks?retainershipId=${retainershipId}`);
-
-                if (tasksResponse.ok) {
-                    const tasksData = await tasksResponse.json();
-                    setTasks(tasksData);
-                } else {
-                    console.error("Error fetching tasks:", await tasksResponse.text());
-                    setTasks([]);
-                }
             } catch (error) {
                 console.error("Error fetching data:", error);
                 const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
                 toast.error(`Failed to load retainership: ${errorMessage}`);
                 setRetainership(null);
-                setTasks([]);
             } finally {
                 setLoading(false);
             }
@@ -205,7 +210,7 @@ export default function RetainershipDetail({ params }: { params: Promise<{ id: s
                                             </div>
                                             <div className="flex items-center gap-2">
                                                 <Tag className="h-4 w-4 text-muted-foreground" />
-                                                <span>Tasks: {tasks.length}</span>
+                                                <span>Client: {retainership.client?.name || "Unknown"}</span>
                                             </div>
                                         </div>
                                     </div>
@@ -232,21 +237,54 @@ export default function RetainershipDetail({ params }: { params: Promise<{ id: s
                                         <TableHead>Legislation Name</TableHead>
                                         <TableHead>Description</TableHead>
                                         <TableHead>Assigned Agent</TableHead>
+                                        <TableHead className="text-right">Actions</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {retainership?.legislation?.length === 0 ? (
+                                    {retainership?.legislations?.length === 0 ? (
                                         <TableRow>
                                             <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
                                                 No legislation found for this retainership.
                                             </TableCell>
                                         </TableRow>
                                     ) : (
-                                        retainership?.legislation?.map((legislation) => (
-                                            <TableRow key={legislation.id}>
+                                        retainership?.legislations?.map((legislation) => (
+                                            <TableRow
+                                                key={legislation.id}
+                                                onClick={() => router.push(`/legislation/${legislation.id}`)}
+                                                className="cursor-pointer hover:bg-muted/50"
+                                            >
                                                 <TableCell>{legislation.title}</TableCell>
                                                 <TableCell>{legislation.description}</TableCell>
                                                 <TableCell>{legislation.assignedAgent?.name || "Unknown"}</TableCell>
+                                                <TableCell className="text-right">
+                                                  <DropdownMenu>
+                                                    <DropdownMenuTrigger asChild>
+                                                      <Button variant="ghost" className="h-8 w-8 p-0" onClick={(e) => e.stopPropagation()}>
+                                                        <span className="sr-only">Open menu</span>
+                                                        <MoreHorizontal className="h-4 w-4" />
+                                                      </Button>
+                                                    </DropdownMenuTrigger>
+                                                    <DropdownMenuContent align="end">
+                                                      <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                                      <DropdownMenuItem asChild>
+                                                        <a href={`/legislation/${legislation.id}`} onClick={(e) => e.stopPropagation()}>
+                                                          <Eye className="mr-2 h-4 w-4" />
+                                                          View Details
+                                                        </a>
+                                                      </DropdownMenuItem>
+                                                      <DropdownMenuItem asChild>
+                                                        <a
+                                                          href={`/task/create?legislationId=${legislation.id}&assignedAgent=${legislation.assignedAgent?.id}&client=${retainership.client?.id}`}
+                                                          onClick={(e) => e.stopPropagation()}
+                                                        >
+                                                          <PlusCircle className="mr-2 h-4 w-4" />
+                                                          Create Task
+                                                        </a>
+                                                      </DropdownMenuItem>
+                                                    </DropdownMenuContent>
+                                                  </DropdownMenu>
+                                                </TableCell>
                                             </TableRow>
                                         ))
                                     )}

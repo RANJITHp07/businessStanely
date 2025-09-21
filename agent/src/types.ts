@@ -70,6 +70,7 @@ export interface Client {
   designation: string | null;
   contactEmail: string | null;
   name?: string; // Added for API compatibility
+  getDisplayName(): string;
 }
 
 export interface Task {
@@ -95,6 +96,15 @@ export interface Task {
     status: string;
   };
   comments?: Comment[];
+  legislationId?: string; // Added to link tasks to legislations
+  legislation?: {
+    id: string;
+    title: string;
+    description?: string;
+    status: string;
+    createdAt: string;
+    updatedAt: string;
+  }; // Added legislation object to include detailed information
 }
 
 export interface Comment {
@@ -144,9 +154,9 @@ export interface Retainership {
   taskCount?: number;
   isOwner?: boolean;
   photo?: string;
-  legislation: {
+  legislations: {
     id: string;
-    title: string; 
+    title: string;
     description?: string;
     assignedAgent?: {
       id: string;
@@ -163,5 +173,33 @@ export interface Retainership {
     id: string;
     name: string;
     email: string;
+  };
+  client?: Client;
+}
+
+export interface Legislation {
+  id: string;
+  title: string;
+  description?: string;
+  assignedAgent?: {
+    id: string;
+    name: string;
+    email: string;
+  };
+  client?: {
+    id: string;
+    name: string;
+    email: string;
+    phoneNumber?: string;
+  };
+  retainership?: {
+    client?: {
+      name: string;
+      email: string;
+      organizationName?: string; // Added for API compatibility
+      clientType: string;
+      firstName: string | null;
+      lastName: string | null;
+    };
   };
 }

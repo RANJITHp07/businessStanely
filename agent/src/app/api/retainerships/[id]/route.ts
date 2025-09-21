@@ -59,12 +59,23 @@ export async function GET(
             username: true,
           },
         },
-        legislation: {
+        legislations: {
+          include: {
+            assignedAgent: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
+        client: {
           select: {
             id: true,
-            title: true,
-            description: true,
-            assignedAgent: true,
+            firstName: true,
+            lastName: true,
+            organizationName: true,
+            email: true,
           },
         },
       },
@@ -77,6 +88,7 @@ export async function GET(
       );
     }
 
+    // Updated the mapping logic to handle the nested structure of `assignedAgent`
     const formattedRetainership = {
       id: retainership.id,
       name: retainership.name,
@@ -87,14 +99,25 @@ export async function GET(
       updatedAt: retainership.updatedAt.toISOString(),
       rejectionReason: retainership.rejectionReason || null,
       createdBy: retainership.createdByUser?.username || retainership.createdByAgent?.name || "Unknown",
-      legislation: retainership.legislation.map((leg: { id: string; title: string; description: string | null; assignedAgent: string }) => ({
-        id: leg.id,
-        title: leg.title,
-        description: leg.description,
-        assignedAgent: leg.assignedAgent,
+      client: retainership.client
+        ? {
+            id: retainership.client.id,
+            name: retainership.client.organizationName || `${retainership.client.firstName || ""} ${retainership.client.lastName || ""}`.trim(),
+            email: retainership.client.email,
+          }
+        : null,
+      legislations: retainership.legislations.map((legislation) => ({
+        id: legislation.id,
+        title: legislation.title,
+        description: legislation.description,
+        assignedAgent: legislation.assignedAgent
+          ? {
+              id: legislation.assignedAgent.id,
+              name: legislation.assignedAgent.name,
+            }
+          : null,
       })),
     };
-
     return NextResponse.json(formattedRetainership);
   } catch (error) {
     console.error("Error fetching retainership:", error);

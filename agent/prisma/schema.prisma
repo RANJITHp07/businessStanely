@@ -51,8 +51,11 @@ model Agent {
   // Single-session enforcement
   currentSessionToken String?
 
-  // Relation to Legislation
-  legislations Legislation[] @relation("AgentLegislations")
+  // Legislation relation
+  legislationsAssigned Legislation[] @relation("LegislationsAssigned")
+
+  assignedLegislationId String?   @db.ObjectId @unique
+  assignedLegislation   Legislation? @relation("AssignedLegislation", fields: [assignedLegislationId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 }
 
 model User {
@@ -60,7 +63,7 @@ model User {
   username    String    @unique // Used for both login and display
   email       String    @unique
   password    String
-  adminType   String    @default("admin") // Either "owner" or "admin"
+  adminType   String    @default("owner") // Either "owner" or "admin"
   status      String    @default("active") // "active" or "inactive"
   photo       String?
   lastLogin   DateTime?
@@ -118,6 +121,9 @@ model Client {
   authorizedPersonName String?
   designation          String?
   contactEmail         String?
+
+  retainerships Retainership[]
+  legislations Legislation[]
 }
 
 model Task {
@@ -147,6 +153,10 @@ model Task {
 
   retainershipId String? @db.ObjectId
   retainership   Retainership? @relation("RetainershipTasks", fields: [retainershipId], references: [id])
+
+  // Relation to Legislation
+  legislationId String?      @db.ObjectId
+  legislation   Legislation? @relation("LegislationTasks", fields: [legislationId], references: [id])
 
   comments Comment[]
   timeLogs TimeLog[]
@@ -249,20 +259,33 @@ model Retainership {
   // Tasks relation
   tasks Task[] @relation("RetainershipTasks")
 
-  // Relation to Legislation
-  legislation Legislation[]
+  clientId String? @db.ObjectId
+  client   Client? @relation(fields: [clientId], references: [id])
+
+  legislations Legislation[] @relation("RetainershipLegislation")
 }
 
 model Legislation {
-  id              String   @id @default(auto()) @map("_id") @db.ObjectId
-  title           String
-  description     String?
-  assignedAgentId String?  @db.ObjectId
-  assignedAgent   Agent?   @relation("AgentLegislations", fields: [assignedAgentId], references: [id])
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  title       String
+  description String?
+  status      String   @default("active") // "active" or "inactive"
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  // Relation to Retainership
-  retainershipId String       @db.ObjectId
-  retainership   Retainership @relation(fields: [retainershipId], references: [id], onDelete: Cascade)
+  // Direct relations
+  assignedAgentId String?   @db.ObjectId @unique
+  assignedAgent   Agent?    @relation("LegislationsAssigned", fields: [assignedAgentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  retainershipId String?   @db.ObjectId
+  retainership   Retainership? @relation("RetainershipLegislation", fields: [retainershipId], references: [id])
+
+  clientId String?   @db.ObjectId
+  client   Client?  @relation(fields: [clientId], references: [id])
+
+  // Inverse relations
+  agent Agent? @relation("AssignedLegislation")
+
+  // New relation to tasks
+  tasks Task[] @relation("LegislationTasks")
 }

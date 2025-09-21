@@ -20,87 +20,80 @@ export async function GET(req: NextRequest) {
 
     // Build where clause for the query
     const where: { status?: string } = {};
-    
-    // If status parameter is provided, filter by status
     if (statusParam && ["approved", "pending"].includes(statusParam)) {
-      where.status = statusParam;
+      where.status = statusParam; // Filter by retainership status
     }
-    // Otherwise show all retainerships (both pending and approved)
-    
-    // Get retainerships from the database with proper relations
+
+    // Fetch retainerships from the database
     const retainerships = await prisma.retainership.findMany({
       where,
+      orderBy: {
+        createdAt: 'desc',
+      },
       include: {
+        client: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            organizationName: true,
+            email: true,
+          },
+        },
         createdByUser: {
           select: {
             id: true,
             username: true,
-            email: true,
-            adminType: true,
-          }
+          },
         },
         createdByAgent: {
           select: {
             id: true,
             name: true,
-            email: true
-          }
+          },
         },
-        approvedBy: {
-          select: {
-            id: true,
-            username: true
-          }
-        }
       },
-      orderBy: {
-        createdAt: 'desc'
-      }
     });
 
-    // Get task counts for each retainership (this will be implemented later)
-    // For now, we'll return 0 for task counts
-    
-    // Transform data for frontend
-    const transformedRetainerships = await Promise.all(retainerships.map(async (retainership) => {
-      // Count tasks that belong to this retainership
-      const taskCount = await prisma.task.count({
-        where: {
-          retainershipId: retainership.id
-        }
-      });
-      // Determine creator name and type
-      let creatorName = null;
-      let creatorType = null;
-      let creatorRole = null;
-      if (retainership.createdByUser) {
-        creatorName = retainership.createdByUser.username;
-        creatorType = "user";
-        creatorRole = retainership.createdByUser.adminType; // "owner" or "admin"
-      } else if (retainership.createdByAgent) {
-        creatorName = retainership.createdByAgent.name;
-        creatorType = "agent";
-        creatorRole = null;
-      }
-      return {
-        id: retainership.id,
-        name: retainership.name,
-        description: retainership.description || "",
-        color: retainership.color,
-        status: retainership.status,
-        createdAt: retainership.createdAt.toISOString(),
-        updatedAt: retainership.updatedAt.toISOString(),
-        createdBy: creatorName,
-        createdByType: creatorType,
-        createdByRole: creatorRole,
-        createdById: retainership.createdByUserId || retainership.createdByAgentId,
-        approvedById: retainership.approvedById || null,
-        approvedBy: retainership.approvedBy?.username || null,
-        approvedAt: retainership.approvedAt?.toISOString() || null,
-        taskCount: taskCount,
-        isOwner: false,
-      };
-    }));
+    // Add debugging logs and ensure proper resolution of createdBy field
+    const transformedRetainerships = await Promise.all(
+      retainerships.map(async (retainership) => {
+        // Safely resolve client name
+        const clientName = retainership.client
+          ? retainership.client.organizationName ||
+            `${retainership.client.firstName || ""} ${retainership.client.lastName || ""}`.trim()
+          : "Unknown Client";
+
+        return {
+          id: retainership.id,
+          name: retainership.name,
+          description: retainership.description || "",
+          status: retainership.status,
+          createdAt: retainership.createdAt.toISOString(),
+          updatedAt: retainership.updatedAt.toISOString(),
+          client: retainership.client
+            ? {
+                id: retainership.client.id,
+                name: clientName,
+                email: retainership.client.email,
+              }
+            : null, // Handle null client case
+          createdBy: retainership.createdByUser
+            ? {
+                id: retainership.createdByUser.id,
+                name: retainership.createdByUser.username,
+                type: "User",
+              }
+            : retainership.createdByAgent
+            ? {
+                id: retainership.createdByAgent.id,
+                name: retainership.createdByAgent.name,
+                type: "Agent",
+              }
+            : null, // Handle null createdBy case
+        };
+      })
+    );
 
     return NextResponse.json(transformedRetainerships);
   } catch (error) {
@@ -113,9 +106,21 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// POST /api/retainerships - Create a new retainership
+// POST /api/legislations - Create a new legislation
 export async function POST(req: NextRequest) {
   try {
+    // Parse request body
+    const body = await req.json();
+    const { name, description, clientId, legislation } = body;
+
+    // Validate required fields
+    if (!name) {
+      return NextResponse.json(
+        { error: "Retainership name is required" },
+        { status: 400 }
+      );
+    }
+
     // Get the current agent user
     const currentAgent = await getCurrentAgent(req);
     if (!currentAgent) {
@@ -125,105 +130,55 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Parse request body
-    const body = await req.json();
-    const { name, description, color, legislation } = body;
 
-    console.log("Incoming request body:", req.body);
-    console.log("Legislation data:", legislation);
+    // Determine creator (user or agent)
+    const createdByUserId = currentAgent.name ? currentAgent.id : null;
+    const createdByAgentId = currentAgent.agentType ? currentAgent.id : null;
 
-    // Validate required fields
-    if (!name) {
-      return NextResponse.json(
-        { error: "Name is required" },
-        { status: 400 }
-      );
+    if (!createdByUserId && !createdByAgentId) {
+      console.warn("Neither createdByUserId nor createdByAgentId could be resolved for currentAgent:", currentAgent);
     }
-
-    // Resolve assignedAgent to assignedAgentId using findFirst
-    const resolvedLegislation = await Promise.all(
-      legislation?.map(async (leg: { title: string; description: string; assignedAgent: string }) => {
-        const agent = await prisma.agent.findFirst({
-          where: { name: leg.assignedAgent }, // Use findFirst for non-unique fields
-        });
-
-        if (!agent) {
-          throw new Error(`Agent with name '${leg.assignedAgent}' not found`);
-        }
-
-        return {
-          title: leg.title,
-          description: leg.description,
-          assignedAgentId: agent.id, // Use the resolved ObjectID
-        };
-      })
-    );
 
     // Create the retainership
     const newRetainership = await prisma.retainership.create({
       data: {
         name,
         description: description || "",
-        color: color || "blue",
-        status: "pending",
-        createdByAgentId: currentAgent.id,
-        approvedById: null,
-        approvedAt: null,
-        legislation: {
-          create: resolvedLegislation,
-        },
-      },
-      include: {
-        createdByAgent: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-        approvedBy: {
-          select: {
-            id: true,
-            username: true,
-          },
-        },
-        legislation: {
-          include: {
-            assignedAgent: {
-              select: {
-                id: true,
-                name: true,
-                email: true,
-              },
-            },
-          },
-        },
+        clientId,
+        createdByUserId,
+        createdByAgentId,
       },
     });
 
-    // Transform data for frontend
-    const transformedRetainership = {
-      id: newRetainership.id,
-      name: newRetainership.name,
-      description: newRetainership.description || "",
-      color: newRetainership.color,
-      status: newRetainership.status,
-      createdAt: newRetainership.createdAt.toISOString(),
-      updatedAt: newRetainership.updatedAt.toISOString(),
-      createdBy: newRetainership.createdByAgent?.name || null,
-      createdById: newRetainership.createdByAgentId,
-      approvedById: newRetainership.approvedById,
-      approvedBy: newRetainership.approvedBy?.username || null,
-      approvedAt: newRetainership.approvedAt?.toISOString() || null,
-      legislation: newRetainership.legislation.map((leg) => ({
-        id: leg.id,
-        title: leg.title,
-        description: leg.description,
-        assignedAgent: leg.assignedAgent?.name || "Unknown", // Include assignedAgent name
-      })),
-      taskCount: 0,
-    };
+    // Create legislations if provided
+    if (legislation && Array.isArray(legislation)) {
+      for (const leg of legislation) {
+        const { title, description, assignedAgent } = leg;
 
-    return NextResponse.json(transformedRetainership, { status: 201 });
+        if (!title) {
+          throw new Error("Each legislation must have a title");
+        }
+
+        const agent = await prisma.agent.findFirst({
+          where: { name: assignedAgent },
+        });
+
+        if (!agent) {
+          throw new Error(`Agent with name '${assignedAgent}' not found`);
+        }
+
+        await prisma.legislation.create({
+          data: {
+            title,
+            description: description || "",
+            assignedAgentId: agent.id,
+            retainershipId: newRetainership.id,
+          },
+        });
+      }
+    }
+
+    return NextResponse.json(newRetainership, { status: 201 });
   } catch (error) {
     console.error("Error creating retainership:", error);
 

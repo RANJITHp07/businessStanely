@@ -53,7 +53,11 @@ export async function GET(
           },
         },
         legislation: {
-          include: {
+          select: {
+            id: true,
+            title: true,
+            description: true,
+            assignedAgentId: true,
             assignedAgent: {
               select: {
                 id: true,
@@ -63,12 +67,18 @@ export async function GET(
             },
           },
         },
+        client: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            organizationName: true,
+            email: true,
+          },
+        },
       }
     });
 
-    // Log the fetched retainership data
-    console.log("Fetched retainership details:", JSON.stringify(retainership, null, 2));
-    
     if (!retainership) {
       return NextResponse.json(
         { error: "Retainership not found" },
@@ -76,9 +86,6 @@ export async function GET(
       );
     }
     
-    // Count tasks associated with this retainership
-    const taskCount = await prisma.task.count({ where: { retainershipId: id } });
-
     // Determine creator name, type, and role
     let creatorName = null;
     let creatorType = null;
@@ -135,7 +142,6 @@ export async function GET(
       rejectedBy: retainership.rejectedBy?.username || null,
       rejectedAt: retainership.rejectedAt || null,
       rejectionReason: retainership.rejectionReason || null,
-      taskCount: taskCount,
       isOwner: currentAdmin.adminType === "owner",
       photo,
       legislation: retainership.legislation.map((leg) => ({
@@ -143,11 +149,24 @@ export async function GET(
         title: leg.title,
         description: leg.description,
         assignedAgent: leg.assignedAgent?.name || "Unknown",
+        assignedAgentId: leg.assignedAgent?.id || null,
       })),
+      client: retainership.client
+        ? {
+            id: retainership.client.id,
+            firstName: retainership.client.firstName,
+            lastName: retainership.client.lastName,
+            organizationName: retainership.client.organizationName,
+            email: retainership.client.email
+          }
+        : null,
     };
 
     // Add debugging logs to inspect legislation details
     console.log("Legislation details fetched from database:", retainership.legislation);
+
+    // Add debugging logs to inspect the formatted retainership object
+    console.log("Formatted Retainership object being sent to frontend:", formattedRetainership);
 
     return NextResponse.json(formattedRetainership);
   } catch (error) {

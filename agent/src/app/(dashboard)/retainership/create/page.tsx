@@ -185,7 +185,7 @@ function Create({ admin, initialData }: CreateProps) {
                 setLoading(true);
                 const [clientsResponse, agentsResponse] = await Promise.all([
                     fetchWithAuth("/api/clients"),
-                    fetchWithAuth("/api/agents"),
+                    fetchWithAuth("/api/team-members"),
                 ]);
 
                 if (!clientsResponse.ok || !agentsResponse.ok) {
@@ -211,7 +211,7 @@ function Create({ admin, initialData }: CreateProps) {
         async function fetchAgents() {
             try {
                 setLoadingAgents(true);
-                const response = await fetchWithAuth("/api/agents");
+                const response = await fetchWithAuth("/api/team-members");
 
                 if (!response.ok) {
                     throw new Error("Failed to fetch agents");

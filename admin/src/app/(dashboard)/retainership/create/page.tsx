@@ -42,10 +42,17 @@ interface LegislationItem {
     assignedAgent: string;
 }
 
+interface FormData {
+    name: string;
+    description: string;
+    clientId: string;
+}
+
 function Create({ admin, initialData }: CreateProps) {
-    const [formData, setFormData] = useState({
+    const [formData, setFormData] = useState<FormData>({
         name: initialData?.name || "",
         description: initialData?.description || "",
+        clientId: "", // Initialize clientId
     })
     const [clientSearch, setClientSearch] = useState('');
     const [showClientDropdown, setShowClientDropdown] = useState(false);
@@ -106,10 +113,11 @@ function Create({ admin, initialData }: CreateProps) {
             // Update the payload to use agent IDs instead of names for assignedAgent
             const payload = {
                 ...formData,
+                clientId: formData.clientId, // Ensure clientId is included
                 legislation: legislationItems.map(item => ({
                     title: item.title,
                     description: item.description,
-                    assignedAgent: item.assignedAgent, // Ensure this is the agent ID
+                    assignedAgent: agents.find(agent => agent.name === item.assignedAgent)?.id || item.assignedAgent, // Use agent ID
                 })),
             };
 

@@ -69,6 +69,9 @@ model Client {
   authorizedPersonName String?
   designation          String?
   contactEmail         String?
+
+  // Add this to the Client model
+  retainerships Retainership[]
 }
 
 model Agent {
@@ -137,12 +140,16 @@ model Task {
   categoryId String?       @db.ObjectId
   category   TaskCategory? @relation(fields: [categoryId], references: [id])
 
-  // Retainership relation
-  retainershipId String?       @db.ObjectId
-  retainership   Retainership? @relation("RetainershipTasks", fields: [retainershipId], references: [id])
+  // Legislation relation
+  legislationId String?       @db.ObjectId
+  legislation   Legislation?  @relation(fields: [legislationId], references: [id])
 
   comments Comment[]
   timeLogs TimeLog[]
+
+  // Add this to the Task model
+  retainershipId String? @db.ObjectId
+  retainership   Retainership? @relation("RetainershipTasks", fields: [retainershipId], references: [id])
 }
 
 model Legislation {
@@ -157,6 +164,9 @@ model Legislation {
   // Relation to Retainership
   retainershipId String       @db.ObjectId
   retainership   Retainership @relation(fields: [retainershipId], references: [id], onDelete: Cascade)
+
+  // Add tasks relation to fetch tasks based on legislation
+  tasks Task[] @relation
 }
 
 model Retainership {
@@ -190,6 +200,9 @@ model Retainership {
 
   // Relation to Legislation
   legislation Legislation[]
+
+  clientId String? @db.ObjectId
+  client   Client? @relation(fields: [clientId], references: [id])
 }
 
 model Comment {

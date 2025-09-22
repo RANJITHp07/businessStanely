@@ -77,6 +77,15 @@ export interface Task {
     status: string;
   };
   comments?: Comment[];
+  legislationId?: string; // Added to link tasks to legislations
+  legislation?: {
+    id: string;
+    title: string;
+    description?: string;
+    status: string;
+    createdAt: string;
+    updatedAt: string;
+  }; // Added legislation object to include detailed information
 }
 
 export interface TaskCategory {
@@ -149,8 +158,14 @@ export interface Retainership {
     id: string;
     title: string;
     description?: string;
-    assignedAgent?: string;
+    assignedAgentId: string; // Use this for task creation URL
+    assignedAgent?: {
+      id: string;
+      name: string;
+      email: string;
+    };
   }[];
+  client?: Client;
 }
 
 export interface Comment {
@@ -175,5 +190,32 @@ export interface Comment {
     name: string;
     email: string;
     photo?: string;
+  };
+}
+
+export interface Legislation {
+  id: string;
+  title: string;
+  description?: string;
+  assignedAgent?: {
+    id: string;
+    name: string;
+    email: string;
+  };
+  client?: {
+    id: string;
+    name: string;
+    email: string;
+    phoneNumber?: string;
+  };
+  retainership?: {
+    client?: {
+      name: string;
+      email: string;
+      organizationName?: string; // Added for API compatibility
+      clientType: string;
+      firstName: string | null;
+      lastName: string | null;
+    };
   };
 }

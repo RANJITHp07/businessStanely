@@ -233,13 +233,6 @@ export default function RetainershipTable() {
     const approvedCount = allRetainerships.filter((cat) => cat.status === "approved").length
     const pendingCount = allRetainerships.filter((cat) => cat.status === "pending").length
 
-    // Update the CreatedBy type to include "Unknown" as a valid type
-    type CreatedBy = {
-        id?: string; // Optional
-        name: string;
-        type: "User" | "Agent" | "Unknown"; // Added "Unknown"
-    };
-
     const renderCreatedBy = (createdBy: { id?: string; name: string; type: "User" | "Agent" | "Unknown" } | null) => {
         if (!createdBy || createdBy.type === "Unknown") return "Unknown";
         return (

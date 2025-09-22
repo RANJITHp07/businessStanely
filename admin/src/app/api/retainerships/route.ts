@@ -52,6 +52,15 @@ export async function GET(req: NextRequest) {
             id: true,
             username: true
           }
+        },
+        client: {
+          select: {
+            id: true,
+            organizationName: true,
+            firstName: true,
+            lastName: true,
+            email: true
+          }
         }
       },
       orderBy: {
@@ -100,6 +109,15 @@ export async function GET(req: NextRequest) {
         approvedAt: retainership.approvedAt?.toISOString() || null,
         taskCount: taskCount,
         isOwner: currentAdmin.adminType === "owner",
+        client: retainership.client
+        ? {
+            id: retainership.client.id,
+            organizationName: retainership.client.organizationName,
+            firstName: retainership.client.firstName,
+            lastName: retainership.client.lastName,
+            email: retainership.client.email
+          }
+        : null
       };
     }));
 
@@ -129,12 +147,12 @@ export async function POST(req: NextRequest) {
 
     // Parse request body
     const body = await req.json();
-    const { name, description, color, legislation } = body;
+    const { name, description, clientId, color, legislation } = body;
 
     // Validate required fields
-    if (!name) {
+    if (!name || !clientId) {
       return NextResponse.json(
-        { error: "Name is required" },
+        { error: "Name and clientId are required" },
         { status: 400 }
       );
     }
@@ -144,9 +162,6 @@ export async function POST(req: NextRequest) {
     const approvedById = currentAdmin.adminType === "owner" ? currentAdmin.id : null;
     const approvedAt = currentAdmin.adminType === "owner" ? new Date() : null;
 
-    // Add debugging logs to inspect legislation data being saved
-    console.log("Legislation data received in request:", legislation);
-
     // Update legislation creation logic to store assignedAgentId
     const newRetainership = await prisma.retainership.create({
       data: {
@@ -154,6 +169,7 @@ export async function POST(req: NextRequest) {
         description: description || "",
         color: color || "blue",
         status,
+        clientId,
         createdByUserId: currentAdmin.id,
         approvedById,
         approvedAt,

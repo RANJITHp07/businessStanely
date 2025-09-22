@@ -338,7 +338,6 @@ export default function RetainershipTable() {
                                                 <TableRow>
                                                     <TableHead>Retainership</TableHead>
                                                     <TableHead>Description</TableHead>
-                                                    <TableHead>Tasks</TableHead>
                                                     <TableHead>Created By</TableHead>
                                                     <TableHead className="text-right">Actions</TableHead>
                                                 </TableRow>
@@ -381,9 +380,6 @@ export default function RetainershipTable() {
                                                                         {retainership.description}
                                                                     </p>
                                                                 </div>
-                                                            </TableCell>
-                                                            <TableCell>
-                                                                <Badge variant="outline">{retainership.taskCount} tasks</Badge>
                                                             </TableCell>
                                                             <TableCell>
                                                                 <div className="text-sm">

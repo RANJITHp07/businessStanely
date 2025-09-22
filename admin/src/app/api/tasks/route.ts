@@ -16,6 +16,7 @@ export async function POST(req: NextRequest) {
       createdById,
       assignedToId,
       categoryId,
+      legislationId,
     } = body;
 
     if (!title || !createdById) {
@@ -36,6 +37,7 @@ export async function POST(req: NextRequest) {
         createdById,
         assignedToId,
         categoryId: categoryId || undefined,
+        legislationId: legislationId || null, // Save legislationId
       },
       include: {
         client: true,

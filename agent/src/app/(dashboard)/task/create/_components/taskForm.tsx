@@ -124,18 +124,6 @@ export default function TaskForm({ id }: TaskFormProps) {
   const [legislationSearchQuery, setLegislationSearchQuery] = useState("");
   const [showLegislationSuggestions, setShowLegislationSuggestions] = useState(false);
   const [legislationList, setLegislationList] = useState<Legislation[]>([]);
-  const [isLegislationModalOpen, setIsLegislationModalOpen] = useState(false);
-  const [isCreatingLegislation, setIsCreatingLegislation] = useState(false);
-  const [newLegislationData, setNewLegislationData] = useState({
-    title: "",
-    description: "",
-  });
-
-  // Added state for new retainership data
-  const [newRetainershipData, setNewRetainershipData] = useState({
-    name: "",
-    description: "",
-  });
 
   // Add this handler function
   const handleNewCategoryInputChange = (field: string, value: string) => {

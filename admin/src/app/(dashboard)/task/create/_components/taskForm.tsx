@@ -51,7 +51,7 @@ import {
 import { format, isBefore, startOfDay } from "date-fns";
 import { cn } from "@/lib/utils";
 
-import { Client, Agent, Task, Retainership } from "@/types";
+import { Client, Agent, Task, Legislation } from "@/types";
 
 interface Category {
   id: string;
@@ -88,6 +88,8 @@ export default function TaskForm() {
     assignedToId: "",
     description: "",
     categoryId: "",
+    legislationId: "",
+    legislationName: "",
   });
   const [clients, setClients] = useState<Client[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
@@ -115,15 +117,14 @@ export default function TaskForm() {
   const [isCreatingCategory, setIsCreatingCategory] = useState(false);
   const [isCreatingClient, setIsCreatingClient] = useState(false);
 
-  const [retainershipSearchQuery, setRetainershipSearchQuery] = useState("");
-  const [showRetainershipSuggestions, setShowRetainershipSuggestions] = useState(false);
-  const [retainershipList, setRetainershipList] = useState<Retainership[]>([]);
-  const [isRetainershipModalOpen, setIsRetainershipModalOpen] = useState(false);
-  const [isCreatingRetainership, setIsCreatingRetainership] = useState(false);
-
-  // Added state for new retainership data
-  const [newRetainershipData, setNewRetainershipData] = useState({
-    name: "",
+  // Added legislation-related state variables
+  const [legislationSearchQuery, setLegislationSearchQuery] = useState("");
+  const [showLegislationSuggestions, setShowLegislationSuggestions] = useState(false);
+  const [legislationList, setLegislationList] = useState<Legislation[]>([]);
+  const [isLegislationModalOpen, setIsLegislationModalOpen] = useState(false);
+  const [isCreatingLegislation, setIsCreatingLegislation] = useState(false);
+  const [newLegislationData, setNewLegislationData] = useState({
+    title: "",
     description: "",
   });
 
@@ -209,7 +210,7 @@ export default function TaskForm() {
         setShowAgentSuggestions(false);
         setShowCategorySuggestions(false);
         setShowSuggestions(false);
-        setShowRetainershipSuggestions(false);
+        setShowLegislationSuggestions(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -272,6 +273,8 @@ export default function TaskForm() {
               assignedToId: task.assignedTo?.id || "",
               description: task.description || "",
               categoryId: task.category?.id || "",
+              legislationId: task.legislation?.id || "",
+              legislationName: task.legislation?.title || "",
             });
             if (task.category) {
               setCategorySearchQuery(task.category.name);
@@ -499,85 +502,89 @@ export default function TaskForm() {
       );
     }
   };
+  // Added handlers for legislation management
 
-  // Filtered retainerships based on search query
-  const filteredRetainerships = retainershipList.filter((retainership) => {
-    return (
-      retainership.name
-        .toLowerCase()
-        .includes(retainershipSearchQuery.toLowerCase()) ||
-      retainership.description
-        ?.toLowerCase()
-        .includes(retainershipSearchQuery.toLowerCase())
-    );
-  });
+  const handleLegislationSearch = (query: string) => {
+    setLegislationSearchQuery(query);
+    if (query.trim()) {
+      setShowLegislationSuggestions(true);
+    } else {
+      setShowLegislationSuggestions(false);
+    }
+  };
 
-  // Fetch retainerships (for demo purposes, using static data)
+  const handleCreateLegislation = async () => {
+    if (!newLegislationData.title.trim()) {
+      toast.error("Legislation title is required");
+      return;
+    }
+
+    setIsCreatingLegislation(true);
+    try {
+      // Logic to create new legislation
+      // console.log("Legislation created");
+    } finally {
+      setIsCreatingLegislation(false);
+    }
+  };
+
+  // Fetch legislation data and populate legislationList
   useEffect(() => {
-    const fetchRetainerships = async () => {
+    const fetchLegislation = async () => {
       try {
-        const response = await fetch("/api/retainerships");
+        const response = await fetch("/api/legislation");
         if (response.ok) {
           const data = await response.json();
-          setRetainershipList(data);
+          setLegislationList(data);
         }
       } catch (error) {
-        console.error("Failed to fetch retainerships", error);
+        console.error("Failed to fetch legislation", error);
       }
     };
 
-    fetchRetainerships();
+    fetchLegislation();
   }, []);
 
-  // Add a button and modal for creating a new retainership
-  const handleAddRetainershipClick = () => {
-    setIsRetainershipModalOpen(true);
-    // Reset form data when opening modal
-    setNewRetainershipData({
-      name: "",
-      description: "",
-    });
-  };
+  useEffect(() => {
+    const query = new URLSearchParams(window.location.search);
+    const legislationId = query.get("legislationId");
+    const assignedAgent = query.get("assignedAgent");
+    const client = query.get("client");
 
-  const handleCreateRetainership = async () => {
-    if (!newRetainershipData.name.trim()) {
-      toast.error("Retainership name is required");
-      return;
-    }
+    if (legislationId || assignedAgent || client) {
+      setFormData((prev) => ({
+        ...prev,
+        legislationId: legislationId || prev.legislationId,
+        assignedToId: assignedAgent || prev.assignedToId,
+        clientId: client || prev.clientId,
+      }));
 
-    if (isCreatingRetainership) {
-      return;
-    }
-
-    setIsCreatingRetainership(true);
-
-    try {
-      const response = await fetch("/api/retainerships", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(newRetainershipData),
-      });
-
-      if (response.ok) {
-        const newRetainership = await response.json();
-        setRetainershipList((prev) => [newRetainership, ...prev]);
-        setFormData((prev) => ({ ...prev, retainershipId: newRetainership.id }));
-        setRetainershipSearchQuery(newRetainership.name);
-        setIsRetainershipModalOpen(false);
-        toast.success("Retainership created successfully!");
-      } else {
-        const error = await response.json();
-        toast.error(error.error || "Failed to create retainership");
+      if (assignedAgent) {
+        const selectedAgent = agents.find((agent) => agent.id === assignedAgent);
+        if (selectedAgent) {
+          setAgentSearchQuery(selectedAgent.name); // Update the search query to show the selected agent's name
+        }
       }
-    } catch (error) {
-      console.error("Error creating retainership:", error);
-      toast.error("Failed to create retainership");
-    } finally {
-      setIsCreatingRetainership(false);
+
+      if (client) {
+        const selectedClient = clients.find((c) => c.id === client);
+        if (selectedClient) {
+          const clientName =
+            selectedClient.clientType === "individual"
+              ? `${selectedClient.firstName || ""} ${selectedClient.lastName || ""}`.trim()
+              : selectedClient.organizationName || "";
+          setSearchQuery(clientName); // Update the search query to show the selected client's name
+        }
+      }
+
+      if (legislationId) {
+        const selectedLegislation = legislationList.find((legislation) => legislation.id === legislationId);
+        if (selectedLegislation) {
+          setLegislationSearchQuery(selectedLegislation.title); // Update the search query to show the selected legislation's name
+        }
+      }
     }
-  };
+  }, [agents, clients, legislationList]);
 
   return (
     <div className="container mx-auto p-6 max-w-7xl">
@@ -817,6 +824,12 @@ export default function TaskForm() {
                   </Button>
                 </DialogTrigger>
                 <DialogContent className="sm:max-w-[500px] max-h-[80vh] overflow-y-auto">
+                  <DialogHeader>
+                    <DialogTitle>Add New Client</DialogTitle>
+                    <DialogDescription>
+                      Select the client type and fill in the details
+                    </DialogDescription>
+                  </DialogHeader>
                   <DialogHeader>
                     <DialogTitle>Add New Client</DialogTitle>
                     <DialogDescription>
@@ -1385,55 +1398,45 @@ export default function TaskForm() {
             </CardContent>
           </Card>
 
-          {/* Retainership Information - New Section */}
+          {/* Legislation Information - New Section */}
           <Card>
             <CardHeader className="flex items-center justify-between">
               <div>
                 <CardTitle className="flex items-center gap-2">
                   <FileText className="h-5 w-5" />
-                  Retainership Information
+                  Legislation Information
                 </CardTitle>
                 <CardDescription>
-                  Optionally, select a retainership for this task
+                  Optionally, select legislation related to this task
                 </CardDescription>
               </div>
 
               <Dialog
-                open={isRetainershipModalOpen}
-                onOpenChange={setIsRetainershipModalOpen}
+                open={isLegislationModalOpen}
+                onOpenChange={setIsLegislationModalOpen}
               >
-                <DialogTrigger asChild>
-                  <Button
-                    type="button"
-                    onClick={handleAddRetainershipClick}
-                    className="h-10"
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add Retainership
-                  </Button>
-                </DialogTrigger>
 
                 <DialogContent className="sm:max-w-[400px] w-full">
                   <DialogHeader>
-                    <DialogTitle>Add New Retainership</DialogTitle>
+                    <DialogTitle>Add New Legislation</DialogTitle>
                     <DialogDescription>
-                      Create a new retainership for long-term tasks or clients
+                      Create a new legislation record for reference
                     </DialogDescription>
                   </DialogHeader>
 
                   {/* Form Fields */}
                   <div className="space-y-4 py-4">
                     <div className="space-y-2">
-                      <Label htmlFor="retainership-name">Retainership Name *</Label>
+                      <Label htmlFor="legislation-title">Legislation Title *</Label>
                       <Input
-                        id="retainership-name"
-                        placeholder="Enter retainership name (e.g., Gold Plan, Silver Plan)"
+                        id="legislation-title"
+                        placeholder="Enter legislation title (e.g., GDPR, CCPA)"
                         className="w-full"
-                        value={newRetainershipData.name}
+                        value={newLegislationData.title}
                         onChange={(e) =>
-                          setNewRetainershipData({
-                            ...newRetainershipData,
-                            name: e.target.value,
+                          setNewLegislationData({
+                            ...newLegislationData,
+                            title: e.target.value,
                           })
                         }
                         required
@@ -1441,15 +1444,15 @@ export default function TaskForm() {
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="retainership-description">Description</Label>
+                      <Label htmlFor="legislation-description">Description</Label>
                       <Textarea
-                        id="retainership-description"
-                        placeholder="Brief description of this retainership (optional)"
+                        id="legislation-description"
+                        placeholder="Brief description of this legislation (optional)"
                         className="w-full"
-                        value={newRetainershipData.description}
+                        value={newLegislationData.description}
                         onChange={(e) =>
-                          setNewRetainershipData({
-                            ...newRetainershipData,
+                          setNewLegislationData({
+                            ...newLegislationData,
                             description: e.target.value,
                           })
                         }
@@ -1463,24 +1466,24 @@ export default function TaskForm() {
                     <Button
                       type="button"
                       variant="outline"
-                      onClick={() => setIsRetainershipModalOpen(false)}
-                      disabled={isCreatingRetainership}
+                      onClick={() => setIsLegislationModalOpen(false)}
+                      disabled={isCreatingLegislation}
                     >
                       Cancel
                     </Button>
 
                     <Button
                       type="button"
-                      onClick={handleCreateRetainership}
-                      disabled={!newRetainershipData.name.trim() || isCreatingRetainership}
+                      onClick={handleCreateLegislation}
+                      disabled={!newLegislationData.title.trim() || isCreatingLegislation}
                     >
-                      {isCreatingRetainership ? (
+                      {isCreatingLegislation ? (
                         <>
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                           Creating...
                         </>
                       ) : (
-                        "Create Retainership"
+                        "Create Legislation"
                       )}
                     </Button>
                   </div>
@@ -1489,69 +1492,50 @@ export default function TaskForm() {
             </CardHeader>
 
             <CardContent className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="retainership">Retainership *</Label>
-                <div className="relative">
-                  <Input
-                    id="retainership"
-                    type="text"
-                    placeholder="Type to search retainerships..."
-                    value={retainershipSearchQuery}
-                    onChange={(e) => {
-                      setRetainershipSearchQuery(e.target.value);
-                      if (e.target.value.trim()) {
-                        setShowRetainershipSuggestions(true);
-                      } else {
-                        setShowRetainershipSuggestions(false);
-                      }
-                    }}
-                    onFocus={() => {
-                      if (retainershipSearchQuery.trim()) {
-                        setShowRetainershipSuggestions(true);
-                      }
-                    }}
-                    className="w-full"
-                  />
+              <div className="space-y-2 relative">
+                <Label htmlFor="legislation">Legislation *</Label>
+                <Input
+                  id="legislation"
+                  type="text"
+                  placeholder="Type to search legislation..."
+                  value={legislationSearchQuery}
+                  onChange={(e) => handleLegislationSearch(e.target.value)}
+                  onFocus={() => {
+                    if (legislationSearchQuery.trim()) {
+                      setShowLegislationSuggestions(true);
+                    }
+                  }}
+                  className="w-full"
+                  required
+                />
 
-                  {/* Retainership Suggestions Dropdown - Only show when searching */}
-                  {showRetainershipSuggestions &&
-                    retainershipSearchQuery.trim() &&
-                    filteredRetainerships.length > 0 && (
-                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto">
-                      {filteredRetainerships.map((retainership) => (
-                        <div
-                          key={retainership.id}
-                          className="flex items-center justify-between p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
-                          onClick={() => {
-                            setFormData((prev) => ({ ...prev, retainershipId: retainership.id }));
-                            setRetainershipSearchQuery(retainership.name);
-                            setShowRetainershipSuggestions(false);
-                          }}
-                        >
-                          <div className="flex items-center gap-2">
-                            <div>
-                              <span className="font-medium">{retainership.name}</span>
-                              {retainership.description && (
-                                <div className="text-xs text-gray-500 mt-1">
-                                  {retainership.description}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                {showLegislationSuggestions && legislationSearchQuery.trim() && (
+                  <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto">
+                    {legislationList.map((legislation) => (
+                      <div
+                        key={legislation.id}
+                        className="flex items-center gap-2 p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
+                        onClick={() => {
+                          setFormData((prev) => ({
+                            ...prev,
+                            legislationId: legislation.id,
+                            legislationName: legislation.title,
+                          }));
+                          setLegislationSearchQuery(legislation.title);
+                          setShowLegislationSuggestions(false);
+                        }}
+                      >
+                        <span className="font-medium">{legislation.title}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
 
-                  {/* No results message - Only when searching */}
-                  {showRetainershipSuggestions &&
-                    retainershipSearchQuery &&
-                    filteredRetainerships.length === 0 && (
-                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg p-3">
-                      <span className="text-gray-500">No retainerships found</span>
-                    </div>
-                  )}
-                </div>
+                {showLegislationSuggestions && legislationSearchQuery && legislationList.length === 0 && (
+                  <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg p-3">
+                    <span className="text-gray-500">No legislation found</span>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>

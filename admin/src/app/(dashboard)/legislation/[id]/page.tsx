@@ -17,7 +17,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 // } from "@/components/ui/dropdown-menu";
 // import { Button } from "@/components/ui/button";
 // import { FileText, MoreHorizontal, Eye, PlusCircle } from "lucide-react";
-// import { Badge } from "@/components/ui/badge";
 
 import { Legislation, Task } from "@/types";
 import { FileText } from "lucide-react";

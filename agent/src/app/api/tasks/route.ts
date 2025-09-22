@@ -27,7 +27,7 @@ export async function GET(req: NextRequest) {
   const status = searchParams.get("status");
   const priority = searchParams.get("priority");
   const categoryId = searchParams.get("categoryId");
-
+  
 
     // If categoryId is present, return all tasks for that category (regardless of assignment)
     // If assignedToId is present, return all tasks for that agent
@@ -166,6 +166,7 @@ export async function POST(req: NextRequest) {
       clientId,
       assignedToId,
       categoryId,
+      legislationId, // Add legislationId to the destructured fields
     } = body;
 
     // Validate required fields
@@ -188,6 +189,7 @@ export async function POST(req: NextRequest) {
         createdById: agent.id,
         assignedToId: assignedToId || agent.id,
         categoryId: categoryId || null,
+        legislationId: legislationId || null, // Save legislationId
       },
       include: {
         client: {

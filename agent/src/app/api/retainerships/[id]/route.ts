@@ -37,7 +37,7 @@ export async function GET(
             email: true,
             adminType: true,
             photo: true,
-          }
+          },
         },
         createdByAgent: {
           select: {
@@ -45,80 +45,79 @@ export async function GET(
             name: true,
             email: true,
             photo: true,
-          }
+          },
         },
         approvedBy: {
           select: {
             id: true,
             username: true,
-            email: true,
-            photo: true,
-          }
+          },
         },
         rejectedBy: {
           select: {
             id: true,
             username: true,
-            email: true,
-            photo: true,
-          }
+          },
         },
-      }
+        legislations: {
+          include: {
+            assignedAgent: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
+        client: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            organizationName: true,
+            email: true,
+          },
+        },
+      },
     });
-    
+
     if (!retainership) {
       return NextResponse.json(
         { error: "Retainership not found" },
         { status: 404 }
       );
     }
-    
-    // Count tasks associated with this retainership
-    const taskCount = await prisma.task.count({ where: { retainershipId: id } });
 
-    // Determine creator name, type, and role
-    let creatorName = null;
-    let creatorType = null;
-    let creatorRole = null;
-    let creatorId = null;
-    if (retainership.createdByAgent) {
-      creatorName = retainership.createdByAgent.name;
-      creatorType = "agent";
-      creatorRole = null;
-      creatorId = retainership.createdByAgent.id;
-    }
-
-    // Use the creator's photo if available, fallback to null
-    let photo = null;
-    if (retainership.createdByAgent && retainership.createdByAgent.photo) {
-      photo = retainership.createdByAgent.photo;
-    } else {
-      photo = null;
-    }
-
+    // Updated the mapping logic to handle the nested structure of `assignedAgent`
     const formattedRetainership = {
       id: retainership.id,
       name: retainership.name,
       description: retainership.description || "",
       color: retainership.color,
       status: retainership.status,
-      createdAt: retainership.createdAt,
-      updatedAt: retainership.updatedAt,
-      createdBy: creatorName || "Unknown",
-      createdByType: creatorType,
-      createdByRole: creatorRole,
-      createdById: creatorId,
-      approvedById: retainership.approvedById || null,
-      approvedBy: retainership.approvedBy?.username || null,
-      approvedAt: retainership.approvedAt || null,
-      rejectedById: retainership.rejectedById || null,
-      rejectedBy: retainership.rejectedBy?.username || null,
-      rejectedAt: retainership.rejectedAt || null,
+      createdAt: retainership.createdAt.toISOString(),
+      updatedAt: retainership.updatedAt.toISOString(),
       rejectionReason: retainership.rejectionReason || null,
-      taskCount: taskCount,
-      photo,
+      createdBy: retainership.createdByUser?.username || retainership.createdByAgent?.name || "Unknown",
+      client: retainership.client
+        ? {
+            id: retainership.client.id,
+            name: retainership.client.organizationName || `${retainership.client.firstName || ""} ${retainership.client.lastName || ""}`.trim(),
+            email: retainership.client.email,
+          }
+        : null,
+      legislations: retainership.legislations.map((legislation) => ({
+        id: legislation.id,
+        title: legislation.title,
+        description: legislation.description,
+        assignedAgent: legislation.assignedAgent
+          ? {
+              id: legislation.assignedAgent.id,
+              name: legislation.assignedAgent.name,
+            }
+          : null,
+      })),
     };
-
     return NextResponse.json(formattedRetainership);
   } catch (error) {
     console.error("Error fetching retainership:", error);

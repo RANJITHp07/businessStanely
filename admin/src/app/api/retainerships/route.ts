@@ -129,7 +129,7 @@ export async function POST(req: NextRequest) {
 
     // Parse request body
     const body = await req.json();
-    const { name, description, color } = body;
+    const { name, description, color, legislation } = body;
 
     // Validate required fields
     if (!name) {
@@ -140,12 +140,14 @@ export async function POST(req: NextRequest) {
     }
 
     // Determine retainership status based on user role
-    // Owners can create approved retainerships, admins create pending retainerships
     const status = currentAdmin.adminType === "owner" ? "approved" : "pending";
     const approvedById = currentAdmin.adminType === "owner" ? currentAdmin.id : null;
     const approvedAt = currentAdmin.adminType === "owner" ? new Date() : null;
 
-    // Create new retainership in the database
+    // Add debugging logs to inspect legislation data being saved
+    console.log("Legislation data received in request:", legislation);
+
+    // Update legislation creation logic to store assignedAgentId
     const newRetainership = await prisma.retainership.create({
       data: {
         name,
@@ -155,24 +157,48 @@ export async function POST(req: NextRequest) {
         createdByUserId: currentAdmin.id,
         approvedById,
         approvedAt,
+        legislation: {
+          create: legislation?.map((leg: { title: string; description: string; assignedAgent: string }) => {
+            console.log("Legislation being created:", leg);
+            return {
+              title: leg.title,
+              description: leg.description,
+              assignedAgentId: leg.assignedAgent, // Store assignedAgentId instead of assignedAgent
+            };
+          }),
+        },
       },
       include: {
         createdByUser: {
           select: {
             id: true,
             username: true,
-          }
+          },
         },
         approvedBy: {
           select: {
             id: true,
             username: true,
-          }
-        }
-      }
+          },
+        },
+        legislation: {
+          include: {
+            assignedAgent: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+              },
+            },
+          },
+        },
+      },
     });
 
-    // Transform data for frontend
+    // Log the created retainership data
+    console.log("New retainership created:", newRetainership);
+
+    // Transform legislation data to include assignedAgent name
     const transformedRetainership = {
       id: newRetainership.id,
       name: newRetainership.name,
@@ -186,6 +212,12 @@ export async function POST(req: NextRequest) {
       approvedById: newRetainership.approvedById,
       approvedBy: newRetainership.approvedBy?.username || null,
       approvedAt: newRetainership.approvedAt?.toISOString() || null,
+      legislation: newRetainership.legislation.map((leg) => ({
+        id: leg.id,
+        title: leg.title,
+        description: leg.description,
+        assignedAgent: leg.assignedAgent?.name || "Unknown", // Include assignedAgent name
+      })),
       taskCount: 0,
     };
 

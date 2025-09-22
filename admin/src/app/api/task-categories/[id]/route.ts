@@ -4,9 +4,12 @@ import prisma from "@/lib/prisma";
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: { id: string } }
 ) {
   try {
+    const { params } = context;
+    const id = params?.id;
+
     // Get the current admin user
     const currentAdmin = await getCurrentAdmin(req);
     
@@ -16,8 +19,6 @@ export async function GET(
         { status: 401 }
       );
     }
-
-    const { id } = params;
 
     if (!id) {
       return NextResponse.json(

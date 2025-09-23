@@ -273,15 +273,17 @@ export default function RetainershipDetail({ params }: { params: Promise<{ id: s
                                                           View Details
                                                         </a>
                                                       </DropdownMenuItem>
-                                                      <DropdownMenuItem asChild>
-                                                        <a
-                                                          href={`/task/create?legislationId=${legislation.id}&assignedAgent=${legislation.assignedAgent?.id}&client=${retainership.client?.id}`}
-                                                          onClick={(e) => e.stopPropagation()}
-                                                        >
-                                                          <PlusCircle className="mr-2 h-4 w-4" />
-                                                          Create Task
-                                                        </a>
-                                                      </DropdownMenuItem>
+                                                      {retainership.status !== "pending" && (
+                                                        <DropdownMenuItem asChild>
+                                                          <a
+                                                            href={`/task/create?legislationId=${legislation.id}&assignedAgent=${legislation.assignedAgent?.id}&client=${retainership.client?.id}`}
+                                                            onClick={(e) => e.stopPropagation()}
+                                                          >
+                                                            <PlusCircle className="mr-2 h-4 w-4" />
+                                                            Create Task
+                                                          </a>
+                                                        </DropdownMenuItem>
+                                                      )}
                                                     </DropdownMenuContent>
                                                   </DropdownMenu>
                                                 </TableCell>

@@ -163,6 +163,7 @@ export async function POST(req: NextRequest) {
     const approvedAt = currentAdmin.adminType === "owner" ? new Date() : null;
 
     // Update legislation creation logic to store assignedAgentId
+    // Log the legislation array being passed to the Prisma create method
     const newRetainership = await prisma.retainership.create({
       data: {
         name,
@@ -175,7 +176,6 @@ export async function POST(req: NextRequest) {
         approvedAt,
         legislation: {
           create: legislation?.map((leg: { title: string; description: string; assignedAgent: string }) => {
-            console.log("Legislation being created:", leg);
             return {
               title: leg.title,
               description: leg.description,
@@ -211,8 +211,6 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    // Log the created retainership data
-    console.log("New retainership created:", newRetainership);
 
     // Transform legislation data to include assignedAgent name
     const transformedRetainership = {

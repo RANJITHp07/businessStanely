@@ -202,8 +202,8 @@ export async function PUT(
     }
 
     const { id } = params;
-    const body = await req.json();
-    const { name, description, color } = body;
+    const body = await req.json();    
+    const { name, description, color, legislation } = body;
 
     // Validate required fields
     if (!name) {
@@ -232,6 +232,14 @@ export async function PUT(
         name,
         description: description || "",
         color: color || "blue",
+        legislation: {
+          deleteMany: {}, // Clear existing legislation
+          create: legislation.map((leg: { title: string; description: string; assignedAgent: string }) => ({
+            title: leg.title,
+            description: leg.description,
+            assignedAgentId: leg.assignedAgent,
+          })),
+        },
       },
       include: {
         createdByUser: {
@@ -245,7 +253,8 @@ export async function PUT(
             id: true,
             username: true,
           }
-        }
+        },
+        legislation: true, // Include updated legislation
       }
     });
 

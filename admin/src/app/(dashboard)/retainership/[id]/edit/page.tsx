@@ -1,63 +1,75 @@
 'use client'
 
-import React, { useEffect, useState, use } from 'react'
-import { toast } from "react-toastify"
-import { useRouter } from "next/navigation"
-import CategoryForm from '../../create/page'
+import React, { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { fetchWithAuth } from "@/lib/fetchWithAuth";
+import { toast } from "react-toastify";
+import { use } from 'react';
+import Create from '../../create/page';
 
-interface Category {
-    id: string
-    name: string
-    description: string
-    status: string
-    createdBy: string
-    createdAt: string
-    updatedAt: string
+interface Retainership {
+  id: string;
+  name: string;
+  description: string;
+  client: {
+    organizationName?: string;
+    firstName?: string;
+    lastName?: string;
+  } | null;
+  legislations: Array<{
+    id: string;
+    title: string;
+    description: string;
+    assignedAgent: string | { name: string };
+  }>;
+  photo?: string;
+  status?: "approved" | "pending";
+  createdBy?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
-export default function EditCategory({ params }: { params: Promise<{ id: string }> | { id: string } }) {
-    // Unwrap params using React.use()
-    const resolvedParams = params instanceof Promise ? use(params) : params;
-    const [category, setCategory] = useState<Category | null>(null)
-    const [loading, setLoading] = useState(true)
-    const router = useRouter()
+export default function EditRetainershipPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params); // Properly unwrap the params Promise using React.use()
 
-    useEffect(() => {
-        const fetchCategory = async () => {
-            try {
-                const response = await fetch(`/api/task-categories/${resolvedParams.id}`)
-                if (!response.ok) {
-                    throw new Error('Category not found')
-                }
-                const data = await response.json()
-                setCategory(data)
-            } catch (error) {
-                console.error('Error fetching category:', error)
-                toast.error('Failed to load category')
-                router.push('/task_category')
-            } finally {
-                setLoading(false)
-            }
+  const router = useRouter();
+  const [initialData, setInitialData] = useState<Retainership | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchRetainership = async () => {
+      try {
+        const response = await fetchWithAuth(`/api/retainerships/${id}`);
+        if (response.ok) {
+          const data = await response.json();
+          setInitialData(data);
+        } else {
+          toast.error('Failed to fetch retainership details.');
+          router.push('/retainership');
         }
+      } catch (error) {
+        console.error('Error fetching retainership:', error);
+        toast.error('An error occurred while fetching retainership details.');
+        router.push('/retainership');
+      } finally {
+        setLoading(false);
+      }
+    };
 
-        fetchCategory()
-    }, [resolvedParams.id, router])
+    fetchRetainership();
+  }, [id, router]);
 
-    if (loading) {
-        return <div className="flex items-center justify-center h-screen">Loading...</div>
-    }
+  if (loading) {
+    return <div className="flex items-center justify-center h-screen">Loading...</div>;
+  }
 
-    if (!category) {
-        return null
-    }
+  if (!initialData) {
+    return null;
+  }
 
-    const initialData = {
-        id: category.id,
-        name: category.name,
-        description: category.description || "",
-    }
-
-    return (
-        <CategoryForm admin={{ id: category.id, name: category.name }} initialData={initialData} />
-    )
+  return (
+    <div className="container mx-auto p-6 max-w-7xl">
+      <Create admin={{ id }} initialData={initialData} />
+    </div>
+  );
 }

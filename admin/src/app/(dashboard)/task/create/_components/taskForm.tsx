@@ -1502,16 +1502,10 @@ export default function TaskForm() {
                 <Label htmlFor="legislation">Legislation *</Label>
                 <Input
                   id="legislation"
-                  type="text"
-                  placeholder="Type to search legislation..."
+                  placeholder="Search or select legislation"
                   value={legislationSearchQuery}
                   onChange={(e) => handleLegislationSearch(e.target.value)}
-                  onFocus={() => {
-                    if (legislationSearchQuery.trim()) {
-                      setShowLegislationSuggestions(true);
-                    }
-                  }}
-                  className="w-full"
+                  disabled={isFromRetainership} // Disable field if accessed from retainership
                   required
                 />
 

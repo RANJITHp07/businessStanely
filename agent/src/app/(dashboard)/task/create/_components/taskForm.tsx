@@ -1449,24 +1449,11 @@ export default function TaskForm({ id }: TaskFormProps) {
                 <div className="relative">
                   <Input
                     id="legislation"
-                    type="text"
-                    placeholder="Type to search legislations..."
+                    placeholder="Search or select legislation"
                     value={legislationSearchQuery}
-                    onChange={(e) => {
-                      setLegislationSearchQuery(e.target.value);
-                      if (e.target.value.trim()) {
-                        setShowLegislationSuggestions(true);
-                      } else {
-                        setShowLegislationSuggestions(false);
-                      }
-                    }}
-                    onFocus={() => {
-                      if (legislationSearchQuery.trim()) {
-                        setShowLegislationSuggestions(true);
-                      }
-                    }}
-                    className="w-full"
-                    disabled={isFromRetainership} // Disable if form is from retainership
+                    onChange={(e) => handleInputChange("legislationId", e.target.value)}
+                    disabled={isFromRetainership} // Disable field if accessed from retainership
+                    required
                   />
 
                   {showLegislationSuggestions && legislationSearchQuery.trim() && filteredLegislations.length > 0 && (

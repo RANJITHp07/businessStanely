@@ -374,7 +374,6 @@ export default function RetainershipTable() {
                                                 <TableRow>
                                                     <TableHead>Retainership</TableHead>
                                                     <TableHead>Description</TableHead>
-                                                    <TableHead>Tasks</TableHead>
                                                     <TableHead>Client</TableHead>
                                                     <TableHead>Created By</TableHead>
                                                     <TableHead className="text-right">Actions</TableHead>
@@ -419,11 +418,9 @@ export default function RetainershipTable() {
                                                                 </div>
                                                             </TableCell>
                                                             <TableCell>
-                                                                <Badge variant="outline">{retainership.taskCount} tasks</Badge>
-                                                            </TableCell>
-                                                            <TableCell>
                                                                 <div className="text-sm">
-                                                                    {retainership.client?.name || "Unknown"} ({retainership.client?.email || "No Email"})
+                                                                    <p>{retainership.client?.name || "N/A"}</p>
+                                                                    <p className="text-muted-foreground text-xs">{retainership.client?.email || "N/A"}</p>
                                                                 </div>
                                                             </TableCell>
                                                             <TableCell>
@@ -595,7 +592,6 @@ export default function RetainershipTable() {
                                                 <TableRow>
                                                     <TableHead>Retainership</TableHead>
                                                     <TableHead>Description</TableHead>
-                                                    <TableHead>Status</TableHead>
                                                     <TableHead>Client</TableHead>
                                                     <TableHead>Created By</TableHead>
                                                     <TableHead className="text-right">Actions</TableHead>
@@ -639,10 +635,10 @@ export default function RetainershipTable() {
                                                                     </p>
                                                                 </div>
                                                             </TableCell>
-                                                            <TableCell>{getStatusBadge(retainership.status)}</TableCell>
                                                             <TableCell>
                                                                 <div className="text-sm">
-                                                                    {retainership.client?.name || "Unknown"} ({retainership.client?.email || "No Email"})
+                                                                    <p>{retainership.client?.name || "N/A"}</p>
+                                                                    <p className="text-muted-foreground text-xs">{retainership.client?.email || "N/A"}</p>
                                                                 </div>
                                                             </TableCell>
                                                             <TableCell>

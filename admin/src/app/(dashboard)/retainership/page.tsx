@@ -37,7 +37,6 @@ import {
 import {
     Avatar, AvatarFallback, AvatarImage
 } from "@/components/ui/avatar"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -195,19 +194,6 @@ export default function RetainershipTable() {
         }
     }
 
-
-
-    const getStatusBadge = (status: string) => {
-        return (
-            <Badge
-                variant={status === "approved" ? "default" : "secondary"}
-                className={status === "approved" ? "bg-green-100 text-green-800" : "bg-yellow-100 text-yellow-800"}
-            >
-                {status}
-            </Badge>
-        )
-    }
-
     // Get counts for tabs from allRetainerships to always show correct counts
     const approvedCount = allRetainerships.filter((cat) => cat.status === "approved").length
     const pendingCount = allRetainerships.filter((cat) => cat.status === "pending").length
@@ -339,6 +325,7 @@ export default function RetainershipTable() {
                                                     <TableHead>Retainership</TableHead>
                                                     <TableHead>Description</TableHead>
                                                     <TableHead>Created By</TableHead>
+                                                    <TableHead>Client</TableHead>
                                                     <TableHead className="text-right">Actions</TableHead>
                                                 </TableRow>
                                             </TableHeader>
@@ -393,6 +380,12 @@ export default function RetainershipTable() {
                                                                     {retainership.createdByType === "user" && retainership.createdByRole === "admin" && (
                                                                         <span className="ml-1 text-xs text-green-600">(Admin)</span>
                                                                     )}
+                                                                </div>
+                                                            </TableCell>
+                                                            <TableCell>
+                                                                <div className="text-sm">
+                                                                    <p>{retainership.client?.organizationName || `${retainership.client?.firstName || ""} ${retainership.client?.lastName || ""}`.trim() || "N/A"}</p>
+                                                                    <p className="text-muted-foreground text-xs">{retainership.client?.email || "N/A"}</p>
                                                                 </div>
                                                             </TableCell>
                                                             <TableCell className="text-right">
@@ -559,8 +552,9 @@ export default function RetainershipTable() {
                                                 <TableRow>
                                                     <TableHead>Retainership</TableHead>
                                                     <TableHead>Description</TableHead>
-                                                    <TableHead>Status</TableHead>
+                                                    {/* <TableHead>Status</TableHead> */}
                                                     <TableHead>Created By</TableHead>
+                                                    <TableHead>Client</TableHead>
                                                     <TableHead className="text-right">Actions</TableHead>
                                                 </TableRow>
                                             </TableHeader>
@@ -603,7 +597,7 @@ export default function RetainershipTable() {
                                                                     </p>
                                                                 </div>
                                                             </TableCell>
-                                                            <TableCell>{getStatusBadge(retainership.status)}</TableCell>
+                                                            {/* <TableCell>{getStatusBadge(retainership.status)}</TableCell> */}
                                                             <TableCell>
                                                                 <div className="text-sm">
                                                                     {retainership.createdBy || "Unknown"}
@@ -616,6 +610,12 @@ export default function RetainershipTable() {
                                                                     {retainership.createdByType === "user" && retainership.createdByRole === "admin" && (
                                                                         <span className="ml-1 text-xs text-green-600">(Admin)</span>
                                                                     )}
+                                                                </div>
+                                                            </TableCell>
+                                                            <TableCell>
+                                                                <div className="text-sm">
+                                                                    <p>{retainership.client?.organizationName || `${retainership.client?.firstName || ""} ${retainership.client?.lastName || ""}`.trim() || "N/A"}</p>
+                                                                    <p className="text-muted-foreground text-xs">{retainership.client?.email || "N/A"}</p>
                                                                 </div>
                                                             </TableCell>
                                                             <TableCell className="text-right">

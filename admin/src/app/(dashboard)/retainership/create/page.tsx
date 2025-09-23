@@ -11,6 +11,7 @@ import { toast } from "react-toastify"
 import { Badge } from '@/components/ui/badge'
 import { fetchWithAuth } from '@/lib/fetchWithAuth'
 
+// Update the CreateProps interface to include client and legislations in initialData
 interface CreateProps {
     admin?: {
         id: string;
@@ -20,6 +21,17 @@ interface CreateProps {
         id: string;
         name: string;
         description: string;
+        client?: {
+            organizationName?: string;
+            firstName?: string;
+            lastName?: string;
+        } | null;
+        legislation?: Array<{
+            id: string;
+            title: string;
+            description: string;
+            assignedAgent: string | { name: string };
+        }>;
     };
 }
 
@@ -90,6 +102,29 @@ function Create({ admin, initialData }: CreateProps) {
         fetchClientsAndAgents();
     }, []);
 
+    // Use initialData to pre-fill client and legislation fields
+    useEffect(() => {
+        if (initialData) {
+            setFormData((prev) => ({
+                ...prev,
+                clientId: initialData.client?.organizationName || "",
+            }));
+            setClientSearch(initialData.client?.organizationName || "");
+
+            // Map legislation only if it exists
+            if (initialData.legislation && initialData.legislation.length > 0) {
+                setLegislationItems(
+                    initialData.legislation.map((legislation) => ({
+                        id: legislation.id,
+                        title: legislation.title,
+                        description: legislation.description,
+                        assignedAgent: typeof legislation.assignedAgent === "string" ? legislation.assignedAgent : legislation.assignedAgent.name,
+                    }))
+                );
+            }
+        }
+    }, [initialData]);
+
     // Filter clients based on search input
     const filteredClients = clients.filter(client =>
         (client.name?.toLowerCase().includes(clientSearch.toLowerCase()) ||
@@ -120,7 +155,7 @@ function Create({ admin, initialData }: CreateProps) {
                     assignedAgent: agents.find(agent => agent.name === item.assignedAgent)?.id || item.assignedAgent, // Use agent ID
                 })),
             };
-
+   
             // Call API to create/update retainership
             const response = await fetch(
                 isEditing ? `/api/retainerships/${admin.id}` : '/api/retainerships', 
@@ -139,7 +174,6 @@ function Create({ admin, initialData }: CreateProps) {
             }
             
             toast.success(`Retainership ${isEditing ? 'updated' : 'created'} successfully!`)
-            console.log('Redirecting to /retainership'); // Debug log
             router.push('/retainership')
         } catch (error) {
             console.error("Error creating retainership:", error)

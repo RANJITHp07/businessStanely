@@ -124,6 +124,7 @@ export default function TaskForm({ id }: TaskFormProps) {
   const [legislationSearchQuery, setLegislationSearchQuery] = useState("");
   const [showLegislationSuggestions, setShowLegislationSuggestions] = useState(false);
   const [legislationList, setLegislationList] = useState<Legislation[]>([]);
+  const [isFromRetainership, setIsFromRetainership] = useState(false); // New state to track if form is from retainership
 
   // Add this handler function
   const handleNewCategoryInputChange = (field: string, value: string) => {
@@ -246,6 +247,8 @@ export default function TaskForm({ id }: TaskFormProps) {
         assignedToId: assignedAgent || prev.assignedToId,
         clientId: client || prev.clientId,
       }));
+
+      setIsFromRetainership(true); // Mark the form as coming from retainership
 
       if (assignedAgent) {
         const selectedAgent = agents.find((agent) => agent.id === assignedAgent);
@@ -1095,6 +1098,7 @@ export default function TaskForm({ id }: TaskFormProps) {
                       }
                     }}
                     className="w-full"
+                    disabled={isFromRetainership} // Disable if form is from retainership
                   />
 
                   {showSuggestions &&
@@ -1300,6 +1304,7 @@ export default function TaskForm({ id }: TaskFormProps) {
                         }
                       }}
                       className="w-full"
+                      disabled={isFromRetainership} // Disable if form is from retainership
                     />
 
                     {showAgentSuggestions &&
@@ -1461,6 +1466,7 @@ export default function TaskForm({ id }: TaskFormProps) {
                       }
                     }}
                     className="w-full"
+                    disabled={isFromRetainership} // Disable if form is from retainership
                   />
 
                   {showLegislationSuggestions && legislationSearchQuery.trim() && filteredLegislations.length > 0 && (

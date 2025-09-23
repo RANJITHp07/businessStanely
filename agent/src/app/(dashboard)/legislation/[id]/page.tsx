@@ -171,7 +171,7 @@ export default function LegislationDetail({ params }: { params: Promise<{ id: st
                   tasks.map((task) => (
                     <TableRow
                       key={task.id}
-                      onClick={() => router.push(`/tasks/${task.id}`)}
+                      onClick={() => router.push(`/task/${task.id}`)}
                       className="cursor-pointer hover:bg-muted/50"
                     >
                       <TableCell>{task.title}</TableCell>

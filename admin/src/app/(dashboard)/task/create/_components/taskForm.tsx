@@ -128,6 +128,8 @@ export default function TaskForm() {
     description: "",
   });
 
+  const [isFromRetainership, setIsFromRetainership] = useState(false); // New state to track if form is from retainership
+
   // Add this handler function
   const handleNewCategoryInputChange = (field: string, value: string) => {
     setNewCategoryData((prev) => ({ ...prev, [field]: value }));
@@ -558,6 +560,8 @@ export default function TaskForm() {
         assignedToId: assignedAgent || prev.assignedToId,
         clientId: client || prev.clientId,
       }));
+
+      setIsFromRetainership(true); // Mark the form as coming from retainership
 
       if (assignedAgent) {
         const selectedAgent = agents.find((agent) => agent.id === assignedAgent);
@@ -1065,6 +1069,7 @@ export default function TaskForm() {
                       }
                     }}
                     className="w-full"
+                    disabled={isFromRetainership} // Disable if form is from retainership
                   />
 
                   {showSuggestions &&
@@ -1272,6 +1277,7 @@ export default function TaskForm() {
                         }
                       }}
                       className="w-full"
+                      disabled={isFromRetainership} // Disable if form is from retainership
                     />
 
                     {showAgentSuggestions &&

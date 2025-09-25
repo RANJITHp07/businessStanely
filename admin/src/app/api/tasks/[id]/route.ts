@@ -14,6 +14,7 @@ export async function GET(
         createdBy: true,
         assignedTo: true,
         category: true, // Re-enabled category
+        legislation: true, // Added legislation relation
         comments: {
           include: {
             user: {

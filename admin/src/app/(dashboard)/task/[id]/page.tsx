@@ -614,6 +614,7 @@ export default function TaskDetails() {
                       </div>
                     </div>
                   </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <Label className="text-sm font-medium text-muted-foreground">
                       Description
@@ -622,6 +623,15 @@ export default function TaskDetails() {
                       {taskData.description}
                     </p>
                   </div>
+                    <div>
+                      <Label className="text-sm font-medium text-muted-foreground">
+                        Legislation Name
+                      </Label>
+                      <p className="font-medium">
+                        {taskData.legislation?.title || "N/A"}
+                      </p>
+                    </div>
+                    </div>
                 </CardContent>
               </Card>
 
@@ -673,6 +683,30 @@ export default function TaskDetails() {
                       Email
                     </Label>
                     <p className="font-medium">{taskData.client?.email}</p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Legislation Information</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <Label className="text-sm font-medium text-muted-foreground">
+                      Legislation Name
+                    </Label>
+                    <p className="font-medium">
+                      {taskData.legislation?.title || "N/A"}
+                    </p>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium text-muted-foreground">
+                      Legislation Description
+                    </Label>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {taskData.legislation?.description || "N/A"}
+                    </p>
                   </div>
                 </CardContent>
               </Card>

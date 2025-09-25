@@ -103,6 +103,9 @@ interface Task {
       name: string;
     };
   }[];
+  legislation?: {
+    title?: string;
+  };
 }
 
 interface Comment {
@@ -953,6 +956,7 @@ export default function TaskDetails() {
                       </div>
                     </div>
                   </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <Label className="text-sm font-medium text-muted-foreground">
                       Description
@@ -960,6 +964,15 @@ export default function TaskDetails() {
                     <p className="text-sm text-muted-foreground mt-1">
                       {task.description}
                     </p>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium text-muted-foreground">
+                      Legislation Name
+                    </Label>
+                    <p className="font-medium">
+                      {task.legislation?.title || "N/A"}
+                    </p>
+                  </div>
                   </div>
                 </CardContent>
               </Card>

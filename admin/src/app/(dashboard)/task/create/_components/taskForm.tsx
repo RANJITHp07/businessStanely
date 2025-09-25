@@ -1405,140 +1405,142 @@ export default function TaskForm() {
           </Card>
 
           {/* Legislation Information - New Section */}
-          <Card>
-            <CardHeader className="flex items-center justify-between">
-              <div>
-                <CardTitle className="flex items-center gap-2">
-                  <FileText className="h-5 w-5" />
-                  Legislation Information
-                </CardTitle>
-                <CardDescription>
-                  Optionally, select legislation related to this task
-                </CardDescription>
-              </div>
+          {isFromRetainership && (
+            <Card>
+              <CardHeader className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <FileText className="h-5 w-5" />
+                    Legislation Information
+                  </CardTitle>
+                  <CardDescription>
+                    Optionally, select legislation related to this task
+                  </CardDescription>
+                </div>
 
-              <Dialog
-                open={isLegislationModalOpen}
-                onOpenChange={setIsLegislationModalOpen}
-              >
+                <Dialog
+                  open={isLegislationModalOpen}
+                  onOpenChange={setIsLegislationModalOpen}
+                >
 
-                <DialogContent className="sm:max-w-[400px] w-full">
-                  <DialogHeader>
-                    <DialogTitle>Add New Legislation</DialogTitle>
-                    <DialogDescription>
-                      Create a new legislation record for reference
-                    </DialogDescription>
-                  </DialogHeader>
+                  <DialogContent className="sm:max-w-[400px] w-full">
+                    <DialogHeader>
+                      <DialogTitle>Add New Legislation</DialogTitle>
+                      <DialogDescription>
+                        Create a new legislation record for reference
+                      </DialogDescription>
+                    </DialogHeader>
 
-                  {/* Form Fields */}
-                  <div className="space-y-4 py-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="legislation-title">Legislation Title *</Label>
-                      <Input
-                        id="legislation-title"
-                        placeholder="Enter legislation title (e.g., GDPR, CCPA)"
-                        className="w-full"
-                        value={newLegislationData.title}
-                        onChange={(e) =>
-                          setNewLegislationData({
-                            ...newLegislationData,
-                            title: e.target.value,
-                          })
-                        }
-                        required
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="legislation-description">Description</Label>
-                      <Textarea
-                        id="legislation-description"
-                        placeholder="Brief description of this legislation (optional)"
-                        className="w-full"
-                        value={newLegislationData.description}
-                        onChange={(e) =>
-                          setNewLegislationData({
-                            ...newLegislationData,
-                            description: e.target.value,
-                          })
-                        }
-                        rows={4}
-                      />
-                    </div>
-                  </div>
-
-                  {/* Modal Actions */}
-                  <div className="flex justify-end gap-3 pt-4 border-t">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => setIsLegislationModalOpen(false)}
-                      disabled={isCreatingLegislation}
-                    >
-                      Cancel
-                    </Button>
-
-                    <Button
-                      type="button"
-                      onClick={handleCreateLegislation}
-                      disabled={!newLegislationData.title.trim() || isCreatingLegislation}
-                    >
-                      {isCreatingLegislation ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Creating...
-                        </>
-                      ) : (
-                        "Create Legislation"
-                      )}
-                    </Button>
-                  </div>
-                </DialogContent>
-              </Dialog>
-            </CardHeader>
-
-            <CardContent className="space-y-6">
-              <div className="space-y-2 relative">
-                <Label htmlFor="legislation">Legislation *</Label>
-                <Input
-                  id="legislation"
-                  placeholder="Search or select legislation"
-                  value={legislationSearchQuery}
-                  onChange={(e) => handleLegislationSearch(e.target.value)}
-                  disabled={isFromRetainership} // Disable field if accessed from retainership
-                  required
-                />
-
-                {showLegislationSuggestions && legislationSearchQuery.trim() && (
-                  <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto">
-                    {legislationList.map((legislation) => (
-                      <div
-                        key={legislation.id}
-                        className="flex items-center gap-2 p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
-                        onClick={() => {
-                          setFormData((prev) => ({
-                            ...prev,
-                            legislationId: legislation.id,
-                            legislationName: legislation.title,
-                          }));
-                          setLegislationSearchQuery(legislation.title);
-                          setShowLegislationSuggestions(false);
-                        }}
-                      >
-                        <span className="font-medium">{legislation.title}</span>
+                    {/* Form Fields */}
+                    <div className="space-y-4 py-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="legislation-title">Legislation Title *</Label>
+                        <Input
+                          id="legislation-title"
+                          placeholder="Enter legislation title (e.g., GDPR, CCPA)"
+                          className="w-full"
+                          value={newLegislationData.title}
+                          onChange={(e) =>
+                            setNewLegislationData({
+                              ...newLegislationData,
+                              title: e.target.value,
+                            })
+                          }
+                          required
+                        />
                       </div>
-                    ))}
-                  </div>
-                )}
 
-                {showLegislationSuggestions && legislationSearchQuery && legislationList.length === 0 && (
-                  <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg p-3">
-                    <span className="text-gray-500">No legislation found</span>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+                      <div className="space-y-2">
+                        <Label htmlFor="legislation-description">Description</Label>
+                        <Textarea
+                          id="legislation-description"
+                          placeholder="Brief description of this legislation (optional)"
+                          className="w-full"
+                          value={newLegislationData.description}
+                          onChange={(e) =>
+                            setNewLegislationData({
+                              ...newLegislationData,
+                              description: e.target.value,
+                            })
+                          }
+                          rows={4}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Modal Actions */}
+                    <div className="flex justify-end gap-3 pt-4 border-t">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => setIsLegislationModalOpen(false)}
+                        disabled={isCreatingLegislation}
+                      >
+                        Cancel
+                      </Button>
+
+                      <Button
+                        type="button"
+                        onClick={handleCreateLegislation}
+                        disabled={!newLegislationData.title.trim() || isCreatingLegislation}
+                      >
+                        {isCreatingLegislation ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Creating...
+                          </>
+                        ) : (
+                          "Create Legislation"
+                        )}
+                      </Button>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </CardHeader>
+
+              <CardContent className="space-y-6">
+                <div className="space-y-2 relative">
+                  <Label htmlFor="legislation">Legislation *</Label>
+                  <Input
+                    id="legislation"
+                    placeholder="Search or select legislation"
+                    value={legislationSearchQuery}
+                    onChange={(e) => handleLegislationSearch(e.target.value)}
+                    required={isFromRetainership} // Make required only if from retainership
+                    disabled // Disable the legislation field
+                  />
+
+                  {showLegislationSuggestions && legislationSearchQuery.trim() && (
+                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto">
+                      {legislationList.map((legislation) => (
+                        <div
+                          key={legislation.id}
+                          className="flex items-center gap-2 p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
+                          onClick={() => {
+                            setFormData((prev) => ({
+                              ...prev,
+                              legislationId: legislation.id,
+                              legislationName: legislation.title,
+                            }));
+                            setLegislationSearchQuery(legislation.title);
+                            setShowLegislationSuggestions(false);
+                          }}
+                        >
+                          <span className="font-medium">{legislation.title}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {showLegislationSuggestions && legislationSearchQuery && legislationList.length === 0 && (
+                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg p-3">
+                      <span className="text-gray-500">No legislation found</span>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Submit Buttons */}
           <div className="flex justify-end gap-4">

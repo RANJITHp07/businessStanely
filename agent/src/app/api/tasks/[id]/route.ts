@@ -1,3 +1,11 @@
+import { NextRequest, NextResponse } from "next/server";
+import { getCurrentAgent } from "@/lib/auth";
+import prisma from "@/lib/prisma";
+
+interface TaskWithFields {
+  categoryId?: string;
+}
+
 export async function DELETE(
   req: NextRequest,
   { params }: { params: { id: string } }
@@ -36,15 +44,6 @@ export async function DELETE(
       { status: 500 }
     );
   }
-}
-import { NextRequest, NextResponse } from "next/server";
-import { getCurrentAgent } from "@/lib/auth";
-import prisma from "@/lib/prisma";
-
-
-
-interface TaskWithFields {
-  categoryId?: string;
 }
 
 export async function GET(
@@ -143,6 +142,7 @@ export async function GET(
             date: "desc",
           },
         },
+        legislation: true, // Added legislation relation
       },
     });
 
@@ -168,7 +168,7 @@ export async function GET(
       });
     }
 
-    return NextResponse.json({ 
+    return NextResponse.json({
       task: {
         ...task,
         category
@@ -267,7 +267,7 @@ export async function PUT(
       });
     }
 
-    return NextResponse.json({ 
+    return NextResponse.json({
       task: {
         ...updatedTask,
         category

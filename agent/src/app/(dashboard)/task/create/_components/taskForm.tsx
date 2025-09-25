@@ -1432,75 +1432,77 @@ export default function TaskForm({ id }: TaskFormProps) {
           </Card>
 
           {/* Legislation Information */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="h-5 w-5" />
-                Legislation Information
-              </CardTitle>
-              <CardDescription>
-                Optionally, select legislation for this task
-              </CardDescription>
-            </CardHeader>
+          {isFromRetainership && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="h-5 w-5" />
+                  Legislation Information
+                </CardTitle>
+                <CardDescription>
+                  Optionally, select legislation for this task
+                </CardDescription>
+              </CardHeader>
 
-            <CardContent className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="legislation">Legislation *</Label>
-                <div className="relative">
-                  <Input
-                    id="legislation"
-                    placeholder="Search or select legislation"
-                    value={legislationSearchQuery}
-                    onChange={(e) => handleInputChange("legislationId", e.target.value)}
-                    disabled={isFromRetainership} // Disable field if accessed from retainership
-                    required
-                  />
+              <CardContent className="space-y-6">
+                <div className="space-y-2">
+                  <Label htmlFor="legislation">Legislation *</Label>
+                  <div className="relative">
+                    <Input
+                      id="legislation"
+                      placeholder="Search or select legislation"
+                      value={legislationSearchQuery}
+                      onChange={(e) => handleInputChange("legislationId", e.target.value)}
+                      disabled={isFromRetainership} // Disable field if accessed from retainership
+                      required
+                    />
 
-                  {showLegislationSuggestions && legislationSearchQuery.trim() && filteredLegislations.length > 0 && (
-                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto">
-                      {filteredLegislations.map((legislation) => (
-                        <div
-                          key={legislation.id}
-                          className="flex items-center justify-between p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
-                          onClick={() => {
-                            setFormData((prev) => ({ ...prev, legislationId: legislation.id }));
-                            setLegislationSearchQuery(legislation.title);
-                            setShowLegislationSuggestions(false);
-                          }}
-                        >
-                          <div className="flex items-center gap-2">
-                            <div>
-                              <span className="font-medium">{legislation.title}</span>
-                              {legislation.description && (
-                                <div className="text-xs text-gray-500 mt-1">
-                                  {legislation.description}
-                                </div>
-                              )}
+                    {showLegislationSuggestions && legislationSearchQuery.trim() && filteredLegislations.length > 0 && (
+                      <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto">
+                        {filteredLegislations.map((legislation) => (
+                          <div
+                            key={legislation.id}
+                            className="flex items-center justify-between p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
+                            onClick={() => {
+                              setFormData((prev) => ({ ...prev, legislationId: legislation.id }));
+                              setLegislationSearchQuery(legislation.title);
+                              setShowLegislationSuggestions(false);
+                            }}
+                          >
+                            <div className="flex items-center gap-2">
+                              <div>
+                                <span className="font-medium">{legislation.title}</span>
+                                {legislation.description && (
+                                  <div className="text-xs text-gray-500 mt-1">
+                                    {legislation.description}
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                        ))}
+                      </div>
+                    )}
 
-                  {showLegislationSuggestions && legislationSearchQuery && filteredLegislations.length === 0 && (
-                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg p-3">
-                      <span className="text-gray-500">No legislations found</span>
-                    </div>
-                  )}
+                    {showLegislationSuggestions && legislationSearchQuery && filteredLegislations.length === 0 && (
+                      <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg p-3">
+                        <span className="text-gray-500">No legislations found</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
 
-              {/* Add a visual indicator for the selected legislation below the input field */}
-              {formData.legislationId && (
-                <div className="p-4 bg-green-50 border border-green-200 rounded-lg mt-2">
-                  <p className="text-sm font-medium text-green-800">
-                    Selected Legislation: {formData.legislationName}
-                  </p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                {/* Add a visual indicator for the selected legislation below the input field */}
+                {formData.legislationId && (
+                  <div className="p-4 bg-green-50 border border-green-200 rounded-lg mt-2">
+                    <p className="text-sm font-medium text-green-800">
+                      Selected Legislation: {formData.legislationName}
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
           {/* Submit Buttons */}
           <div className="flex justify-end gap-4">

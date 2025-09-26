@@ -255,6 +255,9 @@ model TaskCategory {
 
   // Tasks relation
   tasks Task[]
+
+  // New optional field for time period in days
+  timePeriod Int?
 }
 
 model TimeLog {

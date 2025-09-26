@@ -19,6 +19,7 @@ interface CreateProps {
         id: string;
         name: string;
         description: string;
+        timePeriod: number;
     };
 }
 
@@ -26,6 +27,7 @@ function Create({ admin, initialData }: CreateProps) {
     const [formData, setFormData] = useState({
         name: initialData?.name || "",
         description: initialData?.description || "",
+        timePeriod: initialData?.timePeriod || 0, // Default to 0 if not provided
     })
     const [isSubmitting, setIsSubmitting] = useState(false)
     const router = useRouter()
@@ -113,6 +115,17 @@ function Create({ admin, initialData }: CreateProps) {
                                     onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
                                     placeholder="Enter category description (optional)"
                                     rows={4}
+                                />
+                            </div>
+                            <div className="space-y-2 mt-3">
+                                <Label htmlFor="timePeriod">Time Period (in days)</Label>
+                                <Input
+                                    id="timePeriod"
+                                    type="number"
+                                    value={formData.timePeriod}
+                                    onChange={(e) => setFormData((prev) => ({ ...prev, timePeriod: parseInt(e.target.value, 10) || 0 }))}
+                                    placeholder="Enter time period in days"
+                                    required
                                 />
                             </div>
                         </div>

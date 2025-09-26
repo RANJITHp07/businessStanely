@@ -58,6 +58,7 @@ interface Category {
   name: string;
   description?: string;
   status: string;
+  timePeriod?: number; // Add timePeriod as an optional property
 }
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "react-toastify";
@@ -590,6 +591,19 @@ export default function TaskForm() {
     }
   }, [agents, clients, legislationList]);
 
+  const handleCategorySelection = (category: Category) => {
+    setFormData((prev) => ({ ...prev, categoryId: category.id }));
+    setCategorySearchQuery(category.name);
+    setShowCategorySuggestions(false);
+
+    // Automatically set due date based on category's time period
+    if (category.timePeriod) {
+      const calculatedDueDate = new Date();
+      calculatedDueDate.setDate(calculatedDueDate.getDate() + category.timePeriod);
+      setDueDate(calculatedDueDate);
+    }
+  };
+
   return (
     <div className="container mx-auto p-6 max-w-7xl">
       <div className="mb-8">
@@ -750,11 +764,7 @@ export default function TaskForm() {
                         <div
                           key={category.id}
                           className="flex items-center justify-between p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
-                          onClick={() => {
-                            setFormData((prev) => ({ ...prev, categoryId: category.id }));
-                            setCategorySearchQuery(category.name);
-                            setShowCategorySuggestions(false);
-                          }}
+                          onClick={() => handleCategorySelection(category)}
                         >
                           <div className="flex items-center gap-2">
                             <div>

@@ -111,6 +111,7 @@ export default function TaskForm() {
   const [newCategoryData, setNewCategoryData] = useState({
     name: "",
     description: "",
+    timePeriod: "", // Added timePeriod property
   });
   const [categorySearchQuery, setCategorySearchQuery] = useState("");
   const [showCategorySuggestions, setShowCategorySuggestions] = useState(false);
@@ -142,6 +143,7 @@ export default function TaskForm() {
     setNewCategoryData({
       name: "",
       description: "",
+      timePeriod: "",
     });
   };
 
@@ -181,6 +183,8 @@ export default function TaskForm() {
             "Category created! It's pending approval and will be available once approved."
           );
         }
+
+        handleCategorySelection(newCategory); // Auto-select due date based on new category
       } else {
         const error = await response.json();
         toast.error(error.error || "Failed to create category");
@@ -592,7 +596,7 @@ export default function TaskForm() {
   }, [agents, clients, legislationList]);
 
   const handleCategorySelection = (category: Category) => {
-    setFormData((prev) => ({ ...prev, categoryId: category.id }));
+    setFormData((prev) => ({ ...prev, categoryId: category.id, timePeriod: category.timePeriod }));
     setCategorySearchQuery(category.name);
     setShowCategorySuggestions(false);
 
@@ -694,6 +698,20 @@ export default function TaskForm() {
                                 handleNewCategoryInputChange("description", e.target.value)
                               }
                               rows={4}
+                            />
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="category-timePeriod">Time Period (in days)</Label>
+                            <Input
+                              id="category-timePeriod"
+                              type="number"
+                              placeholder="Enter time period in days"
+                              className="w-full"
+                              value={newCategoryData.timePeriod || ""}
+                              onChange={(e) =>
+                                handleNewCategoryInputChange("timePeriod", e.target.value)
+                              }
                             />
                           </div>
                         </div>

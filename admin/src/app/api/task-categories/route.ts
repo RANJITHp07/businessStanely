@@ -132,6 +132,9 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { name, description, color, timePeriod } = body; // Include timePeriod
 
+    // Convert timePeriod to an integer
+    const parsedTimePeriod = timePeriod ? parseInt(timePeriod, 10) : null;
+
     // Validate required fields
     if (!name) {
       return NextResponse.json(
@@ -152,7 +155,7 @@ export async function POST(req: NextRequest) {
         name,
         description: description || "",
         color: color || "blue",
-        timePeriod: timePeriod || null,
+        timePeriod: parsedTimePeriod, // Use parsed integer value
         status,
         createdByUserId: currentAdmin.id,
         approvedById,

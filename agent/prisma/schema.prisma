@@ -228,6 +228,9 @@ model TaskCategory {
 
   // Tasks relation
   tasks Task[]
+
+  // New field for time period
+  timePeriod Int? // Optional field to specify the time period in days
 }
 
 model Retainership {

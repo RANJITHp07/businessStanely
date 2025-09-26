@@ -58,6 +58,7 @@ interface Category {
   name: string;
   description?: string;
   status: string;
+  timePeriod?: number; // Added timePeriod property
 }
 import { useRouter } from "next/navigation";
 import { toast } from "react-toastify";
@@ -625,6 +626,19 @@ export default function TaskForm({ id }: TaskFormProps) {
     }
   }, [agents]);
 
+  const handleCategorySelection = (category: Category) => {
+    setFormData((prev) => ({ ...prev, categoryId: category.id }));
+    setCategorySearchQuery(category.name);
+    setShowCategorySuggestions(false);
+
+    // Automatically set due date based on category's time period
+    if (category.timePeriod) {
+      const calculatedDueDate = new Date();
+      calculatedDueDate.setDate(calculatedDueDate.getDate() + category.timePeriod);
+      setDueDate(calculatedDueDate);
+    }
+  };
+
   return (
     <div className="container mx-auto p-6 max-w-7xl">
       <div className="mb-8">
@@ -786,9 +800,7 @@ export default function TaskForm({ id }: TaskFormProps) {
                           key={category.id}
                           className="flex items-center justify-between p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
                           onClick={() => {
-                            setFormData((prev) => ({ ...prev, categoryId: category.id }));
-                            setCategorySearchQuery(category.name);
-                            setShowCategorySuggestions(false);
+                            handleCategorySelection(category);
                           }}
                         >
                           <div className="flex items-center gap-2">
@@ -1491,15 +1503,6 @@ export default function TaskForm({ id }: TaskFormProps) {
                     )}
                   </div>
                 </div>
-
-                {/* Add a visual indicator for the selected legislation below the input field */}
-                {formData.legislationId && (
-                  <div className="p-4 bg-green-50 border border-green-200 rounded-lg mt-2">
-                    <p className="text-sm font-medium text-green-800">
-                      Selected Legislation: {formData.legislationName}
-                    </p>
-                  </div>
-                )}
               </CardContent>
             </Card>
           )}

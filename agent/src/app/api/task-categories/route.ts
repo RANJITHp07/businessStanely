@@ -100,6 +100,7 @@ export async function GET(req: NextRequest) {
         approvedAt: category.approvedAt?.toISOString() || null,
         taskCount: taskCount,
         isOwner: false,
+        timePeriod: category.timePeriod,
       };
     }));
 
@@ -128,7 +129,7 @@ export async function POST(req: NextRequest) {
 
     // Parse request body
     const body = await req.json();
-    const { name, description, color } = body;
+    const { name, description, color, timePeriod } = body; // Include timePeriod
 
     // Validate required fields
     if (!name) {
@@ -148,6 +149,7 @@ export async function POST(req: NextRequest) {
         createdByAgentId: currentAgent.id,
         approvedById: null,
         approvedAt: null,
+        timePeriod: timePeriod || null,
       },
       include: {
         createdByAgent: {
@@ -180,6 +182,7 @@ export async function POST(req: NextRequest) {
       approvedBy: newCategory.approvedBy?.username || null,
       approvedAt: newCategory.approvedAt?.toISOString() || null,
       taskCount: 0,
+      timePeriod: newCategory.timePeriod, // Include timePeriod in the response
     };
 
     return NextResponse.json(transformedCategory, { status: 201 });

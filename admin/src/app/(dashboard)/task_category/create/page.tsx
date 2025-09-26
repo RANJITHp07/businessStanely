@@ -25,6 +25,7 @@ function Create({ admin, initialData }: CreateProps) {
     const [formData, setFormData] = useState({
         name: initialData?.name || "",
         description: initialData?.description || "",
+        timePeriod: "" // New field for time period
     })
     const [isSubmitting, setIsSubmitting] = useState(false)
     const router = useRouter()
@@ -50,7 +51,7 @@ function Create({ admin, initialData }: CreateProps) {
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify(formData),
+                    body: JSON.stringify({ ...formData, timePeriod: parseInt(formData.timePeriod, 10) }), // Ensure timePeriod is sent as a number
                 }
             )
             
@@ -112,6 +113,16 @@ function Create({ admin, initialData }: CreateProps) {
                                     onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
                                     placeholder="Enter category description (optional)"
                                     rows={4}
+                                />
+                            </div>
+                            <div className="space-y-2 mt-3">
+                                <Label htmlFor="timePeriod">Time Period (in days)</Label>
+                                <Input
+                                    id="timePeriod"
+                                    type="number"
+                                    value={formData.timePeriod}
+                                    onChange={(e) => setFormData((prev) => ({ ...prev, timePeriod: e.target.value }))}
+                                    placeholder="Enter time period in days"
                                 />
                             </div>
                         </div>

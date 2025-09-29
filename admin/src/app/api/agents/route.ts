@@ -8,7 +8,7 @@ import { sendAgentInviteEmail } from "@/lib/email";
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-  const { specializations, superiors, photo, password: providedPassword, ...agentData } = body;
+  const { specializations, superiors, subordinates, photo, password: providedPassword, ...agentData } = body;
 
     // Generate a random password if not provided
     const password = providedPassword || Math.random().toString(36).slice(-8);
@@ -37,6 +37,10 @@ export async function POST(req: NextRequest) {
       agentData.email = agentData.email.toLowerCase();
     }
 
+    // Remove subordinates from agentData if present
+    if ('subordinates' in agentData) {
+      delete agentData.subordinates;
+    }
     const data: Prisma.AgentCreateInput = {
       ...agentData,
       password: hashedPassword,
@@ -54,7 +58,7 @@ export async function POST(req: NextRequest) {
       data,
     });
 
-    // If superiors are provided, create AgentSuperior links
+    // If superiors are provided, create AgentSuperior links (agent is subordinate)
     if (superiors?.length) {
       await prisma.agentSuperior.createMany({
         data: superiors.map((superiorId: string) => ({
@@ -63,15 +67,30 @@ export async function POST(req: NextRequest) {
         })),
       });
     }
+    // If subordinates are provided, create AgentSuperior links (agent is superior)
+    if (subordinates?.length) {
+      await prisma.agentSuperior.createMany({
+        data: subordinates.map((subordinateId: string) => ({
+          superiorId: newAgent.id,
+          subordinateId,
+        })),
+      });
+    }
 
     // Fetch agent with superiors/subordinates
-    const agentWithLinks = await prisma.agent.findUnique({
-      where: { id: newAgent.id },
-      include: {
-        superiorsLinks: { include: { superior: true } },
-        subordinatesLinks: { include: { subordinate: true } },
-      },
+    const superiorsLinks = await prisma.agentSuperior.findMany({
+      where: { subordinateId: newAgent.id },
+      include: { superior: true },
     });
+    const subordinatesLinks = await prisma.agentSuperior.findMany({
+      where: { superiorId: newAgent.id },
+      include: { subordinate: true },
+    });
+    const agentWithLinks = {
+      ...newAgent,
+      superiors: superiorsLinks.map(link => link.superior),
+      subordinates: subordinatesLinks.map(link => link.subordinate),
+    };
 
     // Send email with credentials to the agent
     try {
@@ -80,7 +99,6 @@ export async function POST(req: NextRequest) {
         userName: agentData.name,
         password: password, // Send the plain text password
       });
-      console.log("Agent invite email sent successfully");
     } catch (emailError) {
       console.error("Failed to send agent invite email:", emailError);
       // Note: We don't fail the agent creation if email sending fails

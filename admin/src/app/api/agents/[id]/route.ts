@@ -147,7 +147,6 @@ export async function PUT(
     });
 
     const updatedSubordinates = subordinatesLinks.map(link => link.subordinate);
-    console.log('Updated agent subordinates (team members):', updatedSubordinates);
     return NextResponse.json({
       ...updatedAgent,
       superiors: superiorsLinks.map(link => link.superior),

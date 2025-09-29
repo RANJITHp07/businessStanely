@@ -150,12 +150,13 @@ export default function AgentForm({ agent }: AgentFormProps) {
     string[]
   >(agent?.specializations || []);
   const [selectedSubordinates, setSelectedSubordinates] = useState<string[]>(
-    []
+    agent?.subordinates ? agent.subordinates.map((sub) => sub.id) : []
   );
   const [photoPreview, setPhotoPreview] = useState<string | null>(
     agent?.photo || null
   );
   const [allAgents, setAllAgents] = useState<Agent[]>([]);
+  const [allSubordinateIds, setAllSubordinateIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: agent?.name || "",
@@ -169,7 +170,7 @@ export default function AgentForm({ agent }: AgentFormProps) {
   const [agentSearch, setAgentSearch] = useState("");
   const router = useRouter();
 
-  // Fetch all agents from API
+  // Fetch all agents from API and collect all subordinate IDs
   const fetchAgents = async () => {
     setLoading(true);
     try {
@@ -177,6 +178,16 @@ export default function AgentForm({ agent }: AgentFormProps) {
       if (response.ok) {
         const agents = await response.json();
         setAllAgents(agents);
+        // Collect all subordinate IDs except for the current agent's subordinates
+        const subordinateIds: string[] = [];
+        agents.forEach((a: Agent) => {
+          if (!agent || a.id !== agent.id) {
+            if (Array.isArray(a.subordinates)) {
+              subordinateIds.push(...a.subordinates.map((s: Agent) => s.id));
+            }
+          }
+        });
+        setAllSubordinateIds(subordinateIds);
       }
     } catch (error) {
       console.error("Error fetching agents:", error);
@@ -190,12 +201,14 @@ export default function AgentForm({ agent }: AgentFormProps) {
     fetchAgents();
   }, []);
 
-  // Initialize subordinates when editing an existing agent
+  // Initialize subordinates when editing an existing agent (handle API response updates)
   useEffect(() => {
     if (agent?.subordinates) {
       setSelectedSubordinates(agent.subordinates.map((sub) => sub.id));
+    } else {
+      setSelectedSubordinates([]);
     }
-  }, [agent]);
+  }, [agent?.subordinates]);
 
   // Get available agents based on selected agent type hierarchy
   const getAvailableAgents = () => {
@@ -207,7 +220,17 @@ export default function AgentForm({ agent }: AgentFormProps) {
       if (agent && existingAgent.id === agent.id) return false;
 
       // Only show agents that are lower in hierarchy
-      return allowedTypes.includes(existingAgent.agentType);
+      if (!allowedTypes.includes(existingAgent.agentType)) return false;
+
+      // Prevent agents from being added to multiple teams (unless already subordinate to this agent)
+      if (
+        allSubordinateIds.includes(existingAgent.id) &&
+        !(agent?.subordinates?.some((s) => s.id === existingAgent.id))
+      ) {
+        return false;
+      }
+
+      return true;
     });
   };
 

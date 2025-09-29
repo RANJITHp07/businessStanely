@@ -8,7 +8,7 @@ import { sendAgentInviteEmail } from "@/lib/email";
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { specializations, subordinates, photo, password: providedPassword, ...agentData } = body;
+  const { specializations, superiors, photo, password: providedPassword, ...agentData } = body;
 
     // Generate a random password if not provided
     const password = providedPassword || Math.random().toString(36).slice(-8);
@@ -39,26 +39,37 @@ export async function POST(req: NextRequest) {
 
     const data: Prisma.AgentCreateInput = {
       ...agentData,
-      password: hashedPassword, // Add the hashed password
+      password: hashedPassword,
       photo: photoS3Key,
-      status: "active", // Set default status
+      status: "active",
       ...(specializations?.length && {
         specializations: {
           set: specializations,
         },
       }),
-      ...(subordinates?.length && {
-        subordinates: {
-          connect: subordinates.map((id: string) => ({ id })),
-        },
-      }),
     };
 
+    // Create the agent first
     const newAgent = await prisma.agent.create({
       data,
+    });
+
+    // If superiors are provided, create AgentSuperior links
+    if (superiors?.length) {
+      await prisma.agentSuperior.createMany({
+        data: superiors.map((superiorId: string) => ({
+          superiorId,
+          subordinateId: newAgent.id,
+        })),
+      });
+    }
+
+    // Fetch agent with superiors/subordinates
+    const agentWithLinks = await prisma.agent.findUnique({
+      where: { id: newAgent.id },
       include: {
-        superior: true,
-        subordinates: true,
+        superiorsLinks: { include: { superior: true } },
+        subordinatesLinks: { include: { subordinate: true } },
       },
     });
 
@@ -76,7 +87,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Return agent data (password is not included in the response by default)
-    return NextResponse.json(newAgent, { status: 201 });
+  return NextResponse.json(agentWithLinks, { status: 201 });
   } catch (error) {
     console.error("Error creating agent:", error);
 
@@ -100,8 +111,8 @@ export async function GET() {
   try {
     const agents = await prisma.agent.findMany({
       include: {
-        superior: true,
-        subordinates: true,
+        superiorsLinks: { include: { superior: true } },
+        subordinatesLinks: { include: { subordinate: true } },
       },
       orderBy: {
         createdAt: "desc",

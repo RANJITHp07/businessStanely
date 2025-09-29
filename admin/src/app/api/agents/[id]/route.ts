@@ -7,18 +7,28 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const { id } = await params;
+  const { id } = await params;
     const agent = await prisma.agent.findUnique({
       where: { id },
-      include: {
-        subordinates: true,
-        superior: true,
-      },
     });
     if (!agent) {
       return NextResponse.json({ error: "Agent not found" }, { status: 404 });
     }
-    return NextResponse.json(agent);
+    // Fetch superiors
+    const superiorsLinks = await prisma.agentSuperior.findMany({
+      where: { subordinateId: id },
+      include: { superior: true },
+    });
+    // Fetch subordinates
+    const subordinatesLinks = await prisma.agentSuperior.findMany({
+      where: { superiorId: id },
+      include: { subordinate: true },
+    });
+    return NextResponse.json({
+      ...agent,
+      superiors: superiorsLinks.map(link => link.superior),
+      subordinates: subordinatesLinks.map(link => link.subordinate),
+    });
   } catch (error) {
     console.error(`Error fetching agent ${params.id}:`, error);
     return NextResponse.json(
@@ -33,8 +43,8 @@ export async function PUT(
   { params }: { params: { id: string } }
 ) {
   try {
-    const body = await req.json();
-    const { email, specializations, subordinates, photo, ...agentData } = body;
+  const body = await req.json();
+  const { email, specializations, superiors, subordinates, photo, ...agentData } = body;
 
 
     // Always store and check emails in lowercase for case-insensitive uniqueness
@@ -45,7 +55,8 @@ export async function PUT(
         })
       : undefined;
 
-    if (existingAgent && existingAgent.id !== params.id) {
+  const { id } = await params;
+  if (existingAgent && existingAgent.id !== id) {
       return NextResponse.json(
         { error: "Another user with the same email already exists." },
         { status: 400 }
@@ -53,7 +64,7 @@ export async function PUT(
     }
 
     const currentAgent = await prisma.agent.findUnique({
-      where: { id: params.id },
+      where: { id },
     });
 
     let photoS3Key = currentAgent?.photo;
@@ -82,26 +93,66 @@ export async function PUT(
     }
 
 
+    // Remove subordinates if present in agentData (not a valid field)
+    if ('subordinates' in agentData) {
+      delete agentData.subordinates;
+    }
     const updatedAgent = await prisma.agent.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         ...agentData,
         email: emailToCheck,
         photo: photoS3Key,
         specializations,
-        ...(subordinates && {
-          subordinates: {
-            set: subordinates.map((id: string) => ({ id })),
-          },
-        }),
-      },
-      include: {
-        superior: true,
-        subordinates: true,
       },
     });
 
-    return NextResponse.json(updatedAgent);
+    // Only update subordinates (team members) for this agent
+    if (typeof subordinates !== 'undefined') {
+      // Remove all existing AgentSuperior links where this agent is the superior
+      await prisma.agentSuperior.deleteMany({ where: { superiorId: id } });
+      // Add new AgentSuperior links for subordinates
+      if (subordinates.length) {
+        await prisma.agentSuperior.createMany({
+          data: subordinates.map((subordinateId: string) => ({
+            superiorId: id,
+            subordinateId,
+          })),
+        });
+      }
+    }
+    // Only update superiors for this agent
+    if (typeof superiors !== 'undefined') {
+      // Remove all existing AgentSuperior links where this agent is the subordinate
+      await prisma.agentSuperior.deleteMany({ where: { subordinateId: id } });
+      // Add new AgentSuperior links for superiors
+      if (superiors.length) {
+        await prisma.agentSuperior.createMany({
+          data: superiors.map((superiorId: string) => ({
+            superiorId,
+            subordinateId: id,
+          })),
+        });
+      }
+    }
+
+    // Fetch updated superiors/subordinates
+    const superiorsLinks = await prisma.agentSuperior.findMany({
+      where: { subordinateId: id },
+      include: { superior: true },
+    });
+    const subordinatesLinks = await prisma.agentSuperior.findMany({
+      where: { superiorId: id },
+      include: { subordinate: true },
+    });
+
+    const updatedSubordinates = subordinatesLinks.map(link => link.subordinate);
+    console.log('Updated agent subordinates (team members):', updatedSubordinates);
+    return NextResponse.json({
+      ...updatedAgent,
+      superiors: superiorsLinks.map(link => link.superior),
+      subordinates: updatedSubordinates,
+    });
   } catch (error) {
     console.error(`Error updating agent ${params.id}:`, error);
     return NextResponse.json(

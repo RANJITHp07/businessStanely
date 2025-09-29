@@ -96,10 +96,9 @@ model Agent {
   otpExpiry     DateTime?
   isOtpVerified Boolean   @default(false)
 
-  // Team Management
-  superiorId    String?   @db.ObjectId
-  superior      Agent?    @relation("AgentHierarchy", fields: [superiorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  subordinates  Agent[]   @relation("AgentHierarchy")
+  // Team Management (multiple superiors via join table)
+  superiorsLinks    AgentSuperior[] @relation("AgentSuperiors_superior")
+  subordinatesLinks AgentSuperior[] @relation("AgentSuperiors_subordinate")
   createdTasks  Task[]    @relation("CreatedTasks")
   assignedTasks Task[]    @relation("AssignedTasks")
   comments      Comment[] @relation("CommentAuthor")
@@ -113,6 +112,15 @@ model Agent {
 
   // Legislation relations
   legislations Legislation[] @relation("AgentLegislations")
+}
+
+model AgentSuperior {
+  id            String @id @default(auto()) @map("_id") @db.ObjectId
+  superiorId    String @db.ObjectId
+  subordinateId String @db.ObjectId
+
+  superior      Agent  @relation("AgentSuperiors_superior", fields: [superiorId], references: [id])
+  subordinate   Agent  @relation("AgentSuperiors_subordinate", fields: [subordinateId], references: [id])
 }
 
 model Task {

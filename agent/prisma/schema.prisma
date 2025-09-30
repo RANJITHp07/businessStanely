@@ -1,61 +1,11 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-generator client {
-  provider      = "prisma-client-js"
-  binaryTargets = ["native", "rhel-openssl-1.0.x"]
-}
-
 datasource db {
   provider = "mongodb"
   url      = env("DATABASE_URL")
 }
 
-model Agent {
-  id                   String   @id @default(auto()) @map("_id") @db.ObjectId
-  name                 String
-  email                String   @unique
-  password             String   // Required password field
-  phoneNumber          String
-  secondaryPhoneNumber String?
-  agentType            String
-  barAssociationId     String
-  jurisdiction         String
-  specializations      String[]
-  photo                String?
-  status               String   @default("active") // "active" or "inactive"
-  lastLogin            DateTime?
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
-
-  // OTP fields for password reset
-  resetOtp             String?
-  otpExpiry            DateTime?
-  isOtpVerified        Boolean  @default(false)
-
-  // Team Management
-  superiorId    String?   @db.ObjectId
-  superior      Agent?    @relation("AgentHierarchy", fields: [superiorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  subordinates  Agent[]   @relation("AgentHierarchy")
-  createdTasks  Task[]    @relation("CreatedTasks")
-  assignedTasks Task[]    @relation("AssignedTasks")
-  comments      Comment[] @relation("CommentAuthor")
-  timeLogs      TimeLog[] @relation("AgentTimeLogs")
-
-  // TaskCategory agent-created relation
-  createdCategories TaskCategory[] @relation("AgentCreatedCategories")
-
-  // Retainership agent-created relation
-  createdRetainerships Retainership[] @relation("AgentCreatedRetainerships")
-
-  // Single-session enforcement
-  currentSessionToken String?
-
-  // Legislation relation
-  legislationsAssigned Legislation[] @relation("LegislationsAssigned")
-
-  assignedLegislationId String?   @db.ObjectId @unique
-  assignedLegislation   Legislation? @relation("AssignedLegislation", fields: [assignedLegislationId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-1.0.x"]
 }
 
 model User {
@@ -63,7 +13,7 @@ model User {
   username    String    @unique // Used for both login and display
   email       String    @unique
   password    String
-  adminType   String    @default("owner") // Either "owner" or "admin"
+  adminType   String    @default("admin") // Either "owner" or "admin"
   status      String    @default("active") // "active" or "inactive"
   photo       String?
   lastLogin   DateTime?
@@ -83,11 +33,9 @@ model User {
   rejectedRetainerships Retainership[] @relation("RetainershipRejections")
 
   // OTP fields for password reset
-  resetOtp      String?
-  otpExpiry     DateTime?
-  isOtpVerified Boolean   @default(false)
-
-  // Single-session enforcement
+  resetOtp            String?
+  otpExpiry           DateTime?
+  isOtpVerified       Boolean   @default(false)
   currentSessionToken String?
 }
 
@@ -122,22 +70,71 @@ model Client {
   designation          String?
   contactEmail         String?
 
+  // Add this to the Client model
   retainerships Retainership[]
-  legislations Legislation[]
+}
+
+model Agent {
+  id                   String    @id @default(auto()) @map("_id") @db.ObjectId
+  name                 String
+  email                String    @unique
+  password             String // Authentication password field
+  phoneNumber          String
+  secondaryPhoneNumber String?
+  agentType            String
+  barAssociationId     String
+  jurisdiction         String
+  specializations      String[]
+  photo                String?
+  status               String    @default("active") // "active" or "inactive"
+  lastLogin            DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  // OTP fields for password reset
+  resetOtp      String?
+  otpExpiry     DateTime?
+  isOtpVerified Boolean   @default(false)
+
+  // Team Management (multiple superiors via join table)
+  superiorsLinks    AgentSuperior[] @relation("AgentSuperiors_superior")
+  subordinatesLinks AgentSuperior[] @relation("AgentSuperiors_subordinate")
+  createdTasks  Task[]    @relation("CreatedTasks")
+  assignedTasks Task[]    @relation("AssignedTasks")
+  comments      Comment[] @relation("CommentAuthor")
+  timeLogs      TimeLog[] @relation("TimeLogAgent")
+
+  // TaskCategory agent-created relation
+  createdCategories    TaskCategory[] @relation("AgentCreatedCategories")
+  // Retainership agent-created relation
+  createdRetainerships Retainership[] @relation("AgentCreatedRetainerships")
+  currentSessionToken  String?
+
+  // Legislation relations
+  legislations Legislation[] @relation("AgentLegislations")
+}
+
+model AgentSuperior {
+  id            String @id @default(auto()) @map("_id") @db.ObjectId
+  superiorId    String @db.ObjectId
+  subordinateId String @db.ObjectId
+
+  superior      Agent  @relation("AgentSuperiors_superior", fields: [superiorId], references: [id])
+  subordinate   Agent  @relation("AgentSuperiors_subordinate", fields: [subordinateId], references: [id])
 }
 
 model Task {
-  id          String    @id @default(auto()) @map("_id") @db.ObjectId
-  title       String
-  description String?
-  status      String    @default("To Do") // e.g., To Do, In Progress, Hold, Completed
-  priority    String    @default("Medium") // e.g., Low, Medium, High
-  dueDate     DateTime?
-  progress    Int?      @default(0) // Progress percentage (0-100)
-  followUpRequired Boolean @default(false)
-  completed   Boolean   @default(false)
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id               String    @id @default(auto()) @map("_id") @db.ObjectId
+  title            String
+  description      String?
+  status           String    @default("To Do") // e.g., To Do, In Progress, Hold, Completed
+  priority         String    @default("Medium") // e.g., Low, Medium, High
+  dueDate          DateTime?
+  progress         Int?      @default(0) // Progress percentage (0-100)
+  followUpRequired Boolean   @default(false)
+  completed        Boolean   @default(false)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
   clientId String? @db.ObjectId
   client   Client? @relation(fields: [clientId], references: [id])
@@ -148,34 +145,72 @@ model Task {
   assignedToId String? @db.ObjectId
   assignedTo   Agent?  @relation("AssignedTasks", fields: [assignedToId], references: [id])
 
-  categoryId String?      @db.ObjectId
+  categoryId String?       @db.ObjectId
   category   TaskCategory? @relation(fields: [categoryId], references: [id])
 
-  retainershipId String? @db.ObjectId
-  retainership   Retainership? @relation("RetainershipTasks", fields: [retainershipId], references: [id])
-
-  // Relation to Legislation
-  legislationId String?      @db.ObjectId
-  legislation   Legislation? @relation("LegislationTasks", fields: [legislationId], references: [id])
+  // Legislation relation
+  legislationId String?       @db.ObjectId
+  legislation   Legislation?  @relation(fields: [legislationId], references: [id])
 
   comments Comment[]
   timeLogs TimeLog[]
+
+  // Add this to the Task model
+  retainershipId String? @db.ObjectId
+  retainership   Retainership? @relation("RetainershipTasks", fields: [retainershipId], references: [id])
 }
 
-model TimeLog {
+model Legislation {
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  title           String
+  description     String?
+  assignedAgentId String?  @db.ObjectId
+  assignedAgent   Agent?   @relation("AgentLegislations", fields: [assignedAgentId], references: [id])
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  // Relation to Retainership
+  retainershipId String       @db.ObjectId
+  retainership   Retainership @relation(fields: [retainershipId], references: [id], onDelete: Cascade)
+
+  // Add tasks relation to fetch tasks based on legislation
+  tasks Task[] @relation
+}
+
+model Retainership {
   id          String   @id @default(auto()) @map("_id") @db.ObjectId
-  date        DateTime
-  hours       Float    // Hours worked (can be decimal like 1.5, 2.75)
-  description String
+  name        String
+  description String?
+  color       String   @default("blue")
+  status      String   @default("pending") // "pending" or "approved"
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  taskId String @db.ObjectId
-  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  // Creator information (polymorphic: agent or user)
+  createdByUserId  String? @db.ObjectId
+  createdByUser    User?   @relation("UserCreatedRetainerships", fields: [createdByUserId], references: [id])
+  createdByAgentId String? @db.ObjectId
+  createdByAgent   Agent?  @relation("AgentCreatedRetainerships", fields: [createdByAgentId], references: [id])
 
-  // Agent who logged the time
-  agentId String @db.ObjectId
-  agent   Agent  @relation("AgentTimeLogs", fields: [agentId], references: [id])
+  // Approval information
+  approvedById String?   @db.ObjectId
+  approvedBy   User?     @relation("RetainershipApprovals", fields: [approvedById], references: [id])
+  approvedAt   DateTime?
+
+  // Rejection information
+  rejectedById    String?   @db.ObjectId
+  rejectedBy      User?     @relation("RetainershipRejections", fields: [rejectedById], references: [id])
+  rejectedAt      DateTime?
+  rejectionReason String?
+
+  // Tasks relation
+  tasks Task[] @relation("RetainershipTasks")
+
+  // Relation to Legislation
+  legislation Legislation[]
+
+  clientId String? @db.ObjectId
+  client   Client? @relation(fields: [clientId], references: [id])
 }
 
 model Comment {
@@ -210,10 +245,10 @@ model TaskCategory {
   updatedAt   DateTime @updatedAt
 
   // Creator information (polymorphic: agent or user)
-  createdByUserId   String? @db.ObjectId
-  createdByUser     User?   @relation("UserCreatedCategories", fields: [createdByUserId], references: [id])
-  createdByAgentId  String? @db.ObjectId
-  createdByAgent    Agent?  @relation("AgentCreatedCategories", fields: [createdByAgentId], references: [id])
+  createdByUserId  String? @db.ObjectId
+  createdByUser    User?   @relation("UserCreatedCategories", fields: [createdByUserId], references: [id])
+  createdByAgentId String? @db.ObjectId
+  createdByAgent   Agent?  @relation("AgentCreatedCategories", fields: [createdByAgentId], references: [id])
 
   // Approval information
   approvedById String?   @db.ObjectId
@@ -229,66 +264,21 @@ model TaskCategory {
   // Tasks relation
   tasks Task[]
 
-  // New field for time period
-  timePeriod Int? // Optional field to specify the time period in days
+  // New optional field for time period in days
+  timePeriod Int?
 }
 
-model Retainership {
+model TimeLog {
   id          String   @id @default(auto()) @map("_id") @db.ObjectId
-  name        String
-  description String?
-  color       String   @default("blue")
-  status      String   @default("pending") // "pending" or "approved"
+  date        DateTime
+  hours       Float
+  description String
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  // Creator information (polymorphic: agent or user)
-  createdByUserId   String? @db.ObjectId
-  createdByUser     User?   @relation("UserCreatedRetainerships", fields: [createdByUserId], references: [id])
-  createdByAgentId  String? @db.ObjectId
-  createdByAgent    Agent?  @relation("AgentCreatedRetainerships", fields: [createdByAgentId], references: [id])
+  taskId String @db.ObjectId
+  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
-  // Approval information
-  approvedById String?   @db.ObjectId
-  approvedBy   User?     @relation("RetainershipApprovals", fields: [approvedById], references: [id])
-  approvedAt   DateTime?
-
-  // Rejection information
-  rejectedById    String?   @db.ObjectId
-  rejectedBy      User?     @relation("RetainershipRejections", fields: [rejectedById], references: [id])
-  rejectedAt      DateTime?
-  rejectionReason String?
-
-  // Tasks relation
-  tasks Task[] @relation("RetainershipTasks")
-
-  clientId String? @db.ObjectId
-  client   Client? @relation(fields: [clientId], references: [id])
-
-  legislations Legislation[] @relation("RetainershipLegislation")
-}
-
-model Legislation {
-  id          String   @id @default(auto()) @map("_id") @db.ObjectId
-  title       String
-  description String?
-  status      String   @default("active") // "active" or "inactive"
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  // Direct relations
-  assignedAgentId String?   @db.ObjectId @unique
-  assignedAgent   Agent?    @relation("LegislationsAssigned", fields: [assignedAgentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-
-  retainershipId String?   @db.ObjectId
-  retainership   Retainership? @relation("RetainershipLegislation", fields: [retainershipId], references: [id])
-
-  clientId String?   @db.ObjectId
-  client   Client?  @relation(fields: [clientId], references: [id])
-
-  // Inverse relations
-  agent Agent? @relation("AssignedLegislation")
-
-  // New relation to tasks
-  tasks Task[] @relation("LegislationTasks")
+  agentId String @db.ObjectId
+  agent   Agent  @relation("TimeLogAgent", fields: [agentId], references: [id])
 }

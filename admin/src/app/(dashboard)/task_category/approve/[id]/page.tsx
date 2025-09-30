@@ -311,7 +311,7 @@ export default function ApproveCategory({ params }: { params: Promise<{ id: stri
             <div className="mb-8">
                 <div className="flex items-center gap-4 mb-6">
                     <div>
-                        <h1 className="text-[28px] md:text-3xl font-bold">Approve Category</h1>
+                        <h1 className="text-[28px] md:text-3xl font-bold">Approve Service</h1>
                         <p className="text-[18px] md:text-[16px] text-muted-foreground mt-2">
                             Review category details and associated tasks before approval
                         </p>
@@ -393,7 +393,7 @@ export default function ApproveCategory({ params }: { params: Promise<{ id: stri
                                     ) : (
                                         <>
                                             <CheckCircle className="h-4 w-4 mr-2" />
-                                            Approve Category
+                                            Approve Service
                                         </>
                                     )}
                                 </Button>
@@ -404,7 +404,7 @@ export default function ApproveCategory({ params }: { params: Promise<{ id: stri
                                     className="w-full"
                                 >
                                     <X className="h-4 w-4 mr-2" />
-                                    Reject Category
+                                    Reject Service
                                 </Button>
                             </CardContent>
                         </Card>
@@ -416,7 +416,7 @@ export default function ApproveCategory({ params }: { params: Promise<{ id: stri
                         <div className="flex items-center justify-between">
                             <CardTitle className="flex items-center gap-2">
                                 <FileText className="h-5 w-5" />
-                                Category Tasks ({tasks?.length || 0})
+                                Service Tasks ({tasks?.length || 0})
                             </CardTitle>
                             {/* <div className="flex items-center gap-2">
                                 <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
@@ -651,7 +651,7 @@ export default function ApproveCategory({ params }: { params: Promise<{ id: stri
                 <AlertDialog open={showRejectDialog} onOpenChange={setShowRejectDialog}>
                     <AlertDialogContent>
                         <AlertDialogHeader>
-                            <AlertDialogTitle>Reject Category</AlertDialogTitle>
+                            <AlertDialogTitle>Reject Service</AlertDialogTitle>
                             <AlertDialogDescription>
                                 Please provide a reason for rejecting this category. This will help the creator understand what needs to
                                 be improved.
@@ -681,7 +681,7 @@ export default function ApproveCategory({ params }: { params: Promise<{ id: stri
                                         Rejecting...
                                     </>
                                 ) : (
-                                    "Reject Category"
+                                    "Reject Service"
                                 )}
                             </AlertDialogAction>
                         </AlertDialogFooter>

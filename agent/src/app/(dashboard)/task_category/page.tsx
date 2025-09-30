@@ -312,7 +312,7 @@ export default function TaskCategoryTable() {
                             <div className="flex items-center justify-between">
                                 <CardTitle className="flex items-center gap-2">
                                     <CheckCircle className="h-5 w-5" />
-                                    Approved Categories ({sortedCategories.length})
+                                    Approved Services ({sortedCategories.length})
                                 </CardTitle>
                                 {/* <div className="flex items-center gap-2">
                                     <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
@@ -654,7 +654,7 @@ export default function TaskCategoryTable() {
                                                                             <DropdownMenuItem asChild>
                                                                                 <Link href={`/task_category/approve/${category.id}`} onClick={(e) => e.stopPropagation()}>
                                                                                     <CheckCircle className="mr-2 h-4 w-4" />
-                                                                                    Approve/Reject Category
+                                                                                    Approve/Reject Service
                                                                                 </Link>
                                                                             </DropdownMenuItem>
                                                                         )}

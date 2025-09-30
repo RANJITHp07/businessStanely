@@ -615,14 +615,14 @@ export default function TaskDetails() {
                     </div>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label className="text-sm font-medium text-muted-foreground">
-                      Description
-                    </Label>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {taskData.description}
-                    </p>
-                  </div>
+                    <div>
+                      <Label className="text-sm font-medium text-muted-foreground">
+                        Description
+                      </Label>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {taskData.description}
+                      </p>
+                    </div>
                     <div>
                       <Label className="text-sm font-medium text-muted-foreground">
                         Legislation Name
@@ -631,7 +631,7 @@ export default function TaskDetails() {
                         {taskData.legislation?.title || "N/A"}
                       </p>
                     </div>
-                    </div>
+                  </div>
                 </CardContent>
               </Card>
 
@@ -761,11 +761,10 @@ export default function TaskDetails() {
                               Completed: 100,
                               Overdue: 0,
                             };
-                            return `${
-                              statusProgress[
-                                taskData.status as keyof typeof statusProgress
-                              ] || 0
-                            }%`;
+                            return `${statusProgress[
+                              taskData.status as keyof typeof statusProgress
+                            ] || 0
+                              }%`;
                           })()}
                         </span>
                       </div>
@@ -780,11 +779,10 @@ export default function TaskDetails() {
                           Follow-up Required
                         </span>
                         <span
-                          className={`font-medium ${
-                            taskData.followUpRequired
-                              ? "text-green-600"
-                              : "text-gray-400"
-                          }`}
+                          className={`font-medium ${taskData.followUpRequired
+                            ? "text-green-600"
+                            : "text-gray-400"
+                            }`}
                         >
                           {taskData.followUpRequired ? `+10%` : `0%`}
                         </span>
@@ -800,11 +798,10 @@ export default function TaskDetails() {
                           Status Check
                         </span>
                         <span
-                          className={`font-medium ${
-                            taskData.completed
-                              ? "text-green-600"
-                              : "text-gray-400"
-                          }`}
+                          className={`font-medium ${taskData.completed
+                            ? "text-green-600"
+                            : "text-gray-400"
+                            }`}
                         >
                           {taskData.completed ? `+15%` : `0%`}
                         </span>
@@ -847,7 +844,7 @@ export default function TaskDetails() {
         <TabsContent value="comments" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Task Comments</CardTitle>
+              <CardTitle>Task Interactions</CardTitle>
               <CardDescription>
                 Communication and updates related to this task
               </CardDescription>
@@ -926,9 +923,9 @@ export default function TaskDetails() {
               {/* Comments List */}
               <div className="space-y-4">
                 {commentsLoading ? (
-                  <p className="text-muted-foreground">Loading comments...</p>
+                  <p className="text-muted-foreground">Loading interactions...</p>
                 ) : comments.length === 0 ? (
-                  <p className="text-muted-foreground">No comments yet.</p>
+                  <p className="text-muted-foreground">No interactions yet.</p>
                 ) : (
                   <div className="space-y-4">
                     {comments.map((comment) => (
@@ -940,12 +937,12 @@ export default function TaskDetails() {
                           <AvatarFallback className="text-xs">
                             {comment.authorType === "USER"
                               ? comment.user?.username
-                                  ?.charAt(0)
-                                  .toUpperCase() || "U"
+                                ?.charAt(0)
+                                .toUpperCase() || "U"
                               : comment.agent?.name
-                                  ?.split(" ")
-                                  .map((n) => n[0])
-                                  .join("") || "A"}
+                                ?.split(" ")
+                                .map((n) => n[0])
+                                .join("") || "A"}
                           </AvatarFallback>
                         </Avatar>
                         <div className="flex-1 space-y-1">
@@ -964,7 +961,7 @@ export default function TaskDetails() {
                             <div className="mt-2">
                               {/* Check if attachment is an image */}
                               {comment.attachmentType?.startsWith("image/") &&
-                              comment.attachmentUrl ? (
+                                comment.attachmentUrl ? (
                                 <div className="space-y-2">
                                   {/* Image preview */}
                                   <div className="relative inline-block">

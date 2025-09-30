@@ -427,13 +427,12 @@ export default function TasksTable() {
                             <TableRow
                               key={task.id}
                               onClick={() => router.push(`/task/${task.id}`)}
-                              className={`cursor-pointer hover:bg-muted/50 ${
-                                isOverdue(task.dueDate, task.status)
-                                  ? "bg-red-50"
-                                  : ""
-                              }`}
+                              className={`cursor-pointer hover:bg-muted/50 ${isOverdue(task.dueDate, task.status)
+                                ? "bg-red-50"
+                                : ""
+                                }`}
                             >
-                              <TableCell>
+                              <TableCell className="max-w-36 truncate overflow-hidden whitespace-nowrap">
                                 <div className="space-y-1">
                                   <div className="font-medium">
                                     {task.title}

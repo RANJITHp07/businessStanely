@@ -74,9 +74,10 @@ export async function PUT(
 ) {
   try {
     const body = await req.json();
+    const {clientId,assignedToId,categoryId,legislationId,legislationName, ...data}=body
     const updatedTask = await prisma.task.update({
       where: { id: params.id },
-      data: body,
+      data: data,
     });
     return NextResponse.json(updatedTask);
   } catch (error) {

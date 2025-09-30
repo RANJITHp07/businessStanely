@@ -182,8 +182,8 @@ export default function TaskDetails() {
   // Filtered members for search: only show results when searching
   const filteredMembers = searchQuery.trim()
     ? teamMembers.filter((member) =>
-        member.name.toLowerCase().includes(searchQuery.toLowerCase())
-      )
+      member.name.toLowerCase().includes(searchQuery.toLowerCase())
+    )
     : [];
 
   // Assign task to selected member
@@ -397,9 +397,9 @@ export default function TaskDetails() {
         setTask((prevTask) =>
           prevTask
             ? {
-                ...prevTask,
-                comments: [newCommentData, ...(prevTask.comments || [])],
-              }
+              ...prevTask,
+              comments: [newCommentData, ...(prevTask.comments || [])],
+            }
             : prevTask
         );
         setNewComment("");
@@ -808,7 +808,7 @@ export default function TaskDetails() {
           <TabsTrigger value="comments" className="flex items-center gap-2">
             <MessageSquare className="h-4 w-4 hidden md:block" />
             <p className="text-[12px] md:text-[14px]">
-              Comments ({commentsData.length})
+              Interactions ({commentsData.length})
             </p>
           </TabsTrigger>
           <TabsTrigger value="timelog" className="flex items-center gap-2">
@@ -957,22 +957,22 @@ export default function TaskDetails() {
                     </div>
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label className="text-sm font-medium text-muted-foreground">
-                      Description
-                    </Label>
-                    <p className="text-sm text-muted-foreground mt-1">
-                      {task.description}
-                    </p>
-                  </div>
-                  <div>
-                    <Label className="text-sm font-medium text-muted-foreground">
-                      Legislation Name
-                    </Label>
-                    <p className="font-medium">
-                      {task.legislation?.title || "N/A"}
-                    </p>
-                  </div>
+                    <div>
+                      <Label className="text-sm font-medium text-muted-foreground">
+                        Description
+                      </Label>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {task.description}
+                      </p>
+                    </div>
+                    <div>
+                      <Label className="text-sm font-medium text-muted-foreground">
+                        Legislation Name
+                      </Label>
+                      <p className="font-medium">
+                        {task.legislation?.title || "N/A"}
+                      </p>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -1110,7 +1110,7 @@ export default function TaskDetails() {
         <TabsContent value="comments" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Task Comments</CardTitle>
+              <CardTitle>Task Interactions</CardTitle>
               <CardDescription>
                 Communication and updates related to this task
               </CardDescription>
@@ -1178,7 +1178,7 @@ export default function TaskDetails() {
               {/* Comments List */}
               <div className="space-y-4">
                 {commentsData.length === 0 ? (
-                  <p className="text-muted-foreground">No comments yet.</p>
+                  <p className="text-muted-foreground">No interactions yet.</p>
                 ) : (
                   <div className="space-y-4">
                     {commentsData.map((comment) => (
@@ -1190,12 +1190,12 @@ export default function TaskDetails() {
                           <AvatarFallback className="text-xs">
                             {comment.authorType === "USER"
                               ? comment.user?.username
-                                  ?.charAt(0)
-                                  .toUpperCase() || "U"
+                                ?.charAt(0)
+                                .toUpperCase() || "U"
                               : comment.agent?.name
-                                  ?.split(" ")
-                                  .map((n) => n[0])
-                                  .join("") || "A"}
+                                ?.split(" ")
+                                .map((n) => n[0])
+                                .join("") || "A"}
                           </AvatarFallback>
                         </Avatar>
                         <div className="flex-1 space-y-1">
@@ -1214,7 +1214,7 @@ export default function TaskDetails() {
                             <div className="mt-2">
                               {/* Check if attachment is an image */}
                               {comment.attachmentType?.startsWith("image/") &&
-                              comment.attachmentUrl ? (
+                                comment.attachmentUrl ? (
                                 <div className="space-y-2">
                                   {/* Image preview */}
                                   <div className="relative inline-block">

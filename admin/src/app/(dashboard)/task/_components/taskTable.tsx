@@ -70,7 +70,7 @@ export default function TasksTable() {
   useEffect(() => {
     const fetchTasks = async () => {
       try {
-  const response = await fetchWithAuth('/api/tasks');
+        const response = await fetchWithAuth('/api/tasks');
         if (response.ok) {
           const data = await response.json();
           setTasks(data);
@@ -385,10 +385,10 @@ export default function TasksTable() {
                           <TableRow
                             key={task.id}
                             onClick={() => router.push(`/task/${task.id}`)}
-                            className={`cursor-pointer hover:bg-muted/50 ${isOverdue(task.dueDate, task.status) ? "bg-red-50" : ""
+                            className={`cursor-pointer hover:bg-muted/50  ${isOverdue(task.dueDate, task.status) ? "bg-red-50" : ""
                               }`}
                           >
-                            <TableCell>
+                            <TableCell className="max-w-36 truncate overflow-hidden whitespace-nowrap">
                               <div className="space-y-1">
                                 <div className="font-medium">{task.title}</div>
                                 {/* Show approved category only */}

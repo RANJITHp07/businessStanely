@@ -47,7 +47,7 @@ function Create({ admin, initialData }: CreateProps) {
 
             // Call API to create/update category
             const response = await fetchWithAuth(
-                isEditing ? `/api/task-categories/${admin.id}` : '/api/task-categories', 
+                isEditing ? `/api/task-categories/${admin.id}` : '/api/task-categories',
                 {
                     method: isEditing ? 'PUT' : 'POST',
                     headers: {
@@ -56,12 +56,12 @@ function Create({ admin, initialData }: CreateProps) {
                     body: JSON.stringify(formData),
                 }
             )
-            
+
             if (!response.ok) {
                 const errorData = await response.json()
                 throw new Error(errorData.error || `Failed to ${isEditing ? 'update' : 'create'} category`)
             }
-            
+
             toast.success(`Category ${isEditing ? 'updated' : 'created'} successfully!`)
             // Use router for better navigation
             router.push('/task_category')
@@ -78,7 +78,7 @@ function Create({ admin, initialData }: CreateProps) {
         <div className="container mx-auto p-6 max-w-7xl">
             <div className="mb-8">
                 <h1 className="text-3xl font-bold">
-                    {admin ? "Edit Task Category" : "Create New Task Category"}
+                    {admin ? "Edit Task Service" : "Create New Task Service"}
                 </h1>
                 <p className="text-muted-foreground mt-2">
                     {admin
@@ -91,19 +91,19 @@ function Create({ admin, initialData }: CreateProps) {
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2">
                             <User className="h-5 w-5" />
-                            Task Category Information
+                            Task Service Information
                         </CardTitle>
                         <CardDescription>Basic details about the category</CardDescription>
                     </CardHeader>
                     <CardContent>
                         <div >
                             <div className="space-y-2">
-                                <Label htmlFor="username">Task Category *</Label>
+                                <Label htmlFor="username">Task Service *</Label>
                                 <Input
                                     id="username"
                                     value={formData.name}
                                     onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
-                                    placeholder="Enter task category name"
+                                    placeholder="Enter task service name"
                                     required
                                 />
                             </div>
@@ -145,7 +145,7 @@ function Create({ admin, initialData }: CreateProps) {
                         type="submit"
                         disabled={isSubmitting}
                     >
-                        {isSubmitting ? "Processing..." : admin ? "Update Category" : "Create Category"}
+                        {isSubmitting ? "Processing..." : admin ? "Update Service" : "Create Service"}
                     </Button>
                 </div>
             </form>

@@ -290,9 +290,9 @@ export default function CategoryDetail({ params }: { params: Promise<{ id: strin
             <div className="mb-8">
                 <div className="flex items-center gap-4 mb-6">
                     <div>
-                        <h1 className="text-[28px] md:text-3xl font-bold">Task Category Details</h1>
+                        <h1 className="text-[28px] md:text-3xl font-bold">Task Service Details</h1>
                         <p className="text-[18px] md:text-[16px] text-muted-foreground mt-2">
-                            Comprehensive view of task category details and associated tasks
+                            Comprehensive view of task service details and associated tasks
                         </p>
                     </div>
                 </div>
@@ -303,7 +303,7 @@ export default function CategoryDetail({ params }: { params: Promise<{ id: strin
                             <CardHeader>
                                 <CardTitle className="flex items-center gap-2">
                                     <FileText className="h-5 w-5" />
-                                    Category Details
+                                    Service Details
                                 </CardTitle>
                             </CardHeader>
                             <CardContent className="space-y-6">
@@ -362,7 +362,7 @@ export default function CategoryDetail({ params }: { params: Promise<{ id: strin
                         <div className="flex items-center justify-between">
                             <CardTitle className="flex items-center gap-2">
                                 <FileText className="h-5 w-5" />
-                                Category Tasks ({tasks.length})
+                                Service Tasks ({tasks.length})
                             </CardTitle>
                             {/* <div className="flex items-center gap-2">
                                 <ArrowUpDown className="h-4 w-4 text-muted-foreground" />

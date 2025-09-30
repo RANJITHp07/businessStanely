@@ -217,15 +217,15 @@ export default function TaskCategoryTable() {
             <div className="mb-8">
                 <div className="flex flex-col md:flex-row justify-between md:items-center mb-6 md:mb-4">
                     <div>
-                        <h1 className="text-[28px] md:text-3xl font-bold">Task Category Management</h1>
+                        <h1 className="text-[28px] md:text-3xl font-bold">Task Service Management</h1>
                         <p className="text-[18px] md:text-[16px] text-muted-foreground mt-2">
-                            Manage and organize your task categories
+                            Manage and organize your task services
                         </p>
                     </div>
                     <Link href="/task_category/create" className="flex justify-end">
                         <Button className="mt-[20px] md:mt-none bg-[#003459] hover:bg-[#003459] text-white rounded-lg px-4 py-2 flex items-center gap-2 cursor-pointer shadow-none hover:shadow-md transition-shadow duration-300">
                             <Plus className="h-4 w-4" />
-                            Create Category
+                            Create Service
                         </Button>
                     </Link>
                 </div>
@@ -236,7 +236,7 @@ export default function TaskCategoryTable() {
                             <Filter className="h-5 w-5" />
                             Filters & Search
                         </CardTitle>
-                        <CardDescription>Filter and search through your task categories</CardDescription>
+                        <CardDescription>Filter and search through your task services</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
                         {loading ? (
@@ -252,7 +252,7 @@ export default function TaskCategoryTable() {
                                 {/* Search */}
                                 <div className="flex items-center gap-4">
                                     <div className="flex-1">
-                                        <Label htmlFor="search">Search Categories</Label>
+                                        <Label htmlFor="search">Search Services</Label>
                                         <div className="relative my-1">
                                             <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                                             <Input
@@ -286,11 +286,11 @@ export default function TaskCategoryTable() {
                 <TabsList className="grid w-full grid-cols-2">
                     <TabsTrigger value="approved" className="flex items-center gap-2">
                         <CheckCircle className="h-4 w-4" />
-                        Approved Categories ({approvedCount})
+                        Approved Services ({approvedCount})
                     </TabsTrigger>
                     <TabsTrigger value="pending" className="flex items-center gap-2">
                         <Clock className="h-4 w-4" />
-                        Pending Categories ({pendingCount})
+                        Pending Services ({pendingCount})
                     </TabsTrigger>
                 </TabsList>
 
@@ -336,7 +336,7 @@ export default function TaskCategoryTable() {
                                         <Table>
                                             <TableHeader>
                                                 <TableRow>
-                                                    <TableHead>Category</TableHead>
+                                                    <TableHead>Service</TableHead>
                                                     <TableHead>Description</TableHead>
                                                     <TableHead>Tasks</TableHead>
                                                     <TableHead>Created By</TableHead>
@@ -420,7 +420,7 @@ export default function TaskCategoryTable() {
                                                                                 <DropdownMenuItem asChild>
                                                                                     <Link href={`/task_category/${category.id}/edit`} onClick={(e) => e.stopPropagation()}>
                                                                                         <Edit className="mr-2 h-4 w-4" />
-                                                                                        Edit Category
+                                                                                        Edit Service
                                                                                     </Link>
                                                                                 </DropdownMenuItem>
                                                                                 <DropdownMenuSeparator />
@@ -429,7 +429,7 @@ export default function TaskCategoryTable() {
                                                                                     onClick={(e) => { e.stopPropagation(); setCategoryToDelete(category); }}
                                                                                 >
                                                                                     <Trash2 className="mr-2 h-4 w-4" />
-                                                                                    Delete Category
+                                                                                    Delete Service
                                                                                 </DropdownMenuItem>
                                                                             </>
                                                                         )}
@@ -561,7 +561,7 @@ export default function TaskCategoryTable() {
                                         <Table>
                                             <TableHeader>
                                                 <TableRow>
-                                                    <TableHead>Category</TableHead>
+                                                    <TableHead>Service</TableHead>
                                                     <TableHead>Description</TableHead>
                                                     <TableHead>Status</TableHead>
                                                     <TableHead>Created By</TableHead>
@@ -738,7 +738,7 @@ export default function TaskCategoryTable() {
                     <AlertDialogHeader>
                         <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                         <AlertDialogDescription>
-                            This action cannot be undone. This will permanently delete the task category and may affect existing tasks
+                            This action cannot be undone. This will permanently delete the task service and may affect existing tasks
                             Ownership to this category.
                         </AlertDialogDescription>
                     </AlertDialogHeader>

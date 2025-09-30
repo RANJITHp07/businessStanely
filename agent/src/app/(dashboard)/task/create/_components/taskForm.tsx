@@ -328,8 +328,8 @@ export default function TaskForm({ id }: TaskFormProps) {
               assignedToId: task.assignedTo?.id || "",
               description: task.description || "",
               categoryId: task.category?.id || "",
-              legislationId: task.legislationId ||  "",
-              legislationName: task.legislation?.title ||  "",
+              legislationId: task.legislationId || "",
+              legislationName: task.legislation?.title || "",
             });
             if (task.category) {
               setCategorySearchQuery(task.category.name);
@@ -406,13 +406,13 @@ export default function TaskForm({ id }: TaskFormProps) {
         clientType: selectedClientType,
         ...(selectedClientType === "individual"
           ? {
-              firstName: newClientData.firstName,
-              lastName: newClientData.lastName,
-            }
+            firstName: newClientData.firstName,
+            lastName: newClientData.lastName,
+          }
           : {
-              organizationName: newClientData.organizationName,
-              authorizedPersonName: newClientData.authorizedPersonName,
-            }),
+            organizationName: newClientData.organizationName,
+            authorizedPersonName: newClientData.authorizedPersonName,
+          }),
         email: newClientData.email,
         phoneNumber: newClientData.phoneNumber,
       };
@@ -702,7 +702,7 @@ export default function TaskForm({ id }: TaskFormProps) {
                         <DialogHeader>
                           <DialogTitle>Add New Category</DialogTitle>
                           <DialogDescription>
-                            Create a new task category for better organization
+                            Create a new task service for better organization
                           </DialogDescription>
                         </DialogHeader>
 
@@ -773,7 +773,7 @@ export default function TaskForm({ id }: TaskFormProps) {
                                 Creating...
                               </>
                             ) : (
-                              "Create Category"
+                              "Create Service"
                             )}
                           </Button>
                         </div>
@@ -784,12 +784,12 @@ export default function TaskForm({ id }: TaskFormProps) {
               </div>
 
               <div className="space-y-2 relative">
-                <Label htmlFor="taskCategory">Task Category *</Label>
+                <Label htmlFor="taskCategory">Task Service *</Label>
                 <div className="relative">
                   <Input
                     id="taskCategory"
                     type="text"
-                    placeholder="Type to search categories..."
+                    placeholder="Type to search services..."
                     value={categorySearchQuery}
                     onChange={(e) => {
                       setCategorySearchQuery(e.target.value);
@@ -812,47 +812,46 @@ export default function TaskForm({ id }: TaskFormProps) {
                   {showCategorySuggestions &&
                     categorySearchQuery.trim() &&
                     filteredCategories.length > 0 && (
-                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto">
-                      {filteredCategories.map((category) => (
-                        <div
-                          key={category.id}
-                          className="flex items-center justify-between p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
-                          onClick={() => {
-                            handleCategorySelection(category);
-                          }}
-                        >
-                          <div className="flex items-center gap-2">
-                            <div>
-                              <span className="font-medium">{category.name}</span>
-                              {category.description && (
-                                <div className="text-xs text-gray-500 mt-1">
-                                  {category.description}
-                                </div>
-                              )}
+                      <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto">
+                        {filteredCategories.map((category) => (
+                          <div
+                            key={category.id}
+                            className="flex items-center justify-between p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
+                            onClick={() => {
+                              handleCategorySelection(category);
+                            }}
+                          >
+                            <div className="flex items-center gap-2">
+                              <div>
+                                <span className="font-medium">{category.name}</span>
+                                {category.description && (
+                                  <div className="text-xs text-gray-500 mt-1">
+                                    {category.description}
+                                  </div>
+                                )}
+                              </div>
                             </div>
-                          </div>
-                          <Badge
-                            className={`text-xs ${
-                              category.status === "approved"
+                            <Badge
+                              className={`text-xs ${category.status === "approved"
                                 ? "bg-green-100 text-green-800"
                                 : "bg-yellow-100 text-yellow-800"
-                            }`}
-                          >
-                            {category.status}
-                          </Badge>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                                }`}
+                            >
+                              {category.status}
+                            </Badge>
+                          </div>
+                        ))}
+                      </div>
+                    )}
 
                   {/* No results message - Only when searching */}
                   {showCategorySuggestions &&
                     categorySearchQuery &&
                     filteredCategories.length === 0 && (
-                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg p-3">
-                      <span className="text-gray-500">No categories found</span>
-                    </div>
-                  )}
+                      <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg p-3">
+                        <span className="text-gray-500">No categories found</span>
+                      </div>
+                    )}
                 </div>
               </div>
 
@@ -1134,61 +1133,58 @@ export default function TaskForm({ id }: TaskFormProps) {
                   {showSuggestions &&
                     searchQuery.trim() &&
                     filteredClients.length > 0 && (
-                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto">
-                      {filteredClients.map((client) => (
-                        <div
-                          key={client.id}
-                          className="flex items-center justify-between p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
-                          onClick={() => {
-                            const clientName =
-                              client.clientType === "individual"
-                                ? `${client.firstName || ""} ${
-                                    client.lastName || ""
-                                  }`.trim()
-                                : client.organizationName || "";
-                            setSearchQuery(clientName);
-                            handleInputChange("clientId", client.id);
-                            setShowSuggestions(false);
-                          }}
-                        >
-                          <div className="flex items-center gap-2">
-                            <Avatar className="h-6 w-6">
-                              <AvatarFallback className="text-xs">
-                                {(client.clientType === "individual"
-                                  ? `${client.firstName || ""} ${
-                                      client.lastName || ""
-                                    }`
-                                  : client.organizationName || ""
-                                )
-                                  ?.split(" ")
-                                  .filter((n) => n.length > 0)
-                                  .map((n) => n[0])
-                                  .join("")}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div>
-                              <span className="font-medium">
-                                {client.clientType === "individual"
-                                  ? `${client.firstName || ""} ${
-                                      client.lastName || ""
+                      <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto">
+                        {filteredClients.map((client) => (
+                          <div
+                            key={client.id}
+                            className="flex items-center justify-between p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
+                            onClick={() => {
+                              const clientName =
+                                client.clientType === "individual"
+                                  ? `${client.firstName || ""} ${client.lastName || ""
                                     }`.trim()
-                                  : client.organizationName || ""}
-                              </span>
+                                  : client.organizationName || "";
+                              setSearchQuery(clientName);
+                              handleInputChange("clientId", client.id);
+                              setShowSuggestions(false);
+                            }}
+                          >
+                            <div className="flex items-center gap-2">
+                              <Avatar className="h-6 w-6">
+                                <AvatarFallback className="text-xs">
+                                  {(client.clientType === "individual"
+                                    ? `${client.firstName || ""} ${client.lastName || ""
+                                    }`
+                                    : client.organizationName || ""
+                                  )
+                                    ?.split(" ")
+                                    .filter((n) => n.length > 0)
+                                    .map((n) => n[0])
+                                    .join("")}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div>
+                                <span className="font-medium">
+                                  {client.clientType === "individual"
+                                    ? `${client.firstName || ""} ${client.lastName || ""
+                                      }`.trim()
+                                    : client.organizationName || ""}
+                                </span>
+                              </div>
                             </div>
+                            {getClientTypeBadge(client.clientType)}
                           </div>
-                          {getClientTypeBadge(client.clientType)}
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                        ))}
+                      </div>
+                    )}
 
                   {showSuggestions &&
                     searchQuery &&
                     filteredClients.length === 0 && (
-                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg p-3">
-                      <span className="text-gray-500">No clients found</span>
-                    </div>
-                  )}
+                      <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg p-3">
+                        <span className="text-gray-500">No clients found</span>
+                      </div>
+                    )}
                 </div>
               </div>
 
@@ -1402,7 +1398,7 @@ export default function TaskForm({ id }: TaskFormProps) {
                       className={cn(
                         "w-full justify-start text-left font-normal",
                         !dueDate &&
-                          "text-muted-foreground border-red-200 focus:border-red-500"
+                        "text-muted-foreground border-red-200 focus:border-red-500"
                       )}
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />

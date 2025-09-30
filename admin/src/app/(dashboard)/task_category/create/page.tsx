@@ -18,6 +18,7 @@ interface CreateProps {
         id: string;
         name: string;
         description: string;
+        timePeriod?: number;
     };
 }
 
@@ -25,7 +26,7 @@ function Create({ admin, initialData }: CreateProps) {
     const [formData, setFormData] = useState({
         name: initialData?.name || "",
         description: initialData?.description || "",
-        timePeriod: "" // New field for time period
+        timePeriod: initialData?.timePeriod !== undefined && initialData?.timePeriod !== null ? String(initialData.timePeriod) : "",
     })
     const [isSubmitting, setIsSubmitting] = useState(false)
     const router = useRouter()

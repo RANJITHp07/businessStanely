@@ -126,8 +126,8 @@ export async function GET(
       taskCount: taskCount,
       isOwner: currentAdmin.adminType === "owner",
       photo,
+      timePeriod: category.timePeriod ?? null,
     };
-
     return NextResponse.json(formattedCategory);
   } catch (error) {
     console.error("Error fetching task category:", error);
@@ -161,9 +161,9 @@ export async function PUT(
       );
     }
 
-    const { id } = params;
-    const body = await req.json();
-    const { name, description, color } = body;
+  const { id } = params;
+  const body = await req.json();
+  const { name, description, color, timePeriod } = body;
 
     // Validate required fields
     if (!name) {
@@ -192,6 +192,7 @@ export async function PUT(
         name,
         description: description || "",
         color: color || "blue",
+        timePeriod: typeof timePeriod === 'number' ? timePeriod : (timePeriod ? parseInt(timePeriod, 10) : null),
       },
       include: {
         createdByUser: {

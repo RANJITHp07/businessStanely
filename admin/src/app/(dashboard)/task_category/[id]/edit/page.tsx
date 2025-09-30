@@ -13,6 +13,7 @@ interface Category {
     createdBy: string
     createdAt: string
     updatedAt: string
+    timePeriod?: number
 }
 
 export default function EditCategory({ params }: { params: Promise<{ id: string }> | { id: string } }) {
@@ -55,6 +56,7 @@ export default function EditCategory({ params }: { params: Promise<{ id: string 
         id: category.id,
         name: category.name,
         description: category.description || "",
+        timePeriod: category.timePeriod,
     }
 
     return (

@@ -74,10 +74,32 @@ export async function PUT(
 ) {
   try {
     const body = await req.json();
-    const {clientId,assignedToId,categoryId,legislationId,legislationName, ...data}=body
+    // Only pick allowed fields from body
+    const allowedFields = [
+      "title", "description", "status", "priority", "dueDate", "progress", "followUpRequired", "completed"
+    ];
+    const data: Record<string, unknown> = {};
+    for (const key of allowedFields) {
+      if (body[key] !== undefined) {
+        data[key] = body[key];
+      }
+    }
+    // Handle relations
+    if (body.clientId) {
+      data.client = { connect: { id: body.clientId } };
+    }
+    if (body.assignedToId) {
+      data.assignedTo = { connect: { id: body.assignedToId } };
+    }
+    if (body.categoryId) {
+      data.category = { connect: { id: body.categoryId } };
+    }
+    if (body.legislationId) {
+      data.legislation = { connect: { id: body.legislationId } };
+    }
     const updatedTask = await prisma.task.update({
       where: { id: params.id },
-      data: data,
+      data,
     });
     return NextResponse.json(updatedTask);
   } catch (error) {

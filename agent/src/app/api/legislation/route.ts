@@ -6,12 +6,12 @@ export async function GET() {
     const legislations = await prisma.legislation.findMany({
       include: {
         assignedAgent: true,
-        client: true,
         retainership: {
           include: {
             client: true,
           },
         },
+        tasks: true,
       },
     });
 

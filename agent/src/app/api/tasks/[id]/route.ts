@@ -100,14 +100,18 @@ export async function GET(
             id: true,
             name: true,
             email: true,
-            subordinates: {
-              select: {
-                id: true,
-                name: true,
-                email: true,
-                photo: true,
-              },
-            },
+            subordinatesLinks: {
+              include: {
+                subordinate: {
+                  select: {
+                    id: true,
+                    name: true,
+                    email: true,
+                    photo: true,
+                  }
+                }
+              }
+            }
           },
         },
         comments: {
@@ -220,11 +224,32 @@ export async function PUT(
 
 
 
-    // Allow updating all relevant fields (spread body)
-    const updateData = {
+    // Transform relation IDs to nested connect objects for Prisma
+  const updateData: Record<string, unknown> = {
       ...body,
       updatedAt: new Date(),
     };
+    if (updateData.clientId) {
+      updateData.client = { connect: { id: updateData.clientId } };
+      delete updateData.clientId;
+    }
+    if (updateData.assignedToId) {
+      updateData.assignedTo = { connect: { id: updateData.assignedToId } };
+      delete updateData.assignedToId;
+    }
+    if (updateData.categoryId) {
+      updateData.category = { connect: { id: updateData.categoryId } };
+      delete updateData.categoryId;
+    }
+    if (typeof updateData.legislationId === "string") {
+      if (updateData.legislationId.trim()) {
+        updateData.legislation = { connect: { id: updateData.legislationId } };
+      }
+      // Remove legislationId from updateData regardless
+      delete updateData.legislationId;
+    }
+    // Remove any frontend-only fields
+    delete updateData.legislationName;
 
     const updatedTask = await prisma.task.update({
       where: { id: taskId },

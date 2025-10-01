@@ -12,7 +12,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     if (!id) {
       return NextResponse.json({ error: "Team member ID is required" }, { status: 400 });
     }
-    // Find the team member by ID
+    // Find the team member by ID, including superiors and subordinates via join tables
     const teamMember = await prisma.agent.findUnique({
       where: { id },
       select: {
@@ -26,32 +26,39 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
         specializations: true,
         photo: true,
         status: true,
-        superiorId: true,
-        superior: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            agentType: true,
-            photo: true,
+        superiorsLinks: {
+          include: {
+            superior: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                agentType: true,
+                photo: true,
+              }
+            }
           }
         },
-        subordinates: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            agentType: true,
-            photo: true,
+        subordinatesLinks: {
+          include: {
+            subordinate: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                agentType: true,
+                photo: true,
+              }
+            }
           }
-        },
+        }
       }
     });
     if (!teamMember) {
       return NextResponse.json({ error: "Team member not found" }, { status: 404 });
     }
     return NextResponse.json(teamMember);
-  } catch (error) {
+  } catch {
     return NextResponse.json({ error: "Failed to fetch team member" }, { status: 500 });
   }
 }

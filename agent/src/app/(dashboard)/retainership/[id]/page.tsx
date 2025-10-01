@@ -241,14 +241,14 @@ export default function RetainershipDetail({ params }: { params: Promise<{ id: s
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {retainership?.legislations?.length === 0 ? (
+                                    {retainership?.legislation?.length === 0 ? (
                                         <TableRow>
                                             <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
                                                 No legislation found for this retainership.
                                             </TableCell>
                                         </TableRow>
                                     ) : (
-                                        retainership?.legislations?.map((legislation) => (
+                                        retainership?.legislation?.map((legislation) => (
                                             <TableRow
                                                 key={legislation.id}
                                                 onClick={() => router.push(`/legislation/${legislation.id}`)}

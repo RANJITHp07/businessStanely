@@ -94,18 +94,7 @@ export async function GET(
             id: true,
             name: true,
             email: true,
-            subordinatesLinks: {
-              include: {
-                subordinate: {
-                  select: {
-                    id: true,
-                    name: true,
-                    email: true,
-                    photo: true,
-                  }
-                }
-              }
-            }
+            photo: true,
           },
         },
         comments: {
@@ -144,6 +133,39 @@ export async function GET(
       },
     });
 
+    // Fetch subordinates for assigned agent (team members)
+    interface TeamMember {
+      id: string;
+      name: string;
+      email: string;
+      photo?: string;
+    }
+    let assignedAgentSubordinates: TeamMember[] = [];
+    if (task?.assignedTo?.id) {
+      const subLinks = await prisma.agentSuperior.findMany({
+        where: { superiorId: task.assignedTo.id },
+        include: {
+          subordinate: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              photo: true,
+            }
+          }
+        }
+      });
+      assignedAgentSubordinates = subLinks.map(link => {
+        const { id, name, email, photo } = link.subordinate;
+        return {
+          id,
+          name,
+          email,
+          photo: photo === null ? undefined : photo,
+        };
+      });
+    }
+
     if (!task) {
       return NextResponse.json(
         { error: "Task not found" },
@@ -169,6 +191,9 @@ export async function GET(
     return NextResponse.json({
       task: {
         ...task,
+        assignedTo: task?.assignedTo
+          ? { ...task.assignedTo, subordinates: assignedAgentSubordinates }
+          : null,
         category
       }
     });

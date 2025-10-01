@@ -9,13 +9,12 @@ export async function GET(req: Request, context: { params: { id: string } }) {
       where: { id },
       include: {
         assignedAgent: true,
-        client: true,
         retainership: {
           include: {
             client: true,
           },
         },
-        tasks: true, // Ensure tasks are included
+        tasks: true,
       },
     });
 

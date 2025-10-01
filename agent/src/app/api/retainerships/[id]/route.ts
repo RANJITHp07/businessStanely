@@ -17,7 +17,7 @@ export async function GET(
       );
     }
 
-    const { id } = params;
+  const { id } = await params;
 
     if (!id) {
       return NextResponse.json(
@@ -59,7 +59,7 @@ export async function GET(
             username: true,
           },
         },
-        legislations: {
+        legislation: {
           include: {
             assignedAgent: {
               select: {
@@ -88,8 +88,8 @@ export async function GET(
       );
     }
 
-    // Updated the mapping logic to handle the nested structure of `assignedAgent`
-    const formattedRetainership = {
+  // Updated the mapping logic to handle the nested structure of `assignedAgent`
+  const formattedRetainership = {
       id: retainership.id,
       name: retainership.name,
       description: retainership.description || "",
@@ -106,7 +106,7 @@ export async function GET(
             email: retainership.client.email,
           }
         : null,
-      legislations: retainership.legislations.map((legislation) => ({
+      legislation: retainership.legislation.map((legislation) => ({
         id: legislation.id,
         title: legislation.title,
         description: legislation.description,

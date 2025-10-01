@@ -154,7 +154,7 @@ export interface Retainership {
   taskCount?: number;
   isOwner?: boolean;
   photo?: string;
-  legislations: {
+  legislation: {
     id: string;
     title: string;
     description?: string;

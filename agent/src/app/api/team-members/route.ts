@@ -8,30 +8,29 @@ export async function GET(req: NextRequest) {
     if (!agent) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-    // Fetch subordinates (team members) for the current agent using join table
-    const agentWithSubordinates = await prisma.agent.findUnique({
-      where: { id: agent.id },
+    // Accept agentId as query param, fallback to current agent
+    const { searchParams } = new URL(req.url);
+    const agentId = searchParams.get("agentId") || agent.id;
+    // Fetch subordinates using AgentSuperior join table (recommended logic)
+    const subordinatesLinks = await prisma.agentSuperior.findMany({
+      where: { superiorId: agentId },
       include: {
-        subordinatesLinks: {
-          include: {
-            subordinate: {
-              select: {
-                id: true,
-                name: true,
-                email: true,
-                agentType: true,
-                phoneNumber: true,
-                jurisdiction: true,
-                specializations: true,
-                photo: true,
-                status: true,
-              }
-            }
+        subordinate: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            agentType: true,
+            phoneNumber: true,
+            jurisdiction: true,
+            specializations: true,
+            photo: true,
+            status: true,
           }
         }
       }
     });
-    const teamMembers = agentWithSubordinates?.subordinatesLinks?.map(link => link.subordinate) || [];
+    const teamMembers = subordinatesLinks.map(link => link.subordinate);
     return NextResponse.json(teamMembers);
   } catch {
     return NextResponse.json({ error: "Failed to fetch team members" }, { status: 500 });

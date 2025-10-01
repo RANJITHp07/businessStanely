@@ -62,15 +62,9 @@ export async function GET(
 
     const { id: taskId } = await params;
 
-    // Fetch the specific task with full details
-    const task = await prisma.task.findFirst({
-      where: {
-        id: taskId,
-        OR: [
-          { createdById: agent.id },
-          { assignedToId: agent.id },
-        ],
-      },
+    // Fetch the specific task with full details (no assignment restriction)
+    const task = await prisma.task.findUnique({
+      where: { id: taskId },
       include: {
         client: {
           select: {
@@ -146,7 +140,7 @@ export async function GET(
             date: "desc",
           },
         },
-        legislation: true, // Added legislation relation
+        legislation: true,
       },
     });
 

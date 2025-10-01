@@ -228,7 +228,20 @@ export default function TaskDetails() {
         const response = await fetch(`/api/tasks/${taskId}`);
 
         if (!response.ok) {
-          throw new Error("Failed to fetch task details");
+          if (response.status === 401) {
+            // Redirect to login page if unauthorized
+            router.push("/login");
+            return;
+          }
+          let errorMsg = "Failed to load task details";
+          try {
+            const errorData = await response.json();
+            if (errorData && errorData.error) {
+              errorMsg = errorData.error;
+            }
+          } catch {}
+          setError(errorMsg);
+          return;
         }
 
         const data = await response.json();

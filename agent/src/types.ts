@@ -83,6 +83,7 @@ export interface Task {
   progress?: number;
   followUpRequired?: boolean;
   completed?: boolean;
+  recurring?: number; // Recurring in months (1-12), undefined/null means not recurring
   createdAt: string;
   updatedAt: string;
   client?: Client;

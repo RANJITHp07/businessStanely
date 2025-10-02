@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentAgent } from "@/lib/auth";
 import prisma from "@/lib/prisma";
+import { createNextRecurringTask } from "@/lib/recurringTasks";
 
 interface TaskWithFields {
   categoryId?: string;
@@ -267,6 +268,11 @@ export async function PUT(
       // Remove legislationId from updateData regardless
       delete updateData.legislationId;
     }
+    // Handle recurring field conversion
+    if (updateData.recurring) {
+      const recurringValue = updateData.recurring as string;
+      updateData.recurring = recurringValue && recurringValue !== "0" ? parseInt(recurringValue) : null;
+    }
     // Remove any frontend-only fields
     delete updateData.legislationName;
 
@@ -293,8 +299,29 @@ export async function PUT(
             email: true,
           },
         },
+        category: {
+          select: {
+            id: true,
+            name: true,
+            timePeriod: true,
+          },
+        },
       },
     });
+
+    // Check if task was marked as completed and has recurring setting
+    if (updateData.completed === true && updatedTask.recurring) {
+      // Create next recurring task
+      try {
+        const nextTask = await createNextRecurringTask(updatedTask);
+        if (nextTask) {
+          console.log(`Created next recurring task: ${nextTask.id}`);
+        }
+      } catch (error) {
+        console.error("Error creating next recurring task:", error);
+        // Don't fail the main update if recurring task creation fails
+      }
+    }
 
     // Fetch category separately if needed
     let category = null;

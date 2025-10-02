@@ -64,6 +64,7 @@ export interface Task {
   progress?: number;
   followUpRequired?: boolean;
   completed?: boolean;
+  recurring?: number | null; // Recurring in months (1-12), null means not recurring
   createdAt: string;
   updatedAt: string;
   client?: Client;

@@ -133,6 +133,7 @@ model Task {
   progress         Int?      @default(0) // Progress percentage (0-100)
   followUpRequired Boolean   @default(false)
   completed        Boolean   @default(false)
+  recurring        Int?      // Recurring in months (1-12), null means not recurring
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 

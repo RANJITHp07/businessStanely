@@ -1,10 +1,23 @@
+import { Task } from "@prisma/client";
 import prisma from "@/lib/prisma";
 
-export interface RecurringTaskData {
-  taskId: string;
-  recurring: number; // months
-  currentDueDate: Date;
-  categoryTimePeriod?: number; // days
+export interface TaskCreationData {
+  title: string;
+  description?: string;
+  priority?: string;
+  status?: string;
+  categoryId?: string;
+  assignedToId?: string;
+  clientId?: string;
+  dueDate?: Date;
+  recurring?: number | null;
+}
+
+// Calculate end date based on recurring months
+export function calculateEndDate(startDate: Date, recurringMonths: number): Date {
+  const endDate = new Date(startDate);
+  endDate.setMonth(endDate.getMonth() + recurringMonths);
+  return endDate;
 }
 
 /**
@@ -27,195 +40,258 @@ export function calculateStartDate(dueDate: Date, timePeriodDays?: number): Date
   return startDate;
 }
 
-/**
- * Create the next recurring task
- */
-interface CreatedTask {
-  id: string;
-  title: string;
-  dueDate: Date | null;
-}
+// Create recurring tasks based on task completion
+export async function createNextRecurringTask(completedTask: Task) {
+  if (!completedTask.recurring || completedTask.recurring <= 0) {
+    return;
+  }
 
-interface OriginalTask {
-  id: string;
-  title: string;
-  description: string | null;
-  priority: string;
-  dueDate: Date | null;
-  recurring: number | null;
-  clientId: string | null;
-  createdById: string | null;
-  assignedToId: string | null;
-  categoryId: string | null;
-  legislationId: string | null;
-  retainershipId: string | null;
-}
-
-export async function createNextRecurringTask(originalTask: OriginalTask): Promise<CreatedTask | null> {
   try {
-    // Check if task has recurring setting and due date
-    if (!originalTask.recurring || originalTask.recurring <= 0 || !originalTask.dueDate) {
-      return null;
-    }
+    const nextDueDate = new Date(completedTask.dueDate || new Date());
+    nextDueDate.setMonth(nextDueDate.getMonth() + completedTask.recurring);
 
-    // Calculate next due date
-    const currentDueDate = new Date(originalTask.dueDate);
-    const nextDueDate = calculateNextDueDate(currentDueDate, originalTask.recurring);
-
-    // Get category time period if available (for future use in calculating start dates)
-    if (originalTask.categoryId) {
-      const category = await prisma.taskCategory.findUnique({
-        where: { id: originalTask.categoryId },
-        select: { timePeriod: true }
-      });
-      const categoryTimePeriod = category?.timePeriod || 0;
-      console.log(`Category time period: ${categoryTimePeriod} days`);
-    }
-
-    // Create new task with updated dates
-    const newTask = await prisma.task.create({
+    const nextTask = await prisma.task.create({
       data: {
-        title: originalTask.title,
-        description: originalTask.description,
+        title: completedTask.title,
+        description: completedTask.description,
+        priority: completedTask.priority,
         status: "To Do",
-        priority: originalTask.priority,
+        categoryId: completedTask.categoryId,
+        assignedToId: completedTask.assignedToId,
+        clientId: completedTask.clientId,
+        createdById: completedTask.createdById,
         dueDate: nextDueDate,
+        recurring: completedTask.recurring,
         progress: 0,
-        followUpRequired: false,
         completed: false,
-        recurring: originalTask.recurring,
-        clientId: originalTask.clientId,
-        createdById: originalTask.createdById,
-        assignedToId: originalTask.assignedToId,
-        categoryId: originalTask.categoryId,
-        legislationId: originalTask.legislationId,
-        retainershipId: originalTask.retainershipId,
+        followUpRequired: completedTask.followUpRequired,
+        legislationId: completedTask.legislationId,
+        retainershipId: completedTask.retainershipId,
       },
-      include: {
-        client: true,
-        createdBy: true,
-        assignedTo: true,
-        category: true,
-        legislation: true,
-      }
     });
 
-    console.log(`Created recurring task: ${newTask.id} with due date: ${nextDueDate.toISOString()}`);
-    return newTask;
-
+    console.log("Created next recurring task:", nextTask);
+    return nextTask;
   } catch (error) {
     console.error("Error creating recurring task:", error);
-    return null;
+    throw error;
   }
 }
 
-/**
- * Check and create recurring tasks based on calendar dates (automatic creation)
- */
-export async function processScheduledRecurringTasks(): Promise<void> {
+// Create recurring tasks based on calendar schedule - IMPROVED VERSION
+export async function createCalendarBasedRecurringTasks() {
   try {
     const today = new Date();
-    console.log(`Processing scheduled recurring tasks for date: ${today.toISOString()}`);
-
-    // Find all tasks with recurring settings (completed or not)
-    const recurringTasks = await prisma.task.findMany({
+    const createdTasks = [];
+    
+    // Get all completed recurring tasks that might need next iteration
+    const completedRecurringTasks = await prisma.task.findMany({
       where: {
-        recurring: { not: null },
-        dueDate: { not: null },
+        recurring: {
+          not: null,
+          gt: 0,
+        },
+        status: "Completed",
+        completed: true,
       },
       include: {
-        client: true,
-        createdBy: true,
-        assignedTo: true,
         category: true,
-        legislation: true,
-      }
+      },
+      orderBy: {
+        updatedAt: 'desc', // Get most recently completed first
+      },
     });
 
-    for (const task of recurringTasks) {
-      if (!task.dueDate || !task.recurring) continue;
+    console.log(`Found ${completedRecurringTasks.length} completed recurring tasks to check`);
 
-      // Calculate when the next recurring task should be created
-      const taskDueDate = new Date(task.dueDate);
-      const nextDueDate = calculateNextDueDate(taskDueDate, task.recurring);
-      
-      // Get category time period for advance creation
-      const categoryTimePeriod = task.category?.timePeriod || 0;
-      
-      // Calculate when to create the next task (category time period before due date)
-      const creationDate = new Date(nextDueDate);
-      creationDate.setDate(creationDate.getDate() - categoryTimePeriod);
-      
-      // If today is the creation date or after, and the task hasn't been created yet
-      if (today >= creationDate) {
-        // Check if next task already exists
+    for (const completedTask of completedRecurringTasks) {
+      if (!completedTask.recurring || !completedTask.dueDate) continue;
+
+      // Calculate when the next task should be due
+      const originalDueDate = new Date(completedTask.dueDate);
+      const nextDueDate = new Date(originalDueDate);
+      nextDueDate.setMonth(nextDueDate.getMonth() + completedTask.recurring);
+
+      // Only create if the next due date is in the future or within the current month
+      if (nextDueDate <= today) {
+        // Check if we already created a task for this next period
         const existingNextTask = await prisma.task.findFirst({
           where: {
-            title: task.title,
-            clientId: task.clientId,
-            assignedToId: task.assignedToId,
+            title: completedTask.title,
+            categoryId: completedTask.categoryId,
+            assignedToId: completedTask.assignedToId,
+            clientId: completedTask.clientId,
             dueDate: {
-              gte: new Date(nextDueDate.getTime() - 12 * 60 * 60 * 1000), // 12 hours before
-              lte: new Date(nextDueDate.getTime() + 12 * 60 * 60 * 1000), // 12 hours after
-            }
-          }
+              gte: new Date(nextDueDate.getFullYear(), nextDueDate.getMonth(), 1), // Start of month
+              lte: new Date(nextDueDate.getFullYear(), nextDueDate.getMonth() + 1, 0), // End of month
+            },
+            recurring: completedTask.recurring,
+          },
         });
 
         if (!existingNextTask) {
-          const nextTask = await createNextRecurringTask(task);
-          if (nextTask) {
-            console.log(`Auto-created recurring task: ${nextTask.id} for ${nextDueDate.toLocaleDateString()}`);
-          }
+          // Create the next recurring task
+          const newTask = await prisma.task.create({
+            data: {
+              title: completedTask.title,
+              description: completedTask.description,
+              priority: completedTask.priority,
+              status: "To Do",
+              categoryId: completedTask.categoryId,
+              assignedToId: completedTask.assignedToId,
+              clientId: completedTask.clientId,
+              createdById: completedTask.createdById,
+              dueDate: nextDueDate,
+              recurring: completedTask.recurring,
+              progress: 0,
+              completed: false,
+              followUpRequired: completedTask.followUpRequired,
+              legislationId: completedTask.legislationId,
+              retainershipId: completedTask.retainershipId,
+            },
+          });
+
+          createdTasks.push(newTask);
+          console.log(`Created recurring task: "${newTask.title}" due ${nextDueDate.toISOString().split('T')[0]}`);
+        } else {
+          console.log(`Task already exists for period: "${completedTask.title}" - ${nextDueDate.toISOString().split('T')[0]}`);
         }
       }
     }
 
+    // Also check for overdue recurring tasks (missed cycles)
+    const overdueRecurringTasks = await checkForOverdueRecurringTasks();
+    createdTasks.push(...overdueRecurringTasks);
+
+    return createdTasks;
   } catch (error) {
-    console.error("Error processing scheduled recurring tasks:", error);
+    console.error("Error creating calendar-based recurring tasks:", error);
+    throw error;
   }
 }
 
-/**
- * Check and create recurring tasks for completed tasks (manual completion trigger)
- */
-export async function processRecurringTasks(): Promise<void> {
+// Helper function to check for missed recurring cycles
+async function checkForOverdueRecurringTasks() {
   try {
-    // Find completed tasks that have recurring settings and haven't been processed yet
-    const completedRecurringTasks = await prisma.task.findMany({
+    const today = new Date();
+    const createdTasks = [];
+    
+    // Find the latest completed task for each recurring pattern
+    const recurringPatterns = await prisma.task.groupBy({
+      by: ['title', 'categoryId', 'assignedToId', 'clientId', 'recurring'],
       where: {
-        completed: true,
-        recurring: { not: null },
+        recurring: {
+          not: null,
+          gt: 0,
+        },
+        status: "Completed",
       },
-      include: {
-        client: true,
-        createdBy: true,
-        assignedTo: true,
-        category: true,
-        legislation: true,
-      }
+      _max: {
+        dueDate: true,
+      },
     });
 
-    for (const task of completedRecurringTasks) {
-      // Check if next task already exists (simple duplicate prevention)
-      const nextDueDate = calculateNextDueDate(new Date(task.dueDate!), task.recurring!);
-      const existingNextTask = await prisma.task.findFirst({
-        where: {
-          title: task.title,
-          clientId: task.clientId,
-          assignedToId: task.assignedToId,
-          dueDate: {
-            gte: new Date(nextDueDate.getTime() - 24 * 60 * 60 * 1000), // 1 day before
-            lte: new Date(nextDueDate.getTime() + 24 * 60 * 60 * 1000), // 1 day after
+    for (const pattern of recurringPatterns) {
+      if (!pattern.recurring || !pattern._max.dueDate) continue;
+
+      const lastDueDate = new Date(pattern._max.dueDate);
+      const monthsSinceLastTask = Math.floor((today.getTime() - lastDueDate.getTime()) / (1000 * 60 * 60 * 24 * 30));
+      
+      // If more than the recurring period has passed, create missing tasks
+      if (monthsSinceLastTask >= pattern.recurring) {
+        const missedCycles = Math.floor(monthsSinceLastTask / pattern.recurring);
+        
+        // Get the original task details
+        const originalTask = await prisma.task.findFirst({
+          where: {
+            title: pattern.title,
+            categoryId: pattern.categoryId,
+            assignedToId: pattern.assignedToId,
+            clientId: pattern.clientId,
+            recurring: pattern.recurring,
+          },
+        });
+
+        if (originalTask) {
+          // Create only the most recent missed cycle (not all of them to avoid spam)
+          const nextDueDate = new Date(lastDueDate);
+          nextDueDate.setMonth(nextDueDate.getMonth() + pattern.recurring);
+
+          // Check if this task already exists
+          const existingTask = await prisma.task.findFirst({
+            where: {
+              title: pattern.title,
+              categoryId: pattern.categoryId,
+              assignedToId: pattern.assignedToId,
+              clientId: pattern.clientId,
+              dueDate: {
+                gte: new Date(nextDueDate.getFullYear(), nextDueDate.getMonth(), 1),
+                lte: new Date(nextDueDate.getFullYear(), nextDueDate.getMonth() + 1, 0),
+              },
+            },
+          });
+
+          if (!existingTask) {
+            const newTask = await prisma.task.create({
+              data: {
+                title: originalTask.title,
+                description: originalTask.description,
+                priority: originalTask.priority,
+                status: "To Do",
+                categoryId: originalTask.categoryId,
+                assignedToId: originalTask.assignedToId,
+                clientId: originalTask.clientId,
+                createdById: originalTask.createdById,
+                dueDate: nextDueDate,
+                recurring: originalTask.recurring,
+                progress: 0,
+                completed: false,
+                followUpRequired: originalTask.followUpRequired,
+                legislationId: originalTask.legislationId,
+                retainershipId: originalTask.retainershipId,
+              },
+            });
+
+            createdTasks.push(newTask);
+            console.log(`Created overdue recurring task: "${newTask.title}" (${missedCycles} cycles missed)`);
           }
         }
-      });
-
-      if (!existingNextTask) {
-        await createNextRecurringTask(task);
       }
     }
 
+    return createdTasks;
   } catch (error) {
-    console.error("Error processing recurring tasks:", error);
+    console.error("Error checking overdue recurring tasks:", error);
+    return [];
   }
 }
+
+// Get display dates for recurring tasks
+export function getRecurringDateRange(dueDate: Date, recurring: number | null, categoryTimePeriod: number | null): { start: Date; end: Date } {
+  const start = new Date(dueDate);
+  const end = new Date(dueDate);
+  
+  if (recurring && recurring > 0) {
+    // Use recurring months
+    end.setMonth(end.getMonth() + recurring);
+  } else if (categoryTimePeriod && categoryTimePeriod > 0) {
+    // Use category time period as fallback
+    end.setMonth(end.getMonth() + categoryTimePeriod);
+  } else {
+    // Default to 1 month if no period specified
+    end.setMonth(end.getMonth() + 1);
+  }
+  
+  return { start, end };
+}
+
+const recurringTasks = {
+  calculateEndDate,
+  createNextRecurringTask,
+  createCalendarBasedRecurringTasks,
+  getRecurringDateRange,
+  calculateNextDueDate,
+  calculateStartDate,
+};
+
+export default recurringTasks;

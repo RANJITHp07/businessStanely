@@ -73,11 +73,12 @@ export async function PUT(
   { params }: { params: { id: string } }
 ) {
   try {
+    const { id } = await params;
     const body = await req.json();
     
     // Get the current task to check if it's being marked as completed
     const currentTask = await prisma.task.findUnique({
-      where: { id: params.id },
+      where: { id },
     });
     
     if (!currentTask) {
@@ -115,7 +116,7 @@ export async function PUT(
     }
     
     const updatedTask = await prisma.task.update({
-      where: { id: params.id },
+      where: { id },
       data,
     });
     
@@ -151,12 +152,14 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
+    const { id } = await params;
     await prisma.task.delete({
-      where: { id: params.id },
+      where: { id },
     });
     return new NextResponse(null, { status: 204 });
   } catch (error) {
-    console.error(`Error deleting task ${params.id}:`, error);
+    const { id } = await params;
+    console.error(`Error deleting task ${id}:`, error);
     return NextResponse.json(
       { error: "Failed to delete task" },
       { status: 500 }

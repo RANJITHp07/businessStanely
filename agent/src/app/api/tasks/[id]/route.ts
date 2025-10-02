@@ -19,7 +19,7 @@ export async function DELETE(
         { status: 401 }
       );
     }
-    const { id: taskId } = params;
+    const { id: taskId } = await params;
     // Only allow delete if agent is creator or assigned
     const existingTask = await prisma.task.findFirst({
       where: {
@@ -39,7 +39,8 @@ export async function DELETE(
     await prisma.task.delete({ where: { id: taskId } });
     return new NextResponse(null, { status: 204 });
   } catch (error) {
-    console.error(`Error deleting task ${params.id}:`, error);
+    const { id: taskId } = await params;
+    console.error(`Error deleting task ${taskId}:`, error);
     return NextResponse.json(
       { error: "Failed to delete task" },
       { status: 500 }

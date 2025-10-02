@@ -17,6 +17,7 @@ export async function POST(req: NextRequest) {
       assignedToId,
       categoryId,
       legislationId,
+      recurring,
     } = body;
 
     if (!title || !createdById) {
@@ -38,6 +39,7 @@ export async function POST(req: NextRequest) {
         assignedToId,
         categoryId: categoryId || undefined,
         legislationId: legislationId || null, // Save legislationId
+        recurring: recurring && recurring !== "0" ? parseInt(recurring) : null, // Save recurring field
       },
       include: {
         client: true,

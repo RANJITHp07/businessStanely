@@ -71,6 +71,7 @@ interface Task {
   updatedAt: string;
   followUpRequired: boolean;
   completed: boolean;
+  recurring?: number;
   assignedTo?: {
     id: string;
     name: string;
@@ -984,6 +985,18 @@ export default function TaskDetails() {
                       </Label>
                       <p className="font-medium">
                         {task.legislation?.title || "N/A"}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-sm font-medium text-muted-foreground">
+                        Recurring
+                      </Label>
+                      <p className="font-medium">
+                        {task.recurring 
+                          ? `Every ${task.recurring} ${task.recurring === 1 ? "month" : "months"}` 
+                          : "Not recurring"}
                       </p>
                     </div>
                   </div>

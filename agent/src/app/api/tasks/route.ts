@@ -113,6 +113,7 @@ export async function GET(req: NextRequest) {
       progress: (task as TaskWithAdditionalFields).progress,
       followUpRequired: (task as TaskWithAdditionalFields).followUpRequired,
       completed: (task as TaskWithAdditionalFields).completed,
+      recurring: task.recurring,
       createdAt: task.createdAt,
       updatedAt: task.updatedAt,
       client: task.client ? {
@@ -167,6 +168,7 @@ export async function POST(req: NextRequest) {
       assignedToId,
       categoryId,
       legislationId, // Add legislationId to the destructured fields
+      recurring,
     } = body;
 
     // Validate required fields
@@ -190,6 +192,7 @@ export async function POST(req: NextRequest) {
         assignedToId: assignedToId || agent.id,
         categoryId: categoryId || null,
         legislationId: legislationId || null, // Save legislationId
+        recurring: recurring && recurring !== "0" ? parseInt(recurring) : null, // Save recurring field
       },
       include: {
         client: {
@@ -230,6 +233,7 @@ export async function POST(req: NextRequest) {
       progress: taskWithFields.progress,
       followUpRequired: taskWithFields.followUpRequired,
       completed: taskWithFields.completed,
+      recurring: newTask.recurring,
       createdAt: newTask.createdAt,
       updatedAt: newTask.updatedAt,
       client: newTask.client ? {

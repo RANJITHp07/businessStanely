@@ -95,6 +95,7 @@ export default function TaskForm({ id }: TaskFormProps) {
     categoryId: "",
     legislationId: "",
     legislationName: "",
+    recurring: "0",
   });
   const [clients, setClients] = useState<Client[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
@@ -330,6 +331,7 @@ export default function TaskForm({ id }: TaskFormProps) {
               categoryId: task.category?.id || "",
               legislationId: task.legislationId || "",
               legislationName: task.legislation?.title || "",
+              recurring: task.recurring ? task.recurring.toString() : "0",
             });
             if (task.category) {
               setCategorySearchQuery(task.category.name);
@@ -640,6 +642,18 @@ export default function TaskForm({ id }: TaskFormProps) {
       const calculatedDueDate = new Date();
       calculatedDueDate.setDate(calculatedDueDate.getDate() + category.timePeriod);
       setDueDate(calculatedDueDate);
+    }
+  };
+
+  // Add handler for recurring selection to show information
+  const handleRecurringChange = (value: string) => {
+    handleInputChange("recurring", value);
+    
+    // Show information about next task creation if recurring is selected
+    if (value !== "0" && dueDate) {
+      const nextDueDate = new Date(dueDate);
+      nextDueDate.setMonth(nextDueDate.getMonth() + parseInt(value));
+      console.log(`Next recurring task will be due on: ${nextDueDate.toLocaleDateString()}`);
     }
   };
 
@@ -1417,6 +1431,48 @@ export default function TaskForm({ id }: TaskFormProps) {
                 </Popover>
                 <p className="text-xs text-muted-foreground">
                   Choose the date when this task should be completed (required)
+                </p>
+              </div>
+
+              {/* Recurring Field */}
+              <div className="space-y-2">
+                <Label htmlFor="recurring">Recurring (Monthly)</Label>
+                <Select
+                  value={formData.recurring}
+                  onValueChange={handleRecurringChange}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select recurring interval (optional)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="0">No Recurring</SelectItem>
+                    {Array.from({ length: 12 }, (_, i) => i + 1).map((month) => (
+                      <SelectItem key={month} value={month.toString()}>
+                        Every {month} {month === 1 ? "month" : "months"}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Set how often this task should repeat (1-12 months, optional)
+                  {formData.recurring !== "0" && dueDate && (
+                    <span className="block mt-1 text-blue-600">
+                      {(() => {
+                        const nextDueDate = new Date(dueDate);
+                        nextDueDate.setMonth(nextDueDate.getMonth() + parseInt(formData.recurring));
+                        
+                        // Get selected category to find time period
+                        const selectedCategory = categories.find(cat => cat.id === formData.categoryId);
+                        const timePeriod = selectedCategory?.timePeriod || 7; // Default to 7 days if no category time period
+                        
+                        // Always calculate and show start date (due date - time period)
+                        const startDate = new Date(nextDueDate);
+                        startDate.setDate(startDate.getDate() - timePeriod);
+                        
+                        return `Next task period: ${startDate.toLocaleDateString('en-GB')} to ${nextDueDate.toLocaleDateString('en-GB')}`;
+                      })()}
+                    </span>
+                  )}
                 </p>
               </div>
 

@@ -74,14 +74,30 @@ export async function PUT(
 ) {
   try {
     const body = await req.json();
+    
+    // Get the current task to check if it's being marked as completed
+    const currentTask = await prisma.task.findUnique({
+      where: { id: params.id },
+    });
+    
+    if (!currentTask) {
+      return NextResponse.json({ error: "Task not found" }, { status: 404 });
+    }
+    
     // Only pick allowed fields from body
     const allowedFields = [
-      "title", "description", "status", "priority", "dueDate", "progress", "followUpRequired", "completed"
+      "title", "description", "status", "priority", "dueDate", "progress", "followUpRequired", "completed", "recurring"
     ];
     const data: Record<string, unknown> = {};
     for (const key of allowedFields) {
       if (body[key] !== undefined) {
-        data[key] = body[key];
+        if (key === "recurring") {
+          // Handle recurring field conversion
+          const recurringValue = body[key] as string;
+          data[key] = recurringValue && recurringValue !== "0" ? parseInt(recurringValue) : null;
+        } else {
+          data[key] = body[key];
+        }
       }
     }
     // Handle relations
@@ -97,10 +113,29 @@ export async function PUT(
     if (body.legislationId) {
       data.legislation = { connect: { id: body.legislationId } };
     }
+    
     const updatedTask = await prisma.task.update({
       where: { id: params.id },
       data,
     });
+    
+    // Check if task is being marked as completed and has recurring setting
+    const isBeingCompleted = (body.status === "Completed" || body.completed === true) && 
+                            (currentTask.status !== "Completed" && currentTask.completed !== true);
+    
+    if (isBeingCompleted && updatedTask.recurring && updatedTask.recurring > 0) {
+      // Import the recurring task function here to avoid circular imports
+      const { createNextRecurringTask } = await import("@/lib/recurringTasks");
+      
+      try {
+        const nextTask = await createNextRecurringTask(updatedTask);
+        console.log("Created next recurring task:", nextTask);
+      } catch (recurringError) {
+        console.error("Error creating next recurring task:", recurringError);
+        // Don't fail the main task update if recurring task creation fails
+      }
+    }
+    
     return NextResponse.json(updatedTask);
   } catch (error) {
     console.error(`Error updating task ${params.id}:`, error);

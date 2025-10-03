@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { notFound, useParams } from "next/navigation";
+import { notFound, useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -51,6 +51,7 @@ import Link from "next/link";
 
 export default function AgentDetails() {
   const params = useParams();
+  const router = useRouter();
   const id = params.id as string;
   const [agent, setAgent] = useState<Agent | null>(null);
   const [agentTasks, setAgentTasks] = useState<Task[]>([]);
@@ -568,7 +569,11 @@ export default function AgentDetails() {
                     </TableHeader>
                     <TableBody>
                       {agentTasks.map((task) => (
-                        <TableRow key={task.id}>
+                        <TableRow 
+                          key={task.id}
+                          className="cursor-pointer hover:bg-muted/50 transition-colors"
+                          onClick={() => router.push(`/task/${task.id}`)}
+                        >
                           <TableCell>
                             <div className="space-y-1">
                               <div className="font-medium">{task.title}</div>
@@ -632,7 +637,7 @@ export default function AgentDetails() {
                               />
                             </div>
                           </TableCell>
-                          <TableCell className="text-right">
+                          <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
                                 <Button variant="ghost" className="h-8 w-8 p-0">

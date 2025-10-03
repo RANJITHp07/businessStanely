@@ -17,15 +17,21 @@ export async function GET(req: NextRequest) {
     // Parse query parameters
     const url = new URL(req.url);
     const statusParam = url.searchParams.get("status");
+    const includeAll = url.searchParams.get("includeAll") === "true";
 
     // Build where clause for the query
-    const where: { status?: string } = {};
+    const where: { status?: string | { not: string } } = {};
     
-    // If status parameter is provided, filter by status
-    if (statusParam && ["approved", "pending"].includes(statusParam)) {
+    // If status parameter is provided, filter by specific status
+    if (statusParam && ["approved", "pending", "rejected"].includes(statusParam)) {
       where.status = statusParam;
+    } else if (includeAll) {
+      // Show all categories including rejected (for admin purposes)
+      // No status filter
+    } else {
+      // Default: exclude rejected categories for task creation/selection
+      where.status = { not: "rejected" };
     }
-    // Otherwise show all categories (both pending and approved)
     
     // Get categories from the database with proper relations
     // Get categories from the database with proper relations

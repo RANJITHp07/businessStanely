@@ -194,8 +194,11 @@ export default function TaskForm({ id }: TaskFormProps) {
     }
   };
 
-  // Show all categories for task selection, regardless of status
+  // Filter categories: exclude rejected ones and match search query
   const filteredCategories = categories.filter((category) => {
+    // Only show approved and pending categories, not rejected ones
+    if (category.status === "rejected") return false;
+    
     return category.name.toLowerCase().includes(categorySearchQuery.toLowerCase());
   });
 

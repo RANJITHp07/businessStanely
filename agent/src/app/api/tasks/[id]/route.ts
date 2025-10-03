@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentAgent } from "@/lib/auth";
 import prisma from "@/lib/prisma";
-import { createNextRecurringTask } from "@/lib/recurringTasks";
 
 interface TaskWithFields {
   categoryId?: string;
@@ -310,19 +309,9 @@ export async function PUT(
       },
     });
 
-    // Check if task was marked as completed and has recurring setting
-    if (updateData.completed === true && updatedTask.recurring) {
-      // Create next recurring task
-      try {
-        const nextTask = await createNextRecurringTask(updatedTask);
-        if (nextTask) {
-          console.log(`Created next recurring task: ${nextTask.id}`);
-        }
-      } catch (error) {
-        console.error("Error creating next recurring task:", error);
-        // Don't fail the main update if recurring task creation fails
-      }
-    }
+    // Check if task is transitioning from not completed to completed and has recurring setting
+    // Recurring tasks are handled automatically by calendar schedule via cron job
+    // No action needed on completion - the daily automation will update due dates based on calendar
 
     // Fetch category separately if needed
     let category = null;

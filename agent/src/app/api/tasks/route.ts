@@ -179,6 +179,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const recurringValue = recurring && recurring !== "0" ? parseInt(recurring) : null;
+    const taskDueDate = dueDate ? new Date(dueDate) : null;
+    
     // Create new task
     const newTask = await prisma.task.create({
       data: {
@@ -186,13 +189,13 @@ export async function POST(req: NextRequest) {
         description: description || null,
         status: status || "To Do",
         priority: priority || "Medium",
-        dueDate: dueDate ? new Date(dueDate) : null,
+        dueDate: taskDueDate,
         clientId: clientId || null,
         createdById: agent.id,
         assignedToId: assignedToId || agent.id,
         categoryId: categoryId || null,
         legislationId: legislationId || null, // Save legislationId
-        recurring: recurring && recurring !== "0" ? parseInt(recurring) : null, // Save recurring field
+        recurring: recurringValue, // Save recurring field
       },
       include: {
         client: {
@@ -220,6 +223,16 @@ export async function POST(req: NextRequest) {
         },
       },
     });
+
+    // Initialize recurring fields if this is a recurring task
+    if (recurringValue && taskDueDate) {
+      try {
+        const { initializeRecurringTask } = await import("@/lib/singleTaskRecurring");
+        await initializeRecurringTask(newTask.id, recurringValue, taskDueDate);
+      } catch (error) {
+        console.error("Error initializing recurring task:", error);
+      }
+    }
 
     // Format task for frontend
     const taskWithFields = newTask as typeof newTask & TaskWithAdditionalFields;

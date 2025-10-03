@@ -120,22 +120,9 @@ export async function PUT(
       data,
     });
     
-    // Check if task is being marked as completed and has recurring setting
-    const isBeingCompleted = (body.status === "Completed" || body.completed === true) && 
-                            (currentTask.status !== "Completed" && currentTask.completed !== true);
-    
-    if (isBeingCompleted && updatedTask.recurring && updatedTask.recurring > 0) {
-      // Import the recurring task function here to avoid circular imports
-      const { createNextRecurringTask } = await import("@/lib/recurringTasks");
-      
-      try {
-        const nextTask = await createNextRecurringTask(updatedTask);
-        console.log("Created next recurring task:", nextTask);
-      } catch (recurringError) {
-        console.error("Error creating next recurring task:", recurringError);
-        // Don't fail the main task update if recurring task creation fails
-      }
-    }
+    // Check if task is transitioning from not completed to completed and has recurring setting
+    // Recurring tasks are handled automatically by calendar schedule via cron job
+    // No action needed on completion - the daily automation will update due dates based on calendar
     
     return NextResponse.json(updatedTask);
   } catch (error) {

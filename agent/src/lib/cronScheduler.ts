@@ -1,5 +1,4 @@
 import * as cron from 'node-cron';
-import { createCalendarBasedRecurringTasks } from './recurringTasks';
 
 class CronScheduler {
   private static instance: CronScheduler;
@@ -23,7 +22,22 @@ class CronScheduler {
     
     // Schedule to run daily at 9:00 AM UTC
     const task = cron.schedule('0 9 * * *', async () => {
-      await this.runRecurringTasksJob();
+      console.log('🔄 Running recurring tasks cron job at:', new Date().toISOString());
+      
+      try {
+        const { updateAllRecurringTasks } = await import('./singleTaskRecurring');
+        const updatedTasks = await updateAllRecurringTasks();
+        console.log(`✅ Cron job completed. Auto-updated ${updatedTasks.length} recurring tasks.`);
+        
+        if (updatedTasks.length > 0) {
+          console.log('📝 Updated tasks:');
+          updatedTasks.forEach(task => {
+            console.log(`  - ${task.title} (New due date: ${task.dueDate?.toISOString()?.split('T')[0]})`);
+          });
+        }
+      } catch (error) {
+        console.error('❌ Error in recurring tasks cron job:', error);
+      }
     }, {
       timezone: 'UTC'
     });
@@ -32,25 +46,6 @@ class CronScheduler {
     
     console.log(`🚀 Recurring tasks cron scheduler started (daily at 9:00 AM UTC)`);
     return task;
-  }
-
-  // The actual recurring tasks job
-  private async runRecurringTasksJob() {
-    console.log('🔄 Running recurring tasks cron job at:', new Date().toISOString());
-    
-    try {
-      const createdTasks = await createCalendarBasedRecurringTasks();
-      console.log(`✅ Cron job completed. Created ${createdTasks.length} recurring tasks.`);
-      
-      if (createdTasks.length > 0) {
-        console.log('📝 Created tasks:');
-        createdTasks.forEach(task => {
-          console.log(`  - ${task.title} (Due: ${task.dueDate?.toISOString().split('T')[0]})`);
-        });
-      }
-    } catch (error) {
-      console.error('❌ Error in recurring tasks cron job:', error);
-    }
   }
 
   // Stop a specific task
@@ -86,9 +81,10 @@ class CronScheduler {
     console.log('🧪 Running recurring tasks manually...');
     
     try {
-      const createdTasks = await createCalendarBasedRecurringTasks();
-      console.log(`✅ Manual run completed. Created ${createdTasks.length} recurring tasks.`);
-      return createdTasks;
+      const { updateAllRecurringTasks } = await import('./singleTaskRecurring');
+      const updatedTasks = await updateAllRecurringTasks();
+      console.log(`✅ Manual run completed. Auto-updated ${updatedTasks.length} recurring tasks.`);
+      return updatedTasks;
     } catch (error) {
       console.error('❌ Error in manual recurring tasks run:', error);
       throw error;

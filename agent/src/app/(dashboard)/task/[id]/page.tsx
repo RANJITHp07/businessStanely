@@ -573,14 +573,11 @@ export default function TaskDetails() {
 
   const handleCompletedChange = async (checked: boolean) => {
     if (!task) return;
-    // Optimistic update
+    // Optimistic update - only change the completed field, not status or progress
     taskRef.current = task;
-    const isCompleted = checked;
     setTask({
       ...task,
-      completed: isCompleted,
-      status: isCompleted ? "Completed" : "In Progress",
-      progress: isCompleted ? 100 : task.progress,
+      completed: checked,
     });
     try {
       const response = await fetch(`/api/tasks/${task.id}`, {
@@ -589,9 +586,7 @@ export default function TaskDetails() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          completed: isCompleted,
-          status: isCompleted ? "Completed" : "In Progress",
-          progress: isCompleted ? 100 : task.progress,
+          completed: checked,
         }),
       });
       if (response.ok) {

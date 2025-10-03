@@ -155,7 +155,7 @@ export default function TaskDetails() {
   const taskRef = useRef<Task | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState("details");
+  const [activeTab, setActiveTab] = useState("comments");
   const [newComment, setNewComment] = useState("");
   const [submittingComment, setSubmittingComment] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);

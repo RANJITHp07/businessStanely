@@ -455,7 +455,18 @@ export default function TaskDetails() {
       });
       if (response.ok) {
         const data = await response.json();
-        setTask(data.task);
+        // Preserve existing related data and only update the fields that were changed
+        setTask(prevTaskState => ({
+          ...prevTaskState!,
+          ...data.task,
+          // Preserve these fields that might not be in the API response
+          comments: prevTaskState!.comments,
+          assignedTo: prevTaskState!.assignedTo,
+          client: prevTaskState!.client,
+          category: data.task.category || prevTaskState!.category,
+          timeLogs: prevTaskState!.timeLogs,
+          legislation: prevTaskState!.legislation,
+        }));
       } else {
         setTask(prevTask); // revert
         console.error("Failed to update task status");
@@ -496,7 +507,18 @@ export default function TaskDetails() {
       });
       if (response.ok) {
         const data = await response.json();
-        setTask(data.task);
+        // Preserve existing related data and only update the fields that were changed
+        setTask(prevTaskState => ({
+          ...prevTaskState!,
+          ...data.task,
+          // Preserve these fields that might not be in the API response
+          comments: prevTaskState!.comments,
+          assignedTo: prevTaskState!.assignedTo,
+          client: prevTaskState!.client,
+          category: data.task.category || prevTaskState!.category,
+          timeLogs: prevTaskState!.timeLogs,
+          legislation: prevTaskState!.legislation,
+        }));
       } else {
         setTask(prevTask); // revert
       }
@@ -559,7 +581,19 @@ export default function TaskDetails() {
       });
       if (response.ok) {
         const data = await response.json();
-        setTask(data.task);
+        // Preserve existing related data (comments, assignedTo, client, etc.) 
+        // and only update the fields that were actually changed
+        setTask(prevTask => ({
+          ...prevTask!,
+          ...data.task,
+          // Preserve these fields that might not be in the API response
+          comments: prevTask!.comments,
+          assignedTo: prevTask!.assignedTo,
+          client: prevTask!.client,
+          category: data.task.category || prevTask!.category,
+          timeLogs: prevTask!.timeLogs,
+          legislation: prevTask!.legislation,
+        }));
       } else {
         // Revert on error
         setTask(taskRef.current);
@@ -591,7 +625,18 @@ export default function TaskDetails() {
       });
       if (response.ok) {
         const data = await response.json();
-        setTask(data.task);
+        // Preserve existing related data and only update the fields that were changed
+        setTask(prevTask => ({
+          ...prevTask!,
+          ...data.task,
+          // Preserve these fields that might not be in the API response
+          comments: prevTask!.comments,
+          assignedTo: prevTask!.assignedTo,
+          client: prevTask!.client,
+          category: data.task.category || prevTask!.category,
+          timeLogs: prevTask!.timeLogs,
+          legislation: prevTask!.legislation,
+        }));
       } else {
         setTask(taskRef.current);
         console.error("Failed to update task completion status");

@@ -32,7 +32,6 @@ import {
     ChevronRight,
     ChevronsLeft,
     ChevronsRight,
-    ArrowUpDown,
     Calendar,
     User,
     Clock,
@@ -381,7 +380,7 @@ export default function ApproveCategory({ params }: { params: Promise<{ id: stri
                         <Card>
                             <CardHeader>
                                 <CardTitle>Actions</CardTitle>
-                                <CardDescription>Approve or reject this category</CardDescription>
+                                <CardDescription>Approve or reject this service</CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-4">
                                 <Button onClick={handleApprove} disabled={approving} className="w-full bg-green-600 hover:bg-green-700">
@@ -474,7 +473,7 @@ export default function ApproveCategory({ params }: { params: Promise<{ id: stri
                                             {!currentTasks || currentTasks.length === 0 ? (
                                                 <TableRow>
                                                     <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                                                        No tasks found in this category.
+                                                        No tasks found in this service.
                                                     </TableCell>
                                                 </TableRow>
                                             ) : (
@@ -653,7 +652,7 @@ export default function ApproveCategory({ params }: { params: Promise<{ id: stri
                         <AlertDialogHeader>
                             <AlertDialogTitle>Reject Service</AlertDialogTitle>
                             <AlertDialogDescription>
-                                Please provide a reason for rejecting this category. This will help the creator understand what needs to
+                                Please provide a reason for rejecting this service. This will help the creator understand what needs to
                                 be improved.
                             </AlertDialogDescription>
                         </AlertDialogHeader>

@@ -711,13 +711,13 @@ export default function TaskForm({ id }: TaskFormProps) {
                           className="h-10"
                         >
                           <Plus className="h-4 w-4 mr-2" />
-                          Add Category
+                          Add Service
                         </Button>
                       </DialogTrigger>
 
                       <DialogContent className="sm:max-w-[400px] w-full">
                         <DialogHeader>
-                          <DialogTitle>Add New Category</DialogTitle>
+                          <DialogTitle>Add New Service</DialogTitle>
                           <DialogDescription>
                             Create a new task service for better organization
                           </DialogDescription>
@@ -726,7 +726,7 @@ export default function TaskForm({ id }: TaskFormProps) {
                         {/* Form Fields */}
                         <div className="space-y-4 py-4">
                           <div className="space-y-2">
-                            <Label htmlFor="category-name">Category Name *</Label>
+                            <Label htmlFor="category-name">Service Name *</Label>
                             <Input
                               id="category-name"
                               placeholder="Enter category name (e.g., Legal Research, Contract Review)"
@@ -743,7 +743,7 @@ export default function TaskForm({ id }: TaskFormProps) {
                             <Label htmlFor="category-description">Description</Label>
                             <Textarea
                               id="category-description"
-                              placeholder="Brief description of this category (optional)"
+                              placeholder="Brief description of this service (optional)"
                               className="w-full"
                               value={newCategoryData.description}
                               onChange={(e) =>
@@ -866,7 +866,7 @@ export default function TaskForm({ id }: TaskFormProps) {
                     categorySearchQuery &&
                     filteredCategories.length === 0 && (
                       <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg p-3">
-                        <span className="text-gray-500">No categories found</span>
+                        <span className="text-gray-500">No services found</span>
                       </div>
                     )}
                 </div>

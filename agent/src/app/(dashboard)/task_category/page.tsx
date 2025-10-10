@@ -97,13 +97,13 @@ export default function TaskCategoryTable() {
                 const response = await fetchWithAuth(`/api/task-categories`);
 
                 if (!response.ok) {
-                    throw new Error('Failed to fetch all categories');
+                    throw new Error('Failed to fetch all services');
                 }
 
                 const data = await response.json();
                 setAllCategories(data);
             } catch (error) {
-                console.error("Error fetching all categories:", error);
+                console.error("Error fetching all services:", error);
                 setAllCategories([]);
             }
         };

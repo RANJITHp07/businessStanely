@@ -591,7 +591,7 @@ export default function TaskDetails() {
                     </div>
                     <div>
                       <Label className="text-sm font-medium text-muted-foreground">
-                        Category
+                        Service
                       </Label>
                       <div className="mt-1">
                         {taskData.category ? (

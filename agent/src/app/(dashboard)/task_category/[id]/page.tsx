@@ -261,7 +261,7 @@ export default function CategoryDetail({ params }: { params: Promise<{ id: strin
         return (
             <div className="container mx-auto p-6 max-w-7xl">
                 <div className="text-center py-20">
-                    <p className="text-muted-foreground">Category not found</p>
+                    <p className="text-muted-foreground">Service not found</p>
                 </div>
             </div>
         )

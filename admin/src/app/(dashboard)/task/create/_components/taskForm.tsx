@@ -664,7 +664,7 @@ export default function TaskForm() {
                           className="h-10"
                         >
                           <Plus className="h-4 w-4 mr-2" />
-                          Add Category
+                          Add Service
                         </Button>
                       </DialogTrigger>
 

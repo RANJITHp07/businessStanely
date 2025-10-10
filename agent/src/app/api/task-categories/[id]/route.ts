@@ -248,7 +248,7 @@ export async function DELETE(
     }
     if (existingCategory.createdByAgentId !== currentAgent.id) {
       return NextResponse.json(
-        { error: "You can only delete your own categories" },
+        { error: "You can only delete your own services" },
         { status: 403 }
       );
     }
@@ -258,10 +258,10 @@ export async function DELETE(
       where: { id },
     });
 
-    return NextResponse.json({ message: "Category deleted successfully" });
+    return NextResponse.json({ message: "Service deleted successfully" });
   } catch (error) {
-    console.error("Error deleting task category:", error);
-    
+    console.error("Error deleting task service:", error);
+
     // Check for foreign key constraint violations
     if (error instanceof Error && 'code' in error && error.code === 'P2003') {
       return NextResponse.json(

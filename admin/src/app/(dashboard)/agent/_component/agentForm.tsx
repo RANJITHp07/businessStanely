@@ -525,7 +525,7 @@ export default function AgentForm({ agent }: AgentFormProps) {
               <Label htmlFor="bar-id">Employee ID *</Label>
               <Input
                 id="bar-id"
-                placeholder="Enter bar association ID"
+                placeholder="Enter Employee ID"
                 value={formData.barAssociationId}
                 onChange={(e) =>
                   handleInputChange("barAssociationId", e.target.value)

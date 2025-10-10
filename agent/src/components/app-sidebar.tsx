@@ -65,7 +65,7 @@ const items = [
     icon: ClipboardList,
   },
   {
-    title: "Task Services",
+    title: "Services",
     url: "/task_category",
     icon: Boxes,
   },

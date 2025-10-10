@@ -60,7 +60,7 @@ const items = [
     icon: ClipboardCheck,
   },
   {
-    title: "Task Service",
+    title: "Services",
     url: "/task_category",
     icon: Boxes,
   },

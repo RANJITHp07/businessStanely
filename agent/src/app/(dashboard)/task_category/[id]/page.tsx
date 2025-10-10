@@ -290,9 +290,9 @@ export default function CategoryDetail({ params }: { params: Promise<{ id: strin
             <div className="mb-8">
                 <div className="flex items-center gap-4 mb-6">
                     <div>
-                        <h1 className="text-[28px] md:text-3xl font-bold">Task Service Details</h1>
+                        <h1 className="text-[28px] md:text-3xl font-bold">Service Details</h1>
                         <p className="text-[18px] md:text-[16px] text-muted-foreground mt-2">
-                            Comprehensive view of task service details and associated tasks
+                            Comprehensive view of service details and associated tasks
                         </p>
                     </div>
                 </div>

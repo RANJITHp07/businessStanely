@@ -719,7 +719,7 @@ export default function TaskForm({ id }: TaskFormProps) {
                         <DialogHeader>
                           <DialogTitle>Add New Service</DialogTitle>
                           <DialogDescription>
-                            Create a new task service for better organization
+                            Create a new service for better organization
                           </DialogDescription>
                         </DialogHeader>
 
@@ -801,7 +801,7 @@ export default function TaskForm({ id }: TaskFormProps) {
               </div>
 
               <div className="space-y-2 relative">
-                <Label htmlFor="taskCategory">Task Service *</Label>
+                <Label htmlFor="taskCategory">Service *</Label>
                 <div className="relative">
                   <Input
                     id="taskCategory"

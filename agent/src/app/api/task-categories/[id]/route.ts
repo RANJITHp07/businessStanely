@@ -260,7 +260,7 @@ export async function DELETE(
 
     return NextResponse.json({ message: "Service deleted successfully" });
   } catch (error) {
-    console.error("Error deleting task service:", error);
+    console.error("Error deleting service:", error);
 
     // Check for foreign key constraint violations
     if (error instanceof Error && 'code' in error && error.code === 'P2003') {

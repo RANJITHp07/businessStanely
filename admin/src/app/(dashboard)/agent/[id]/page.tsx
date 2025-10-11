@@ -423,7 +423,7 @@ export default function AgentDetails() {
                     </div>
                     <div>
                       <label className="text-sm font-medium text-muted-foreground">
-                        Bar Association ID
+                        Employee ID
                       </label>
                       <p className="font-medium">{agent.barAssociationId}</p>
                     </div>

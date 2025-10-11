@@ -97,13 +97,13 @@ export default function TaskCategoryTable() {
                 const response = await fetchWithAuth(`/api/task-categories`);
 
                 if (!response.ok) {
-                    throw new Error('Failed to fetch all categories');
+                    throw new Error('Failed to fetch all services');
                 }
 
                 const data = await response.json();
                 setAllCategories(data);
             } catch (error) {
-                console.error("Error fetching all categories:", error);
+                console.error("Error fetching all services:", error);
                 setAllCategories([]);
             }
         };
@@ -229,9 +229,9 @@ export default function TaskCategoryTable() {
             <div className="mb-8">
                 <div className="flex flex-col md:flex-row justify-between md:items-center mb-6 md:mb-4">
                     <div>
-                        <h1 className="text-[28px] md:text-3xl font-bold">Task Service Management</h1>
+                        <h1 className="text-[28px] md:text-3xl font-bold">Service Management</h1>
                         <p className="text-[18px] md:text-[16px] text-muted-foreground mt-2">
-                            Manage and organize your task services
+                            Manage and organize your services
                         </p>
                     </div>
                     <Link href="/task_category/create" className="flex justify-end">
@@ -248,7 +248,7 @@ export default function TaskCategoryTable() {
                             <Filter className="h-5 w-5" />
                             Filters & Search
                         </CardTitle>
-                        <CardDescription>Filter and search through your task services</CardDescription>
+                        <CardDescription>Filter and search through your services</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
                         {loading ? (
@@ -750,7 +750,7 @@ export default function TaskCategoryTable() {
                     <AlertDialogHeader>
                         <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                         <AlertDialogDescription>
-                            This action cannot be undone. This will permanently delete the task service and may affect existing tasks
+                            This action cannot be undone. This will permanently delete the service and may affect existing tasks
                             Ownership to this category.
                         </AlertDialogDescription>
                     </AlertDialogHeader>

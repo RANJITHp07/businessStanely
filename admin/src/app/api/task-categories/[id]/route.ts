@@ -156,7 +156,7 @@ export async function PUT(
     // Only owner can edit categories
     if (currentAdmin.adminType !== "owner") {
       return NextResponse.json(
-        { error: "Only owners can edit categories" },
+        { error: "Only owners can edit services" },
         { status: 403 }
       );
     }
@@ -284,7 +284,7 @@ export async function DELETE(
     }
 
     return NextResponse.json(
-      { error: "Failed to delete category" },
+      { error: "Failed to delete service" },
       { status: 500 }
     );
   }

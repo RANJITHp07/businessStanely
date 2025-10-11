@@ -19,20 +19,34 @@ export async function DELETE(
       );
     }
     const { id: taskId } = await params;
-    // Only allow delete if agent is creator or assigned
-    const existingTask = await prisma.task.findFirst({
-      where: {
-        id: taskId,
-        OR: [
-          { createdById: agent.id },
-          { assignedToId: agent.id },
-        ],
-      },
+    // Allow delete if agent is creator, assigned, or superior of assigned agent
+    const task = await prisma.task.findUnique({
+      where: { id: taskId },
+      select: { createdById: true, assignedToId: true },
     });
-    if (!existingTask) {
+    if (!task) {
       return NextResponse.json(
-        { error: "Task not found or not authorized" },
+        { error: "Task not found" },
         { status: 404 }
+      );
+    }
+    let isAuthorized = false;
+    if (task.createdById === agent.id || task.assignedToId === agent.id) {
+      isAuthorized = true;
+    } else if (task.assignedToId) {
+      // Check if agent is a superior of the assigned agent
+      const superiorLink = await prisma.agentSuperior.findFirst({
+        where: {
+          superiorId: agent.id,
+          subordinateId: task.assignedToId,
+        },
+      });
+      if (superiorLink) isAuthorized = true;
+    }
+    if (!isAuthorized) {
+      return NextResponse.json(
+        { error: "Not authorized to delete this task" },
+        { status: 403 }
       );
     }
     await prisma.task.delete({ where: { id: taskId } });
@@ -224,21 +238,34 @@ export async function PUT(
     const { id: taskId } = await params;
     const body = await req.json();
 
-    // Verify the task exists and agent has access
-    const existingTask = await prisma.task.findFirst({
-      where: {
-        id: taskId,
-        OR: [
-          { createdById: agent.id },
-          { assignedToId: agent.id },
-        ],
-      },
+    // Allow update if agent is creator, assigned, or superior of assigned agent
+    const task = await prisma.task.findUnique({
+      where: { id: taskId },
+      select: { createdById: true, assignedToId: true },
     });
-
-    if (!existingTask) {
+    if (!task) {
       return NextResponse.json(
         { error: "Task not found" },
         { status: 404 }
+      );
+    }
+    let isAuthorized = false;
+    if (task.createdById === agent.id || task.assignedToId === agent.id) {
+      isAuthorized = true;
+    } else if (task.assignedToId) {
+      // Check if agent is a superior of the assigned agent
+      const superiorLink = await prisma.agentSuperior.findFirst({
+        where: {
+          superiorId: agent.id,
+          subordinateId: task.assignedToId,
+        },
+      });
+      if (superiorLink) isAuthorized = true;
+    }
+    if (!isAuthorized) {
+      return NextResponse.json(
+        { error: "Not authorized to update this task" },
+        { status: 403 }
       );
     }
 

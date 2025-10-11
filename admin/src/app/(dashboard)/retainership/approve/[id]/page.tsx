@@ -245,7 +245,7 @@ export default function ApproveRetainership({ params }: { params: Promise<{ id: 
                         onClick={() => router.push('/retainership')}
                         variant="outline"
                     >
-                        Return to Categories
+                        Return to Services
                     </Button>
                 </div>
             </div>

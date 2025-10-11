@@ -20,7 +20,7 @@ export async function PUT(
     // Check if user is an owner
     if (currentAdmin.adminType !== "owner") {
       return NextResponse.json(
-        { error: "Only owners can approve categories" },
+        { error: "Only owners can approve services" },
         { status: 403 }
       );
     }
@@ -29,7 +29,7 @@ export async function PUT(
 
     if (!id) {
       return NextResponse.json(
-        { error: "Category ID is required" },
+        { error: "Service ID is required" },
         { status: 400 }
       );
     }
@@ -61,7 +61,7 @@ export async function PUT(
 
     if (!category) {
       return NextResponse.json(
-        { error: "Category not found" },
+        { error: "Service not found" },
         { status: 404 }
       );
     }

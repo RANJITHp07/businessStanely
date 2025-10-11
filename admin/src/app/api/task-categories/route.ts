@@ -208,7 +208,7 @@ export async function POST(req: NextRequest) {
     // Check for unique constraint violations - Prisma error
     if (error instanceof Error && 'code' in error && error.code === 'P2002') {
       return NextResponse.json(
-        { error: "A category with this name already exists" },
+        { error: "A service with this name already exists" },
         { status: 409 }
       );
     }

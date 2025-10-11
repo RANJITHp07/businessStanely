@@ -35,7 +35,7 @@ function Create({ admin, initialData }: CreateProps) {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         if (!formData.name) {
-            toast.error("Category name is required")
+            toast.error("Service name is required")
             return
         }
 
@@ -77,7 +77,7 @@ function Create({ admin, initialData }: CreateProps) {
         <div className="container mx-auto p-6 max-w-7xl">
             <div className="mb-8">
                 <h1 className="text-3xl font-bold">
-                    {admin ? "Edit Task Service" : "Create New Task Service"}
+                    {admin ? "Edit Service" : "Create New Service"}
                 </h1>
                 <p className="text-muted-foreground mt-2">
                     {admin
@@ -90,19 +90,19 @@ function Create({ admin, initialData }: CreateProps) {
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2">
                             <User className="h-5 w-5" />
-                            Task Service Information
+                            Service Information
                         </CardTitle>
                         <CardDescription>Basic details about the category</CardDescription>
                     </CardHeader>
                     <CardContent>
                         <div >
                             <div className="space-y-2">
-                                <Label htmlFor="username">Task Service *</Label>
+                                <Label htmlFor="username">Service *</Label>
                                 <Input
                                     id="username"
                                     value={formData.name}
                                     onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
-                                    placeholder="Enter task service name"
+                                    placeholder="Enter service name"
                                     required
                                 />
                             </div>
@@ -112,7 +112,7 @@ function Create({ admin, initialData }: CreateProps) {
                                     id="description"
                                     value={formData.description}
                                     onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
-                                    placeholder="Enter category description (optional)"
+                                    placeholder="Enter service description (optional)"
                                     rows={4}
                                 />
                             </div>

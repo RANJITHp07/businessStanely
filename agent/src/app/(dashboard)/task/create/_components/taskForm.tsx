@@ -102,6 +102,8 @@ export default function TaskForm({ id }: TaskFormProps) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [dueDate, setDueDate] = useState<Date>();
+  // Disable due date if a service/category is selected
+  const isDueDateDisabled = !!formData.categoryId;
   const [isEditMode, setIsEditMode] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedClientType, setSelectedClientType] = useState("");
@@ -639,7 +641,6 @@ export default function TaskForm({ id }: TaskFormProps) {
     setFormData((prev) => ({ ...prev, categoryId: category.id, timePeriod: category.timePeriod }));
     setCategorySearchQuery(category.name);
     setShowCategorySuggestions(false);
-
     // Automatically set due date based on category's time period
     if (category.timePeriod) {
       const calculatedDueDate = new Date();
@@ -711,22 +712,22 @@ export default function TaskForm({ id }: TaskFormProps) {
                           className="h-10"
                         >
                           <Plus className="h-4 w-4 mr-2" />
-                          Add Category
+                          Add Service
                         </Button>
                       </DialogTrigger>
 
                       <DialogContent className="sm:max-w-[400px] w-full">
                         <DialogHeader>
-                          <DialogTitle>Add New Category</DialogTitle>
+                          <DialogTitle>Add New Service</DialogTitle>
                           <DialogDescription>
-                            Create a new task service for better organization
+                            Create a new service for better organization
                           </DialogDescription>
                         </DialogHeader>
 
                         {/* Form Fields */}
                         <div className="space-y-4 py-4">
                           <div className="space-y-2">
-                            <Label htmlFor="category-name">Category Name *</Label>
+                            <Label htmlFor="category-name">Service Name *</Label>
                             <Input
                               id="category-name"
                               placeholder="Enter category name (e.g., Legal Research, Contract Review)"
@@ -743,7 +744,7 @@ export default function TaskForm({ id }: TaskFormProps) {
                             <Label htmlFor="category-description">Description</Label>
                             <Textarea
                               id="category-description"
-                              placeholder="Brief description of this category (optional)"
+                              placeholder="Brief description of this service (optional)"
                               className="w-full"
                               value={newCategoryData.description}
                               onChange={(e) =>
@@ -801,7 +802,7 @@ export default function TaskForm({ id }: TaskFormProps) {
               </div>
 
               <div className="space-y-2 relative">
-                <Label htmlFor="taskCategory">Task Service *</Label>
+                <Label htmlFor="taskCategory">Service *</Label>
                 <div className="relative">
                   <Input
                     id="taskCategory"
@@ -866,7 +867,7 @@ export default function TaskForm({ id }: TaskFormProps) {
                     categorySearchQuery &&
                     filteredCategories.length === 0 && (
                       <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg p-3">
-                        <span className="text-gray-500">No categories found</span>
+                        <span className="text-gray-500">No services found</span>
                       </div>
                     )}
                 </div>
@@ -1417,6 +1418,9 @@ export default function TaskForm({ id }: TaskFormProps) {
                         !dueDate &&
                         "text-muted-foreground border-red-200 focus:border-red-500"
                       )}
+                      disabled={isDueDateDisabled}
+                      tabIndex={isDueDateDisabled ? -1 : 0}
+                      aria-disabled={isDueDateDisabled}
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
                       {dueDate ? format(dueDate, "PPP") : "Select completion date"}
@@ -1426,15 +1430,19 @@ export default function TaskForm({ id }: TaskFormProps) {
                     <Calendar
                       mode="single"
                       selected={dueDate}
-                      onSelect={setDueDate}
+                      onSelect={isDueDateDisabled ? undefined : setDueDate}
                       fromDate={new Date()}
                       initialFocus
+                      disabled={isDueDateDisabled}
                     />
                   </PopoverContent>
                 </Popover>
-                <p className="text-xs text-muted-foreground">
-                  Choose the date when this task should be completed (required)
-                </p>
+                {/* Remove or update the helper text so it does not show when due date is disabled */}
+                {!isDueDateDisabled && (
+                  <p className="text-xs text-muted-foreground">
+                    Choose the date when this task should be completed (required)
+                  </p>
+                )}
               </div>
 
               {/* Recurring Field */}

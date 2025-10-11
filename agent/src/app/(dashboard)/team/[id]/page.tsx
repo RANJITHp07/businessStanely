@@ -527,7 +527,7 @@ export default function AgentDetails() {
             <CardHeader>
               <CardTitle>Assigned Tasks</CardTitle>
               <CardDescription>
-                All tasks currently Ownership to {agent.name}
+                All tasks currently assigned to {agent.name}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -538,7 +538,7 @@ export default function AgentDetails() {
               ) : agentTasks.length === 0 ? (
                 <div className="text-center py-8">
                   <p className="text-muted-foreground">
-                    No tasks Ownership to this agent.
+                    No tasks assigned to this agent.
                   </p>
                 </div>
               ) : (
@@ -548,8 +548,8 @@ export default function AgentDetails() {
                       <TableRow>
                         <TableHead>Task</TableHead>
                         <TableHead>Client</TableHead>
+                        <TableHead>Assigned To</TableHead>
                         <TableHead>Priority</TableHead>
-                        <TableHead>Status</TableHead>
                         <TableHead>Due Date</TableHead>
                         <TableHead>Progress</TableHead>
                         <TableHead className="text-right">Actions</TableHead>
@@ -558,12 +558,14 @@ export default function AgentDetails() {
                     <TableBody>
                       {agentTasks.map((task) => (
                         <TableRow key={task.id}>
-                          <TableCell>
+                          <TableCell className="max-w-36 truncate overflow-hidden whitespace-nowrap">
                             <div className="space-y-1">
                               <div className="font-medium">{task.title}</div>
-                              {task.description && (
-                                <div className="text-sm text-muted-foreground">
-                                  {task.description}
+                              {task.category && task.category.status === "approved" && (
+                                <div className="text-xs mt-1">
+                                  <span className="inline-block px-2 py-1 rounded bg-blue-100 text-blue-800 border border-blue-200">
+                                    {task.category.name}
+                                  </span>
                                 </div>
                               )}
                             </div>
@@ -571,41 +573,59 @@ export default function AgentDetails() {
                           <TableCell>
                             <div className="font-medium">
                               {task.client
-                                ? task.client.clientType === "Individual"
+                                ? task.client.name || (task.client.clientType === "individual"
                                   ? `${task.client.firstName} ${task.client.lastName}`
-                                  : task.client.organizationName
-                                : "No Client"}
+                                  : task.client.organizationName)
+                                : "N/A"}
                             </div>
                             <div className="text-sm text-muted-foreground">
-                              Created: {task.createdAt}
+                              {task.client?.email}
                             </div>
                           </TableCell>
-                          <TableCell>{task.priority}</TableCell>
-                          <TableCell>{task.status}</TableCell>
                           <TableCell>
-                            {task.dueDate ? (
-                              <div className="flex items-center gap-1">
-                                <Calendar className="h-4 w-4 text-muted-foreground" />
-                                <span>{task.dueDate}</span>
+                            <div className="flex items-center space-x-2">
+                              <Avatar className="h-8 w-8">
+                                <AvatarFallback className="text-xs">
+                                  {task.assignedTo?.name
+                                    ? task.assignedTo.name.toUpperCase().split(" ").map((n) => n[0]).join("")
+                                    : "-"}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div>
+                                <div className="font-medium text-sm">
+                                  {task.assignedTo?.name || "-"}
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                  {task.assignedTo?.agentType}
+                                </div>
                               </div>
-                            ) : (
-                              <span className="text-muted-foreground">No due date</span>
-                            )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            {getPriorityBadge(task.priority)}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-1">
+                              <Calendar className="h-4 w-4 text-muted-foreground" />
+                              <span>
+                                {task.dueDate ? formatDate(task.dueDate) : "N/A"}
+                              </span>
+                            </div>
                           </TableCell>
                           <TableCell>
                             <div className="space-y-2">
                               <div className="flex items-center justify-between">
                                 <span className="text-sm font-medium">
-                                  {task.status === "Completed" || task.status === "Done" ? "100%" : task.status === "In Progress" ? "50%" : "0%"}
+                                  {task.status}
                                 </span>
                               </div>
-                              <Progress value={task.status === "Completed" || task.status === "Done" ? 100 : task.status === "In Progress" ? 50 : 0} className="h-2" />
                             </div>
                           </TableCell>
                           <TableCell className="text-right">
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
                                 <Button variant="ghost" className="h-8 w-8 p-0">
+                                  <span className="sr-only">Open menu</span>
                                   <MoreHorizontal className="h-4 w-4" />
                                 </Button>
                               </DropdownMenuTrigger>
@@ -614,7 +634,13 @@ export default function AgentDetails() {
                                 <DropdownMenuItem asChild>
                                   <Link href={`/task/${task.id}`}>
                                     <Eye className="mr-2 h-4 w-4" />
-                                    View Task
+                                    View Details
+                                  </Link>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem asChild>
+                                  <Link href={`/task/${task.id}/edit`}>
+                                    <Edit className="mr-2 h-4 w-4" />
+                                    Edit Task
                                   </Link>
                                 </DropdownMenuItem>
                               </DropdownMenuContent>

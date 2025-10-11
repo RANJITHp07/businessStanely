@@ -433,13 +433,13 @@ export default function TaskDetails() {
   const handleStatusChange = async (newStatus: string) => {
     if (!task) return;
     const prevTask = { ...task };
-    // If status is Completed, set progress to 100%
+    // If status is Completed, set progress to 100%, else set to 0%
     const isCompleted = newStatus === "Completed";
     setTask({
       ...task,
       status: newStatus,
       completed: isCompleted,
-      progress: isCompleted ? 100 : task.progress,
+      progress: isCompleted ? 100 : 0,
     });
     try {
       const response = await fetch(`/api/tasks/${task.id}`, {
@@ -450,7 +450,7 @@ export default function TaskDetails() {
         body: JSON.stringify({
           status: newStatus,
           completed: isCompleted,
-          progress: isCompleted ? 100 : task.progress,
+          progress: isCompleted ? 100 : 0,
         }),
       });
       if (response.ok) {

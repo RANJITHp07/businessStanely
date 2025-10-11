@@ -102,6 +102,8 @@ export default function TaskForm({ id }: TaskFormProps) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [dueDate, setDueDate] = useState<Date>();
+  // Disable due date if a service/category is selected
+  const isDueDateDisabled = !!formData.categoryId;
   const [isEditMode, setIsEditMode] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedClientType, setSelectedClientType] = useState("");
@@ -639,7 +641,6 @@ export default function TaskForm({ id }: TaskFormProps) {
     setFormData((prev) => ({ ...prev, categoryId: category.id, timePeriod: category.timePeriod }));
     setCategorySearchQuery(category.name);
     setShowCategorySuggestions(false);
-
     // Automatically set due date based on category's time period
     if (category.timePeriod) {
       const calculatedDueDate = new Date();
@@ -1417,6 +1418,9 @@ export default function TaskForm({ id }: TaskFormProps) {
                         !dueDate &&
                         "text-muted-foreground border-red-200 focus:border-red-500"
                       )}
+                      disabled={isDueDateDisabled}
+                      tabIndex={isDueDateDisabled ? -1 : 0}
+                      aria-disabled={isDueDateDisabled}
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
                       {dueDate ? format(dueDate, "PPP") : "Select completion date"}
@@ -1426,15 +1430,19 @@ export default function TaskForm({ id }: TaskFormProps) {
                     <Calendar
                       mode="single"
                       selected={dueDate}
-                      onSelect={setDueDate}
+                      onSelect={isDueDateDisabled ? undefined : setDueDate}
                       fromDate={new Date()}
                       initialFocus
+                      disabled={isDueDateDisabled}
                     />
                   </PopoverContent>
                 </Popover>
-                <p className="text-xs text-muted-foreground">
-                  Choose the date when this task should be completed (required)
-                </p>
+                {/* Remove or update the helper text so it does not show when due date is disabled */}
+                {!isDueDateDisabled && (
+                  <p className="text-xs text-muted-foreground">
+                    Choose the date when this task should be completed (required)
+                  </p>
+                )}
               </div>
 
               {/* Recurring Field */}

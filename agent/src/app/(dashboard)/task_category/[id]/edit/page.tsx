@@ -14,6 +14,9 @@ interface Category {
     createdBy: string
     createdAt: string
     updatedAt: string
+    notes?: string;
+    processFlow?: string;
+    timePeriod?: number;
 }
 
 export default function EditCategory({ params }: { params: Promise<{ id: string }> | { id: string } }) {
@@ -56,6 +59,9 @@ export default function EditCategory({ params }: { params: Promise<{ id: string 
         id: category.id,
         name: category.name,
         description: category.description || "",
+        notes: category.notes || "",
+        processFlow: category.processFlow || "",
+        timePeriod: typeof category.timePeriod === 'number' ? category.timePeriod : 0,
     }
 
     return (

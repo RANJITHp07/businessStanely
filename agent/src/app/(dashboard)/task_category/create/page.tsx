@@ -20,6 +20,8 @@ interface CreateProps {
         name: string;
         description: string;
         timePeriod: number;
+        notes?: string;
+        processFlow?: string;
     };
 }
 
@@ -28,6 +30,8 @@ function Create({ admin, initialData }: CreateProps) {
         name: initialData?.name || "",
         description: initialData?.description || "",
         timePeriod: initialData?.timePeriod || 0, // Default to 0 if not provided
+        notes: initialData?.notes || "",
+        processFlow: initialData?.processFlow || "",
     })
     const [isSubmitting, setIsSubmitting] = useState(false)
     const router = useRouter()
@@ -113,7 +117,7 @@ function Create({ admin, initialData }: CreateProps) {
                                     id="description"
                                     value={formData.description}
                                     onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
-                                    placeholder="Enter category description (optional)"
+                                    placeholder="Enter service description (optional)"
                                     rows={4}
                                 />
                             </div>
@@ -126,6 +130,26 @@ function Create({ admin, initialData }: CreateProps) {
                                     onChange={(e) => setFormData((prev) => ({ ...prev, timePeriod: parseInt(e.target.value, 10) || 0 }))}
                                     placeholder="Enter time period in days"
                                     required
+                                />
+                            </div>
+                            <div className="space-y-2 mt-3">
+                                <Label htmlFor="notes">Notes</Label>
+                                <Textarea
+                                    id="notes"
+                                    value={formData.notes}
+                                    onChange={(e) => setFormData((prev) => ({ ...prev, notes: e.target.value }))}
+                                    placeholder="Enter notes (optional)"
+                                    rows={2}
+                                />
+                            </div>
+                            <div className="space-y-2 mt-3">
+                                <Label htmlFor="processFlow">Process Flow</Label>
+                                <Textarea
+                                    id="processFlow"
+                                    value={formData.processFlow}
+                                    onChange={(e) => setFormData((prev) => ({ ...prev, processFlow: e.target.value }))}
+                                    placeholder="Enter process flow (optional)"
+                                    rows={2}
                                 />
                             </div>
                         </div>

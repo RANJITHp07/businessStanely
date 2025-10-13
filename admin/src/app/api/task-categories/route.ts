@@ -136,7 +136,7 @@ export async function POST(req: NextRequest) {
 
     // Parse request body
     const body = await req.json();
-    const { name, description, color, timePeriod } = body; // Include timePeriod
+  const { name, description, color, timePeriod, notes, processFlow } = body; // Include timePeriod, notes, processFlow
 
     // Convert timePeriod to an integer
     const parsedTimePeriod = timePeriod ? parseInt(timePeriod, 10) : null;
@@ -160,6 +160,8 @@ export async function POST(req: NextRequest) {
       data: {
         name,
         description: description || "",
+        notes: notes || "",
+        processFlow: processFlow || "",
         color: color || "blue",
         timePeriod: parsedTimePeriod, // Use parsed integer value
         status,
@@ -188,6 +190,8 @@ export async function POST(req: NextRequest) {
       id: newCategory.id,
       name: newCategory.name,
       description: newCategory.description || "",
+      notes: newCategory.notes || "",
+      processFlow: newCategory.processFlow || "",
       color: newCategory.color,
       status: newCategory.status,
       createdAt: newCategory.createdAt.toISOString(),

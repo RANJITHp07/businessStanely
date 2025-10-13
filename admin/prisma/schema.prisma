@@ -249,6 +249,8 @@ model TaskCategory {
   id          String   @id @default(auto()) @map("_id") @db.ObjectId
   name        String
   description String?
+  notes       String?
+  processFlow String?
   color       String   @default("blue")
   status      String   @default("pending") // "pending" or "approved"
   createdAt   DateTime @default(now())

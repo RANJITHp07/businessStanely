@@ -433,12 +433,11 @@ export default function TaskDetails() {
   const handleStatusChange = async (newStatus: string) => {
     if (!task) return;
     const prevTask = { ...task };
-    // If status is Completed, set progress to 100%, else set to 0%
+    // Only update status and progress, do not auto-toggle completed
     const isCompleted = newStatus === "Completed";
     setTask({
       ...task,
       status: newStatus,
-      completed: isCompleted,
       progress: isCompleted ? 100 : 0,
     });
     try {
@@ -449,17 +448,14 @@ export default function TaskDetails() {
         },
         body: JSON.stringify({
           status: newStatus,
-          completed: isCompleted,
           progress: isCompleted ? 100 : 0,
         }),
       });
       if (response.ok) {
         const data = await response.json();
-        // Preserve existing related data and only update the fields that were changed
         setTask(prevTaskState => ({
           ...prevTaskState!,
           ...data.task,
-          // Preserve these fields that might not be in the API response
           comments: prevTaskState!.comments,
           assignedTo: prevTaskState!.assignedTo,
           client: prevTaskState!.client,
@@ -486,7 +482,7 @@ export default function TaskDetails() {
     if (task) {
       setProgressInput(task.progress && task.progress > 0 ? String(task.progress) : "");
     }
-  }, [task?.progress]);
+  }, [task]);
 
   // Clamp value between 0 and 100
   const clampProgress = (val: number) => Math.max(0, Math.min(100, val));

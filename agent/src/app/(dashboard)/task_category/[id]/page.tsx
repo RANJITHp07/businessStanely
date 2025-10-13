@@ -404,11 +404,11 @@ export default function CategoryDetail({ params }: { params: Promise<{ id: strin
                     ) : (
                         <>
                             <CardContent>
-                                <div className="rounded-md border">
-                                    <Table>
+                                <div className="rounded-md border overflow-x-auto">
+                                    <Table className="min-w-[700px]">
                                         <TableHeader>
                                             <TableRow>
-                                                <TableHead>Task</TableHead>
+                                                <TableHead className="w-[220px] max-w-[220px] truncate">Task</TableHead>
                                                 <TableHead>Ownership to</TableHead>
                                                 <TableHead>Priority</TableHead>
                                                 <TableHead>Due Date</TableHead>
@@ -426,11 +426,11 @@ export default function CategoryDetail({ params }: { params: Promise<{ id: strin
                                             ) : (
                                                 currentTasks.map((task) => (
                                                     <TableRow key={task.id}>
-                                                        <TableCell>
+                                                        <TableCell className="max-w-[200px] truncate align-middle">
                                                             <div className="space-y-1">
-                                                                <div className="font-medium">{task.title}</div>
+                                                                <div className="font-medium truncate" title={task.title}>{task.title}</div>
                                                                 <div
-                                                                    className="text-sm text-muted-foreground max-w-xs truncate"
+                                                                    className="text-sm text-muted-foreground truncate"
                                                                     title={task.description}
                                                                 >
                                                                     {task.description}

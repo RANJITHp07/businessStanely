@@ -14,6 +14,8 @@ interface Category {
     createdAt: string
     updatedAt: string
     timePeriod?: number
+    notes?: string
+    processFlow?: string
 }
 
 export default function EditCategory({ params }: { params: Promise<{ id: string }> | { id: string } }) {
@@ -31,6 +33,7 @@ export default function EditCategory({ params }: { params: Promise<{ id: string 
                     throw new Error('Category not found')
                 }
                 const data = await response.json()
+                console.log('Fetched category data:', data)
                 setCategory(data)
             } catch (error) {
                 console.error('Error fetching category:', error)
@@ -57,6 +60,8 @@ export default function EditCategory({ params }: { params: Promise<{ id: string 
         name: category.name,
         description: category.description || "",
         timePeriod: category.timePeriod,
+        notes: category.notes || "",
+        processFlow: category.processFlow || "",
     }
 
     return (

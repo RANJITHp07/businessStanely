@@ -95,9 +95,9 @@ export default function TaskDetails() {
           const response = await fetch(`/api/tasks/${id}`);
           if (response.ok) {
             const data = await response.json();
-            setTaskData(data);
-            if (data.comments) {
-              setComments(data.comments);
+            setTaskData(data.task);
+            if (data.task && data.task.comments) {
+              setComments(data.task.comments);
               setCommentsLoading(false);
             }
           } else {
@@ -149,7 +149,9 @@ export default function TaskDetails() {
     return (
       <Badge className={`${colors[priority as keyof typeof colors]} border`}>
         <AlertTriangle className="w-3 h-3 mr-1" />
-        {priority.charAt(0).toUpperCase() + priority.slice(1)}
+        {typeof priority === "string" && priority.length > 0
+          ? priority.charAt(0).toUpperCase() + priority.slice(1)
+          : "Unknown"}
       </Badge>
     );
   };
@@ -499,39 +501,73 @@ export default function TaskDetails() {
                 </div>
               </div>
 
-              {/* Follow-up and Status Checkboxes */}
+              {/* Quick Stats Row (like agent app) */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                <div className="flex items-center gap-2 text-sm">
+                  <Calendar className="h-4 w-4 text-gray-500" />
+                  <span className="text-gray-600">
+                    Due in {(() => {
+                      if (!taskData.dueDate) return 0;
+                      const dueDate = new Date(taskData.dueDate);
+                      const today = new Date();
+                      const diffTime = dueDate.getTime() - today.getTime();
+                      return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                    })()} days
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <Clock className="h-4 w-4 text-gray-500" />
+                  <span className="text-gray-600">
+                    {totalHours}h logged
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="inline-flex"><Avatar className="h-4 w-4"><AvatarFallback className="text-xs">{taskData.assignedTo?.name?.split(" ").map((n) => n[0]).join("") || "U"}</AvatarFallback></Avatar></span>
+                  <span className="text-gray-600">
+                    Ownership to {taskData.assignedTo?.name || "Unassigned"}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <CheckCircle className="h-4 w-4 text-gray-500" />
+                  <span className="text-gray-600">
+                    {calculateCompletionRate()}% complete
+                  </span>
+                </div>
+              </div>
+
+              {/* Follow-up and Status Check Dropdowns (read-only) */}
               <div className="flex flex-col md:flex-row md:items-center gap-4 md:gap-6 p-0 md:p-4 bg-muted/30 rounded-lg">
                 <div className="flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    id="follow-up"
-                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed"
-                    checked={taskData.followUpRequired || false}
-                    disabled={true}
-                    readOnly
-                  />
-                  <label
-                    htmlFor="follow-up"
-                    className="text-sm font-medium cursor-pointer"
-                  >
+                  <Label htmlFor="follow-up-duration" className="text-sm font-medium cursor-pointer">
                     Follow-up Required
-                  </label>
+                  </Label>
+                  <select
+                    id="follow-up-duration"
+                    className="w-28 px-2 py-1 border rounded bg-gray-100 text-gray-700 cursor-not-allowed"
+                    value={taskData.followUpDuration || "None"}
+                    disabled
+                  >
+                    <option value="None">None</option>
+                    <option value="24hr">24 Hours</option>
+                    <option value="48hr">48 Hours</option>
+                    <option value="1w">1 Week</option>
+                  </select>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    id="check-status"
-                    className="h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded disabled:opacity-50 disabled:cursor-not-allowed"
-                    checked={taskData.completed || false}
-                    disabled={true}
-                    readOnly
-                  />
-                  <label
-                    htmlFor="check-status"
-                    className="text-sm font-medium cursor-pointer"
-                  >
+                  <Label htmlFor="status-check-duration" className="text-sm font-medium cursor-pointer">
                     Status Check
-                  </label>
+                  </Label>
+                  <select
+                    id="status-check-duration"
+                    className="w-28 px-2 py-1 border rounded bg-gray-100 text-gray-700 cursor-not-allowed"
+                    value={taskData.statusCheckDuration || "None"}
+                    disabled
+                  >
+                    <option value="None">None</option>
+                    <option value="24hr">24 Hours</option>
+                    <option value="48hr">48 Hours</option>
+                    <option value="1w">1 Week</option>
+                  </select>
                 </div>
                 <div className="text-xs text-muted-foreground md:ml-auto">
                   Last updated: {formatDateTime(taskData.updatedAt)}

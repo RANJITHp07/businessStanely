@@ -37,7 +37,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-import { Checkbox } from "@/components/ui/checkbox";
+
 import {
   FileText,
   Calendar,
@@ -70,6 +70,8 @@ interface Task {
   dueDate: string;
   updatedAt: string;
   followUpRequired: boolean;
+  followUpDuration?: string; // e.g., '24hr', '48hr', '1w', 'None'
+  statusCheckDuration?: string; // e.g., '24hr', '48hr', '1w', 'None'
   completed: boolean;
   recurring?: number;
   assignedTo?: {
@@ -280,7 +282,7 @@ export default function TaskDetails() {
 
     fetchTaskDetails();
     fetchTimeLogs();
-  }, [taskId]);
+  }, [taskId, router]);
 
   const fetchTimeLogs = async () => {
     try {
@@ -560,29 +562,30 @@ export default function TaskDetails() {
     }
   };
 
-  const handleFollowUpChange = async (checked: boolean) => {
+
+  // Dropdown options for durations
+  const durationOptions = [
+    { value: "None", label: "None" },
+    { value: "24hr", label: "24 Hours" },
+    { value: "48hr", label: "48 Hours" },
+    { value: "1w", label: "1 Week" },
+  ];
+
+  const handleFollowUpDurationChange = async (value: string) => {
     if (!task) return;
-    // Optimistic update
     taskRef.current = task;
-    setTask({ ...task, followUpRequired: checked });
+    setTask({ ...task, followUpDuration: value });
     try {
       const response = await fetch(`/api/tasks/${task.id}`, {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          followUpRequired: checked,
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ followUpDuration: value }),
       });
       if (response.ok) {
         const data = await response.json();
-        // Preserve existing related data (comments, assignedTo, client, etc.) 
-        // and only update the fields that were actually changed
         setTask(prevTask => ({
           ...prevTask!,
           ...data.task,
-          // Preserve these fields that might not be in the API response
           comments: prevTask!.comments,
           assignedTo: prevTask!.assignedTo,
           client: prevTask!.client,
@@ -591,41 +594,30 @@ export default function TaskDetails() {
           legislation: prevTask!.legislation,
         }));
       } else {
-        // Revert on error
         setTask(taskRef.current);
-        console.error("Failed to update follow-up status");
+        console.error("Failed to update follow-up duration");
       }
     } catch (error) {
       setTask(taskRef.current);
-      console.error("Error updating follow-up status:", error);
+      console.error("Error updating follow-up duration:", error);
     }
   };
 
-  const handleCompletedChange = async (checked: boolean) => {
+  const handleStatusCheckDurationChange = async (value: string) => {
     if (!task) return;
-    // Optimistic update - only change the completed field, not status or progress
     taskRef.current = task;
-    setTask({
-      ...task,
-      completed: checked,
-    });
+    setTask({ ...task, statusCheckDuration: value });
     try {
       const response = await fetch(`/api/tasks/${task.id}`, {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          completed: checked,
-        }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ statusCheckDuration: value }),
       });
       if (response.ok) {
         const data = await response.json();
-        // Preserve existing related data and only update the fields that were changed
         setTask(prevTask => ({
           ...prevTask!,
           ...data.task,
-          // Preserve these fields that might not be in the API response
           comments: prevTask!.comments,
           assignedTo: prevTask!.assignedTo,
           client: prevTask!.client,
@@ -635,13 +627,15 @@ export default function TaskDetails() {
         }));
       } else {
         setTask(taskRef.current);
-        console.error("Failed to update task completion status");
+        console.error("Failed to update status check duration");
       }
     } catch (error) {
       setTask(taskRef.current);
-      console.error("Error updating task completion status:", error);
+      console.error("Error updating status check duration:", error);
     }
   };
+
+
 
   // Helper to format date in IST as 'do MMMM yyyy' (e.g., '9th July 2025') for display
   const formatDateISTDisplay = (dateString: string) => {
@@ -807,33 +801,43 @@ export default function TaskDetails() {
                 </div>
               </div>
 
-              {/* Follow-up and Status Checkboxes */}
+              {/* Follow-up and Status Check Dropdowns */}
               <div className="flex flex-col md:flex-row md:items-center gap-4 md:gap-6 p-0 md:p-4 bg-muted/30 rounded-lg">
                 <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="follow-up"
-                    checked={task.followUpRequired}
-                    onCheckedChange={handleFollowUpChange}
-                  />
-                  <Label
-                    htmlFor="follow-up"
-                    className="text-sm font-medium cursor-pointer"
-                  >
+                  <Label htmlFor="follow-up-duration" className="text-sm font-medium cursor-pointer">
                     Follow-up Required
                   </Label>
+                  <Select
+                    value={task.followUpDuration || "None"}
+                    onValueChange={handleFollowUpDurationChange}
+                  >
+                    <SelectTrigger id="follow-up-duration" className="w-28">
+                      <SelectValue placeholder="None" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {durationOptions.map(opt => (
+                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="check-status"
-                    checked={task.completed}
-                    onCheckedChange={handleCompletedChange}
-                  />
-                  <Label
-                    htmlFor="check-status"
-                    className="text-sm font-medium cursor-pointer"
-                  >
+                  <Label htmlFor="status-check-duration" className="text-sm font-medium cursor-pointer">
                     Status Check
                   </Label>
+                  <Select
+                    value={task.statusCheckDuration || "None"}
+                    onValueChange={handleStatusCheckDurationChange}
+                  >
+                    <SelectTrigger id="status-check-duration" className="w-28">
+                      <SelectValue placeholder="None" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {durationOptions.map(opt => (
+                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="text-xs text-muted-foreground md:ml-auto">
                   Last updated: {formatDateTime(task.updatedAt)}

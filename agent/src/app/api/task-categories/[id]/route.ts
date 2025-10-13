@@ -4,9 +4,11 @@ import prisma from "@/lib/prisma";
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: { id: string } }
 ) {
   try {
+    const { params } = context;
+    const id = params?.id;
     // Get the current agent user
     const currentAgent = await getCurrentAgent(req);
     if (!currentAgent) {
@@ -15,8 +17,6 @@ export async function GET(
         { status: 401 }
       );
     }
-
-    const { id } = params;
 
     if (!id) {
       return NextResponse.json(
@@ -150,7 +150,7 @@ export async function PUT(
 
     const { id } = params;
     const body = await req.json();
-    const { name, description, color } = body;
+  const { name, description, color, notes, processFlow } = body;
 
     // Validate required fields
     if (!name) {
@@ -183,6 +183,8 @@ export async function PUT(
       data: {
         name,
         description: description || "",
+        notes: notes || "",
+        processFlow: processFlow || "",
         color: color || "blue",
       },
       include: {

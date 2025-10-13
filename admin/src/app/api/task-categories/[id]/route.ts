@@ -108,6 +108,8 @@ export async function GET(
       id: category.id,
       name: category.name,
       description: category.description || "",
+      notes: category.notes || "",
+      processFlow: category.processFlow || "",
       color: category.color,
       status: category.status,
       createdAt: category.createdAt,
@@ -163,7 +165,7 @@ export async function PUT(
 
   const { id } = params;
   const body = await req.json();
-  const { name, description, color, timePeriod } = body;
+  const { name, description, color, timePeriod, notes, processFlow } = body;
 
     // Validate required fields
     if (!name) {
@@ -191,6 +193,8 @@ export async function PUT(
       data: {
         name,
         description: description || "",
+        notes: notes || "",
+        processFlow: processFlow || "",
         color: color || "blue",
         timePeriod: typeof timePeriod === 'number' ? timePeriod : (timePeriod ? parseInt(timePeriod, 10) : null),
       },

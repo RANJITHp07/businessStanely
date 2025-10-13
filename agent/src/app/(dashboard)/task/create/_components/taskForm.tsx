@@ -119,6 +119,8 @@ export default function TaskForm({ id }: TaskFormProps) {
     name: "",
     description: "",
     timePeriod: "", // Added timePeriod property
+    notes: "",
+    processFlow: "",
   });
   const [categorySearchQuery, setCategorySearchQuery] = useState("");
   const [showCategorySuggestions, setShowCategorySuggestions] = useState(false);
@@ -143,6 +145,8 @@ export default function TaskForm({ id }: TaskFormProps) {
       name: "",
       description: "",
       timePeriod: "", // Reset timePeriod property
+      notes: "",
+      processFlow: "",
     });
   };
 
@@ -767,6 +771,32 @@ export default function TaskForm({ id }: TaskFormProps) {
                               }
                             />
                           </div>
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="category-notes">Notes</Label>
+                          <Textarea
+                            id="category-notes"
+                            placeholder="Enter notes (optional)"
+                            className="w-full"
+                            value={newCategoryData.notes}
+                            onChange={(e) =>
+                              handleNewCategoryInputChange("notes", e.target.value)
+                            }
+                            rows={2}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="category-processFlow">Process Flow</Label>
+                          <Textarea
+                            id="category-processFlow"
+                            placeholder="Enter process flow (optional)"
+                            className="w-full"
+                            value={newCategoryData.processFlow}
+                            onChange={(e) =>
+                              handleNewCategoryInputChange("processFlow", e.target.value)
+                            }
+                            rows={2}
+                          />
                         </div>
 
                         {/* Modal Actions */}

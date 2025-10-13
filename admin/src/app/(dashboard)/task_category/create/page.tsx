@@ -19,6 +19,8 @@ interface CreateProps {
         name: string;
         description: string;
         timePeriod?: number;
+        notes?: string;
+        processFlow?: string;
     };
 }
 
@@ -27,6 +29,8 @@ function Create({ admin, initialData }: CreateProps) {
         name: initialData?.name || "",
         description: initialData?.description || "",
         timePeriod: initialData?.timePeriod !== undefined && initialData?.timePeriod !== null ? String(initialData.timePeriod) : "",
+        notes: initialData?.notes || "",
+        processFlow: initialData?.processFlow || "",
     })
     const [isSubmitting, setIsSubmitting] = useState(false)
     const router = useRouter()
@@ -124,6 +128,26 @@ function Create({ admin, initialData }: CreateProps) {
                                     value={formData.timePeriod}
                                     onChange={(e) => setFormData((prev) => ({ ...prev, timePeriod: e.target.value }))}
                                     placeholder="Enter time period in days"
+                                />
+                            </div>
+                            <div className="space-y-2 mt-3">
+                                <Label htmlFor="notes">Notes</Label>
+                                <Textarea
+                                    id="notes"
+                                    value={formData.notes}
+                                    onChange={(e) => setFormData((prev) => ({ ...prev, notes: e.target.value }))}
+                                    placeholder="Enter notes (optional)"
+                                    rows={2}
+                                />
+                            </div>
+                            <div className="space-y-2 mt-3">
+                                <Label htmlFor="processFlow">Process Flow</Label>
+                                <Textarea
+                                    id="processFlow"
+                                    value={formData.processFlow}
+                                    onChange={(e) => setFormData((prev) => ({ ...prev, processFlow: e.target.value }))}
+                                    placeholder="Enter process flow (optional)"
+                                    rows={2}
                                 />
                             </div>
                         </div>

@@ -484,7 +484,11 @@ export default function TaskDetails() {
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <div className="flex flex-col  md:flex-row  items-start md:items-center gap-3 mb-2">
-                    <h2 className="text-[18px] md:text-2xl font-bold">
+                    <h2
+                      className="text-[18px] md:text-2xl font-bold truncate"
+                      style={{ maxWidth: '350px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                      title={taskData.title}
+                    >
                       {taskData.title}
                     </h2>
                     {getStatusBadge(taskData.status)}
@@ -553,7 +557,7 @@ export default function TaskDetails() {
             <MessageSquare className="h-4 w-4 hidden md:block" />
             <p className="text-[12px] md:text-[14px]">
               {" "}
-              Comments ({comments.length}){" "}
+              Interactions ({comments.length}){" "}
             </p>
           </TabsTrigger>
           <TabsTrigger value="timelog" className="flex items-center gap-2">
@@ -579,7 +583,13 @@ export default function TaskDetails() {
                       <Label className="text-sm font-medium text-muted-foreground">
                         Task Name
                       </Label>
-                      <p className="font-medium">{taskData.title}</p>
+                      <p
+                        className="font-medium truncate"
+                        style={{ maxWidth: '250px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                        title={taskData.title}
+                      >
+                        {taskData.title}
+                      </p>
                     </div>
                     <div>
                       <Label className="text-sm font-medium text-muted-foreground">

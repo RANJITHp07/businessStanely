@@ -457,8 +457,8 @@ export default function ApproveCategory({ params }: { params: Promise<{ id: stri
                     ) : (
                         <>
                             <CardContent>
-                                <div className="rounded-md border">
-                                    <Table>
+                                <div className="rounded-md border overflow-x-auto">
+                                    <Table className="min-w-[700px]">
                                         <TableHeader>
                                             <TableRow>
                                                 <TableHead>Task</TableHead>
@@ -479,11 +479,12 @@ export default function ApproveCategory({ params }: { params: Promise<{ id: stri
                                             ) : (
                                                 currentTasks.map((task) => (
                                                     <TableRow key={task.id}>
-                                                        <TableCell>
+                                                        <TableCell className="max-w-[220px] align-middle">
                                                             <div className="space-y-1">
-                                                                <div className="font-medium">{task.title}</div>
+                                                                <div className="font-medium truncate" style={{maxWidth: '200px'}} title={task.title}>{task.title}</div>
                                                                 <div
-                                                                    className="text-sm text-muted-foreground max-w-xs truncate"
+                                                                    className="text-sm text-muted-foreground truncate"
+                                                                    style={{maxWidth: '200px'}}
                                                                     title={task.description}
                                                                 >
                                                                     {task.description}

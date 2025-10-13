@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { use } from "react"
 import { toast } from "react-toastify"
 import Link from "next/link"
@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -106,7 +107,7 @@ interface UserInfo {
 
 
 export default function CategoryDetail({ params }: { params: Promise<{ id: string }> | { id: string } }) {
-    // Helper to render the creator label (name + (Owner/Admin/Agent))
+
     const renderCreatedBy = () => {
         if (!category?.createdBy) return "Unknown";
         return (
@@ -133,9 +134,25 @@ export default function CategoryDetail({ params }: { params: Promise<{ id: strin
     const [currentPage, setCurrentPage] = useState(1)
     const [itemsPerPage, setItemsPerPage] = useState(20)
     const [loading, setLoading] = useState(true)
+    const [taskToDelete, setTaskToDelete] = useState<Task | null>(null)
     // We only need the loading state for this view page
     // Other states were needed for approve page but not here
 
+       const handleDelete = useCallback(async () => {
+        if (!taskToDelete) return;
+        try {
+            const response = await fetch(`/api/tasks/${taskToDelete.id}`, { method: 'DELETE' });
+            if (response.ok) {
+                setTasks((prev) => prev.filter((t) => t.id !== taskToDelete.id));
+                setTaskToDelete(null);
+                toast.success('Task deleted successfully');
+            } else {
+                toast.error('Failed to delete task');
+            }
+        } catch {
+            toast.error('Failed to delete task');
+        }
+    }, [taskToDelete, setTasks]);
     useEffect(() => {
         const fetchData = async () => {
             try {
@@ -402,8 +419,8 @@ export default function CategoryDetail({ params }: { params: Promise<{ id: strin
                     ) : (
                         <>
                             <CardContent>
-                                <div className="rounded-md border">
-                                    <Table>
+                                <div className="rounded-md border overflow-x-auto">
+                                    <Table className="min-w-[700px]">
                                         <TableHeader>
                                             <TableRow>
                                                 <TableHead>Task</TableHead>
@@ -424,11 +441,12 @@ export default function CategoryDetail({ params }: { params: Promise<{ id: strin
                                             ) : (
                                                 currentTasks.map((task) => (
                                                     <TableRow key={task.id}>
-                                                        <TableCell>
+                                                        <TableCell className="max-w-[220px] align-middle">
                                                             <div className="space-y-1">
-                                                                <div className="font-medium">{task.title}</div>
+                                                                <div className="font-medium truncate" style={{maxWidth: '200px'}} title={task.title}>{task.title}</div>
                                                                 <div
-                                                                    className="text-sm text-muted-foreground max-w-xs truncate"
+                                                                    className="text-sm text-muted-foreground truncate"
+                                                                    style={{maxWidth: '200px'}}
                                                                     title={task.description}
                                                                 >
                                                                     {task.description}
@@ -505,7 +523,7 @@ export default function CategoryDetail({ params }: { params: Promise<{ id: strin
                                                                         </Link>
                                                                     </DropdownMenuItem>
                                                                     <DropdownMenuSeparator />
-                                                                    <DropdownMenuItem className="text-destructive">
+                                                                    <DropdownMenuItem className="text-destructive" onClick={() => setTaskToDelete(task)}>
                                                                         <Trash2 className="mr-2 h-4 w-4" />
                                                                         Delete Task
                                                                     </DropdownMenuItem>
@@ -592,7 +610,20 @@ export default function CategoryDetail({ params }: { params: Promise<{ id: strin
                     )}
                 </Card>
 
-                {/* No AlertDialog needed for the detail view */}
+                <AlertDialog open={!!taskToDelete} onOpenChange={() => setTaskToDelete(null)}>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                                This action cannot be undone. This will permanently delete the task and remove its data from our servers.
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={handleDelete}>Delete</AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
             </div>
         </div>
     )

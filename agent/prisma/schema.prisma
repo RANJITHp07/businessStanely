@@ -132,15 +132,17 @@ model Task {
   dueDate          DateTime?
   progress         Int?      @default(0) // Progress percentage (0-100)
   followUpRequired Boolean   @default(false)
+  followUpDuration     String? // e.g., "24hr", "48hr", "1w", "None"
+  statusCheckDuration  String? // e.g., "24hr", "48hr", "1w", "None"
   completed        Boolean   @default(false)
   recurring        Int?      // Recurring in months (1-12), null means not recurring
-  
+
   // New recurring tracking fields
   lastCompletedDate    DateTime? // When the current period was completed
   nextDueDate          DateTime? // When the next occurrence is due
   completionHistory    Json?     // Array of completion dates for tracking
   currentPeriodStart   DateTime? // Start of current recurring period
-  
+
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 

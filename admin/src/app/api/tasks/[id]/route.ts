@@ -58,7 +58,7 @@ export async function GET(
     if (!task) {
       return NextResponse.json({ error: "Task not found" }, { status: 404 });
     }
-    return NextResponse.json(task);
+    return NextResponse.json({ task });
   } catch (error) {
     console.error(`Error fetching task ${params.id}:`, error);
     return NextResponse.json(
@@ -87,7 +87,8 @@ export async function PUT(
     
     // Only pick allowed fields from body
     const allowedFields = [
-      "title", "description", "status", "priority", "dueDate", "progress", "followUpRequired", "completed", "recurring"
+      "title", "description", "status", "priority", "dueDate", "progress", "followUpRequired", "completed", "recurring",
+      "followUpDuration", "statusCheckDuration"
     ];
     const data: Record<string, unknown> = {};
     for (const key of allowedFields) {

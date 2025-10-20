@@ -30,6 +30,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuCheckboxItem,
 } from "@/components/ui/dropdown-menu"
 import {
   FileText,
@@ -46,6 +47,7 @@ import {
   ChevronsRight,
   AlertCircle,
   Calendar,
+  X,
 } from "lucide-react"
 import Link from "next/link"
 
@@ -60,7 +62,8 @@ export default function TasksTable() {
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedPriority, setSelectedPriority] = useState("All Priorities")
-  const [selectedStatus, setSelectedStatus] = useState("All Status")
+  // Multi-select statuses: empty = all statuses
+  const [selectedStatuses, setSelectedStatuses] = useState<string[]>([])
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(20)
   const [taskToDelete, setTaskToDelete] = useState<Task | null>(null)
@@ -123,8 +126,8 @@ export default function TasksTable() {
       (task.assignedTo && task.assignedTo.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (task.description && task.description.toLowerCase().includes(searchTerm.toLowerCase()));
 
-    const matchesPriority = selectedPriority === "All Priorities" || task.priority.toLowerCase() === selectedPriority.toLowerCase();
-    const matchesStatus = selectedStatus === "All Status" || task.status === selectedStatus;
+  const matchesPriority = selectedPriority === "All Priorities" || task.priority.toLowerCase() === selectedPriority.toLowerCase();
+  const matchesStatus = selectedStatuses.length === 0 || selectedStatuses.includes(task.status);
 
     return matchesSearch && matchesPriority && matchesStatus;
   });
@@ -179,8 +182,8 @@ export default function TasksTable() {
 
   const resetFilter = () => {
     setSearchTerm("");
-    setSelectedPriority("All Priorities")
-    setSelectedStatus("All Status")
+  setSelectedPriority("All Priorities")
+    setSelectedStatuses([])
   }
 
   const isOverdue = (dueDate: string | undefined, status: string) => {
@@ -191,6 +194,14 @@ export default function TasksTable() {
   // if (loading) {
   //     return <p>Loading...</p>;
   // }
+
+  // Multi-select status helpers
+  const statusOptions = statuses.filter((s) => s !== "All Status")
+  const toggleStatus = (status: string) => {
+    setSelectedStatuses((prev) =>
+      prev.includes(status) ? prev.filter((s) => s !== status) : [...prev, status]
+    )
+  }
 
   return (
     <div className="container mx-auto p-6 max-w-7xl">
@@ -276,18 +287,54 @@ export default function TasksTable() {
 
                   <div className="space-y-2">
                     <Label>Status</Label>
-                    <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-                      <SelectTrigger className="w-full">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {statuses.map((status) => (
-                          <SelectItem key={status} value={status}>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" className="w-full justify-between">
+                          {selectedStatuses.length ? `${selectedStatuses.length} selected` : "All Status"}
+                          <Filter className="ml-2 h-4 w-4 opacity-60" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent className="w-56">
+                        <DropdownMenuLabel>Filter by status</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuCheckboxItem
+                          checked={selectedStatuses.length === 0}
+                          onCheckedChange={(checked) => {
+                            if (checked) setSelectedStatuses([])
+                          }}
+                        >
+                          All Status
+                        </DropdownMenuCheckboxItem>
+                        <DropdownMenuSeparator />
+                        {statusOptions.map((status) => (
+                          <DropdownMenuCheckboxItem
+                            key={status}
+                            checked={selectedStatuses.includes(status)}
+                            onCheckedChange={() => toggleStatus(status)}
+                          >
                             {status}
-                          </SelectItem>
+                          </DropdownMenuCheckboxItem>
                         ))}
-                      </SelectContent>
-                    </Select>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+
+                    {selectedStatuses.length > 0 && (
+                      <div className="flex flex-wrap gap-2 pt-2 justify-end">
+                        {selectedStatuses.map((status) => (
+                          <Badge key={status} variant="secondary" className="px-2 py-1">
+                            <span>{status}</span>
+                            <button
+                              type="button"
+                              aria-label={`Remove ${status}`}
+                              className="ml-1 inline-flex h-4 w-4 items-center justify-center rounded hover:bg-muted/70"
+                              onClick={() => toggleStatus(status)}
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -358,7 +405,23 @@ export default function TasksTable() {
           <>
             <CardContent>
               <div className="rounded-md border">
-                <Table>
+                <Table className="table-fixed min-w-[1160px]">
+                  <colgroup>
+                    {/* Task */}
+                    <col className="w-[280px]" />
+                    {/* Client */}
+                    <col className="w-[200px]" />
+                    {/* Ownership to */}
+                    <col className="w-[200px]" />
+                    {/* Priority */}
+                    <col className="w-[120px]" />
+                    {/* Due Date */}
+                    <col className="w-[140px]" />
+                    {/* Progress */}
+                    <col className="w-[140px]" />
+                    {/* Actions */}
+                    <col className="w-[80px]" />
+                  </colgroup>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Task</TableHead>
@@ -381,6 +444,14 @@ export default function TasksTable() {
                       </TableRow>
                     ) : (
                       currentTasks.map((task) => {
+                        const clientName = task.client
+                          ? (task.client.clientType === "individual"
+                              ? `${task.client.firstName} ${task.client.lastName}`
+                              : (task.client.organizationName ?? "N/A"))
+                          : "N/A";
+                        const clientEmail = task.client?.email ?? "";
+                        const ownerName = task.assignedTo?.name ?? "";
+                        const ownerType = task.assignedTo?.agentType ?? "";
                         return (
                           <TableRow
                             key={task.id}
@@ -388,9 +459,9 @@ export default function TasksTable() {
                             className={`cursor-pointer hover:bg-muted/50  ${isOverdue(task.dueDate, task.status) ? "bg-red-50" : ""
                               }`}
                           >
-                            <TableCell className="max-w-36 truncate overflow-hidden whitespace-nowrap">
+                            <TableCell className="overflow-hidden">
                               <div className="space-y-1">
-                                <div className="font-medium">{task.title}</div>
+                                <div className="font-medium truncate" title={task.title}>{task.title}</div>
                                 {/* Show approved category only */}
                                 {task.category && task.category.status === 'approved' && (
                                   <div className="text-xs mt-1">
@@ -401,19 +472,15 @@ export default function TasksTable() {
                                 )}
                               </div>
                             </TableCell>
-                            <TableCell>
+                            <TableCell className="overflow-hidden">
                               <div className="space-y-1">
-                                <div className="font-medium">
-                                  {task.client
-                                    ? task.client.clientType === "individual"
-                                      ? `${task.client.firstName} ${task.client.lastName}`
-                                      : task.client.organizationName
-                                    : "N/A"}
+                                <div className="font-medium truncate" title={clientName === "N/A" ? undefined : clientName}>
+                                  {clientName}
                                 </div>
-                                <div className="text-sm text-muted-foreground">{task.client?.email}</div>
+                                <div className="text-sm text-muted-foreground truncate" title={clientEmail}>{clientEmail}</div>
                               </div>
                             </TableCell>
-                            <TableCell>
+                            <TableCell className="overflow-hidden">
                               <div className="flex items-center space-x-2">
                                 <Avatar className="h-8 w-8">
                                   <AvatarFallback className="text-xs">
@@ -425,8 +492,8 @@ export default function TasksTable() {
                                   </AvatarFallback>
                                 </Avatar>
                                 <div>
-                                  <div className="font-medium text-sm">{task.assignedTo?.name}</div>
-                                  <div className="text-xs text-muted-foreground">{task.assignedTo?.agentType}</div>
+                                  <div className="font-medium text-sm truncate" title={ownerName || undefined}>{ownerName}</div>
+                                  <div className="text-xs text-muted-foreground truncate" title={ownerType || undefined}>{ownerType}</div>
                                 </div>
                               </div>
                             </TableCell>
@@ -452,7 +519,7 @@ export default function TasksTable() {
                               </div>
                             </TableCell>
                             <TableCell
-                              className="text-right"
+                              className="text-right overflow-visible"
                               onClick={(e) => e.stopPropagation()}
                             >
                               <DropdownMenu>

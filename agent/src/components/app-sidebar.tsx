@@ -49,6 +49,11 @@ const items = [
     url: "/team",
     icon: UserRoundPen,
   },
+   {
+    title: "My Tasks",
+    url: "/my-tasks",
+    icon: ClipboardCheck,
+  },
   {
     title: "Task",
     url: "/task",

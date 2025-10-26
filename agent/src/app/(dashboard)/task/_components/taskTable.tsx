@@ -67,6 +67,7 @@ import Link from "next/link";
 
 import { Task } from "@/types";
 import { useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 
 const priorities = ["All Priorities", "Low", "Medium", "High"];
 const statuses = ["All Status", "To Do", "In Progress", "Hold", "Completed"];
@@ -82,6 +83,38 @@ export default function TasksTable() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
   const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
+
+  // Map a status query param into the select label used by this component
+  const mapQueryToStatusLabel = (q: string | null) => {
+    if (!q) return "All Status";
+    const k = q.toLowerCase().replace(/[-_\s]/g, "");
+    if (k.includes("todo") || k === "to") return "To Do";
+    if (k.includes("progress") || k.includes("inprogress"))
+      return "In Progress";
+    if (k.includes("completed")) return "Completed";
+    if (k.includes("hold")) return "Hold";
+    // Fallback: title-case the provided value
+    return q
+      .split(/[-_\s]/)
+      .map((s) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase())
+      .join(" ");
+  };
+
+  // Read ?status=... from the URL and apply it to the status select on mount
+  const searchParams = useSearchParams();
+  useEffect(() => {
+    try {
+      const q = searchParams?.get("status");
+      if (q) {
+        const mapped = mapQueryToStatusLabel(q);
+        setSelectedStatus(mapped);
+        setCurrentPage(1);
+      }
+    } catch (e) {
+      // ignore
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   const handleDelete = async () => {
     if (!taskToDelete) return;

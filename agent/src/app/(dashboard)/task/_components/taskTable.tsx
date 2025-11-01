@@ -52,6 +52,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { DropdownMenuCheckboxItem } from "@/components/ui/dropdown-menu";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -68,6 +69,7 @@ import Link from "next/link";
 import { Task } from "@/types";
 import { useEffect } from "react";
 import { useSearchParams } from "next/navigation";
+import { X } from "lucide-react";
 
 const priorities = ["All Priorities", "Low", "Medium", "High"];
 const statuses = ["All Status", "To Do", "In Progress", "Hold", "Completed"];
@@ -77,8 +79,10 @@ export default function TasksTable() {
   const [tasks, setTasks] = useState<Task[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedPriority, setSelectedPriority] = useState("All Priorities");
-  const [selectedStatus, setSelectedStatus] = useState("All Status");
+  // Multi-select priorities (empty = all priorities)
+  const [selectedPriorities, setSelectedPriorities] = useState<string[]>([]);
+  // Multi-select statuses (empty = all statuses)
+  const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
   const [sortBy, setSortBy] = useState("a-z");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
@@ -100,14 +104,14 @@ export default function TasksTable() {
       .join(" ");
   };
 
-  // Read ?status=... from the URL and apply it to the status select on mount
+  // Read ?status=... from the URL and apply it to the status filter on mount
   const searchParams = useSearchParams();
   useEffect(() => {
     try {
       const q = searchParams?.get("status");
       if (q) {
         const mapped = mapQueryToStatusLabel(q);
-        setSelectedStatus(mapped);
+        setSelectedStatuses([mapped]);
         setCurrentPage(1);
       }
     } catch (e) {
@@ -186,10 +190,10 @@ export default function TasksTable() {
         task.description.toLowerCase().includes(searchTerm.toLowerCase()));
 
     const matchesPriority =
-      selectedPriority === "All Priorities" ||
-      task.priority.toLowerCase() === selectedPriority.toLowerCase();
+      selectedPriorities.length === 0 ||
+      selectedPriorities.map((p) => p.toLowerCase()).includes((task.priority || "").toLowerCase());
     const matchesStatus =
-      selectedStatus === "All Status" || task.status === selectedStatus;
+      selectedStatuses.length === 0 || selectedStatuses.includes(task.status);
 
     return matchesSearch && matchesPriority && matchesStatus;
   });
@@ -244,8 +248,16 @@ export default function TasksTable() {
 
   const resetFilter = () => {
     setSearchTerm("");
-    setSelectedPriority("All Priorities");
-    setSelectedStatus("All Status");
+    setSelectedPriorities([]);
+    setSelectedStatuses([]);
+  };
+
+  // Multi-select status helpers
+  const statusOptions = statuses.filter((s) => s !== "All Status");
+  const toggleStatus = (status: string) => {
+    setSelectedStatuses((prev) =>
+      prev.includes(status) ? prev.filter((s) => s !== status) : [...prev, status]
+    );
   };
 
   const isOverdue = (dueDate: string | undefined, status: string) => {
@@ -329,40 +341,114 @@ export default function TasksTable() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label>Priority</Label>
-                      <Select
-                        value={selectedPriority}
-                        onValueChange={setSelectedPriority}
-                      >
-                        <SelectTrigger className="w-full">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {priorities.map((priority) => (
-                            <SelectItem key={priority} value={priority}>
-                              {priority}
-                            </SelectItem>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="outline" className="w-full justify-between">
+                            {selectedPriorities.length ? `${selectedPriorities.length} selected` : "All Priorities"}
+                            <Filter className="ml-2 h-4 w-4 opacity-60" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent className="w-56">
+                          <DropdownMenuLabel>Filter by priority</DropdownMenuLabel>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuCheckboxItem
+                            checked={selectedPriorities.length === 0}
+                            onCheckedChange={(checked) => {
+                              if (checked) setSelectedPriorities([]);
+                            }}
+                          >
+                            All Priorities
+                          </DropdownMenuCheckboxItem>
+                          <DropdownMenuSeparator />
+                          {priorities
+                            .filter((p) => p !== "All Priorities")
+                            .map((priority) => (
+                              <DropdownMenuCheckboxItem
+                                key={priority}
+                                checked={selectedPriorities.includes(priority)}
+                                onCheckedChange={() => {
+                                  setSelectedPriorities((prev) =>
+                                    prev.includes(priority)
+                                      ? prev.filter((p) => p !== priority)
+                                      : [...prev, priority]
+                                  );
+                                }}
+                              >
+                                {priority}
+                              </DropdownMenuCheckboxItem>
+                            ))}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+
+                      {selectedPriorities.length > 0 && (
+                        <div className="flex flex-wrap gap-2 pt-2 justify-end">
+                          {selectedPriorities.map((priority) => (
+                            <Badge key={priority} variant="secondary" className="px-2 py-1">
+                              <span>{priority}</span>
+                              <button
+                                type="button"
+                                aria-label={`Remove ${priority}`}
+                                className="ml-1 inline-flex h-4 w-4 items-center justify-center rounded hover:bg-muted/70"
+                                onClick={() => setSelectedPriorities((prev) => prev.filter((p) => p !== priority))}
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </Badge>
                           ))}
-                        </SelectContent>
-                      </Select>
+                        </div>
+                      )}
                     </div>
 
                     <div className="space-y-2">
                       <Label>Status</Label>
-                      <Select
-                        value={selectedStatus}
-                        onValueChange={setSelectedStatus}
-                      >
-                        <SelectTrigger className="w-full">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {statuses.map((status) => (
-                            <SelectItem key={status} value={status}>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="outline" className="w-full justify-between">
+                            {selectedStatuses.length ? `${selectedStatuses.length} selected` : "All Status"}
+                            <Filter className="ml-2 h-4 w-4 opacity-60" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent className="w-56">
+                          <DropdownMenuLabel>Filter by status</DropdownMenuLabel>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuCheckboxItem
+                            checked={selectedStatuses.length === 0}
+                            onCheckedChange={(checked) => {
+                              if (checked) setSelectedStatuses([]);
+                            }}
+                          >
+                            All Status
+                          </DropdownMenuCheckboxItem>
+                          <DropdownMenuSeparator />
+                          {statusOptions.map((status) => (
+                            <DropdownMenuCheckboxItem
+                              key={status}
+                              checked={selectedStatuses.includes(status)}
+                              onCheckedChange={() => toggleStatus(status)}
+                            >
                               {status}
-                            </SelectItem>
+                            </DropdownMenuCheckboxItem>
                           ))}
-                        </SelectContent>
-                      </Select>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+
+                      {selectedStatuses.length > 0 && (
+                        <div className="flex flex-wrap gap-2 pt-2 justify-end">
+                          {selectedStatuses.map((status) => (
+                            <Badge key={status} variant="secondary" className="px-2 py-1">
+                              <span>{status}</span>
+                              <button
+                                type="button"
+                                aria-label={`Remove ${status}`}
+                                className="ml-1 inline-flex h-4 w-4 items-center justify-center rounded hover:bg-muted/70"
+                                onClick={() => toggleStatus(status)}
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
 

@@ -61,7 +61,8 @@ export default function TasksTable() {
   const [tasks, setTasks] = useState<Task[] | null>(null)
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
-  const [selectedPriority, setSelectedPriority] = useState("All Priorities")
+  // Multi-select priorities (empty = all priorities)
+  const [selectedPriorities, setSelectedPriorities] = useState<string[]>([])
   // Multi-select statuses: empty = all statuses
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([])
   const [currentPage, setCurrentPage] = useState(1)
@@ -126,7 +127,7 @@ export default function TasksTable() {
       (task.assignedTo && task.assignedTo.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (task.description && task.description.toLowerCase().includes(searchTerm.toLowerCase()));
 
-  const matchesPriority = selectedPriority === "All Priorities" || task.priority.toLowerCase() === selectedPriority.toLowerCase();
+  const matchesPriority = selectedPriorities.length === 0 || selectedPriorities.map((p) => p.toLowerCase()).includes((task.priority || "").toLowerCase());
   const matchesStatus = selectedStatuses.length === 0 || selectedStatuses.includes(task.status);
 
     return matchesSearch && matchesPriority && matchesStatus;
@@ -182,7 +183,7 @@ export default function TasksTable() {
 
   const resetFilter = () => {
     setSearchTerm("");
-  setSelectedPriority("All Priorities")
+  setSelectedPriorities([])
     setSelectedStatuses([])
   }
 
@@ -271,18 +272,58 @@ export default function TasksTable() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Priority</Label>
-                    <Select value={selectedPriority} onValueChange={setSelectedPriority}>
-                      <SelectTrigger className="w-full">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {priorities.map((priority) => (
-                          <SelectItem key={priority} value={priority}>
-                            {priority}
-                          </SelectItem>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" className="w-full justify-between">
+                          {selectedPriorities.length ? `${selectedPriorities.length} selected` : "All Priorities"}
+                          <Filter className="ml-2 h-4 w-4 opacity-60" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent className="w-56">
+                        <DropdownMenuLabel>Filter by priority</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuCheckboxItem
+                          checked={selectedPriorities.length === 0}
+                          onCheckedChange={(checked) => {
+                            if (checked) setSelectedPriorities([])
+                          }}
+                        >
+                          All Priorities
+                        </DropdownMenuCheckboxItem>
+                        <DropdownMenuSeparator />
+                        {priorities
+                          .filter((p) => p !== "All Priorities")
+                          .map((priority) => (
+                            <DropdownMenuCheckboxItem
+                              key={priority}
+                              checked={selectedPriorities.includes(priority)}
+                              onCheckedChange={() => setSelectedPriorities((prev) =>
+                                prev.includes(priority) ? prev.filter((p) => p !== priority) : [...prev, priority]
+                              )}
+                            >
+                              {priority}
+                            </DropdownMenuCheckboxItem>
+                          ))}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+
+                    {selectedPriorities.length > 0 && (
+                      <div className="flex flex-wrap gap-2 pt-2 justify-end">
+                        {selectedPriorities.map((priority) => (
+                          <Badge key={priority} variant="secondary" className="px-2 py-1">
+                            <span>{priority}</span>
+                            <button
+                              type="button"
+                              aria-label={`Remove ${priority}`}
+                              className="ml-1 inline-flex h-4 w-4 items-center justify-center rounded hover:bg-muted/70"
+                              onClick={() => setSelectedPriorities((prev) => prev.filter((p) => p !== priority))}
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </Badge>
                         ))}
-                      </SelectContent>
-                    </Select>
+                      </div>
+                    )}
                   </div>
 
                   <div className="space-y-2">

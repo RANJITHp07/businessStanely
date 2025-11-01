@@ -65,6 +65,10 @@ export default function TasksTable() {
   const [selectedPriorities, setSelectedPriorities] = useState<string[]>([])
   // Multi-select statuses: empty = all statuses
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([])
+  // Show only tasks that require follow-up
+  const [followUpRequiredOnly, setFollowUpRequiredOnly] = useState(false)
+  // Show only tasks that have status check configured
+  const [statusCheckRequiredOnly, setStatusCheckRequiredOnly] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(20)
   const [taskToDelete, setTaskToDelete] = useState<Task | null>(null)
@@ -130,7 +134,18 @@ export default function TasksTable() {
   const matchesPriority = selectedPriorities.length === 0 || selectedPriorities.map((p) => p.toLowerCase()).includes((task.priority || "").toLowerCase());
   const matchesStatus = selectedStatuses.length === 0 || selectedStatuses.includes(task.status);
 
-    return matchesSearch && matchesPriority && matchesStatus;
+  const matchesFollowUp = !followUpRequiredOnly || task.followUpRequired === true;
+
+  const matchesStatusCheck =
+    !statusCheckRequiredOnly || ((task as any).statusCheckDuration !== null && (task as any).statusCheckDuration !== undefined && (task as any).statusCheckDuration !== "");
+
+    return (
+      matchesSearch &&
+      matchesPriority &&
+      matchesStatus &&
+      matchesFollowUp &&
+      matchesStatusCheck
+    );
   });
 
   // Apply sorting to filtered tasks
@@ -185,6 +200,8 @@ export default function TasksTable() {
     setSearchTerm("");
   setSelectedPriorities([])
     setSelectedStatuses([])
+    setFollowUpRequiredOnly(false)
+    setStatusCheckRequiredOnly(false)
   }
 
   const isOverdue = (dueDate: string | undefined, status: string) => {
@@ -269,7 +286,7 @@ export default function TasksTable() {
                 </div>
 
                 {/* Filter Controls */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                   <div className="space-y-2">
                     <Label>Priority</Label>
                     <DropdownMenu>
@@ -374,6 +391,84 @@ export default function TasksTable() {
                             </button>
                           </Badge>
                         ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Follow Up</Label>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" className="w-full justify-between">
+                          {followUpRequiredOnly ? "Follow-up required" : "Any"}
+                          <Filter className="ml-2 h-4 w-4 opacity-60" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent className="w-56">
+                        <DropdownMenuLabel>Filter by follow up</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuCheckboxItem
+                          checked={!followUpRequiredOnly}
+                          onCheckedChange={(checked) => {
+                            if (checked) setFollowUpRequiredOnly(false);
+                          }}
+                        >
+                          Any
+                        </DropdownMenuCheckboxItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuCheckboxItem
+                          checked={followUpRequiredOnly}
+                          onCheckedChange={() => setFollowUpRequiredOnly((v) => !v)}
+                        >
+                          Follow-up required
+                        </DropdownMenuCheckboxItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+
+                    {followUpRequiredOnly && (
+                      <div className="flex flex-wrap gap-2 pt-2 justify-end">
+                        <Badge variant="secondary" className="px-2 py-1">
+                          Follow-up required
+                        </Badge>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Status Check</Label>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" className="w-full justify-between">
+                          {statusCheckRequiredOnly ? "Has status check" : "Any"}
+                          <Filter className="ml-2 h-4 w-4 opacity-60" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent className="w-56">
+                        <DropdownMenuLabel>Filter by status check</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuCheckboxItem
+                          checked={!statusCheckRequiredOnly}
+                          onCheckedChange={(checked) => {
+                            if (checked) setStatusCheckRequiredOnly(false);
+                          }}
+                        >
+                          Any
+                        </DropdownMenuCheckboxItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuCheckboxItem
+                          checked={statusCheckRequiredOnly}
+                          onCheckedChange={() => setStatusCheckRequiredOnly((v) => !v)}
+                        >
+                          Has status check
+                        </DropdownMenuCheckboxItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+
+                    {statusCheckRequiredOnly && (
+                      <div className="flex flex-wrap gap-2 pt-2 justify-end">
+                        <Badge variant="secondary" className="px-2 py-1">
+                          Has status check
+                        </Badge>
                       </div>
                     )}
                   </div>

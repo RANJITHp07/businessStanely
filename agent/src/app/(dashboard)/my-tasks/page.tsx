@@ -22,6 +22,8 @@ import {
   Plus,
   Calendar,
 } from "lucide-react";
+import { AlertCircle } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import {
   Tooltip,
   TooltipTrigger,
@@ -154,18 +156,70 @@ function SectionTable({ label, tasks }: { label: string; tasks: Task[] }) {
     return "text-blue-600"; // New Task
   })();
 
+  // pick a small icon and background for the section label
+  const { Icon: SectionIcon, iconBg } = (() => {
+    const l = label.toLowerCase();
+    if (l.includes("progress"))
+      return { Icon: Loader2, iconBg: "bg-sky-100 text-sky-600" };
+    if (l.includes("completed"))
+      return { Icon: CheckCircle2, iconBg: "bg-green-100 text-green-600" };
+    // New Task / default
+    return { Icon: ClipboardList, iconBg: "bg-blue-100 text-blue-600" };
+  })();
+
+  // priority badge helper (copied to match main TasksTable)
+  const getPriorityBadge = (priority: string | undefined) => {
+    const colors: Record<string, string> = {
+      low: "bg-green-100 text-green-800 border-green-200",
+      medium: "bg-yellow-100 text-yellow-800 border-yellow-200",
+      high: "bg-red-100 text-red-800 border-red-200",
+    };
+    const icon = <AlertCircle className="w-3 h-3 mr-1" />;
+
+    if (!priority) return <span className="text-muted-foreground">-</span>;
+    const key = priority.toLowerCase();
+    if (key.includes("high"))
+      return (
+        <Badge className={`${colors.high} border`}>
+          {icon}
+          High
+        </Badge>
+      );
+    if (key.includes("medium"))
+      return (
+        <Badge className={`${colors.medium} border`}>
+          {icon}
+          Medium
+        </Badge>
+      );
+    return (
+      <Badge className={`${colors.low} border`}>
+        {icon}
+        Low
+      </Badge>
+    );
+  };
+
   return (
 
 
 <>
     <div className="flex items-center gap-4 min-w-0">
       {/* Rotated label column shown on md+ (stretch to full height of the table/card) */}
-      <div className="w-[96px] h-auto hidden md:flex items-center justify-center self-stretch flex-shrink-0 bg-white rounded-lg py-6 px-2">
-        <span
-          className={`block rotate-[-90deg] origin-center whitespace-nowrap tracking-widest font-semibold select-none text-[24px] ${labelColor}`}
-        >
-          {label}
-        </span>
+      <div className="w-[112px] h-auto hidden md:flex items-center justify-center self-stretch flex-shrink-0 bg-white rounded-lg py-4 px-3">
+        <div className="flex flex-col items-center">
+          <div className="-rotate-90 origin-center inline-flex items-center gap-2 px-2">
+            <div className={`rounded-full p-2 ${iconBg}`} aria-hidden>
+              <SectionIcon className="h-4 w-4" />
+            </div>
+            <span
+              className={`inline-block origin-center whitespace-nowrap tracking-widest font-semibold select-none text-[18px] ${labelColor} leading-none`}
+            >
+              {label}
+            </span>
+          </div>
+          <span className="sr-only">{label} section</span>
+        </div>
       </div>
 
       <div className="flex-1 min-w-0">
@@ -175,35 +229,28 @@ function SectionTable({ label, tasks }: { label: string; tasks: Task[] }) {
             <div
               className={`md:hidden flex items-center justify-center px-4 py-4 rounded-lg shadow-sm border border-gray-100 font-semibold ${labelColor} text-2xl tracking-widest`}
             >
+              <div className={`rounded-full p-2 mr-3 ${iconBg}`} aria-hidden>
+                <SectionIcon className="h-5 w-5" />
+              </div>
               {label}
+              <span className="sr-only">{label} section</span>
             </div>
 
             {/* Desktop table */}
-            <div className="rounded-md overflow-hidden hidden md:block bg-white shadow-sm">
-              <Table className="w-full table-fixed text-sm [&_th]:py-3 [&_th]:h-12 [&_td]:py-3">
-                <colgroup>
-                  <col className="w-[260px]" />
-                  <col className="w-[180px]" />
-                  <col className="w-[200px]" />
-                  <col className="w-[120px]" />
-                  <col className="w-[140px]" />
-                  <col className="w-[160px]" />
-                  <col className="w-[72px]" />
-                </colgroup>
-                <TableHeader>
-                  <TableRow className="bg-[#002FFF]">
-                    <TableHead className="text-white">Task</TableHead>
-                    <TableHead className="text-white">Client</TableHead>
-                    <TableHead className="text-white">Assigned To</TableHead>
-                    <TableHead className="text-white">Priority</TableHead>
-                    <TableHead className="text-white">Due Date</TableHead>
-                    <TableHead className="text-white">Progress</TableHead>
-                    <TableHead className="text-right text-white">
-                      Actions
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
+      <div className="rounded-md border hidden md:block">
+    <Table>
+          <TableHeader>
+                    <TableRow>
+                      <TableHead>Task</TableHead>
+                      <TableHead>Client</TableHead>
+                      <TableHead>Assigned To</TableHead>
+                      <TableHead>Priority</TableHead>
+                      <TableHead>Due Date</TableHead>
+                      <TableHead>Progress</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
                   {tasks.length === 0 ? (
                     <TableRow>
                       <TableCell
@@ -240,31 +287,7 @@ function SectionTable({ label, tasks }: { label: string; tasks: Task[] }) {
                         return "To Do";
                       })();
 
-                      const priorityBadge = (p: string) => {
-                        if (!p)
-                          return (
-                            <span className="text-muted-foreground">-</span>
-                          );
-                        if (p.includes("high"))
-                          return (
-                            <span className="inline-flex items-center gap-2 bg-red-100 text-red-700 px-3 py-1 rounded-full text-sm">
-                              {" "}
-                              <span className="text-xs">❗</span> High
-                            </span>
-                          );
-                        if (p.includes("medium"))
-                          return (
-                            <span className="inline-flex items-center gap-2 bg-amber-100 text-amber-800 px-3 py-1 rounded-full text-sm">
-                              {" "}
-                              <span className="text-xs">⚠️</span> Medium
-                            </span>
-                          );
-                        return (
-                          <span className="inline-flex items-center gap-2 bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm">
-                            Low
-                          </span>
-                        );
-                      };
+                      
 
                       return (
                         <TableRow
@@ -272,10 +295,10 @@ function SectionTable({ label, tasks }: { label: string; tasks: Task[] }) {
                           className="hover:bg-muted/50 even:bg-muted/30"
                         >
                           <TableCell
-                            className="truncate max-w-[260px] align-top"
+                            className="max-w-36 truncate overflow-hidden whitespace-nowrap align-top"
                             title={t.title || shortId}
                           >
-                            <div className="flex flex-col">
+                            <div className="space-y-1">
                               <Link
                                 href={`/task/${t.id}`}
                                 className="text-foreground font-medium hover:underline truncate"
@@ -283,8 +306,8 @@ function SectionTable({ label, tasks }: { label: string; tasks: Task[] }) {
                                 {t.title || shortId}
                               </Link>
                               {categoryName ? (
-                                <div className="mt-2">
-                                  <span className="inline-block bg-blue-50 text-blue-600 px-2 py-1 rounded-md text-xs">
+                                <div className="mt-1">
+                                  <span className="inline-block px-2 py-1 rounded bg-blue-100 text-blue-800 border border-blue-200 text-xs">
                                     {categoryName}
                                   </span>
                                 </div>
@@ -335,7 +358,7 @@ function SectionTable({ label, tasks }: { label: string; tasks: Task[] }) {
                           </TableCell>
 
                           <TableCell className="whitespace-nowrap align-top">
-                            {priorityBadge(priority)}
+                            {getPriorityBadge(priority)}
                           </TableCell>
 
                           <TableCell
@@ -426,7 +449,7 @@ function SectionTable({ label, tasks }: { label: string; tasks: Task[] }) {
                         <div className="flex flex-col">
                           <Link
                             href={`/task/${t.id}`}
-                            className="font-medium text-[#1f7aff]"
+                            className="font-medium text-[#002FFF]"
                           >
                             {shortId}
                           </Link>
@@ -492,7 +515,7 @@ function SectionTable({ label, tasks }: { label: string; tasks: Task[] }) {
                             Priority
                           </div>
                           <div className="truncate max-w-[160px]">
-                            {t.priority || "-"}
+                            {getPriorityBadge(t.priority)}
                           </div>
                         </div>
                         <div>
@@ -523,17 +546,18 @@ function SectionTable({ label, tasks }: { label: string; tasks: Task[] }) {
       
     </div>
 
-    <div className="flex justify-end"> 
-        <Link
-          href={`/task?status=${encodeURIComponent(
-            sectionLabelToStatus(label)
-          )}`}
-          className="bg-[#003459] cursor-pointer text-white text-[14px] py-[10px] mt-[10px] px-[10px] rounded-[5px] inline-block"
-        >
+    <div className="flex justify-end">
+      <Link
+        href={`/task?status=${encodeURIComponent(
+          sectionLabelToStatus(label)
+        )}`}
+      >
+        <Button className="bg-[#002FFF] hover:bg-[#0022FF] text-white mt-2">
           View more
-        </Link>
+        </Button>
+      </Link>
 
-</div>
+    </div>
 
 </>
     
@@ -635,7 +659,7 @@ export default function MyTasksPage() {
           </p>
         </div>
         <Link href="/task/create">
-          <Button className="bg-[#003459] cursor-pointer hover:bg-[#003459] text-white">
+          <Button className="bg-[#002FFF] hover:bg-[#0022FF] text-white">
             <Plus className="h-4 w-4 mr-2" /> Add New Task
           </Button>
         </Link>

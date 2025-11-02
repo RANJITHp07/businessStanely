@@ -83,10 +83,16 @@ export default function TasksTable() {
   const [selectedPriorities, setSelectedPriorities] = useState<string[]>([]);
   // Multi-select statuses (empty = all statuses)
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
-  // Show only tasks that require follow-up
-  const [followUpRequiredOnly, setFollowUpRequiredOnly] = useState(false);
-  // Show only tasks that require status check (statusCheckDuration present)
-  const [statusCheckRequiredOnly, setStatusCheckRequiredOnly] = useState(false);
+  // Follow-up / status-check duration options (display -> stored value)
+  const durationOptions = [
+    { label: "None", value: "none" },
+    { label: "24 Hours", value: "24hr" },
+    { label: "48 Hours", value: "48hr" },
+    { label: "1 Week", value: "1w" },
+  ];
+  // Selected durations (empty = any)
+  const [selectedFollowUpDurations, setSelectedFollowUpDurations] = useState<string[]>([]);
+  const [selectedStatusCheckDurations, setSelectedStatusCheckDurations] = useState<string[]>([]);
   const [sortBy, setSortBy] = useState("a-z");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
@@ -199,10 +205,21 @@ export default function TasksTable() {
     const matchesStatus =
       selectedStatuses.length === 0 || selectedStatuses.includes(task.status);
 
-    const matchesFollowUp = !followUpRequiredOnly || task.followUpRequired === true;
+    const matchesFollowUp =
+      selectedFollowUpDurations.length === 0 ||
+      selectedFollowUpDurations.some((v: string) =>
+        v === "none"
+          ? !((task as any).followUpDuration) || (task as any).followUpDuration === ""
+          : (((task as any).followUpDuration || "").toString().toLowerCase() === v)
+      );
 
     const matchesStatusCheck =
-      !statusCheckRequiredOnly || ((task as any).statusCheckDuration !== null && (task as any).statusCheckDuration !== undefined && (task as any).statusCheckDuration !== "");
+      selectedStatusCheckDurations.length === 0 ||
+      selectedStatusCheckDurations.some((v: string) =>
+        v === "none"
+          ? !((task as any).statusCheckDuration) || (task as any).statusCheckDuration === ""
+          : (((task as any).statusCheckDuration || "").toString().toLowerCase() === v)
+      );
 
     return (
       matchesSearch &&
@@ -265,8 +282,8 @@ export default function TasksTable() {
     setSearchTerm("");
     setSelectedPriorities([]);
     setSelectedStatuses([]);
-    setFollowUpRequiredOnly(false);
-    setStatusCheckRequiredOnly(false);
+    setSelectedFollowUpDurations([]);
+    setSelectedStatusCheckDurations([]);
   };
 
   // Multi-select status helpers
@@ -421,7 +438,7 @@ export default function TasksTable() {
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="outline" className="w-full justify-between">
-                            {statusCheckRequiredOnly ? "Has status check" : "Any"}
+                            {selectedStatusCheckDurations.length ? `${selectedStatusCheckDurations.length} selected` : "Any"}
                             <Filter className="ml-2 h-4 w-4 opacity-60" />
                           </Button>
                         </DropdownMenuTrigger>
@@ -429,28 +446,45 @@ export default function TasksTable() {
                           <DropdownMenuLabel>Filter by status check</DropdownMenuLabel>
                           <DropdownMenuSeparator />
                           <DropdownMenuCheckboxItem
-                            checked={!statusCheckRequiredOnly}
+                            checked={selectedStatusCheckDurations.length === 0}
                             onCheckedChange={(checked) => {
-                              if (checked) setStatusCheckRequiredOnly(false);
+                              if (checked) setSelectedStatusCheckDurations([]);
                             }}
                           >
                             Any
                           </DropdownMenuCheckboxItem>
                           <DropdownMenuSeparator />
-                          <DropdownMenuCheckboxItem
-                            checked={statusCheckRequiredOnly}
-                            onCheckedChange={() => setStatusCheckRequiredOnly((v) => !v)}
-                          >
-                            Has status check
-                          </DropdownMenuCheckboxItem>
+                          {durationOptions.map((opt) => (
+                            <DropdownMenuCheckboxItem
+                              key={opt.value}
+                              checked={selectedStatusCheckDurations.includes(opt.value)}
+                              onCheckedChange={() => {
+                                setSelectedStatusCheckDurations((prev) =>
+                                  prev.includes(opt.value) ? prev.filter((p) => p !== opt.value) : [...prev, opt.value]
+                                );
+                              }}
+                            >
+                              {opt.label}
+                            </DropdownMenuCheckboxItem>
+                          ))}
                         </DropdownMenuContent>
                       </DropdownMenu>
 
-                      {statusCheckRequiredOnly && (
+                      {selectedStatusCheckDurations.length > 0 && (
                         <div className="flex flex-wrap gap-2 pt-2 justify-end">
-                          <Badge variant="secondary" className="px-2 py-1">
-                            Has status check
-                          </Badge>
+                          {selectedStatusCheckDurations.map((val) => (
+                            <Badge key={val} variant="secondary" className="px-2 py-1">
+                              <span>{durationOptions.find((d) => d.value === val)?.label ?? val}</span>
+                              <button
+                                type="button"
+                                aria-label={`Remove ${val}`}
+                                className="ml-1 inline-flex h-4 w-4 items-center justify-center rounded hover:bg-muted/70"
+                                onClick={() => setSelectedStatusCheckDurations((prev) => prev.filter((p) => p !== val))}
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </Badge>
+                          ))}
                         </div>
                       )}
                     </div>
@@ -512,7 +546,7 @@ export default function TasksTable() {
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="outline" className="w-full justify-between">
-                            {followUpRequiredOnly ? "Follow-up required" : "Any"}
+                            {selectedFollowUpDurations.length ? `${selectedFollowUpDurations.length} selected` : "Any"}
                             <Filter className="ml-2 h-4 w-4 opacity-60" />
                           </Button>
                         </DropdownMenuTrigger>
@@ -520,28 +554,45 @@ export default function TasksTable() {
                           <DropdownMenuLabel>Filter by follow up</DropdownMenuLabel>
                           <DropdownMenuSeparator />
                           <DropdownMenuCheckboxItem
-                            checked={!followUpRequiredOnly}
+                            checked={selectedFollowUpDurations.length === 0}
                             onCheckedChange={(checked) => {
-                              if (checked) setFollowUpRequiredOnly(false);
+                              if (checked) setSelectedFollowUpDurations([]);
                             }}
                           >
                             Any
                           </DropdownMenuCheckboxItem>
                           <DropdownMenuSeparator />
-                          <DropdownMenuCheckboxItem
-                            checked={followUpRequiredOnly}
-                            onCheckedChange={() => setFollowUpRequiredOnly((v) => !v)}
-                          >
-                            Follow-up required
-                          </DropdownMenuCheckboxItem>
+                          {durationOptions.map((opt) => (
+                            <DropdownMenuCheckboxItem
+                              key={opt.value}
+                              checked={selectedFollowUpDurations.includes(opt.value)}
+                              onCheckedChange={() => {
+                                setSelectedFollowUpDurations((prev) =>
+                                  prev.includes(opt.value) ? prev.filter((p) => p !== opt.value) : [...prev, opt.value]
+                                );
+                              }}
+                            >
+                              {opt.label}
+                            </DropdownMenuCheckboxItem>
+                          ))}
                         </DropdownMenuContent>
                       </DropdownMenu>
 
-                      {followUpRequiredOnly && (
+                      {selectedFollowUpDurations.length > 0 && (
                         <div className="flex flex-wrap gap-2 pt-2 justify-end">
-                          <Badge variant="secondary" className="px-2 py-1">
-                            Follow-up required
-                          </Badge>
+                          {selectedFollowUpDurations.map((val) => (
+                            <Badge key={val} variant="secondary" className="px-2 py-1">
+                              <span>{durationOptions.find((d) => d.value === val)?.label ?? val}</span>
+                              <button
+                                type="button"
+                                aria-label={`Remove ${val}`}
+                                className="ml-1 inline-flex h-4 w-4 items-center justify-center rounded hover:bg-muted/70"
+                                onClick={() => setSelectedFollowUpDurations((prev) => prev.filter((p) => p !== val))}
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </Badge>
+                          ))}
                         </div>
                       )}
                     </div>

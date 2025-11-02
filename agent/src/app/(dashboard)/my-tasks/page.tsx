@@ -262,17 +262,27 @@ function SectionTable({ label, tasks }: { label: string; tasks: Task[] }) {
                     </TableRow>
                   ) : (
                     tasks.map((t) => {
-                      const clientName = t.client
-                        ? t.client.clientType === "individual"
-                          ? `${t.client.firstName ?? ""} ${
-                              t.client.lastName ?? ""
-                            }`.trim()
-                          : t.client.organizationName ?? ""
-                        : "-";
+                      const getClientDisplayName = (client: any) => {
+                        if (!client) return "-";
+                        if (client.name) return client.name;
+                        if (client.organizationName) return client.organizationName;
+                        const clientType = client.clientType || client.type;
+                        if (clientType && clientType.toLowerCase() === "individual") {
+                          const first = client.firstName || client.first_name || "";
+                          const last = client.lastName || client.last_name || "";
+                          const full = `${first} ${last}`.trim();
+                          return full || "-";
+                        }
+                        if (client.email) return client.email;
+                        if (client.id) return client.id;
+                        return "-";
+                      };
+
+                      const clientName = getClientDisplayName(t.client);
                       const ownerName = t.assignedTo?.name ?? "-";
                       const shortId = `T-${t.id.slice(0, 6).toUpperCase()}`;
                       // build richer cells: category badge, client email, assigned role, priority badge, due date with overdue
-                      const categoryName = t.category?.name;
+                      const categoryName = t.client?.name;
                       const clientEmail = t.client?.email ?? "";
                       const assignedRole = t.assignedTo?.agentType ?? "";
                       const priority = (t.priority || "").toLowerCase();
@@ -430,14 +440,24 @@ function SectionTable({ label, tasks }: { label: string; tasks: Task[] }) {
                   No tasks found.
                 </div>
               ) : (
-                tasks.map((t) => {
-                  const clientName = t.client
-                    ? t.client.clientType === "individual"
-                      ? `${t.client.firstName ?? ""} ${
-                          t.client.lastName ?? ""
-                        }`.trim()
-                      : t.client.organizationName ?? ""
-                    : "-";
+                  tasks.map((t) => {
+                  const getClientDisplayName = (client: any) => {
+                    if (!client) return "-";
+                    if (client.name) return client.name;
+                    if (client.organizationName) return client.organizationName;
+                    const clientType = client.clientType || client.type;
+                    if (clientType && clientType.toLowerCase() === "individual") {
+                      const first = client.firstName || client.first_name || "";
+                      const last = client.lastName || client.last_name || "";
+                      const full = `${first} ${last}`.trim();
+                      return full || "-";
+                    }
+                    if (client.email) return client.email;
+                    if (client.id) return client.id;
+                    return "-";
+                  };
+
+                  const clientName = getClientDisplayName(t.client);
                   const ownerName = t.assignedTo?.name ?? "-";
                   const shortId = `T-${t.id.slice(0, 6).toUpperCase()}`;
                   return (
@@ -552,7 +572,7 @@ function SectionTable({ label, tasks }: { label: string; tasks: Task[] }) {
           sectionLabelToStatus(label)
         )}`}
       >
-        <Button className="bg-[#002FFF] hover:bg-[#0022FF] text-white mt-2">
+        <Button className="bg-[#002FFF] hover:bg-[#0022FF] cursor-pointer text-white mt-2">
           View more
         </Button>
       </Link>
@@ -568,16 +588,27 @@ export default function MyTasksPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // debug: always log render to help confirm the component is mounted
+  // eslint-disable-next-line no-console
+  console.log("MyTasksPage render", { loading, tasksCount: tasks.length });
+
   useEffect(() => {
     const load = async () => {
+      // eslint-disable-next-line no-console
+      console.log("MyTasksPage: starting fetch...");
       try {
         const res = await fetchWithAuth("/api/tasks");
         if (!res.ok) throw new Error("Failed to fetch tasks");
         const data = await res.json();
         const arr = Array.isArray(data) ? data : data.tasks ?? [];
         setTasks(arr);
+        // debug: log fetched tasks to the browser console
+        // (user asked to "console that tasks")
+        // eslint-disable-next-line no-console
+        console.log("MyTasksPage - fetched tasks:", arr);
       } catch (e) {
-        console.error(e);
+        // eslint-disable-next-line no-console
+        console.error("MyTasksPage - fetch error:", e);
         setTasks([]);
       } finally {
         setLoading(false);
@@ -671,7 +702,7 @@ export default function MyTasksPage() {
           <Loader2 className="h-6 w-6 animate-spin mr-2" /> Loading tasks...
         </div>
       ) : (
-        <div className="space-y-[40px]">
+        <div className="space-y-[35px]">
           <SectionTable label="New Task" tasks={tasksNew.slice(0, 3)} />
           <SectionTable
             label="In Progress"

@@ -98,6 +98,10 @@ export default function TasksTable() {
   const [itemsPerPage, setItemsPerPage] = useState(20);
   const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
 
+  // Debug: log render and state so console shows activity for the agent /task page
+  // eslint-disable-next-line no-console
+  console.log("Agent TasksTable render", { loading, tasksCount: tasks?.length ?? 0 });
+
   // Map a status query param into the select label used by this component
   const mapQueryToStatusLabel = (q: string | null) => {
     if (!q) return "All Status";
@@ -149,17 +153,23 @@ export default function TasksTable() {
 
   useEffect(() => {
     const fetchTasks = async () => {
+      // eslint-disable-next-line no-console
+      console.log("Agent TasksTable: starting fetch...");
       try {
         const response = await fetchWithAuth("/api/tasks");
         if (response.ok) {
           const data = await response.json();
+          // eslint-disable-next-line no-console
+          console.log("Agent TasksTable - fetched tasks:", data);
           setTasks(data.tasks || data); // Handle both formats
         } else {
-          console.error("Failed to fetch tasks");
+          // eslint-disable-next-line no-console
+          console.error("Agent TasksTable - Failed to fetch tasks", response.status);
           setTasks([]); // Set to empty array on error
         }
       } catch (error) {
-        console.error("Error fetching tasks:", error);
+        // eslint-disable-next-line no-console
+        console.error("Agent TasksTable - Error fetching tasks:", error);
         setTasks([]); // Set to empty array on error
       } finally {
         setLoading(false);

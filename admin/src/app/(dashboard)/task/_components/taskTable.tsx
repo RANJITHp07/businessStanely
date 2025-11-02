@@ -81,19 +81,29 @@ export default function TasksTable() {
 
   const router = useRouter();
 
+  // Debug: indicate component render and state to browser console
+  // eslint-disable-next-line no-console
+  console.log("TasksTable render", { loading, tasksCount: tasks?.length ?? 0 })
+
   useEffect(() => {
     const fetchTasks = async () => {
+      // eslint-disable-next-line no-console
+      console.log("TasksTable: starting fetch...")
       try {
         const response = await fetchWithAuth('/api/tasks');
         if (response.ok) {
           const data = await response.json();
+          // eslint-disable-next-line no-console
+          console.log("TasksTable - fetched tasks:", data)
           setTasks(data);
         } else {
-          console.error("Failed to fetch tasks");
+          // eslint-disable-next-line no-console
+          console.error("TasksTable - Failed to fetch tasks", response.status)
           setTasks([]); // Set to empty array on error
         }
       } catch (error) {
-        console.error("Error fetching tasks:", error);
+        // eslint-disable-next-line no-console
+        console.error("TasksTable - Error fetching tasks:", error);
         setTasks([]); // Set to empty array on error
       } finally {
         setLoading(false);
@@ -623,11 +633,26 @@ export default function TasksTable() {
                       </TableRow>
                     ) : (
                       currentTasks.map((task) => {
-                        const clientName = task.client
-                          ? (task.client.clientType === "individual"
-                              ? `${task.client.firstName} ${task.client.lastName}`
-                              : (task.client.organizationName ?? "N/A"))
-                          : "N/A";
+                        const getClientDisplayName = (client: any) => {
+                          if (!client) return "N/A";
+                          // Prefer explicit name fields used by different APIs
+                          if (client.name) return client.name;
+                          if (client.organizationName) return client.organizationName;
+                          // Some payloads use clientType / type and firstName/lastName for individuals
+                          const clientType = client.clientType || client.type;
+                          if (clientType && clientType.toLowerCase() === "individual") {
+                            const first = client.firstName || client.first_name || "";
+                            const last = client.lastName || client.last_name || "";
+                            const full = `${first} ${last}`.trim();
+                            return full || "N/A";
+                          }
+                          // Fall back to any email or id-based placeholder
+                          if (client.email) return client.email;
+                          if (client.id) return client.id;
+                          return "N/A";
+                        };
+
+                        const clientName = getClientDisplayName(task.client);
                         const clientEmail = task.client?.email ?? "";
                         const ownerName = task.assignedTo?.name ?? "";
                         const ownerType = task.assignedTo?.agentType ?? "";

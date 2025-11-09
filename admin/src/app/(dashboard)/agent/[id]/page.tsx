@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Fragment } from "react";
 import { notFound, useParams, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -49,6 +49,30 @@ import {
 import { Agent, Task } from "@/types";
 import Link from "next/link";
 
+interface AgentActivity {
+  taskId: string;
+  taskTitle: string;
+  content: string;
+  createdAt: string;
+}
+
+function groupActivitiesByDate(activities: AgentActivity[]) {
+  return activities.reduce((acc, activity) => {
+    const date = new Date(activity.createdAt).toLocaleDateString();
+    if (!acc[date]) acc[date] = [];
+    acc[date].push(activity);
+    return acc;
+  }, {} as Record<string, AgentActivity[]>);
+}
+
+function formatDateDMY(dateString: string) {
+  const d = new Date(dateString);
+  const day = String(d.getDate()).padStart(2, "0");
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const year = d.getFullYear();
+  return `${day}/${month}/${year}`;
+}
+
 export default function AgentDetails() {
   const params = useParams();
   const router = useRouter();
@@ -59,6 +83,8 @@ export default function AgentDetails() {
   const [loading, setLoading] = useState(true);
   const [tasksLoading, setTasksLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("details");
+  const [activities, setActivities] = useState<AgentActivity[]>([]);
+  const [activitiesLoading, setActivitiesLoading] = useState(true);
 
   useEffect(() => {
     if (!id) return;
@@ -97,8 +123,25 @@ export default function AgentDetails() {
       }
     };
 
+    const fetchAgentActivities = async () => {
+      try {
+        const response = await fetch(
+          `/api/comments/agent-activities?agentId=${id}`
+        );
+        if (response.ok) {
+          const data = await response.json();
+          setActivities(data);
+        }
+      } catch (error) {
+        console.error("Error fetching agent activities:", error);
+      } finally {
+        setActivitiesLoading(false);
+      }
+    };
+
     fetchAgent();
     fetchAgentTasks();
+    fetchAgentActivities();
   }, [id]);
 
   const getPriorityBadge = (priority: string) => {
@@ -187,73 +230,71 @@ export default function AgentDetails() {
 
   if (loading) {
     return (
-     <>
-      <div className="container mx-auto p-6 max-w-7xl">
-        {/* Header Skeleton */}
-        <div className="mb-8">
-          <div className="flex flex-col md:flex-row justify-between md:items-center mb-6 md:mb-4">
-            <div>
-              <Skeleton className="h-8 w-40 mb-2" />
-              <Skeleton className="h-5 w-80" />
-            </div>
-            <Skeleton className="h-10 w-32 mt-[20px] md:mt-0" />
-          </div>
-          <Card>
-            <CardContent className="p-6">
-              <div className="space-y-4">
-                <Skeleton className="h-6 w-1/2 mb-2" />
-                <Skeleton className="h-4 w-full mb-4" />
-                <div className="flex flex-col md:flex-row md:items-center gap-4 md:gap-6 p-0 md:p-4 bg-muted/30 rounded-lg">
-                  <Skeleton className="h-4 w-32" />
-                  <Skeleton className="h-4 w-32" />
-                  <Skeleton className="h-4 w-40 md:ml-auto" />
-                </div>
+      <>
+        <div className="container mx-auto p-6 max-w-7xl">
+          {/* Header Skeleton */}
+          <div className="mb-8">
+            <div className="flex flex-col md:flex-row justify-between md:items-center mb-6 md:mb-4">
+              <div>
+                <Skeleton className="h-8 w-40 mb-2" />
+                <Skeleton className="h-5 w-80" />
               </div>
-            </CardContent>
-          </Card>
-        </div>
-        {/* Tabs Skeleton */}
-        <Skeleton className="h-10 w-full mb-6" />
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 space-y-6">
+              <Skeleton className="h-10 w-32 mt-[20px] md:mt-0" />
+            </div>
             <Card>
-              <CardHeader>
-                <Skeleton className="h-6 w-40" />
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <Skeleton className="h-4 w-full mb-2" />
-                <Skeleton className="h-4 w-full mb-2" />
-                <Skeleton className="h-4 w-full mb-2" />
-                <Skeleton className="h-4 w-full" />
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <Skeleton className="h-6 w-40" />
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <Skeleton className="h-4 w-full mb-2" />
-                <Skeleton className="h-4 w-full mb-2" />
-                <Skeleton className="h-4 w-full" />
+              <CardContent className="p-6">
+                <div className="space-y-4">
+                  <Skeleton className="h-6 w-1/2 mb-2" />
+                  <Skeleton className="h-4 w-full mb-4" />
+                  <div className="flex flex-col md:flex-row md:items-center gap-4 md:gap-6 p-0 md:p-4 bg-muted/30 rounded-lg">
+                    <Skeleton className="h-4 w-32" />
+                    <Skeleton className="h-4 w-32" />
+                    <Skeleton className="h-4 w-40 md:ml-auto" />
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </div>
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <Skeleton className="h-6 w-40" />
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <Skeleton className="h-4 w-full mb-2" />
-                <Skeleton className="h-3 w-full" />
-              </CardContent>
-            </Card>
-
+          {/* Tabs Skeleton */}
+          <Skeleton className="h-10 w-full mb-6" />
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2 space-y-6">
+              <Card>
+                <CardHeader>
+                  <Skeleton className="h-6 w-40" />
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <Skeleton className="h-4 w-full mb-2" />
+                  <Skeleton className="h-4 w-full mb-2" />
+                  <Skeleton className="h-4 w-full mb-2" />
+                  <Skeleton className="h-4 w-full" />
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader>
+                  <Skeleton className="h-6 w-40" />
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <Skeleton className="h-4 w-full mb-2" />
+                  <Skeleton className="h-4 w-full mb-2" />
+                  <Skeleton className="h-4 w-full" />
+                </CardContent>
+              </Card>
+            </div>
+            <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <Skeleton className="h-6 w-40" />
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <Skeleton className="h-4 w-full mb-2" />
+                  <Skeleton className="h-3 w-full" />
+                </CardContent>
+              </Card>
+            </div>
           </div>
         </div>
-      </div>
-     
-     </>
+      </>
     );
   }
 
@@ -357,7 +398,7 @@ export default function AgentDetails() {
         onValueChange={setActiveTab}
         className="space-y-6"
       >
-        <TabsList className="grid w-full grid-cols-3">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="details" className="flex items-center gap-2">
             <User className="h-4 w-4 hidden md:block" />
             <p className="text-[12px] md:text-[14px]">Agent Details</p>
@@ -375,6 +416,10 @@ export default function AgentDetails() {
               {" "}
               Team ({teamMembers.length}){" "}
             </p>
+          </TabsTrigger>
+          <TabsTrigger value="activities" className="flex items-center gap-2">
+            <Clock className="h-4 w-4 hidden md:block" />
+            <p className="text-[12px] md:text-[14px]">Activities</p>
           </TabsTrigger>
         </TabsList>
 
@@ -569,7 +614,7 @@ export default function AgentDetails() {
                     </TableHeader>
                     <TableBody>
                       {agentTasks.map((task) => (
-                        <TableRow 
+                        <TableRow
                           key={task.id}
                           className="cursor-pointer hover:bg-muted/50 transition-colors"
                           onClick={() => router.push(`/task/${task.id}`)}
@@ -781,6 +826,73 @@ export default function AgentDetails() {
                       ))}
                     </TableBody>
                   </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Activities Tab */}
+        <TabsContent value="activities" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Agent Activities</CardTitle>
+              <CardDescription>
+                Comments made by this agent on their tasks
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {activitiesLoading ? (
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground">Loading activities...</p>
+                </div>
+              ) : activities.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground">
+                    No activities found for this agent.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {Object.entries(groupActivitiesByDate(activities)).map(([date, acts]) => (
+                    <Card key={date} className="border shadow-sm">
+                      <CardHeader className="bg-muted/40 rounded-t-lg">
+                        <CardTitle className="text-base">{formatDateDMY(date)}</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-2">
+                        <div className="rounded-md border overflow-x-auto">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Task</TableHead>
+                                <TableHead>Interaction</TableHead>
+                                <TableHead>Date & Time</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {acts.map((activity, idx) => (
+                                <TableRow key={idx}>
+                                  <TableCell>
+                                    {activity.taskTitle ? (
+                                      <Link href={`/task/${activity.taskId}`} className="text-blue-600 hover:underline">
+                                        {activity.taskTitle}
+                                      </Link>
+                                    ) : (
+                                      <span className="text-muted-foreground">Unknown Task</span>
+                                    )}
+                                  </TableCell>
+                                  <TableCell style={{ wordBreak: 'break-word', whiteSpace: 'pre-line', maxWidth: 320 }}>
+                                    {activity.content}
+                                  </TableCell>
+                                  <TableCell>{new Date(activity.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
                 </div>
               )}
             </CardContent>

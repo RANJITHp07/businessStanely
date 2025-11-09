@@ -1,10 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { Fragment, useState, useEffect } from "react";
 import { notFound, useParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-
 import {
   Card,
   CardContent,
@@ -49,6 +48,30 @@ import {
 import { Agent, Task } from "@/types";
 import Link from "next/link";
 
+interface AgentActivity {
+  taskId: string;
+  taskTitle: string;
+  content: string;
+  createdAt: string;
+}
+
+function groupActivitiesByDate(activities: AgentActivity[]) {
+  return activities.reduce((acc, activity) => {
+    const date = new Date(activity.createdAt).toLocaleDateString();
+    if (!acc[date]) acc[date] = [];
+    acc[date].push(activity);
+    return acc;
+  }, {} as Record<string, AgentActivity[]>);
+}
+
+function formatDateDMY(dateString: string) {
+  const d = new Date(dateString);
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const year = d.getFullYear();
+  return `${day}/${month}/${year}`;
+}
+
 export default function AgentDetails() {
   const params = useParams();
   const id = params.id as string;
@@ -58,6 +81,8 @@ export default function AgentDetails() {
   const [loading, setLoading] = useState(true);
   const [tasksLoading, setTasksLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("details");
+  const [activities, setActivities] = useState<AgentActivity[]>([]);
+  const [activitiesLoading, setActivitiesLoading] = useState(true);
 
   useEffect(() => {
     if (!id) return;
@@ -94,6 +119,21 @@ export default function AgentDetails() {
       }
     };
     fetchTeamMemberAndTasks();
+    // Fetch activities
+    const fetchAgentActivities = async () => {
+      try {
+        const response = await fetch(`/api/comments/agent-activities?agentId=${id}`);
+        if (response.ok) {
+          const data = await response.json();
+          setActivities(data);
+        }
+      } catch (error) {
+        console.error("Error fetching agent activities:", error);
+      } finally {
+        setActivitiesLoading(false);
+      }
+    };
+    fetchAgentActivities();
   }, [id]);
 
   const getPriorityBadge = (priority: string) => {
@@ -352,7 +392,7 @@ export default function AgentDetails() {
         onValueChange={setActiveTab}
         className="space-y-6"
       >
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="details" className="flex items-center gap-2">
             <User className="h-4 w-4 hidden md:block" />
             <p className="text-[12px] md:text-[14px]">Agent Details</p>
@@ -363,6 +403,17 @@ export default function AgentDetails() {
               {" "}
               Tasks ({agentTasks.length}){" "}
             </p>
+          </TabsTrigger>
+          <TabsTrigger value="team" className="flex items-center gap-2">
+            <Users className="h-4 w-4 hidden md:block" />
+            <p className="text-[12px] md:text-[14px]">
+              {" "}
+              Team ({teamMembers.length}){" "}
+            </p>
+          </TabsTrigger>
+          <TabsTrigger value="activities" className="flex items-center gap-2">
+            <Clock className="h-4 w-4 hidden md:block" />
+            <p className="text-[12px] md:text-[14px]">Activities</p>
           </TabsTrigger>
         </TabsList>
 
@@ -650,6 +701,173 @@ export default function AgentDetails() {
                       ))}
                     </TableBody>
                   </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Team Tab */}
+        <TabsContent value="team" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Team Members</CardTitle>
+              <CardDescription>
+                All subordinates under {agent.name}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {tasksLoading ? (
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground">Loading team members...</p>
+                </div>
+              ) : teamMembers.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground">
+                    No team members found for this agent.
+                  </p>
+                </div>
+              ) : (
+                <div className="rounded-md border">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Phone</TableHead>
+                        <TableHead>Agent Type</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {teamMembers.map((member) => (
+                        <TableRow key={member.id}>
+                          <TableCell className="font-medium">
+                            <div className="flex items-center gap-2">
+                              <Avatar className="h-8 w-8">
+                                <AvatarFallback className="text-xs">
+                                  {member.name
+                                    ? member.name.toUpperCase().split(" ").map((n) => n[0]).join("")
+                                    : "-"}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div>
+                                <div className="font-medium text-sm">
+                                  {member.name}
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                  {member.barAssociationId}
+                                </div>
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="text-sm text-muted-foreground">
+                              {member.email}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="text-sm text-muted-foreground">
+                              {member.phoneNumber}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            {getAgentTypeBadge(member.agentType)}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" className="h-8 w-8 p-0">
+                                  <span className="sr-only">Open menu</span>
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                <DropdownMenuItem asChild>
+                                  <Link href={`/agent/${member.id}`}>
+                                    <Eye className="mr-2 h-4 w-4" />
+                                    View Details
+                                  </Link>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem asChild>
+                                  <Link href={`/agent/${member.id}/edit`}>
+                                    <Edit className="mr-2 h-4 w-4" />
+                                    Edit Agent
+                                  </Link>
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Activities Tab */}
+        <TabsContent value="activities" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Agent Activities</CardTitle>
+              <CardDescription>
+                Comments made by this agent on their tasks
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {activitiesLoading ? (
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground">Loading activities...</p>
+                </div>
+              ) : activities.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground">No activities found for this agent.</p>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {Object.entries(groupActivitiesByDate(activities)).map(([date, acts]) => (
+                    <Card key={date} className="border shadow-sm">
+                      <CardHeader className="bg-muted/40 rounded-t-lg">
+                        <CardTitle className="text-base">{formatDateDMY(date)}</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-2">
+                        <div className="rounded-md border overflow-x-auto">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Task</TableHead>
+                                <TableHead>Interaction</TableHead>
+                                <TableHead>Date & Time</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {acts.map((activity, idx) => (
+                                <TableRow key={idx}>
+                                  <TableCell>
+                                    {activity.taskTitle ? (
+                                      <Link href={`/task/${activity.taskId}`} className="text-blue-600 hover:underline">
+                                        {activity.taskTitle}
+                                      </Link>
+                                    ) : (
+                                      <span className="text-muted-foreground">Unknown Task</span>
+                                    )}
+                                  </TableCell>
+                                  <TableCell style={{ wordBreak: 'break-word', whiteSpace: 'pre-line', maxWidth: 320 }}>
+                                    {activity.content}
+                                  </TableCell>
+                                  <TableCell>{new Date(activity.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
                 </div>
               )}
             </CardContent>

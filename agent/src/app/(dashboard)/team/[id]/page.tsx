@@ -67,7 +67,7 @@ function groupActivitiesByDate(activities: AgentActivity[]) {
 function formatDateDMY(dateString: string) {
   const d = new Date(dateString);
   const day = String(d.getDate()).padStart(2, '0');
-  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const month = d.toLocaleString('en-US', { month: 'short' });
   const year = d.getFullYear();
   return `${day}/${month}/${year}`;
 }
@@ -832,7 +832,7 @@ export default function AgentDetails() {
                   {Object.entries(groupActivitiesByDate(activities)).map(([date, acts]) => (
                     <Card key={date} className="border shadow-sm">
                       <CardHeader className="bg-muted/40 rounded-t-lg">
-                        <CardTitle className="text-base">{formatDateDMY(date)}</CardTitle>
+                        <CardTitle className="text-base text-center">{formatDateDMY(date)}</CardTitle>
                       </CardHeader>
                       <CardContent className="space-y-2">
                         <div className="rounded-md border overflow-x-auto">
@@ -847,9 +847,9 @@ export default function AgentDetails() {
                             <TableBody>
                               {acts.map((activity, idx) => (
                                 <TableRow key={idx}>
-                                  <TableCell>
+                                  <TableCell className="break-words whitespace-pre-line align-top" style={{ wordBreak: 'break-word', whiteSpace: 'pre-line', width: '33%', minWidth: 120, maxWidth: 240 }}>
                                     {activity.taskTitle ? (
-                                      <Link href={`/task/${activity.taskId}`} className="text-blue-600 hover:underline">
+                                      <Link href={`/task/${activity.taskId}`} className="text-blue-600 hover:underline break-words whitespace-pre-line block" style={{ wordBreak: 'break-word', whiteSpace: 'pre-line' }}>
                                         {activity.taskTitle}
                                       </Link>
                                     ) : (

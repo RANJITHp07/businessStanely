@@ -333,19 +333,7 @@ export default function TaskCategoryTable() {
                             <>
                                 <CardContent>
                                     <div className="rounded-md border">
-                                        <Table className="table-fixed min-w-[980px] [&_th]:py-2 [&_th]:px-2 [&_td]:py-1.5 [&_td]:px-2">
-                                            <colgroup>
-                                                {/* Service */}
-                                                <col className="w-[260px]" />
-                                                {/* Description */}
-                                                <col className="w-[320px]" />
-                                                {/* Tasks */}
-                                                <col className="w-[120px]" />
-                                                {/* Created By */}
-                                                <col className="w-[200px]" />
-                                                {/* Actions */}
-                                                <col className="w-[80px]" />
-                                            </colgroup>
+                                        <Table>
                                             <TableHeader>
                                                 <TableRow>
                                                     <TableHead>Service</TableHead>
@@ -365,9 +353,9 @@ export default function TaskCategoryTable() {
                                                 ) : (
                                                     currentCategories.map((category) => (
                                                         <TableRow key={category.id} className="cursor-pointer hover:bg-muted/50" onClick={() => router.push(`/task_category/${category.id}`)}>
-                                                            <TableCell className="overflow-hidden">
-                                                                <div className="flex items-center space-x-2">
-                                                                    <Avatar className="h-8 w-8">
+                                                            <TableCell>
+                                                                <div className="flex items-center space-x-3">
+                                                                    <Avatar className="h-10 w-10">
                                                                         <AvatarImage src={category.photo || ""} />
                                                                         <AvatarFallback>
                                                                             {category.name
@@ -378,25 +366,27 @@ export default function TaskCategoryTable() {
                                                                         </AvatarFallback>
                                                                     </Avatar>
                                                                     <div>
-                                                                        <div className="font-medium text-sm truncate" title={category.name}>
+                                                                        <div className="font-medium">
                                                                             {category.name.charAt(0).toUpperCase() + category.name.slice(1)}
                                                                         </div>
-                                                                        <div className="text-xs text-muted-foreground truncate" title={`Created: ${new Date(category.createdAt).toLocaleDateString()}`}>
+                                                                        <div className="text-sm text-muted-foreground">
                                                                             Created: {new Date(category.createdAt).toLocaleDateString()}
                                                                         </div>
                                                                     </div>
                                                                 </div>
                                                             </TableCell>
-                                                            <TableCell className="overflow-hidden">
-                                                                <p className="text-xs truncate" title={category.description || undefined}>
-                                                                    {category.description}
-                                                                </p>
+                                                            <TableCell>
+                                                                <div className="max-w-xs">
+                                                                    <p className="text-sm truncate" title={category.description}>
+                                                                        {category.description}
+                                                                    </p>
+                                                                </div>
                                                             </TableCell>
-                                                            <TableCell className="overflow-hidden">
-                                                                <Badge variant="outline" className="text-xs px-2 py-0.5">{category.taskCount} tasks</Badge>
+                                                            <TableCell>
+                                                                <Badge variant="outline">{category.taskCount} tasks</Badge>
                                                             </TableCell>
-                                                            <TableCell className="overflow-hidden">
-                                                                <div className="text-xs truncate" title={category.createdBy || undefined}>
+                                                            <TableCell>
+                                                                <div className="text-sm">
                                                                     {category.createdBy || "Unknown"}
                                                                     {category.createdByType === "agent" && (
                                                                         <span className="ml-1 text-xs text-blue-600">(Agent)</span>
@@ -409,7 +399,7 @@ export default function TaskCategoryTable() {
                                                                     )}
                                                                 </div>
                                                             </TableCell>
-                                                            <TableCell className="text-right overflow-visible">
+                                                            <TableCell className="text-right">
                                                                 <DropdownMenu>
                                                                     <DropdownMenuTrigger asChild>
                                                                         <Button variant="ghost" className="h-8 w-8 p-0" onClick={(e) => e.stopPropagation()}>
@@ -568,19 +558,7 @@ export default function TaskCategoryTable() {
                             <>
                                 <CardContent>
                                     <div className="rounded-md border">
-                                        <Table className="table-fixed min-w-[980px] [&_th]:py-2 [&_th]:px-2 [&_td]:py-1.5 [&_td]:px-2">
-                                            <colgroup>
-                                                {/* Service */}
-                                                <col className="w-[260px]" />
-                                                {/* Description */}
-                                                <col className="w-[320px]" />
-                                                {/* Status */}
-                                                <col className="w-[120px]" />
-                                                {/* Created By */}
-                                                <col className="w-[200px]" />
-                                                {/* Actions */}
-                                                <col className="w-[80px]" />
-                                            </colgroup>
+                                        <Table>
                                             <TableHeader>
                                                 <TableRow>
                                                     <TableHead>Service</TableHead>
@@ -600,9 +578,9 @@ export default function TaskCategoryTable() {
                                                 ) : (
                                                     currentCategories.map((category) => (
                                                         <TableRow key={category.id} className="cursor-pointer hover:bg-muted/50" onClick={() => router.push(`/task_category/approve/${category.id}`)}>
-                                                            <TableCell className="overflow-hidden">
-                                                                <div className="flex items-center space-x-2">
-                                                                    <Avatar className="h-8 w-8">
+                                                            <TableCell>
+                                                                <div className="flex items-center space-x-3">
+                                                                    <Avatar className="h-10 w-10">
                                                                         <AvatarImage src={category.photo || ""} />
                                                                         <AvatarFallback>
                                                                             {category.name
@@ -613,23 +591,25 @@ export default function TaskCategoryTable() {
                                                                         </AvatarFallback>
                                                                     </Avatar>
                                                                     <div>
-                                                                        <div className="font-medium text-sm truncate" title={category.name}>
+                                                                        <div className="font-medium">
                                                                             {category.name.charAt(0).toUpperCase() + category.name.slice(1)}
                                                                         </div>
-                                                                        <div className="text-xs text-muted-foreground truncate" title={`Created: ${new Date(category.createdAt).toLocaleDateString()}`}>
+                                                                        <div className="text-sm text-muted-foreground">
                                                                             Created: {new Date(category.createdAt).toLocaleDateString()}
                                                                         </div>
                                                                     </div>
                                                                 </div>
                                                             </TableCell>
-                                                            <TableCell className="overflow-hidden">
-                                                                <p className="text-xs truncate" title={category.description || undefined}>
-                                                                    {category.description}
-                                                                </p>
+                                                            <TableCell>
+                                                                <div className="max-w-xs">
+                                                                    <p className="text-sm truncate" title={category.description}>
+                                                                        {category.description}
+                                                                    </p>
+                                                                </div>
                                                             </TableCell>
-                                                            <TableCell className="overflow-hidden">{getStatusBadge(category.status)}</TableCell>
-                                                            <TableCell className="overflow-hidden">
-                                                                <div className="text-xs truncate" title={category.createdBy || undefined}>
+                                                            <TableCell>{getStatusBadge(category.status)}</TableCell>
+                                                            <TableCell>
+                                                                <div className="text-sm">
                                                                     {category.createdBy || "Unknown"}
                                                                     {category.createdByType === "agent" && (
                                                                         <span className="ml-1 text-xs text-blue-600">(Agent)</span>
@@ -642,7 +622,7 @@ export default function TaskCategoryTable() {
                                                                     )}
                                                                 </div>
                                                             </TableCell>
-                                                            <TableCell className="text-right overflow-visible">
+                                                            <TableCell className="text-right">
                                                                 <DropdownMenu>
                                                                     <DropdownMenuTrigger asChild>
                                                                         <Button variant="ghost" className="h-8 w-8 p-0" onClick={(e) => e.stopPropagation()}>

@@ -3,23 +3,13 @@ import React, { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { User, Search, Plus, Edit, Trash2, MoreHorizontal } from "lucide-react"
+import { User, Search, Plus, X } from "lucide-react"
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { useRouter } from "next/navigation"
 import { toast } from "react-toastify"
 import { Badge } from '@/components/ui/badge'
 import { fetchWithAuth } from '@/lib/fetchWithAuth'
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle,
-    DialogFooter,
-} from "@/components/ui/dialog"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 
 // Update the CreateProps interface to include client and legislations in initialData
 interface CreateProps {
@@ -74,26 +64,17 @@ function Create({ admin, initialData }: CreateProps) {
     const [formData, setFormData] = useState<FormData>({
         name: initialData?.name || "",
         description: initialData?.description || "",
-        clientId: "",
+        clientId: "", // Initialize clientId
     })
     const [clientSearch, setClientSearch] = useState('');
     const [showClientDropdown, setShowClientDropdown] = useState(false);
     const [clients, setClients] = useState<Client[]>([]);
     const [agents, setAgents] = useState<Agent[]>([]);
+    const [agentSearches, setAgentSearches] = useState<Record<string, string>>({});
+    const [showAgentDropdowns, setShowAgentDropdowns] = useState<Record<string, boolean>>({});
     const [legislationItems, setLegislationItems] = useState<LegislationItem[]>([]);
     const [isSubmitting, setIsSubmitting] = useState(false)
     const router = useRouter()
-
-    // Modal state
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [editingLegislationId, setEditingLegislationId] = useState<string | null>(null);
-    const [modalFormData, setModalFormData] = useState({
-        title: "",
-        description: "",
-        assignedAgent: "",
-    });
-    const [modalAgentSearch, setModalAgentSearch] = useState("");
-    const [showModalAgentDropdown, setShowModalAgentDropdown] = useState(false);
 
     // Fetch clients and agents from the API
     useEffect(() => {
@@ -128,7 +109,7 @@ function Create({ admin, initialData }: CreateProps) {
                 ...prev,
                 clientId: initialData.client?.organizationName || "",
             }));
-            setClientSearch(initialData.client?.organizationName || ((initialData.client?.firstName || "") + " " + initialData?.client?.lastName) || "");
+            setClientSearch(initialData.client?.organizationName || "");
 
             // Map legislation only if it exists
             if (initialData.legislation && initialData.legislation.length > 0) {
@@ -145,21 +126,10 @@ function Create({ admin, initialData }: CreateProps) {
     }, [initialData]);
 
     // Filter clients based on search input
-    const filteredClients = clientSearch
-        ? clients.filter(client =>
+    const filteredClients = clients.filter(client =>
         (client.name?.toLowerCase().includes(clientSearch.toLowerCase()) ||
-            client.email?.toLowerCase().includes(clientSearch.toLowerCase()))
-        )
-        : [];
-
-    // Filtered agents for modal
-    const filteredModalAgents = modalAgentSearch
-        ? agents.filter(
-            (agent) =>
-                agent.name.toLowerCase().includes(modalAgentSearch.toLowerCase()) ||
-                agent.email.toLowerCase().includes(modalAgentSearch.toLowerCase())
-        )
-        : [];
+         client.email?.toLowerCase().includes(clientSearch.toLowerCase()))
+    );
 
     // Handle form submission
     const handleSubmit = async (e: React.FormEvent) => {
@@ -169,23 +139,26 @@ function Create({ admin, initialData }: CreateProps) {
             return
         }
 
+        // Add debug log to confirm redirect
         try {
             setIsSubmitting(true);
+            // Determine if we're creating or updating
             const isEditing = !!admin?.id
 
             // Update the payload to use agent IDs instead of names for assignedAgent
             const payload = {
                 ...formData,
-                clientId: formData.clientId,
+                clientId: formData.clientId, // Ensure clientId is included
                 legislation: legislationItems.map(item => ({
                     title: item.title,
                     description: item.description,
-                    assignedAgent: agents.find(agent => agent.name === item.assignedAgent)?.id || item.assignedAgent,
+                    assignedAgent: agents.find(agent => agent.name === item.assignedAgent)?.id || item.assignedAgent, // Use agent ID
                 })),
             };
-
+   
+            // Call API to create/update retainership
             const response = await fetch(
-                isEditing ? `/api/retainerships/${admin.id}` : '/api/retainerships',
+                isEditing ? `/api/retainerships/${admin.id}` : '/api/retainerships', 
                 {
                     method: isEditing ? 'PUT' : 'POST',
                     headers: {
@@ -194,12 +167,12 @@ function Create({ admin, initialData }: CreateProps) {
                     body: JSON.stringify(payload),
                 }
             )
-
+            
             if (!response.ok) {
                 const errorData = await response.json()
                 throw new Error(errorData.error || `Failed to ${isEditing ? 'update' : 'create'} retainership`)
             }
-
+            
             toast.success(`Retainership ${isEditing ? 'updated' : 'created'} successfully!`)
             router.push('/retainership')
         } catch (error) {
@@ -220,72 +193,50 @@ function Create({ admin, initialData }: CreateProps) {
 
     // Add a new legislation item
     const addLegislationItem = () => {
-        setEditingLegislationId(null);
-        setModalFormData({
-            title: "",
-            description: "",
-            assignedAgent: "",
-        });
-        setModalAgentSearch("");
-        setIsModalOpen(true);
-    };
-
-    // Edit legislation item
-    const editLegislationItem = (item: LegislationItem) => {
-        setEditingLegislationId(item.id);
-        setModalFormData({
-            title: item.title,
-            description: item.description,
-            assignedAgent: item.assignedAgent,
-        });
-        setModalAgentSearch(item.assignedAgent);
-        setIsModalOpen(true);
-    };
-
-    // Save legislation item (add or update)
-    const saveLegislationItem = () => {
-        if (!modalFormData.title.trim()) {
-            toast.error("Legislation title is required");
-            return;
-        }
-
-        if (editingLegislationId) {
-            // Update existing item
-            setLegislationItems((items) =>
-                items.map((item) =>
-                    item.id === editingLegislationId
-                        ? { ...item, ...modalFormData }
-                        : item
-                )
-            );
-        } else {
-            // Add new item
-            const newItem: LegislationItem = {
-                id: Date.now().toString(),
-                ...modalFormData,
-            };
-            setLegislationItems([...legislationItems, newItem]);
-        }
-
-        setIsModalOpen(false);
-        setModalFormData({
-            title: "",
-            description: "",
-            assignedAgent: "",
-        });
-        setModalAgentSearch("");
-    };
-
-    // Handle agent selection in modal
-    const handleModalAgentSelect = (agent: Agent) => {
-        setModalFormData((prev) => ({ ...prev, assignedAgent: agent.name }));
-        setModalAgentSearch(agent.name);
-        setShowModalAgentDropdown(false);
+        setLegislationItems((prev) => [
+            ...prev,
+            { id: Date.now().toString(), title: '', description: '', assignedAgent: '' },
+        ]);
     };
 
     // Remove a legislation item
     const removeLegislationItem = (id: string) => {
         setLegislationItems((prev) => prev.filter((item) => item.id !== id));
+    };
+
+    // Update a legislation item
+    const updateLegislationItem = (id: string, field: 'title' | 'description', value: string) => {
+        setLegislationItems((prev) =>
+            prev.map((item) => (item.id === id ? { ...item, [field]: value } : item))
+        );
+    };
+
+    // Handle agent search in legislation items
+    const handleAgentSearch = (itemId: string, query: string) => {
+        setAgentSearches((prev) => ({ ...prev, [itemId]: query }));
+        setShowAgentDropdowns((prev) => ({ ...prev, [itemId]: true }));
+    };
+
+    // Update getFilteredAgents to return an empty array if the search query is empty
+    const getFilteredAgents = (itemId: string) => {
+        const query = agentSearches[itemId]?.toLowerCase() || '';
+        if (!query) return []; // Return an empty array if the search query is empty
+        return agents.filter(agent =>
+            agent.name.toLowerCase().includes(query)
+        );
+    };
+
+    // Handle agent selection for a legislation item
+    const handleAgentSelect = (itemId: string, agent: Agent) => {
+        const updatedLegislationItems = legislationItems.map(item => {
+            if (item.id === itemId) {
+                return { ...item, assignedAgent: agent.id };
+            }
+            return item;
+        });
+        setLegislationItems(updatedLegislationItems);
+        setAgentSearches((prev) => ({ ...prev, [itemId]: agent.name }));
+        setShowAgentDropdowns((prev) => ({ ...prev, [itemId]: false }));
     };
 
     return (
@@ -310,29 +261,30 @@ function Create({ admin, initialData }: CreateProps) {
                         <CardDescription>Basic details about the retainership</CardDescription>
                     </CardHeader>
                     <CardContent>
-                        <div className="space-y-2">
-                            <Label htmlFor="username">Retainership *</Label>
-                            <Input
-                                id="username"
-                                value={formData.name}
-                                onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
-                                placeholder="Enter retainership name"
-                                required
-                            />
-                        </div>
-                        <div className="space-y-2 mt-3">
-                            <Label htmlFor="description">Description</Label>
-                            <Textarea
-                                id="description"
-                                value={formData.description}
-                                onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
-                                placeholder="Enter retainership description (optional)"
-                                rows={4}
-                            />
+                        <div >
+                            <div className="space-y-2">
+                                <Label htmlFor="username">Retainership *</Label>
+                                <Input
+                                    id="username"
+                                    value={formData.name}
+                                    onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
+                                    placeholder="Enter retainership name"
+                                    required
+                                />
+                            </div>
+                            <div className="space-y-2 mt-3">
+                                <Label htmlFor="description">Description</Label>
+                                <Textarea
+                                    id="description"
+                                    value={formData.description}
+                                    onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
+                                    placeholder="Enter retainership description (optional)"
+                                    rows={4}
+                                />
+                            </div>
                         </div>
                     </CardContent>
                 </Card>
-
                 <Card>
                     <CardHeader>
                         <CardTitle>Client Information</CardTitle>
@@ -369,18 +321,10 @@ function Create({ admin, initialData }: CreateProps) {
                                         ))}
                                     </div>
                                 )}
-                                {showClientDropdown && clientSearch && filteredClients.length === 0 && (
-                                    <div className="absolute z-10 w-full mt-1 bg-background border border-border rounded-md shadow-lg max-h-60 overflow-auto">
-                                        <div className="px-4 py-3 text-muted-foreground">
-                                            No clients found
-                                        </div>
-                                    </div>
-                                )}
                             </div>
                         </div>
                     </CardContent>
                 </Card>
-
                 <Card>
                     <CardHeader>
                         <div className="flex items-center justify-between">
@@ -394,69 +338,75 @@ function Create({ admin, initialData }: CreateProps) {
                             </Button>
                         </div>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="space-y-4">
                         {legislationItems.length === 0 ? (
                             <div className="text-center py-8 text-muted-foreground">
                                 <p>No legislation items added yet.</p>
                                 <p className="text-sm">Click &quot;Add Legislation&quot; to get started.</p>
                             </div>
                         ) : (
-                            <div className="rounded-md border">
-                                <Table>
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead>Title</TableHead>
-                                            <TableHead>Description</TableHead>
-                                            <TableHead>Assigned Agent</TableHead>
-                                            <TableHead className="text-right">Actions</TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {legislationItems.map((item) => (
-                                            <TableRow key={item.id}>
-                                                <TableCell className="font-medium">{item.title}</TableCell>
-                                                <TableCell>
-                                                    <div className="max-w-xs">
-                                                        <p className="text-sm truncate" title={item.description}>
-                                                            {item.description || "-"}
-                                                        </p>
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Badge variant="secondary">{item.assignedAgent || "Unassigned"}</Badge>
-                                                </TableCell>
-                                                <TableCell className="text-right">
-                                                    <DropdownMenu>
-                                                        <DropdownMenuTrigger asChild>
-                                                            <Button variant="ghost" className="h-8 w-8 p-0">
-                                                                <span className="sr-only">Open menu</span>
-                                                                <MoreHorizontal className="h-4 w-4" />
-                                                            </Button>
-                                                        </DropdownMenuTrigger>
-                                                        <DropdownMenuContent align="end">
-                                                            <DropdownMenuItem onClick={() => editLegislationItem(item)}>
-                                                                <Edit className="mr-2 h-4 w-4" />
-                                                                Edit
-                                                            </DropdownMenuItem>
-                                                            <DropdownMenuItem
-                                                                className="text-destructive"
-                                                                onClick={() => removeLegislationItem(item.id)}
+                            legislationItems.map((item, index) => (
+                                <Card key={item.id} className="relative">
+                                    <CardHeader className="pb-4">
+                                        <div className="flex items-center justify-between">
+                                            <Badge variant="secondary">Legislation {index + 1}</Badge>
+                                            <Button type="button" variant="ghost" size="sm" onClick={() => removeLegislationItem(item.id)}>
+                                                <X className="h-4 w-4" />
+                                            </Button>
+                                        </div>
+                                    </CardHeader>
+                                    <CardContent className="space-y-4">
+                                        <div className="space-y-2">
+                                            <Label>Legislation Title</Label>
+                                            <Input
+                                                value={item.title}
+                                                onChange={(e) => updateLegislationItem(item.id, 'title', e.target.value)}
+                                                placeholder="Enter legislation title"
+                                            />
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <Label>Description</Label>
+                                            <Textarea
+                                                value={item.description}
+                                                onChange={(e) => updateLegislationItem(item.id, 'description', e.target.value)}
+                                                placeholder="Describe the legislation requirements"
+                                                rows={3}
+                                            />
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <Label>Assigned Agent</Label>
+                                            <div className="relative">
+                                                <Input
+                                                    value={agentSearches[item.id] || item.assignedAgent}
+                                                    onChange={(e) => handleAgentSearch(item.id, e.target.value)}
+                                                    onFocus={() => setShowAgentDropdowns((prev) => ({ ...prev, [item.id]: true }))}
+                                                    placeholder="Type agent name or select from list..."
+                                                    className="pr-10"
+                                                />
+                                                {showAgentDropdowns[item.id] && getFilteredAgents(item.id).length > 0 && (
+                                                    <div className="absolute z-10 w-full mt-1 bg-background border border-border rounded-md shadow-lg max-h-60 overflow-auto">
+                                                        {getFilteredAgents(item.id).map((agent) => (
+                                                            <div
+                                                                key={agent.id}
+                                                                className="px-4 py-3 hover:bg-muted cursor-pointer border-b border-border last:border-b-0"
+                                                                onClick={() => handleAgentSelect(item.id, agent)}
                                                             >
-                                                                <Trash2 className="mr-2 h-4 w-4" />
-                                                                Delete
-                                                            </DropdownMenuItem>
-                                                        </DropdownMenuContent>
-                                                    </DropdownMenu>
-                                                </TableCell>
-                                            </TableRow>
-                                        ))}
-                                    </TableBody>
-                                </Table>
-                            </div>
+                                                                <div className="font-medium">{agent.name}</div>
+                                                                <div className="text-sm text-muted-foreground">{agent.email}</div>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            ))
                         )}
                     </CardContent>
                 </Card>
-
                 <div className="flex justify-end gap-4">
                     <Button
                         className="bg-[#f42b03] hover:bg-[#f42b03] shadow-none hover:shadow-lg transition-shadow duration-300 text-white hover:text-white cursor-pointer"
@@ -476,81 +426,6 @@ function Create({ admin, initialData }: CreateProps) {
                 </div>
             </form>
 
-            <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-                <DialogContent className="sm:max-w-[500px]">
-                    <DialogHeader>
-                        <DialogTitle>{editingLegislationId ? "Edit Legislation" : "Add New Legislation"}</DialogTitle>
-                        <DialogDescription>
-                            {editingLegislationId
-                                ? "Update the legislation details below."
-                                : "Fill in the details for the new legislation item."}
-                        </DialogDescription>
-                    </DialogHeader>
-
-                    <div className="space-y-4 py-4">
-                        <div className="space-y-2">
-                            <Label htmlFor="modal-title">Legislation Title *</Label>
-                            <Input
-                                id="modal-title"
-                                value={modalFormData.title}
-                                onChange={(e) => setModalFormData((prev) => ({ ...prev, title: e.target.value }))}
-                                placeholder="Enter legislation title"
-                            />
-                        </div>
-
-                        <div className="space-y-2">
-                            <Label htmlFor="modal-description">Description</Label>
-                            <Textarea
-                                id="modal-description"
-                                value={modalFormData.description}
-                                onChange={(e) => setModalFormData((prev) => ({ ...prev, description: e.target.value }))}
-                                placeholder="Describe the legislation requirements"
-                                rows={3}
-                            />
-                        </div>
-
-                        <div className="space-y-2">
-                            <Label htmlFor="modal-agent">Assigned Agent</Label>
-                            <div className="relative">
-                                <Input
-                                    id="modal-agent"
-                                    value={modalAgentSearch}
-                                    onChange={(e) => {
-                                        setModalAgentSearch(e.target.value);
-                                        setModalFormData((prev) => ({ ...prev, assignedAgent: e.target.value }));
-                                        setShowModalAgentDropdown(true);
-                                    }}
-                                    onFocus={() => setShowModalAgentDropdown(true)}
-                                    placeholder="Type agent name or select from list..."
-                                />
-                                {showModalAgentDropdown && modalAgentSearch && filteredModalAgents.length > 0 && (
-                                    <div className="absolute z-10 w-full mt-1 bg-background border border-border rounded-md shadow-lg max-h-60 overflow-auto">
-                                        {filteredModalAgents.map((agent) => (
-                                            <div
-                                                key={agent.id}
-                                                className="px-4 py-3 hover:bg-muted cursor-pointer border-b border-border last:border-b-0"
-                                                onClick={() => handleModalAgentSelect(agent)}
-                                            >
-                                                <div className="font-medium">{agent.name}</div>
-                                                <div className="text-sm text-muted-foreground">{agent.email}</div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-
-                    <DialogFooter>
-                        <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>
-                            Cancel
-                        </Button>
-                        <Button type="button" onClick={saveLegislationItem}>
-                            {editingLegislationId ? "Update" : "Add"} Legislation
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
         </div>
     )
 }

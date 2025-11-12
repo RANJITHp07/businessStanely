@@ -14,12 +14,10 @@ export default function RootLayout({
 }>) {
   return (
     <AuthGuard>
-      {/* Constrain horizontal overflow at the app shell level and let main area scroll */}
-      <div className={`flex w-full min-h-screen overflow-hidden`}>
+      <div className={`overflow-auto flex w-full`}>
         <SidebarProvider>
           <AppSidebar />
-          {/* Make main content the scroll container and avoid horizontal overflow */}
-          <main className="flex flex-col flex-1 min-w-0 overflow-auto">
+          <main className="flex flex-col flex-1">
             <div className="flex gap-[20px] items-center py-[20px] p-6 md:pl-[20px] md:py-[15px] border-b">
               <Navigator />
               <div className="flex justify-between items-center flex-1 pr-4">
@@ -30,7 +28,7 @@ export default function RootLayout({
               </div>
             </div>
 
-            <div className="w-full flex-1 bg-[#e3f2fd] min-w-0">{children}</div>
+            <div className="w-full  flex-1 bg-[#e3f2fd]">{children}</div>
           </main>
         </SidebarProvider>
         <ToastContainer />

@@ -114,13 +114,6 @@ export default function AgentsTable() {
     fetchAgents();
   }, []);
 
-  // Sort function
-  const sortAgents = (agents: Agent[]) => {
-    return [...agents].sort((a, b) => {
-      return a.name.localeCompare(b.name); // Default A-Z sorting
-    });
-  }
-
   // Filter agents based on search and filters
   const filteredAgents = agents.filter((agent) => {
     const matchesSearch =
@@ -205,19 +198,19 @@ export default function AgentsTable() {
   };
 
   return (
-    <div className=" container mx-auto p-6 max-w-7xl">
-      <div className="mb-8">
-        <div className="flex  flex-col md:flex-row  justify-between md:items-center  mb-6 md:mb-4">
+    <div className="w-full container mx-auto px-3 sm:px-4 md:px-6 py-4 md:py-6 max-w-7xl">
+      <div className="mb-6 md:mb-8">
+        <div className="flex flex-col gap-4 md:flex-row md:justify-between md:items-center mb-6">
           <div>
-            <h1 className="text-[28px] md:text-3xl font-bold">
+            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold break-words">
               Agent Management
             </h1>
-            <p className=" text-[18px] md:text-[16px]  text-muted-foreground mt-2">
+            <p className="text-sm sm:text-base text-muted-foreground mt-2">
               Manage and organize your legal team members
             </p>
           </div>
-          <Link href="/agent/create" className="flex justify-end">
-            <Button className=" mt-[20px] md:mt-none   bg-[#003459] hover:bg-[#003459] text-white rounded-lg px-4 py-2 flex items-center gap-2 cursor-pointer shadow-none hover:shadow-md transition-shadow duration-300">
+          <Link href="/agent/create" className="w-full md:w-auto">
+            <Button className="w-full md:w-auto bg-[#003459] hover:bg-[#003459] text-white rounded-lg px-4 py-2 flex items-center justify-center gap-2 cursor-pointer shadow-none hover:shadow-md transition-shadow duration-300">
               <Plus className="h-4 w-4" />
               Create Agent
             </Button>
@@ -243,38 +236,39 @@ export default function AgentsTable() {
             {loading ? (
               <>
                 <div className="h-[200px] w-full bg-gray-200 rounded-2xl mb-4"></div>
-                <div className="flex justify-between gap-4">
-                  <div className="h-5 w-1/2 bg-gray-200 rounded-xl mb-3"></div>
-                  <div className="h-5 w-1/2 bg-gray-200 rounded-xl mb-3"></div>
+                <div className="flex flex-col md:flex-row justify-between gap-4">
+                  <div className="h-5 w-full md:w-1/2 bg-gray-200 rounded-xl mb-3"></div>
+                  <div className="h-5 w-full md:w-1/2 bg-gray-200 rounded-xl mb-3"></div>
                 </div></>
-            ) : (<>       {/* Search */}
-              <div className="flex items-center gap-4">
-                <div className="flex-1">
-                  <Label htmlFor="search">Search Agents</Label>
-                  <div className="relative my-1">
+            ) : (<>       
+              {/* Search */}
+              <div className="flex flex-col items-start gap-2 md:gap-4">
+                <div className="w-full">
+                  <Label htmlFor="search" className="text-sm sm:text-base">Search Agents</Label>
+                  <div className="relative mt-2">
                     <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                     <Input
                       id="search"
-                      placeholder="Search by name, email, or specialization..."
+                      placeholder="Search by name, email..."
                       value={searchTerm}
                       onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10"
+                      className="pl-10 text-sm"
                     />
                   </div>
                 </div>
               </div>
 
               {/* Filter Controls */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
                 <div className="space-y-2">
-                  <Label>Agent Type</Label>
+                  <Label className="text-sm sm:text-base">Agent Type</Label>
                   <Select value={selectedType} onValueChange={setSelectedType}>
-                    <SelectTrigger className="w-full">
+                    <SelectTrigger className="w-full text-sm">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       {agentTypes.map((type) => (
-                        <SelectItem key={type} value={type}>
+                        <SelectItem key={type} value={type} className="text-sm">
                           {type}
                         </SelectItem>
                       ))}
@@ -283,17 +277,17 @@ export default function AgentsTable() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label>Jurisdiction</Label>
+                  <Label className="text-sm sm:text-base">Jurisdiction</Label>
                   <Select
                     value={selectedJurisdiction}
                     onValueChange={setSelectedJurisdiction}
                   >
-                    <SelectTrigger className="w-full">
+                    <SelectTrigger className="w-full text-sm">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       {jurisdictions.map((jurisdiction) => (
-                        <SelectItem key={jurisdiction} value={jurisdiction}>
+                        <SelectItem key={jurisdiction} value={jurisdiction} className="text-sm">
                           {jurisdiction}
                         </SelectItem>
                       ))}
@@ -303,9 +297,9 @@ export default function AgentsTable() {
               </div>
 
               {/* Results Summary */}
-              <div className="flex items-center justify-end gap-2 text-sm text-muted-foreground">
+              <div className="flex items-center justify-end gap-2 text-xs sm:text-sm text-muted-foreground">
                 <Button
-                  className="cursor-pointer hover:text-white text-white bg-[#f42b03] hover:bg-[#f42b03] rounded-lg px-4 py-2 shadow-none hover:shadow-lg transition-shadow duration-300"
+                  className="cursor-pointer hover:text-white text-white bg-[#f42b03] hover:bg-[#f42b03] rounded-lg px-3 sm:px-4 py-2 text-xs sm:text-sm shadow-none hover:shadow-lg transition-shadow duration-300"
                   variant="outline"
                   onClick={resetFilters}
                 >
@@ -320,60 +314,29 @@ export default function AgentsTable() {
       {/* Agents Table */}
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5" />
-              Agents ({sortedAgents.length})
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
+              <Users className="h-5 w-5 flex-shrink-0" />
+              <span className="truncate">Agents ({sortedAgents.length})</span>
             </CardTitle>
-            {/* <div className="flex items-center gap-2">
-              <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
-              <Select value={sortBy} onValueChange={setSortBy}>
-                <SelectTrigger className="w-32">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="a-z">A-Z</SelectItem>
-                  <SelectItem value="z-a">Z-A</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select  >
-  <SelectTrigger className="w-38">
-    <SelectValue className="text-black" placeholder="Jurisdiction" />
-  </SelectTrigger>
-  <SelectContent>
-    <SelectItem value="newest">Usa</SelectItem>
-    <SelectItem value="oldest">India</SelectItem>
-  </SelectContent>
-</Select>
-
-              <Select value={sortByDate} onValueChange={setSortByDate}>
-                <SelectTrigger className="w-32">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="newest">Newest</SelectItem>
-                  <SelectItem value="oldest">Oldest</SelectItem>
-                </SelectContent>
-              </Select>
-            </div> */}
           </div>
         </CardHeader>
-
 
         {loading ? (<div className="flex justify-center items-center py-8">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
         ) : (<>
-          <CardContent>
-            <div className="rounded-md border">
+          <CardContent className="p-3 sm:p-6">
+            {/* Desktop Table View */}
+            <div className="hidden md:block rounded-md border overflow-hidden">
               <Table>
                 <TableHeader>
                   <TableRow isHeader>
-                    <TableHead>Agent</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Specializations</TableHead>
-                    <TableHead>Jurisdiction</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                    <TableHead className="text-xs sm:text-sm">Agent</TableHead>
+                    <TableHead className="text-xs sm:text-sm">Type</TableHead>
+                    <TableHead className="text-xs sm:text-sm">Specializations</TableHead>
+                    <TableHead className="text-xs sm:text-sm">Jurisdiction</TableHead>
+                    <TableHead className="text-xs sm:text-sm text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
 
@@ -382,7 +345,7 @@ export default function AgentsTable() {
                     <TableRow>
                       <TableCell
                         colSpan={5}
-                        className="text-center py-8 text-muted-foreground"
+                        className="text-center py-8 text-sm text-muted-foreground"
                       >
                         No agents found matching your criteria.
                       </TableCell>
@@ -397,7 +360,7 @@ export default function AgentsTable() {
                         >
                           <TableCell>
                             <div className="flex items-center space-x-3">
-                              <Avatar className="h-10 w-10">
+                              <Avatar className="h-10 w-10 flex-shrink-0">
                                 <AvatarImage src={agent.photo || ""} />
                                 <AvatarFallback>
                                   {agent.name
@@ -407,11 +370,11 @@ export default function AgentsTable() {
                                     .join("")}
                                 </AvatarFallback>
                               </Avatar>
-                              <div>
-                                <div className="font-medium">
+                              <div className="min-w-0">
+                                <div className="font-medium text-sm truncate">
                                   {agent.name.charAt(0).toUpperCase() + agent.name.slice(1)}
                                 </div>
-                                <div className="text-sm text-muted-foreground">
+                                <div className="text-xs text-muted-foreground truncate">
                                   {agent.email}
                                 </div>
                               </div>
@@ -432,7 +395,7 @@ export default function AgentsTable() {
                               )}
                             </div>
                           </TableCell>
-                          <TableCell>{agent.jurisdiction}</TableCell>
+                          <TableCell className="text-sm">{agent.jurisdiction}</TableCell>
                           <TableCell
                             className="text-right"
                             onClick={(e) => e.stopPropagation()}
@@ -474,28 +437,137 @@ export default function AgentsTable() {
                     })
                   )}
                 </TableBody>
+              </Table>
+            </div>
 
+            {/* Mobile Card View */}
+            <div className="md:hidden border rounded-md overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow isHeader>
+                    <TableHead className="text-xs">Agent</TableHead>
+                    <TableHead className="text-xs">Type</TableHead>
+                    <TableHead className="text-xs">Specializations</TableHead>
+                    <TableHead className="text-xs text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
 
+                <TableBody>
+                  {currentAgents.length === 0 ? (
+                    <TableRow>
+                      <TableCell
+                        colSpan={4}
+                        className="text-center py-8 text-xs text-muted-foreground"
+                      >
+                        No agents found matching your criteria.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    currentAgents.map((agent) => {
+                      return (
+                        <TableRow
+                          key={agent.id}
+                          onClick={() => router.push(`/agent/${agent.id}`)}
+                          className="cursor-pointer hover:bg-muted/50"
+                        >
+                          <TableCell>
+                            <div className="flex items-center space-x-2">
+                              <Avatar className="h-8 w-8 flex-shrink-0">
+                                <AvatarImage src={agent.photo || ""} />
+                                <AvatarFallback className="text-xs">
+                                  {agent.name
+                                    .toUpperCase()
+                                    .split(" ")
+                                    .map((n) => n[0])
+                                    .join("")}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div className="min-w-0">
+                                <div className="font-medium text-xs truncate">
+                                  {agent.name.charAt(0).toUpperCase() + agent.name.slice(1)}
+                                </div>
+                                <div className="text-xs text-muted-foreground truncate">
+                                  {agent.email}
+                                </div>
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-xs">{getAgentTypeBadge(agent.agentType)}</TableCell>
+                          <TableCell>
+                            <div className="flex flex-wrap gap-0.5">
+                              {agent.specializations.slice(0, 1).map((spec) => (
+                                <Badge key={spec} variant="outline" className="text-xs">
+                                  {spec}
+                                </Badge>
+                              ))}
+                              {agent.specializations.length > 1 && (
+                                <Badge variant="outline" className="text-xs">
+                                  +{agent.specializations.length - 1}
+                                </Badge>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell
+                            className="text-right"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" className="h-7 w-7 p-0">
+                                  <span className="sr-only">Open menu</span>
+                                  <MoreHorizontal className="h-3 w-3" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuLabel className="text-xs">Actions</DropdownMenuLabel>
+                                <DropdownMenuItem asChild>
+                                  <Link href={`/agent/${agent.id}`}>
+                                    <Eye className="mr-2 h-3 w-3" />
+                                    <span className="text-xs">View Details</span>
+                                  </Link>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem asChild>
+                                  <Link href={`/agent/${agent.id}/edit`}>
+                                    <Edit className="mr-2 h-3 w-3" />
+                                    <span className="text-xs">Edit Agent</span>
+                                  </Link>
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  className="text-destructive text-xs"
+                                  onClick={() => setAgentToDelete(agent)}
+                                >
+                                  <Trash2 className="mr-2 h-3 w-3" />
+                                  Delete Agent
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })
+                  )}
+                </TableBody>
               </Table>
             </div>
 
             {/* Pagination */}
             {totalPages > 1 && (
-              <div className="flex items-center justify-between space-x-2 py-4">
-                <div className="text-sm text-muted-foreground">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mt-6 pt-4 border-t">
+                <div className="text-xs sm:text-sm text-muted-foreground">
                   Page {currentPage} of {totalPages}
                 </div>
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center flex-wrap gap-2">
                   <Select
                     value={itemsPerPage.toString()}
                     onValueChange={handleItemsPerPageChange}
                   >
-                    <SelectTrigger className="w-24">
+                    <SelectTrigger className="w-24 text-xs sm:text-sm">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
                       {[5, 10, 20, 50].map((value) => (
-                        <SelectItem key={value} value={value.toString()}>
+                        <SelectItem key={value} value={value.toString()} className="text-xs sm:text-sm">
                           {value} / page
                         </SelectItem>
                       ))}
@@ -506,44 +578,50 @@ export default function AgentsTable() {
                     size="sm"
                     onClick={() => handlePageChange(1)}
                     disabled={currentPage === 1}
+                    className="text-xs"
                   >
-                    <ChevronsLeft className="h-4 w-4 " />
+                    <ChevronsLeft className="h-4 w-4" />
                   </Button>
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => handlePageChange(currentPage - 1)}
                     disabled={currentPage === 1}
+                    className="text-xs"
                   >
                     <ChevronLeft className="h-4 w-4" />
                   </Button>
 
                   {/* Page Numbers */}
-                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                    const pageNumber =
-                      Math.max(1, Math.min(totalPages - 4, currentPage - 2)) + i;
-                    if (pageNumber <= totalPages) {
-                      return (
-                        <Button
-                          key={pageNumber}
-                          variant={
-                            currentPage === pageNumber ? "default" : "outline"
-                          }
-                          size="sm"
-                          onClick={() => handlePageChange(pageNumber)}
-                        >
-                          {pageNumber}
-                        </Button>
-                      );
-                    }
-                    return null;
-                  })}
+                  <div className="hidden sm:flex items-center gap-1">
+                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                      const pageNumber =
+                        Math.max(1, Math.min(totalPages - 4, currentPage - 2)) + i;
+                      if (pageNumber <= totalPages) {
+                        return (
+                          <Button
+                            key={pageNumber}
+                            variant={
+                              currentPage === pageNumber ? "default" : "outline"
+                            }
+                            size="sm"
+                            onClick={() => handlePageChange(pageNumber)}
+                            className="text-xs"
+                          >
+                            {pageNumber}
+                          </Button>
+                        );
+                      }
+                      return null;
+                    })}
+                  </div>
 
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => handlePageChange(currentPage + 1)}
                     disabled={currentPage === totalPages}
+                    className="text-xs"
                   >
                     <ChevronRight className="h-4 w-4" />
                   </Button>
@@ -552,6 +630,7 @@ export default function AgentsTable() {
                     size="sm"
                     onClick={() => handlePageChange(totalPages)}
                     disabled={currentPage === totalPages}
+                    className="text-xs"
                   >
                     <ChevronsRight className="h-4 w-4" />
                   </Button>
@@ -589,4 +668,4 @@ export default function AgentsTable() {
       </AlertDialog>
     </div>
   );
-} 
+}

@@ -193,15 +193,15 @@ export default function TasksTable() {
   // }
 
   return (
-    <div className="container mx-auto p-6 max-w-7xl">
-      <div className="mb-8">
-        <div className="flex  flex-col md:flex-row  justify-between md:items-center  mb-6 md:mb-4">
+    <div className="w-full container mx-auto px-3 sm:px-4 md:px-6 py-4 md:py-6 max-w-7xl">
+      <div className="mb-6 md:mb-8">
+        <div className="flex flex-col gap-4 md:flex-row md:justify-between md:items-center mb-6">
           <div>
-            <h1 className="text-3xl font-bold">Task Management</h1>
-            <p className="text-muted-foreground mt-2">Manage and track all legal tasks and assignments</p>
+            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold break-words">Task Management</h1>
+            <p className="text-sm sm:text-base text-muted-foreground mt-2">Manage and track all legal tasks and assignments</p>
           </div>
-          <Link href="/task/create" className="flex justify-end">
-            <Button className=" mt-[20px] md:mt-none   bg-[#003459] hover:bg-[#003459] text-white rounded-lg px-4 py-2 flex items-center gap-2 cursor-pointer shadow-none hover:shadow-md transition-shadow duration-300">
+          <Link href="/task/create" className="w-full md:w-auto">
+            <Button className="w-full md:w-auto bg-[#003459] hover:bg-[#003459] text-white rounded-lg px-4 py-2 flex items-center justify-center gap-2 cursor-pointer shadow-none hover:shadow-md transition-shadow duration-300">
               <Plus className="h-4 w-4" />
               Create Task
             </Button>
@@ -222,9 +222,9 @@ export default function TasksTable() {
             <CardContent>
               <div className="h-[200px] w-full bg-gray-200 rounded-2xl mb-4"></div>
 
-              <div className="flex justify-between gap-4">
-                <div className="h-5 w-1/2 bg-gray-200 rounded-xl mb-3"></div>
-                <div className="h-5 w-1/2 bg-gray-200 rounded-xl mb-3"></div>
+              <div className="flex flex-col md:flex-row justify-between gap-4">
+                <div className="h-5 w-full md:w-1/2 bg-gray-200 rounded-xl mb-3"></div>
+                <div className="h-5 w-full md:w-1/2 bg-gray-200 rounded-xl mb-3"></div>
               </div>
 
             </CardContent>
@@ -240,33 +240,33 @@ export default function TasksTable() {
 
               <CardContent className="space-y-4">
                 {/* Search */}
-                <div className="flex items-center gap-4">
-                  <div className="flex-1">
-                    <Label htmlFor="search">Search Tasks</Label>
-                    <div className="relative my-2">
+                <div className="flex flex-col items-start gap-2 md:gap-4">
+                  <div className="w-full">
+                    <Label htmlFor="search" className="text-sm sm:text-base">Search Tasks</Label>
+                    <div className="relative mt-2">
                       <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                       <Input
                         id="search"
-                        placeholder="Search by task name, client, agent, or description..."
+                        placeholder="Search by task name, client, agent..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className="pl-10"
+                        className="pl-10 text-sm"
                       />
                     </div>
                   </div>
                 </div>
 
                 {/* Filter Controls */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
                   <div className="space-y-2">
-                    <Label>Priority</Label>
+                    <Label className="text-sm sm:text-base">Priority</Label>
                     <Select value={selectedPriority} onValueChange={setSelectedPriority}>
-                      <SelectTrigger className="w-full">
+                      <SelectTrigger className="w-full text-sm">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
                         {priorities.map((priority) => (
-                          <SelectItem key={priority} value={priority}>
+                          <SelectItem key={priority} value={priority} className="text-sm">
                             {priority}
                           </SelectItem>
                         ))}
@@ -275,14 +275,14 @@ export default function TasksTable() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label>Status</Label>
+                    <Label className="text-sm sm:text-base">Status</Label>
                     <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-                      <SelectTrigger className="w-full">
+                      <SelectTrigger className="w-full text-sm">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
                         {statuses.map((status) => (
-                          <SelectItem key={status} value={status}>
+                          <SelectItem key={status} value={status} className="text-sm">
                             {status}
                           </SelectItem>
                         ))}
@@ -292,10 +292,10 @@ export default function TasksTable() {
                 </div>
 
                 {/* Results Summary */}
-                <div className="flex items-center justify-end gap-2 text-sm text-muted-foreground">
+                <div className="flex items-center justify-end gap-2 text-xs sm:text-sm text-muted-foreground">
                   <Button
                     onClick={resetFilter}
-                    className="cursor-pointer hover:text-white text-white bg-[#f42b03] hover:bg-[#f42b03] rounded-lg px-4 py-2 shadow-none hover:shadow-lg transition-shadow duration-300"
+                    className="cursor-pointer hover:text-white text-white bg-[#f42b03] hover:bg-[#f42b03] rounded-lg px-3 sm:px-4 py-2 text-xs sm:text-sm shadow-none hover:shadow-lg transition-shadow duration-300"
                     variant="outline"
                   >
                     Clear
@@ -311,42 +311,11 @@ export default function TasksTable() {
 
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5" />
-              Tasks ({sortedTasks.length})
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
+              <FileText className="h-5 w-5 flex-shrink-0" />
+              <span className="truncate">Tasks ({sortedTasks.length})</span>
             </CardTitle>
-            {/* <div className="flex items-center gap-2">
-              <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
-              <Select value={sortBy} onValueChange={setSortBy}>
-                <SelectTrigger className="w-32">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="a-z">A-Z</SelectItem>
-                  <SelectItem value="z-a">Z-A</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select  >
-                <SelectTrigger className="w-28">
-                  <SelectValue className="text-black" placeholder="Priority" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="low">Low</SelectItem>
-                  <SelectItem value="medium">Medium</SelectItem>
-                  <SelectItem value="high">High</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select defaultValue="newest">
-                <SelectTrigger className="w-32">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="newest">Newest</SelectItem>
-                  <SelectItem value="oldest">Oldest</SelectItem>
-                </SelectContent>
-              </Select>
-            </div> */}
           </div>
         </CardHeader>
 

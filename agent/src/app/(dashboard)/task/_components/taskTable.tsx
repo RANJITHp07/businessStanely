@@ -62,7 +62,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { FileText, Search, Filter, ArrowUpDown } from "lucide-react";
+import { FileText, Search, Filter } from "lucide-react";
 import Link from "next/link";
 
 import { Task } from "@/types";
@@ -78,7 +78,6 @@ export default function TasksTable() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedPriority, setSelectedPriority] = useState("All Priorities");
   const [selectedStatus, setSelectedStatus] = useState("All Status");
-  const [sortBy, setSortBy] = useState("a-z");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
   const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
@@ -121,18 +120,6 @@ export default function TasksTable() {
 
     fetchTasks();
   }, []);
-
-  // Sort function
-  const sortTasks = (tasks: Task[], sortBy: string) => {
-    return [...tasks].sort((a, b) => {
-      if (sortBy === "a-z") {
-        return a.title.localeCompare(b.title);
-      } else if (sortBy === "z-a") {
-        return b.title.localeCompare(a.title);
-      }
-      return 0;
-    });
-  };
 
   // Filter tasks based on search and filters only (backend already filters approved tasks)
   const filteredTasks = (tasks || []).filter((task) => {
@@ -276,36 +263,36 @@ export default function TasksTable() {
 
                 <CardContent className="space-y-4">
                   {/* Search */}
-                  <div className="flex items-center gap-4">
-                    <div className="flex-1">
-                      <Label htmlFor="search">Search Tasks</Label>
-                      <div className="relative my-2">
+                  <div className="flex items-start gap-2 md:gap-4 flex-col">
+                    <div className="w-full flex-1">
+                      <Label htmlFor="search" className="text-sm sm:text-base">Search Tasks</Label>
+                      <div className="relative mt-2">
                         <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                         <Input
                           id="search"
                           placeholder="Search by task name, client, agent, or description..."
                           value={searchTerm}
                           onChange={(e) => setSearchTerm(e.target.value)}
-                          className="pl-10"
+                          className="pl-10 text-sm"
                         />
                       </div>
                     </div>
                   </div>
 
                   {/* Filter Controls */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
                     <div className="space-y-2">
-                      <Label>Priority</Label>
+                      <Label className="text-sm sm:text-base">Priority</Label>
                       <Select
                         value={selectedPriority}
                         onValueChange={setSelectedPriority}
                       >
-                        <SelectTrigger className="w-full">
+                        <SelectTrigger className="w-full text-sm">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
                           {priorities.map((priority) => (
-                            <SelectItem key={priority} value={priority}>
+                            <SelectItem key={priority} value={priority} className="text-sm">
                               {priority}
                             </SelectItem>
                           ))}
@@ -314,17 +301,17 @@ export default function TasksTable() {
                     </div>
 
                     <div className="space-y-2">
-                      <Label>Status</Label>
+                      <Label className="text-sm sm:text-base">Status</Label>
                       <Select
                         value={selectedStatus}
                         onValueChange={setSelectedStatus}
                       >
-                        <SelectTrigger className="w-full">
+                        <SelectTrigger className="w-full text-sm">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
                           {statuses.map((status) => (
-                            <SelectItem key={status} value={status}>
+                            <SelectItem key={status} value={status} className="text-sm">
                               {status}
                             </SelectItem>
                           ))}
@@ -334,10 +321,10 @@ export default function TasksTable() {
                   </div>
 
                   {/* Results Summary */}
-                  <div className="flex items-center justify-end gap-2 text-sm text-muted-foreground">
+                  <div className="flex items-center justify-end gap-2 text-xs sm:text-sm text-muted-foreground">
                     <Button
                       onClick={resetFilter}
-                      className="cursor-pointer hover:text-white text-white bg-[#f42b03] hover:bg-[#f42b03] rounded-lg px-4 py-2 shadow-none hover:shadow-lg transition-shadow duration-300"
+                      className="cursor-pointer hover:text-white text-white bg-[#f42b03] hover:bg-[#f42b03] rounded-lg px-3 sm:px-4 py-2 text-xs sm:text-sm shadow-none hover:shadow-lg transition-shadow duration-300"
                       variant="outline"
                     >
                       Clear
@@ -351,42 +338,11 @@ export default function TasksTable() {
 
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="h-5 w-5" />
-                Tasks ({sortedTasks.length})
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
+                <FileText className="h-5 w-5 flex-shrink-0" />
+                <span className="truncate">Tasks ({sortedTasks.length})</span>
               </CardTitle>
-              {/* <div className="flex items-center gap-2">
-                  <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
-                  <Select value={sortBy} onValueChange={setSortBy}>
-                    <SelectTrigger className="w-32">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="a-z">A-Z</SelectItem>
-                      <SelectItem value="z-a">Z-A</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Select>
-                    <SelectTrigger className="w-28">
-                      <SelectValue className="text-black" placeholder="Priority" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="low">Low</SelectItem>
-                      <SelectItem value="medium">Medium</SelectItem>
-                      <SelectItem value="high">High</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <Select defaultValue="newest">
-                    <SelectTrigger className="w-32">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="newest">Newest</SelectItem>
-                      <SelectItem value="oldest">Oldest</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div> */}
             </div>
           </CardHeader>
 
@@ -396,18 +352,19 @@ export default function TasksTable() {
             </div>
           ) : (
             <>
-              <CardContent>
-                <div className="rounded-md border">
+              <CardContent className="p-3 sm:p-6">
+                {/* Desktop Table View */}
+                <div className="hidden md:block rounded-md border overflow-hidden">
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Task</TableHead>
-                        <TableHead>Client</TableHead>
-                        <TableHead>Assigned To</TableHead>
-                        <TableHead>Priority</TableHead>
-                        <TableHead>Due Date</TableHead>
-                        <TableHead>Progress</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
+                        <TableHead className="text-xs sm:text-sm">Task</TableHead>
+                        <TableHead className="text-xs sm:text-sm">Client</TableHead>
+                        <TableHead className="text-xs sm:text-sm">Assigned To</TableHead>
+                        <TableHead className="text-xs sm:text-sm">Priority</TableHead>
+                        <TableHead className="text-xs sm:text-sm">Due Date</TableHead>
+                        <TableHead className="text-xs sm:text-sm">Progress</TableHead>
+                        <TableHead className="text-xs sm:text-sm text-right">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
 
@@ -415,8 +372,8 @@ export default function TasksTable() {
                       {currentTasks.length === 0 ? (
                         <TableRow>
                           <TableCell
-                            colSpan={8}
-                            className="text-center py-8 text-muted-foreground"
+                            colSpan={7}
+                            className="text-center py-8 text-sm text-muted-foreground"
                           >
                             No tasks found matching your criteria.
                           </TableCell>
@@ -432,9 +389,9 @@ export default function TasksTable() {
                                 : ""
                                 }`}
                             >
-                              <TableCell className="max-w-36 truncate overflow-hidden whitespace-nowrap">
+                              <TableCell className="max-w-36">
                                 <div className="space-y-1">
-                                  <div className="font-medium">
+                                  <div className="font-medium text-sm truncate">
                                     {task.title}
                                   </div>
                                   {/* Show approved category only */}
@@ -450,19 +407,19 @@ export default function TasksTable() {
                               </TableCell>
                               <TableCell>
                                 <div className="space-y-1">
-                                  <div className="font-medium">
+                                  <div className="font-medium text-sm truncate">
                                     {task.client
                                       ? task.client.name || "N/A"
                                       : "N/A"}
                                   </div>
-                                  <div className="text-sm text-muted-foreground">
+                                  <div className="text-xs text-muted-foreground truncate">
                                     {task.client?.email}
                                   </div>
                                 </div>
                               </TableCell>
                               <TableCell>
                                 <div className="flex items-center space-x-2">
-                                  <Avatar className="h-8 w-8">
+                                  <Avatar className="h-8 w-8 flex-shrink-0">
                                     <AvatarFallback className="text-xs">
                                       {task.assignedTo?.name
                                         .toUpperCase()
@@ -471,28 +428,28 @@ export default function TasksTable() {
                                         .join("")}
                                     </AvatarFallback>
                                   </Avatar>
-                                  <div>
-                                    <div className="font-medium text-sm">
+                                  <div className="min-w-0">
+                                    <div className="font-medium text-xs truncate">
                                       {task.assignedTo?.name}
                                     </div>
-                                    <div className="text-xs text-muted-foreground">
+                                    <div className="text-xs text-muted-foreground truncate">
                                       {task.assignedTo?.agentType}
                                     </div>
                                   </div>
                                 </div>
                               </TableCell>
-                              <TableCell>
+                              <TableCell className="text-xs">
                                 {getPriorityBadge(task.priority)}
                               </TableCell>
                               <TableCell>
                                 <div className="flex items-center gap-1">
-                                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                                  <Calendar className="h-3 w-3 text-muted-foreground" />
                                   <span
-                                    className={
+                                    className={`text-xs ${
                                       isOverdue(task.dueDate, task.status)
                                         ? "text-red-600 font-medium"
                                         : ""
-                                    }
+                                    }`}
                                   >
                                     {task.dueDate
                                       ? formatDate(task.dueDate)
@@ -512,7 +469,7 @@ export default function TasksTable() {
                               <TableCell>
                                 <div className="space-y-2">
                                   <div className="flex items-center justify-between">
-                                    <span className="text-sm font-medium">
+                                    <span className="text-xs font-medium">
                                       {task.status}
                                     </span>
                                   </div>
@@ -533,7 +490,7 @@ export default function TasksTable() {
                                     </Button>
                                   </DropdownMenuTrigger>
                                   <DropdownMenuContent align="end">
-                                    <DropdownMenuLabel>
+                                    <DropdownMenuLabel className="text-sm">
                                       Actions
                                     </DropdownMenuLabel>
                                     <DropdownMenuItem asChild>
@@ -551,7 +508,7 @@ export default function TasksTable() {
                                     <DropdownMenuSeparator />
                                     <DropdownMenuItem
                                       onClick={() => setTaskToDelete(task)}
-                                      className="text-red-600 focus:text-red-600"
+                                      className="text-destructive"
                                     >
                                       <Trash2 className="mr-2 h-4 w-4" />
                                       Delete Task
@@ -567,23 +524,128 @@ export default function TasksTable() {
                   </Table>
                 </div>
 
+                {/* Mobile Table View */}
+                <div className="md:hidden border rounded-md overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="text-xs">Task</TableHead>
+                        <TableHead className="text-xs">Priority</TableHead>
+                        <TableHead className="text-xs text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+
+                    <TableBody>
+                      {currentTasks.length === 0 ? (
+                        <TableRow>
+                          <TableCell
+                            colSpan={3}
+                            className="text-center py-8 text-xs text-muted-foreground"
+                          >
+                            No tasks found matching your criteria.
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        currentTasks.map((task) => {
+                          return (
+                            <TableRow
+                              key={task.id}
+                              onClick={() => router.push(`/task/${task.id}`)}
+                              className={`cursor-pointer hover:bg-muted/50 ${isOverdue(task.dueDate, task.status)
+                                ? "bg-red-50"
+                                : ""
+                                }`}
+                            >
+                              <TableCell>
+                                <div className="space-y-1">
+                                  <div className="font-medium text-xs truncate">
+                                    {task.title}
+                                  </div>
+                                  <div className="text-xs text-muted-foreground">
+                                    <div>{task.client?.name || "N/A"}</div>
+                                    {task.dueDate && (
+                                      <div className="flex items-center gap-1 mt-1">
+                                        <Calendar className="h-3 w-3" />
+                                        <span className={isOverdue(task.dueDate, task.status) ? "text-red-600 font-medium" : ""}>
+                                          {formatDate(task.dueDate)}
+                                        </span>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-xs">
+                                <div className="space-y-1">
+                                  {getPriorityBadge(task.priority)}
+                                  <div className="text-xs font-medium">{task.status}</div>
+                                </div>
+                              </TableCell>
+                              <TableCell
+                                className="text-right"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button
+                                      variant="ghost"
+                                      className="h-7 w-7 p-0"
+                                    >
+                                      <span className="sr-only">Open menu</span>
+                                      <MoreHorizontal className="h-3 w-3" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    <DropdownMenuLabel className="text-xs">
+                                      Actions
+                                    </DropdownMenuLabel>
+                                    <DropdownMenuItem asChild>
+                                      <Link href={`/task/${task.id}`}>
+                                        <Eye className="mr-2 h-3 w-3" />
+                                        <span className="text-xs">View Details</span>
+                                      </Link>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem asChild>
+                                      <Link href={`/task/${task.id}/edit`}>
+                                        <Edit className="mr-2 h-3 w-3" />
+                                        <span className="text-xs">Edit Task</span>
+                                      </Link>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem
+                                      onClick={() => setTaskToDelete(task)}
+                                      className="text-destructive text-xs"
+                                    >
+                                      <Trash2 className="mr-2 h-3 w-3" />
+                                      Delete Task
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+
                 {/* Pagination */}
                 {totalPages > 1 && (
-                  <div className="flex items-center justify-between space-x-2 py-4">
-                    <div className="text-sm text-muted-foreground">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mt-6 pt-4 border-t">
+                    <div className="text-xs sm:text-sm text-muted-foreground">
                       Page {currentPage} of {totalPages}
                     </div>
-                    <div className="flex items-center space-x-2">
+                    <div className="flex items-center flex-wrap gap-2">
                       <Select
                         value={itemsPerPage.toString()}
                         onValueChange={handleItemsPerPageChange}
                       >
-                        <SelectTrigger className="w-24">
+                        <SelectTrigger className="w-24 text-xs sm:text-sm">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
                           {[5, 10, 20, 50].map((value) => (
-                            <SelectItem key={value} value={value.toString()}>
+                            <SelectItem key={value} value={value.toString()} className="text-xs sm:text-sm">
                               {value} / page
                             </SelectItem>
                           ))}
@@ -594,6 +656,7 @@ export default function TasksTable() {
                         size="sm"
                         onClick={() => handlePageChange(1)}
                         disabled={currentPage === 1}
+                        className="text-xs"
                       >
                         <ChevronsLeft className="h-4 w-4" />
                       </Button>
@@ -602,44 +665,49 @@ export default function TasksTable() {
                         size="sm"
                         onClick={() => handlePageChange(currentPage - 1)}
                         disabled={currentPage === 1}
+                        className="text-xs"
                       >
                         <ChevronLeft className="h-4 w-4" />
                       </Button>
 
-                      {/* Page Numbers */}
-                      {Array.from(
-                        { length: Math.min(5, totalPages) },
-                        (_, i) => {
-                          const pageNumber =
-                            Math.max(
-                              1,
-                              Math.min(totalPages - 4, currentPage - 2)
-                            ) + i;
-                          if (pageNumber <= totalPages) {
-                            return (
-                              <Button
-                                key={pageNumber}
-                                variant={
-                                  currentPage === pageNumber
-                                    ? "default"
-                                    : "outline"
-                                }
-                                size="sm"
-                                onClick={() => handlePageChange(pageNumber)}
-                              >
-                                {pageNumber}
-                              </Button>
-                            );
+                      {/* Page Numbers - Hidden on mobile */}
+                      <div className="hidden sm:flex items-center gap-1">
+                        {Array.from(
+                          { length: Math.min(5, totalPages) },
+                          (_, i) => {
+                            const pageNumber =
+                              Math.max(
+                                1,
+                                Math.min(totalPages - 4, currentPage - 2)
+                              ) + i;
+                            if (pageNumber <= totalPages) {
+                              return (
+                                <Button
+                                  key={pageNumber}
+                                  variant={
+                                    currentPage === pageNumber
+                                      ? "default"
+                                      : "outline"
+                                  }
+                                  size="sm"
+                                  onClick={() => handlePageChange(pageNumber)}
+                                  className="text-xs"
+                                >
+                                  {pageNumber}
+                                </Button>
+                              );
+                            }
+                            return null;
                           }
-                          return null;
-                        }
-                      )}
+                        )}
+                      </div>
 
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => handlePageChange(currentPage + 1)}
                         disabled={currentPage === totalPages}
+                        className="text-xs"
                       >
                         <ChevronRight className="h-4 w-4" />
                       </Button>
@@ -648,6 +716,7 @@ export default function TasksTable() {
                         size="sm"
                         onClick={() => handlePageChange(totalPages)}
                         disabled={currentPage === totalPages}
+                        className="text-xs"
                       >
                         <ChevronsRight className="h-4 w-4" />
                       </Button>

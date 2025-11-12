@@ -36,7 +36,6 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 // Removed Link import
@@ -151,29 +150,13 @@ export default function TeamsTable() {
 
   // Removed handleDelete function
 
-  function getAgentTypeBadge(type?: string) {
-    const colors: Record<string, string> = {
-      "Senior Partner": "bg-purple-100 text-purple-800",
-      Partner: "bg-blue-100 text-blue-800",
-      Associate: "bg-green-100 text-green-800",
-      "Junior Associate": "bg-yellow-100 text-yellow-800",
-      Paralegal: "bg-orange-100 text-orange-800",
-      "Legal Assistant": "bg-gray-100 text-gray-800",
-    };
-    return (
-      <Badge className={colors[type || ""] || "bg-gray-100 text-gray-800"}>
-        {type || "Unknown"}
-      </Badge>
-    );
-  }
-
   return (
-    <div className=" container mx-auto p-6 max-w-7xl">
+    <div className="w-full container mx-auto px-3 sm:px-4 md:px-6 py-4 md:py-6 max-w-7xl">
       <div className="mb-8">
-        <div className="flex flex-col md:flex-row justify-between md:items-center mb-6 md:mb-4">
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-6 md:mb-4">
           <div>
-            <h1 className="text-[28px] md:text-3xl font-bold">Team Members</h1>
-            <p className="text-[18px] md:text-[16px] text-muted-foreground mt-2">
+            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold break-words">Team Members</h1>
+            <p className="text-sm sm:text-base text-muted-foreground mt-2">
               View and manage your team members
             </p>
           </div>
@@ -182,11 +165,11 @@ export default function TeamsTable() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Filter className="h-5 w-5" />
-              Filters & Search
+            <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
+              <Filter className="h-5 w-5 flex-shrink-0" />
+              <span className="truncate">Filters & Search</span>
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="text-xs sm:text-sm">
               Filter and search through your agents
             </CardDescription>
           </CardHeader>
@@ -201,37 +184,36 @@ export default function TeamsTable() {
               </>
             ) : (
               <>
-                {" "}
                 {/* Search */}
-                <div className="flex items-center gap-4">
-                  <div className="flex-1">
-                    <Label htmlFor="search">Search Agents</Label>
-                    <div className="relative my-1">
+                <div className="flex flex-col items-start gap-2 md:gap-4">
+                  <div className="w-full">
+                    <Label htmlFor="search" className="text-sm sm:text-base">Search Agents</Label>
+                    <div className="relative mt-2">
                       <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                       <Input
                         id="search"
                         placeholder="Search by name, email, or specialization..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className="pl-10"
+                        className="pl-10 text-sm"
                       />
                     </div>
                   </div>
                 </div>
                 {/* Filter Controls */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
                   <div className="space-y-2">
-                    <Label>Agent Type</Label>
+                    <Label className="text-sm sm:text-base">Agent Type</Label>
                     <Select
                       value={selectedType}
                       onValueChange={setSelectedType}
                     >
-                      <SelectTrigger className="w-full">
+                      <SelectTrigger className="w-full text-sm">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
                         {agentTypes.map((type) => (
-                          <SelectItem key={type} value={type}>
+                          <SelectItem key={type} value={type} className="text-sm">
                             {type}
                           </SelectItem>
                         ))}
@@ -240,17 +222,17 @@ export default function TeamsTable() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label>Jurisdiction</Label>
+                    <Label className="text-sm sm:text-base">Jurisdiction</Label>
                     <Select
                       value={selectedJurisdiction}
                       onValueChange={setSelectedJurisdiction}
                     >
-                      <SelectTrigger className="w-full">
+                      <SelectTrigger className="w-full text-sm">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
                         {jurisdictions.map((jurisdiction) => (
-                          <SelectItem key={jurisdiction} value={jurisdiction}>
+                          <SelectItem key={jurisdiction} value={jurisdiction} className="text-sm">
                             {jurisdiction}
                           </SelectItem>
                         ))}
@@ -259,15 +241,15 @@ export default function TeamsTable() {
                   </div>
                 </div>
                 {/* Results Summary */}
-                <div className="flex items-center justify-end gap-2 text-sm text-muted-foreground">
+                <div className="flex items-center justify-end gap-2 text-xs sm:text-sm text-muted-foreground">
                   <Button
-                    className="cursor-pointer hover:text-white text-white bg-[#f42b03] hover:bg-[#f42b03] rounded-lg px-4 py-2 shadow-none hover:shadow-lg transition-shadow duration-300"
+                    className="cursor-pointer hover:text-white text-white bg-[#f42b03] hover:bg-[#f42b03] rounded-lg px-3 sm:px-4 py-2 text-xs sm:text-sm shadow-none hover:shadow-lg transition-shadow duration-300"
                     variant="outline"
                     onClick={resetFilters}
                   >
                     Clear
                   </Button>
-                </div>{" "}
+                </div>
               </>
             )}
           </CardContent>
@@ -277,42 +259,11 @@ export default function TeamsTable() {
       {/* Agents Table */}
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5" />
-              Team Members ({sortedTeams.length})
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
+              <Users className="h-5 w-5 flex-shrink-0" />
+              <span className="truncate">Team Members ({sortedTeams.length})</span>
             </CardTitle>
-            {/* <div className="flex items-center gap-2">
-              <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
-              <Select value={sortBy} onValueChange={setSortBy}>
-                <SelectTrigger className="w-32">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="a-z">A-Z</SelectItem>
-                  <SelectItem value="z-a">Z-A</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select  >
-  <SelectTrigger className="w-38">
-    <SelectValue className="text-black" placeholder="Jurisdiction" />
-  </SelectTrigger>
-  <SelectContent>
-    <SelectItem value="newest">Usa</SelectItem>
-    <SelectItem value="oldest">India</SelectItem>
-  </SelectContent>
-</Select>
-
-              <Select value={sortByDate} onValueChange={setSortByDate}>
-                <SelectTrigger className="w-32">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="newest">Newest</SelectItem>
-                  <SelectItem value="oldest">Oldest</SelectItem>
-                </SelectContent>
-              </Select>
-            </div> */}
           </div>
         </CardHeader>
 
@@ -322,16 +273,17 @@ export default function TeamsTable() {
           </div>
         ) : (
           <>
-            <CardContent>
-              <div className="rounded-md border">
+            <CardContent className="p-3 sm:p-6">
+              {/* Desktop Table View */}
+              <div className="hidden md:block rounded-md border overflow-hidden">
                 <Table>
                   <TableHeader>
                     <TableRow isHeader>
-                      <TableHead>Team Member</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Specializations</TableHead>
-                      <TableHead>Jurisdiction</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
+                      <TableHead className="text-xs sm:text-sm">Team Member</TableHead>
+                      <TableHead className="text-xs sm:text-sm">Type</TableHead>
+                      <TableHead className="text-xs sm:text-sm">Specializations</TableHead>
+                      <TableHead className="text-xs sm:text-sm">Jurisdiction</TableHead>
+                      <TableHead className="text-xs sm:text-sm text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
 
@@ -340,7 +292,7 @@ export default function TeamsTable() {
                       <TableRow>
                         <TableCell
                           colSpan={5}
-                          className="text-center py-8 text-muted-foreground"
+                          className="text-center py-8 text-sm text-muted-foreground"
                         >
                           No teams found matching your criteria.
                         </TableCell>
@@ -355,7 +307,7 @@ export default function TeamsTable() {
                           >
                             <TableCell>
                               <div className="flex items-center space-x-3">
-                                <Avatar className="h-10 w-10">
+                                <Avatar className="h-10 w-10 flex-shrink-0">
                                   <AvatarImage src={team.photo || ""} />
                                   <AvatarFallback>
                                     {team.name
@@ -365,18 +317,18 @@ export default function TeamsTable() {
                                       .join("")}
                                   </AvatarFallback>
                                 </Avatar>
-                                <div>
-                                  <div className="font-medium">
+                                <div className="min-w-0">
+                                  <div className="font-medium text-sm truncate">
                                     {team.name.charAt(0).toUpperCase() +
                                       team.name.slice(1)}
                                   </div>
-                                  <div className="text-sm text-muted-foreground">
+                                  <div className="text-xs text-muted-foreground truncate">
                                     {team.email}
                                   </div>
                                 </div>
                               </div>
                             </TableCell>
-                            <TableCell>{team.type}</TableCell>
+                            <TableCell className="text-xs">{team.type}</TableCell>
                             <TableCell>
                               <div className="flex flex-wrap gap-1">
                                 {team.specializations &&
@@ -402,7 +354,7 @@ export default function TeamsTable() {
                                   )}
                               </div>
                             </TableCell>
-                            <TableCell>{team.jurisdiction}</TableCell>
+                            <TableCell className="text-xs">{team.jurisdiction}</TableCell>
                             <TableCell className="text-right">
                               <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
@@ -412,7 +364,7 @@ export default function TeamsTable() {
                                   </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end">
-                                  <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                  <DropdownMenuLabel className="text-sm">Actions</DropdownMenuLabel>
                                   <DropdownMenuItem asChild>
                                     <a href={`/team/${team.id}`} onClick={e => e.stopPropagation()}>
                                       <Eye className="mr-2 h-4 w-4" />
@@ -430,23 +382,130 @@ export default function TeamsTable() {
                 </Table>
               </div>
 
+              {/* Mobile Table View */}
+              <div className="md:hidden border rounded-md overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow isHeader>
+                      <TableHead className="text-xs">Team Member</TableHead>
+                      <TableHead className="text-xs">Type</TableHead>
+                      <TableHead className="text-xs text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+
+                  <TableBody>
+                    {currentTeams.length === 0 ? (
+                      <TableRow>
+                        <TableCell
+                          colSpan={3}
+                          className="text-center py-8 text-xs text-muted-foreground"
+                        >
+                          No teams found matching your criteria.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      currentTeams.map((team) => {
+                        return (
+                          <TableRow
+                            key={team.id}
+                            onClick={() => router.push(`/team/${team.id}`)}
+                            className="cursor-pointer hover:bg-muted/50"
+                          >
+                            <TableCell>
+                              <div className="flex items-center space-x-2">
+                                <Avatar className="h-8 w-8 flex-shrink-0">
+                                  <AvatarImage src={team.photo || ""} />
+                                  <AvatarFallback className="text-xs">
+                                    {team.name
+                                      .toUpperCase()
+                                      .split(" ")
+                                      .map((n) => n[0])
+                                      .join("")}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <div className="min-w-0">
+                                  <div className="font-medium text-xs truncate">
+                                    {team.name.charAt(0).toUpperCase() +
+                                      team.name.slice(1)}
+                                  </div>
+                                  <div className="text-xs text-muted-foreground truncate">
+                                    {team.jurisdiction}
+                                  </div>
+                                </div>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-xs">
+                              <div className="space-y-1">
+                                <div className="font-medium">{team.type}</div>
+                                <div className="flex flex-wrap gap-1">
+                                  {team.specializations &&
+                                    team.specializations
+                                      .slice(0, 1)
+                                      .map((spec) => (
+                                        <Badge
+                                          key={spec}
+                                          variant="outline"
+                                          className="text-xs"
+                                        >
+                                          {spec}
+                                        </Badge>
+                                      ))}
+                                  {team.specializations &&
+                                    team.specializations.length > 1 && (
+                                      <Badge
+                                        variant="outline"
+                                        className="text-xs"
+                                      >
+                                        +{team.specializations.length - 1}
+                                      </Badge>
+                                    )}
+                                </div>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button variant="ghost" className="h-7 w-7 p-0">
+                                    <span className="sr-only">Open menu</span>
+                                    <MoreHorizontal className="h-3 w-3" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuLabel className="text-xs">Actions</DropdownMenuLabel>
+                                  <DropdownMenuItem asChild>
+                                    <a href={`/team/${team.id}`}>
+                                      <Eye className="mr-2 h-3 w-3" />
+                                      <span className="text-xs">View Details</span>
+                                    </a>
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+
               {/* Pagination */}
               {totalPages > 1 && (
-                <div className="flex items-center justify-between space-x-2 py-4">
-                  <div className="text-sm text-muted-foreground">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mt-6 pt-4 border-t">
+                  <div className="text-xs sm:text-sm text-muted-foreground">
                     Page {currentPage} of {totalPages}
                   </div>
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center flex-wrap gap-2">
                     <Select
                       value={itemsPerPage.toString()}
                       onValueChange={handleItemsPerPageChange}
                     >
-                      <SelectTrigger className="w-24">
+                      <SelectTrigger className="w-24 text-xs sm:text-sm">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
                         {[5, 10, 20, 50].map((value) => (
-                          <SelectItem key={value} value={value.toString()}>
+                          <SelectItem key={value} value={value.toString()} className="text-xs sm:text-sm">
                             {value} / page
                           </SelectItem>
                         ))}
@@ -457,45 +516,51 @@ export default function TeamsTable() {
                       size="sm"
                       onClick={() => handlePageChange(1)}
                       disabled={currentPage === 1}
+                      className="text-xs"
                     >
-                      <ChevronsLeft className="h-4 w-4 " />
+                      <ChevronsLeft className="h-4 w-4" />
                     </Button>
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => handlePageChange(currentPage - 1)}
                       disabled={currentPage === 1}
+                      className="text-xs"
                     >
                       <ChevronLeft className="h-4 w-4" />
                     </Button>
 
-                    {/* Page Numbers */}
-                    {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                      const pageNumber =
-                        Math.max(1, Math.min(totalPages - 4, currentPage - 2)) +
-                        i;
-                      if (pageNumber <= totalPages) {
-                        return (
-                          <Button
-                            key={pageNumber}
-                            variant={
-                              currentPage === pageNumber ? "default" : "outline"
-                            }
-                            size="sm"
-                            onClick={() => handlePageChange(pageNumber)}
-                          >
-                            {pageNumber}
-                          </Button>
-                        );
-                      }
-                      return null;
-                    })}
+                    {/* Page Numbers - Hidden on mobile */}
+                    <div className="hidden sm:flex items-center gap-1">
+                      {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                        const pageNumber =
+                          Math.max(1, Math.min(totalPages - 4, currentPage - 2)) +
+                          i;
+                        if (pageNumber <= totalPages) {
+                          return (
+                            <Button
+                              key={pageNumber}
+                              variant={
+                                currentPage === pageNumber ? "default" : "outline"
+                              }
+                              size="sm"
+                              onClick={() => handlePageChange(pageNumber)}
+                              className="text-xs"
+                            >
+                              {pageNumber}
+                            </Button>
+                          );
+                        }
+                        return null;
+                      })}
+                    </div>
 
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => handlePageChange(currentPage + 1)}
                       disabled={currentPage === totalPages}
+                      className="text-xs"
                     >
                       <ChevronRight className="h-4 w-4" />
                     </Button>
@@ -504,6 +569,7 @@ export default function TeamsTable() {
                       size="sm"
                       onClick={() => handlePageChange(totalPages)}
                       disabled={currentPage === totalPages}
+                      className="text-xs"
                     >
                       <ChevronsRight className="h-4 w-4" />
                     </Button>

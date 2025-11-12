@@ -30,6 +30,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuCheckboxItem,
 } from "@/components/ui/dropdown-menu"
 import {
   FileText,
@@ -46,6 +47,7 @@ import {
   ChevronsRight,
   AlertCircle,
   Calendar,
+  X,
 } from "lucide-react"
 import Link from "next/link"
 
@@ -59,27 +61,49 @@ export default function TasksTable() {
   const [tasks, setTasks] = useState<Task[] | null>(null)
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
-  const [selectedPriority, setSelectedPriority] = useState("All Priorities")
-  const [selectedStatus, setSelectedStatus] = useState("All Status")
+  // Multi-select priorities (empty = all priorities)
+  const [selectedPriorities, setSelectedPriorities] = useState<string[]>([])
+  // Multi-select statuses: empty = all statuses
+    const [selectedStatuses, setSelectedStatuses] = useState<string[]>([])
+    // Duration options and selections for follow-up / status-check
+    const durationOptions = [
+      { label: "None", value: "none" },
+      { label: "24 Hours", value: "24hr" },
+      { label: "48 Hours", value: "48hr" },
+      { label: "1 Week", value: "1w" },
+    ]
+    const [selectedFollowUpDurations, setSelectedFollowUpDurations] = useState<string[]>([])
+    const [selectedStatusCheckDurations, setSelectedStatusCheckDurations] = useState<string[]>([])
+  
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(20)
   const [taskToDelete, setTaskToDelete] = useState<Task | null>(null)
 
   const router = useRouter();
 
+  // Debug: indicate component render and state to browser console
+  // eslint-disable-next-line no-console
+  console.log("TasksTable render", { loading, tasksCount: tasks?.length ?? 0 })
+
   useEffect(() => {
     const fetchTasks = async () => {
+      // eslint-disable-next-line no-console
+      console.log("TasksTable: starting fetch...")
       try {
         const response = await fetchWithAuth('/api/tasks');
         if (response.ok) {
           const data = await response.json();
+          // eslint-disable-next-line no-console
+          console.log("TasksTable - fetched tasks:", data)
           setTasks(data);
         } else {
-          console.error("Failed to fetch tasks");
+          // eslint-disable-next-line no-console
+          console.error("TasksTable - Failed to fetch tasks", response.status)
           setTasks([]); // Set to empty array on error
         }
       } catch (error) {
-        console.error("Error fetching tasks:", error);
+        // eslint-disable-next-line no-console
+        console.error("TasksTable - Error fetching tasks:", error);
         setTasks([]); // Set to empty array on error
       } finally {
         setLoading(false);
@@ -123,10 +147,32 @@ export default function TasksTable() {
       (task.assignedTo && task.assignedTo.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (task.description && task.description.toLowerCase().includes(searchTerm.toLowerCase()));
 
-    const matchesPriority = selectedPriority === "All Priorities" || task.priority.toLowerCase() === selectedPriority.toLowerCase();
-    const matchesStatus = selectedStatus === "All Status" || task.status === selectedStatus;
+  const matchesPriority = selectedPriorities.length === 0 || selectedPriorities.map((p) => p.toLowerCase()).includes((task.priority || "").toLowerCase());
+  const matchesStatus = selectedStatuses.length === 0 || selectedStatuses.includes(task.status);
 
-    return matchesSearch && matchesPriority && matchesStatus;
+  const matchesFollowUp =
+    selectedFollowUpDurations.length === 0 ||
+    selectedFollowUpDurations.some((v: string) =>
+      v === "none"
+        ? !((task as any).followUpDuration) || (task as any).followUpDuration === ""
+        : (((task as any).followUpDuration || "").toString().toLowerCase() === v)
+    );
+
+  const matchesStatusCheck =
+    selectedStatusCheckDurations.length === 0 ||
+    selectedStatusCheckDurations.some((v: string) =>
+      v === "none"
+        ? !((task as any).statusCheckDuration) || (task as any).statusCheckDuration === ""
+        : (((task as any).statusCheckDuration || "").toString().toLowerCase() === v)
+    );
+
+    return (
+      matchesSearch &&
+      matchesPriority &&
+      matchesStatus &&
+      matchesFollowUp &&
+      matchesStatusCheck
+    );
   });
 
   // Apply sorting to filtered tasks
@@ -179,8 +225,10 @@ export default function TasksTable() {
 
   const resetFilter = () => {
     setSearchTerm("");
-    setSelectedPriority("All Priorities")
-    setSelectedStatus("All Status")
+  setSelectedPriorities([])
+    setSelectedStatuses([])
+    setSelectedFollowUpDurations([])
+    setSelectedStatusCheckDurations([])
   }
 
   const isOverdue = (dueDate: string | undefined, status: string) => {
@@ -191,6 +239,14 @@ export default function TasksTable() {
   // if (loading) {
   //     return <p>Loading...</p>;
   // }
+
+  // Multi-select status helpers
+  const statusOptions = statuses.filter((s) => s !== "All Status")
+  const toggleStatus = (status: string) => {
+    setSelectedStatuses((prev) =>
+      prev.includes(status) ? prev.filter((s) => s !== status) : [...prev, status]
+    )
+  }
 
   return (
     <div className="w-full container mx-auto px-3 sm:px-4 md:px-6 py-4 md:py-6 max-w-7xl">
@@ -270,8 +326,8 @@ export default function TasksTable() {
                             {priority}
                           </SelectItem>
                         ))}
-                      </SelectContent>
-                    </Select>
+                      </div>
+                    )}
                   </div>
 
                   <div className="space-y-2">
@@ -284,10 +340,132 @@ export default function TasksTable() {
                         {statuses.map((status) => (
                           <SelectItem key={status} value={status} className="text-sm">
                             {status}
-                          </SelectItem>
+                          </DropdownMenuCheckboxItem>
                         ))}
-                      </SelectContent>
-                    </Select>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+
+                    {selectedStatuses.length > 0 && (
+                      <div className="flex flex-wrap gap-2 pt-2 justify-end">
+                        {selectedStatuses.map((status) => (
+                          <Badge key={status} variant="secondary" className="px-2 py-1">
+                            <span>{status}</span>
+                            <button
+                              type="button"
+                              aria-label={`Remove ${status}`}
+                              className="ml-1 inline-flex h-4 w-4 items-center justify-center rounded hover:bg-muted/70"
+                              onClick={() => toggleStatus(status)}
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Follow Up</Label>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" className="w-full justify-between">
+                          {selectedFollowUpDurations.length ? `${selectedFollowUpDurations.length} selected` : "Any"}
+                          <Filter className="ml-2 h-4 w-4 opacity-60" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent className="w-56">
+                        <DropdownMenuLabel>Filter by follow up</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuCheckboxItem
+                          checked={selectedFollowUpDurations.length === 0}
+                          onCheckedChange={(checked) => {
+                            if (checked) setSelectedFollowUpDurations([])
+                          }}
+                        >
+                          Any
+                        </DropdownMenuCheckboxItem>
+                        <DropdownMenuSeparator />
+                        {durationOptions.map((opt) => (
+                          <DropdownMenuCheckboxItem
+                            key={opt.value}
+                            checked={selectedFollowUpDurations.includes(opt.value)}
+                            onCheckedChange={() => setSelectedFollowUpDurations((prev) => prev.includes(opt.value) ? prev.filter((p) => p !== opt.value) : [...prev, opt.value])}
+                          >
+                            {opt.label}
+                          </DropdownMenuCheckboxItem>
+                        ))}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+
+                    {selectedFollowUpDurations.length > 0 && (
+                      <div className="flex flex-wrap gap-2 pt-2 justify-end">
+                        {selectedFollowUpDurations.map((val) => (
+                          <Badge key={val} variant="secondary" className="px-2 py-1">
+                            <span>{durationOptions.find((d) => d.value === val)?.label ?? val}</span>
+                            <button
+                              type="button"
+                              aria-label={`Remove ${val}`}
+                              className="ml-1 inline-flex h-4 w-4 items-center justify-center rounded hover:bg-muted/70"
+                              onClick={() => setSelectedFollowUpDurations((prev) => prev.filter((p) => p !== val))}
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Status Check</Label>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" className="w-full justify-between">
+                          {selectedStatusCheckDurations.length ? `${selectedStatusCheckDurations.length} selected` : "Any"}
+                          <Filter className="ml-2 h-4 w-4 opacity-60" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent className="w-56">
+                        <DropdownMenuLabel>Filter by status check</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuCheckboxItem
+                          checked={selectedStatusCheckDurations.length === 0}
+                          onCheckedChange={(checked) => {
+                            if (checked) setSelectedStatusCheckDurations([])
+                          }}
+                        >
+                          Any
+                        </DropdownMenuCheckboxItem>
+                        <DropdownMenuSeparator />
+                        {durationOptions.map((opt) => (
+                          <DropdownMenuCheckboxItem
+                            key={opt.value}
+                            checked={selectedStatusCheckDurations.includes(opt.value)}
+                            onCheckedChange={() => setSelectedStatusCheckDurations((prev) => prev.includes(opt.value) ? prev.filter((p) => p !== opt.value) : [...prev, opt.value])}
+                          >
+                            {opt.label}
+                          </DropdownMenuCheckboxItem>
+                        ))}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+
+                    {selectedStatusCheckDurations.length > 0 && (
+                      <div className="flex flex-wrap gap-2 pt-2 justify-end">
+                        {selectedStatusCheckDurations.map((val) => (
+                          <Badge key={val} variant="secondary" className="px-2 py-1">
+                            <span>{durationOptions.find((d) => d.value === val)?.label ?? val}</span>
+                            <button
+                              type="button"
+                              aria-label={`Remove ${val}`}
+                              className="ml-1 inline-flex h-4 w-4 items-center justify-center rounded hover:bg-muted/70"
+                              onClick={() => setSelectedStatusCheckDurations((prev) => prev.filter((p) => p !== val))}
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -327,7 +505,23 @@ export default function TasksTable() {
           <>
             <CardContent>
               <div className="rounded-md border">
-                <Table>
+                <Table className="table-fixed min-w-[1160px]">
+                  <colgroup>
+                    {/* Task */}
+                    <col className="w-[280px]" />
+                    {/* Client */}
+                    <col className="w-[200px]" />
+                    {/* Ownership to */}
+                    <col className="w-[200px]" />
+                    {/* Priority */}
+                    <col className="w-[120px]" />
+                    {/* Due Date */}
+                    <col className="w-[140px]" />
+                    {/* Progress */}
+                    <col className="w-[140px]" />
+                    {/* Actions */}
+                    <col className="w-[80px]" />
+                  </colgroup>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Task</TableHead>
@@ -350,6 +544,29 @@ export default function TasksTable() {
                       </TableRow>
                     ) : (
                       currentTasks.map((task) => {
+                        const getClientDisplayName = (client: any) => {
+                          if (!client) return "N/A";
+                          // Prefer explicit name fields used by different APIs
+                          if (client.name) return client.name;
+                          if (client.organizationName) return client.organizationName;
+                          // Some payloads use clientType / type and firstName/lastName for individuals
+                          const clientType = client.clientType || client.type;
+                          if (clientType && clientType.toLowerCase() === "individual") {
+                            const first = client.firstName || client.first_name || "";
+                            const last = client.lastName || client.last_name || "";
+                            const full = `${first} ${last}`.trim();
+                            return full || "N/A";
+                          }
+                          // Fall back to any email or id-based placeholder
+                          if (client.email) return client.email;
+                          if (client.id) return client.id;
+                          return "N/A";
+                        };
+
+                        const clientName = getClientDisplayName(task.client);
+                        const clientEmail = task.client?.email ?? "";
+                        const ownerName = task.assignedTo?.name ?? "";
+                        const ownerType = task.assignedTo?.agentType ?? "";
                         return (
                           <TableRow
                             key={task.id}
@@ -357,9 +574,9 @@ export default function TasksTable() {
                             className={`cursor-pointer hover:bg-muted/50  ${isOverdue(task.dueDate, task.status) ? "bg-red-50" : ""
                               }`}
                           >
-                            <TableCell className="max-w-36 truncate overflow-hidden whitespace-nowrap">
+                            <TableCell className="overflow-hidden">
                               <div className="space-y-1">
-                                <div className="font-medium">{task.title}</div>
+                                <div className="font-medium truncate" title={task.title}>{task.title}</div>
                                 {/* Show approved category only */}
                                 {task.category && task.category.status === 'approved' && (
                                   <div className="text-xs mt-1">
@@ -370,19 +587,15 @@ export default function TasksTable() {
                                 )}
                               </div>
                             </TableCell>
-                            <TableCell>
+                            <TableCell className="overflow-hidden">
                               <div className="space-y-1">
-                                <div className="font-medium">
-                                  {task.client
-                                    ? task.client.clientType === "individual"
-                                      ? `${task.client.firstName} ${task.client.lastName}`
-                                      : task.client.organizationName
-                                    : "N/A"}
+                                <div className="font-medium truncate" title={clientName === "N/A" ? undefined : clientName}>
+                                  {clientName}
                                 </div>
-                                <div className="text-sm text-muted-foreground">{task.client?.email}</div>
+                                <div className="text-sm text-muted-foreground truncate" title={clientEmail}>{clientEmail}</div>
                               </div>
                             </TableCell>
-                            <TableCell>
+                            <TableCell className="overflow-hidden">
                               <div className="flex items-center space-x-2">
                                 <Avatar className="h-8 w-8">
                                   <AvatarFallback className="text-xs">
@@ -394,8 +607,8 @@ export default function TasksTable() {
                                   </AvatarFallback>
                                 </Avatar>
                                 <div>
-                                  <div className="font-medium text-sm">{task.assignedTo?.name}</div>
-                                  <div className="text-xs text-muted-foreground">{task.assignedTo?.agentType}</div>
+                                  <div className="font-medium text-sm truncate" title={ownerName || undefined}>{ownerName}</div>
+                                  <div className="text-xs text-muted-foreground truncate" title={ownerType || undefined}>{ownerType}</div>
                                 </div>
                               </div>
                             </TableCell>
@@ -421,7 +634,7 @@ export default function TasksTable() {
                               </div>
                             </TableCell>
                             <TableCell
-                              className="text-right"
+                              className="text-right overflow-visible"
                               onClick={(e) => e.stopPropagation()}
                             >
                               <DropdownMenu>

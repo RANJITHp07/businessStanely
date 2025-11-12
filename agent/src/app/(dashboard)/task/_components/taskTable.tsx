@@ -52,6 +52,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { DropdownMenuCheckboxItem } from "@/components/ui/dropdown-menu";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -67,6 +68,8 @@ import Link from "next/link";
 
 import { Task } from "@/types";
 import { useEffect } from "react";
+import { useSearchParams } from "next/navigation";
+import { X } from "lucide-react";
 
 const priorities = ["All Priorities", "Low", "Medium", "High"];
 const statuses = ["All Status", "To Do", "In Progress", "Hold", "Completed"];
@@ -76,12 +79,60 @@ export default function TasksTable() {
   const [tasks, setTasks] = useState<Task[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedPriority, setSelectedPriority] = useState("All Priorities");
-  const [selectedStatus, setSelectedStatus] = useState("All Status");
+  // Multi-select priorities (empty = all priorities)
+  const [selectedPriorities, setSelectedPriorities] = useState<string[]>([]);
+  // Multi-select statuses (empty = all statuses)
+  const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
+  // Follow-up / status-check duration options (display -> stored value)
+  const durationOptions = [
+    { label: "None", value: "none" },
+    { label: "24 Hours", value: "24hr" },
+    { label: "48 Hours", value: "48hr" },
+    { label: "1 Week", value: "1w" },
+  ];
+  // Selected durations (empty = any)
+  const [selectedFollowUpDurations, setSelectedFollowUpDurations] = useState<string[]>([]);
+  const [selectedStatusCheckDurations, setSelectedStatusCheckDurations] = useState<string[]>([]);
   const [sortBy, setSortBy] = useState("a-z");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
   const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
+
+  // Debug: log render and state so console shows activity for the agent /task page
+  // eslint-disable-next-line no-console
+  console.log("Agent TasksTable render", { loading, tasksCount: tasks?.length ?? 0 });
+
+  // Map a status query param into the select label used by this component
+  const mapQueryToStatusLabel = (q: string | null) => {
+    if (!q) return "All Status";
+    const k = q.toLowerCase().replace(/[-_\s]/g, "");
+    if (k.includes("todo") || k === "to") return "To Do";
+    if (k.includes("progress") || k.includes("inprogress"))
+      return "In Progress";
+    if (k.includes("completed")) return "Completed";
+    if (k.includes("hold")) return "Hold";
+    // Fallback: title-case the provided value
+    return q
+      .split(/[-_\s]/)
+      .map((s) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase())
+      .join(" ");
+  };
+
+  // Read ?status=... from the URL and apply it to the status filter on mount
+  const searchParams = useSearchParams();
+  useEffect(() => {
+    try {
+      const q = searchParams?.get("status");
+      if (q) {
+        const mapped = mapQueryToStatusLabel(q);
+        setSelectedStatuses([mapped]);
+        setCurrentPage(1);
+      }
+    } catch (e) {
+      // ignore
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   const handleDelete = async () => {
     if (!taskToDelete) return;
@@ -102,17 +153,23 @@ export default function TasksTable() {
 
   useEffect(() => {
     const fetchTasks = async () => {
+      // eslint-disable-next-line no-console
+      console.log("Agent TasksTable: starting fetch...");
       try {
         const response = await fetchWithAuth("/api/tasks");
         if (response.ok) {
           const data = await response.json();
+          // eslint-disable-next-line no-console
+          console.log("Agent TasksTable - fetched tasks:", data);
           setTasks(data.tasks || data); // Handle both formats
         } else {
-          console.error("Failed to fetch tasks");
+          // eslint-disable-next-line no-console
+          console.error("Agent TasksTable - Failed to fetch tasks", response.status);
           setTasks([]); // Set to empty array on error
         }
       } catch (error) {
-        console.error("Error fetching tasks:", error);
+        // eslint-disable-next-line no-console
+        console.error("Agent TasksTable - Error fetching tasks:", error);
         setTasks([]); // Set to empty array on error
       } finally {
         setLoading(false);
@@ -153,12 +210,34 @@ export default function TasksTable() {
         task.description.toLowerCase().includes(searchTerm.toLowerCase()));
 
     const matchesPriority =
-      selectedPriority === "All Priorities" ||
-      task.priority.toLowerCase() === selectedPriority.toLowerCase();
+      selectedPriorities.length === 0 ||
+      selectedPriorities.map((p) => p.toLowerCase()).includes((task.priority || "").toLowerCase());
     const matchesStatus =
-      selectedStatus === "All Status" || task.status === selectedStatus;
+      selectedStatuses.length === 0 || selectedStatuses.includes(task.status);
 
-    return matchesSearch && matchesPriority && matchesStatus;
+    const matchesFollowUp =
+      selectedFollowUpDurations.length === 0 ||
+      selectedFollowUpDurations.some((v: string) =>
+        v === "none"
+          ? !((task as any).followUpDuration) || (task as any).followUpDuration === ""
+          : (((task as any).followUpDuration || "").toString().toLowerCase() === v)
+      );
+
+    const matchesStatusCheck =
+      selectedStatusCheckDurations.length === 0 ||
+      selectedStatusCheckDurations.some((v: string) =>
+        v === "none"
+          ? !((task as any).statusCheckDuration) || (task as any).statusCheckDuration === ""
+          : (((task as any).statusCheckDuration || "").toString().toLowerCase() === v)
+      );
+
+    return (
+      matchesSearch &&
+      matchesPriority &&
+      matchesStatus &&
+      matchesFollowUp &&
+      matchesStatusCheck
+    );
   });
 
   // Apply sorting to filtered tasks
@@ -211,8 +290,18 @@ export default function TasksTable() {
 
   const resetFilter = () => {
     setSearchTerm("");
-    setSelectedPriority("All Priorities");
-    setSelectedStatus("All Status");
+    setSelectedPriorities([]);
+    setSelectedStatuses([]);
+    setSelectedFollowUpDurations([]);
+    setSelectedStatusCheckDurations([]);
+  };
+
+  // Multi-select status helpers
+  const statusOptions = statuses.filter((s) => s !== "All Status");
+  const toggleStatus = (status: string) => {
+    setSelectedStatuses((prev) =>
+      prev.includes(status) ? prev.filter((s) => s !== status) : [...prev, status]
+    );
   };
 
   const isOverdue = (dueDate: string | undefined, status: string) => {
@@ -293,43 +382,229 @@ export default function TasksTable() {
                   </div>
 
                   {/* Filter Controls */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div className="space-y-2">
                       <Label>Priority</Label>
-                      <Select
-                        value={selectedPriority}
-                        onValueChange={setSelectedPriority}
-                      >
-                        <SelectTrigger className="w-full">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {priorities.map((priority) => (
-                            <SelectItem key={priority} value={priority}>
-                              {priority}
-                            </SelectItem>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="outline" className="w-full justify-between">
+                            {selectedPriorities.length ? `${selectedPriorities.length} selected` : "All Priorities"}
+                            <Filter className="ml-2 h-4 w-4 opacity-60" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent className="w-56">
+                          <DropdownMenuLabel>Filter by priority</DropdownMenuLabel>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuCheckboxItem
+                            checked={selectedPriorities.length === 0}
+                            onCheckedChange={(checked) => {
+                              if (checked) setSelectedPriorities([]);
+                            }}
+                          >
+                            All Priorities
+                          </DropdownMenuCheckboxItem>
+                          <DropdownMenuSeparator />
+                          {priorities
+                            .filter((p) => p !== "All Priorities")
+                            .map((priority) => (
+                              <DropdownMenuCheckboxItem
+                                key={priority}
+                                checked={selectedPriorities.includes(priority)}
+                                onCheckedChange={() => {
+                                  setSelectedPriorities((prev) =>
+                                    prev.includes(priority)
+                                      ? prev.filter((p) => p !== priority)
+                                      : [...prev, priority]
+                                  );
+                                }}
+                              >
+                                {priority}
+                              </DropdownMenuCheckboxItem>
+                            ))}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+
+                      {selectedPriorities.length > 0 && (
+                        <div className="flex flex-wrap gap-2 pt-2 justify-end">
+                          {selectedPriorities.map((priority) => (
+                            <Badge key={priority} variant="secondary" className="px-2 py-1">
+                              <span>{priority}</span>
+                              <button
+                                type="button"
+                                aria-label={`Remove ${priority}`}
+                                className="ml-1 inline-flex h-4 w-4 items-center justify-center rounded hover:bg-muted/70"
+                                onClick={() => setSelectedPriorities((prev) => prev.filter((p) => p !== priority))}
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </Badge>
                           ))}
-                        </SelectContent>
-                      </Select>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Status Check</Label>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="outline" className="w-full justify-between">
+                            {selectedStatusCheckDurations.length ? `${selectedStatusCheckDurations.length} selected` : "Any"}
+                            <Filter className="ml-2 h-4 w-4 opacity-60" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent className="w-56">
+                          <DropdownMenuLabel>Filter by status check</DropdownMenuLabel>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuCheckboxItem
+                            checked={selectedStatusCheckDurations.length === 0}
+                            onCheckedChange={(checked) => {
+                              if (checked) setSelectedStatusCheckDurations([]);
+                            }}
+                          >
+                            Any
+                          </DropdownMenuCheckboxItem>
+                          <DropdownMenuSeparator />
+                          {durationOptions.map((opt) => (
+                            <DropdownMenuCheckboxItem
+                              key={opt.value}
+                              checked={selectedStatusCheckDurations.includes(opt.value)}
+                              onCheckedChange={() => {
+                                setSelectedStatusCheckDurations((prev) =>
+                                  prev.includes(opt.value) ? prev.filter((p) => p !== opt.value) : [...prev, opt.value]
+                                );
+                              }}
+                            >
+                              {opt.label}
+                            </DropdownMenuCheckboxItem>
+                          ))}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+
+                      {selectedStatusCheckDurations.length > 0 && (
+                        <div className="flex flex-wrap gap-2 pt-2 justify-end">
+                          {selectedStatusCheckDurations.map((val) => (
+                            <Badge key={val} variant="secondary" className="px-2 py-1">
+                              <span>{durationOptions.find((d) => d.value === val)?.label ?? val}</span>
+                              <button
+                                type="button"
+                                aria-label={`Remove ${val}`}
+                                className="ml-1 inline-flex h-4 w-4 items-center justify-center rounded hover:bg-muted/70"
+                                onClick={() => setSelectedStatusCheckDurations((prev) => prev.filter((p) => p !== val))}
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
                     </div>
 
                     <div className="space-y-2">
                       <Label>Status</Label>
-                      <Select
-                        value={selectedStatus}
-                        onValueChange={setSelectedStatus}
-                      >
-                        <SelectTrigger className="w-full">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {statuses.map((status) => (
-                            <SelectItem key={status} value={status}>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="outline" className="w-full justify-between">
+                            {selectedStatuses.length ? `${selectedStatuses.length} selected` : "All Status"}
+                            <Filter className="ml-2 h-4 w-4 opacity-60" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent className="w-56">
+                          <DropdownMenuLabel>Filter by status</DropdownMenuLabel>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuCheckboxItem
+                            checked={selectedStatuses.length === 0}
+                            onCheckedChange={(checked) => {
+                              if (checked) setSelectedStatuses([]);
+                            }}
+                          >
+                            All Status
+                          </DropdownMenuCheckboxItem>
+                          <DropdownMenuSeparator />
+                          {statusOptions.map((status) => (
+                            <DropdownMenuCheckboxItem
+                              key={status}
+                              checked={selectedStatuses.includes(status)}
+                              onCheckedChange={() => toggleStatus(status)}
+                            >
                               {status}
-                            </SelectItem>
+                            </DropdownMenuCheckboxItem>
                           ))}
-                        </SelectContent>
-                      </Select>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+
+                      {selectedStatuses.length > 0 && (
+                        <div className="flex flex-wrap gap-2 pt-2 justify-end">
+                          {selectedStatuses.map((status) => (
+                            <Badge key={status} variant="secondary" className="px-2 py-1">
+                              <span>{status}</span>
+                              <button
+                                type="button"
+                                aria-label={`Remove ${status}`}
+                                className="ml-1 inline-flex h-4 w-4 items-center justify-center rounded hover:bg-muted/70"
+                                onClick={() => toggleStatus(status)}
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Follow Up</Label>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="outline" className="w-full justify-between">
+                            {selectedFollowUpDurations.length ? `${selectedFollowUpDurations.length} selected` : "Any"}
+                            <Filter className="ml-2 h-4 w-4 opacity-60" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent className="w-56">
+                          <DropdownMenuLabel>Filter by follow up</DropdownMenuLabel>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuCheckboxItem
+                            checked={selectedFollowUpDurations.length === 0}
+                            onCheckedChange={(checked) => {
+                              if (checked) setSelectedFollowUpDurations([]);
+                            }}
+                          >
+                            Any
+                          </DropdownMenuCheckboxItem>
+                          <DropdownMenuSeparator />
+                          {durationOptions.map((opt) => (
+                            <DropdownMenuCheckboxItem
+                              key={opt.value}
+                              checked={selectedFollowUpDurations.includes(opt.value)}
+                              onCheckedChange={() => {
+                                setSelectedFollowUpDurations((prev) =>
+                                  prev.includes(opt.value) ? prev.filter((p) => p !== opt.value) : [...prev, opt.value]
+                                );
+                              }}
+                            >
+                              {opt.label}
+                            </DropdownMenuCheckboxItem>
+                          ))}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+
+                      {selectedFollowUpDurations.length > 0 && (
+                        <div className="flex flex-wrap gap-2 pt-2 justify-end">
+                          {selectedFollowUpDurations.map((val) => (
+                            <Badge key={val} variant="secondary" className="px-2 py-1">
+                              <span>{durationOptions.find((d) => d.value === val)?.label ?? val}</span>
+                              <button
+                                type="button"
+                                aria-label={`Remove ${val}`}
+                                className="ml-1 inline-flex h-4 w-4 items-center justify-center rounded hover:bg-muted/70"
+                                onClick={() => setSelectedFollowUpDurations((prev) => prev.filter((p) => p !== val))}
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
 

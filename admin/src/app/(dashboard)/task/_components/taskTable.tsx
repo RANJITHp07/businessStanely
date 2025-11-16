@@ -30,6 +30,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuCheckboxItem,
 } from "@/components/ui/dropdown-menu"
 import {
   FileText,
@@ -46,26 +47,62 @@ import {
   ChevronsRight,
   AlertCircle,
   Calendar,
+  X,
 } from "lucide-react"
 import Link from "next/link"
 
 import { Task } from "@/types"
 import { useEffect } from "react"
+import { useSearchParams } from "next/navigation"
 
 const priorities = ["All Priorities", "Low", "Medium", "High"]
 const statuses = ["All Status", "To Do", "In Progress", "Hold", "Completed"]
+const durations = ["24hr", "48hr", "1w"]
 
 export default function TasksTable() {
   const [tasks, setTasks] = useState<Task[] | null>(null)
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
-  const [selectedPriority, setSelectedPriority] = useState("All Priorities")
-  const [selectedStatus, setSelectedStatus] = useState("All Status")
+  // Multi-select priorities (empty = all priorities)
+  const [selectedPriorities, setSelectedPriorities] = useState<string[]>([])
+  // Multi-select statuses: empty = all statuses
+  const [selectedStatuses, setSelectedStatuses] = useState<string[]>([])
+  // Multi-select follow up durations
+  const [selectedFollowUpDurations, setSelectedFollowUpDurations] = useState<string[]>([])
+  // Multi-select status check durations
+  const [selectedStatusCheckDurations, setSelectedStatusCheckDurations] = useState<string[]>([])
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(20)
   const [taskToDelete, setTaskToDelete] = useState<Task | null>(null)
 
   const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // Update URL when filters change
+  const updateUrlFilters = (priorities: string[], statuses: string[], search: string) => {
+    const params = new URLSearchParams();
+    if (search) params.set("search", search);
+    if (priorities.length > 0) params.set("priorities", priorities.join(","));
+    if (statuses.length > 0) params.set("statuses", statuses.join(","));
+    
+    const newUrl = params.toString() ? `?${params.toString()}` : window.location.pathname;
+    window.history.replaceState({}, "", newUrl);
+  };
+
+  // Load filters from URL on mount
+  useEffect(() => {
+    try {
+      const urlSearch = searchParams?.get("search");
+      const urlPriorities = searchParams?.get("priorities");
+      const urlStatuses = searchParams?.get("statuses");
+      
+      if (urlSearch) setSearchTerm(urlSearch);
+      if (urlPriorities) setSelectedPriorities(urlPriorities.split(","));
+      if (urlStatuses) setSelectedStatuses(urlStatuses.split(","));
+    } catch (e) {
+      // ignore
+    }
+  }, []);
 
   useEffect(() => {
     const fetchTasks = async () => {
@@ -123,10 +160,12 @@ export default function TasksTable() {
       (task.assignedTo && task.assignedTo.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
       (task.description && task.description.toLowerCase().includes(searchTerm.toLowerCase()));
 
-    const matchesPriority = selectedPriority === "All Priorities" || task.priority.toLowerCase() === selectedPriority.toLowerCase();
-    const matchesStatus = selectedStatus === "All Status" || task.status === selectedStatus;
+    const matchesPriority = selectedPriorities.length === 0 || selectedPriorities.map((p) => p.toLowerCase()).includes((task.priority || "").toLowerCase());
+    const matchesStatus = selectedStatuses.length === 0 || selectedStatuses.includes(task.status);
+    const matchesFollowUp = selectedFollowUpDurations.length === 0 || (task.followUpDuration && selectedFollowUpDurations.includes(task.followUpDuration));
+    const matchesStatusCheck = selectedStatusCheckDurations.length === 0 || (task.statusCheckDuration && selectedStatusCheckDurations.includes(task.statusCheckDuration));
 
-    return matchesSearch && matchesPriority && matchesStatus;
+    return matchesSearch && matchesPriority && matchesStatus && matchesFollowUp && matchesStatusCheck;
   });
 
   // Apply sorting to filtered tasks
@@ -179,8 +218,8 @@ export default function TasksTable() {
 
   const resetFilter = () => {
     setSearchTerm("");
-    setSelectedPriority("All Priorities")
-    setSelectedStatus("All Status")
+  setSelectedPriorities([])
+    setSelectedStatuses([])
   }
 
   const isOverdue = (dueDate: string | undefined, status: string) => {
@@ -192,16 +231,24 @@ export default function TasksTable() {
   //     return <p>Loading...</p>;
   // }
 
+  // Multi-select status helpers
+  const statusOptions = statuses.filter((s) => s !== "All Status")
+  const toggleStatus = (status: string) => {
+    setSelectedStatuses((prev) =>
+      prev.includes(status) ? prev.filter((s) => s !== status) : [...prev, status]
+    )
+  }
+
   return (
-    <div className="w-full container mx-auto px-3 sm:px-4 md:px-6 py-4 md:py-6 max-w-7xl">
-      <div className="mb-6 md:mb-8">
-        <div className="flex flex-col gap-4 md:flex-row md:justify-between md:items-center mb-6">
+    <div className="container mx-auto p-6 max-w-7xl">
+      <div className="mb-8">
+        <div className="flex  flex-col md:flex-row  justify-between md:items-center  mb-6 md:mb-4">
           <div>
-            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold break-words">Task Management</h1>
-            <p className="text-sm sm:text-base text-muted-foreground mt-2">Manage and track all legal tasks and assignments</p>
+            <h1 className="text-3xl font-bold">Task Management</h1>
+            <p className="text-muted-foreground mt-2">Manage and track all legal tasks and assignments</p>
           </div>
-          <Link href="/task/create" className="w-full md:w-auto">
-            <Button className="w-full md:w-auto bg-[#003459] hover:bg-[#003459] text-white rounded-lg px-4 py-2 flex items-center justify-center gap-2 cursor-pointer shadow-none hover:shadow-md transition-shadow duration-300">
+          <Link href="/task/create" className="flex justify-end">
+            <Button className=" mt-[20px] md:mt-none   bg-[#003459] hover:bg-[#003459] text-white rounded-lg px-4 py-2 flex items-center gap-2 cursor-pointer shadow-none hover:shadow-md transition-shadow duration-300">
               <Plus className="h-4 w-4" />
               Create Task
             </Button>
@@ -222,9 +269,9 @@ export default function TasksTable() {
             <CardContent>
               <div className="h-[200px] w-full bg-gray-200 rounded-2xl mb-4"></div>
 
-              <div className="flex flex-col md:flex-row justify-between gap-4">
-                <div className="h-5 w-full md:w-1/2 bg-gray-200 rounded-xl mb-3"></div>
-                <div className="h-5 w-full md:w-1/2 bg-gray-200 rounded-xl mb-3"></div>
+              <div className="flex justify-between gap-4">
+                <div className="h-5 w-1/2 bg-gray-200 rounded-xl mb-3"></div>
+                <div className="h-5 w-1/2 bg-gray-200 rounded-xl mb-3"></div>
               </div>
 
             </CardContent>
@@ -240,62 +287,290 @@ export default function TasksTable() {
 
               <CardContent className="space-y-4">
                 {/* Search */}
-                <div className="flex flex-col items-start gap-2 md:gap-4">
-                  <div className="w-full">
-                    <Label htmlFor="search" className="text-sm sm:text-base">Search Tasks</Label>
-                    <div className="relative mt-2">
+                <div className="flex items-center gap-4">
+                  <div className="flex-1">
+                    <Label htmlFor="search">Search Tasks</Label>
+                    <div className="relative my-2">
                       <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                       <Input
                         id="search"
-                        placeholder="Search by task name, client, agent..."
+                        placeholder="Search by task name, client, agent, or description..."
                         value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="pl-10 text-sm"
+                        onChange={(e) => {
+                          setSearchTerm(e.target.value);
+                          updateUrlFilters(selectedPriorities, selectedStatuses, e.target.value);
+                        }}
+                        className="pl-10"
                       />
                     </div>
                   </div>
                 </div>
 
                 {/* Filter Controls */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                   <div className="space-y-2">
-                    <Label className="text-sm sm:text-base">Priority</Label>
-                    <Select value={selectedPriority} onValueChange={setSelectedPriority}>
-                      <SelectTrigger className="w-full text-sm">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {priorities.map((priority) => (
-                          <SelectItem key={priority} value={priority} className="text-sm">
-                            {priority}
-                          </SelectItem>
+                    <Label>Priority</Label>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" className="w-full justify-between">
+                          {selectedPriorities.length ? `${selectedPriorities.length} selected` : "All Priorities"}
+                          <Filter className="ml-2 h-4 w-4 opacity-60" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent className="w-56">
+                        <DropdownMenuLabel>Filter by priority</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuCheckboxItem
+                          checked={selectedPriorities.length === 0}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setSelectedPriorities([]);
+                            }
+                          }}
+                        >
+                          All Priorities
+                        </DropdownMenuCheckboxItem>
+                        <DropdownMenuSeparator />
+                        {priorities
+                          .filter((p) => p !== "All Priorities")
+                          .map((priority) => (
+                            <DropdownMenuCheckboxItem
+                              key={priority}
+                              checked={selectedPriorities.includes(priority)}
+                              onCheckedChange={() => {
+                                const newPriorities = selectedPriorities.includes(priority)
+                                  ? selectedPriorities.filter((p) => p !== priority)
+                                  : [...selectedPriorities, priority];
+                                setSelectedPriorities(newPriorities);
+                              }}
+                            >
+                              {priority}
+                            </DropdownMenuCheckboxItem>
+                          ))}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+
+                    {selectedPriorities.length > 0 && (
+                      <div className="flex flex-wrap gap-2 pt-2 justify-end">
+                        {selectedPriorities.map((priority) => (
+                          <Badge key={priority} variant="secondary" className="px-2 py-1">
+                            <span>{priority}</span>
+                            <button
+                              type="button"
+                              aria-label={`Remove ${priority}`}
+                              className="ml-1 inline-flex h-4 w-4 items-center justify-center rounded hover:bg-muted/70"
+                              onClick={() => {
+                                const newPriorities = selectedPriorities.filter((p) => p !== priority);
+                                setSelectedPriorities(newPriorities);
+                              }}
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </Badge>
                         ))}
-                      </SelectContent>
-                    </Select>
+                      </div>
+                    )}
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="text-sm sm:text-base">Status</Label>
-                    <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-                      <SelectTrigger className="w-full text-sm">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {statuses.map((status) => (
-                          <SelectItem key={status} value={status} className="text-sm">
+                    <Label>Status</Label>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" className="w-full justify-between">
+                          {selectedStatuses.length ? `${selectedStatuses.length} selected` : "All Status"}
+                          <Filter className="ml-2 h-4 w-4 opacity-60" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent className="w-56">
+                        <DropdownMenuLabel>Filter by status</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuCheckboxItem
+                          checked={selectedStatuses.length === 0}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setSelectedStatuses([]);
+                            }
+                          }}
+                        >
+                          All Status
+                        </DropdownMenuCheckboxItem>
+                        <DropdownMenuSeparator />
+                        {statuses.filter((s) => s !== "All Status").map((status) => (
+                          <DropdownMenuCheckboxItem
+                            key={status}
+                            checked={selectedStatuses.includes(status)}
+                            onCheckedChange={() => {
+                              const newStatuses = selectedStatuses.includes(status)
+                                ? selectedStatuses.filter((s) => s !== status)
+                                : [...selectedStatuses, status];
+                              setSelectedStatuses(newStatuses);
+                            }}
+                          >
                             {status}
-                          </SelectItem>
+                          </DropdownMenuCheckboxItem>
                         ))}
-                      </SelectContent>
-                    </Select>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+
+                    {selectedStatuses.length > 0 && (
+                      <div className="flex flex-wrap gap-2 pt-2 justify-end">
+                        {selectedStatuses.map((status) => (
+                          <Badge key={status} variant="secondary" className="px-2 py-1">
+                            <span>{status}</span>
+                            <button
+                              type="button"
+                              aria-label={`Remove ${status}`}
+                              className="ml-1 inline-flex h-4 w-4 items-center justify-center rounded hover:bg-muted/70"
+                              onClick={() => {
+                                const newStatuses = selectedStatuses.filter((s) => s !== status);
+                                setSelectedStatuses(newStatuses);
+                              }}
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Follow Up Duration</Label>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" className="w-full justify-between">
+                          {selectedFollowUpDurations.length ? `${selectedFollowUpDurations.length} selected` : "All Durations"}
+                          <Filter className="ml-2 h-4 w-4 opacity-60" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent className="w-56">
+                        <DropdownMenuLabel>Filter by follow up duration</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuCheckboxItem
+                          checked={selectedFollowUpDurations.length === 0}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setSelectedFollowUpDurations([]);
+                            }
+                          }}
+                        >
+                          All Durations
+                        </DropdownMenuCheckboxItem>
+                        <DropdownMenuSeparator />
+                        {durations.map((duration) => (
+                          <DropdownMenuCheckboxItem
+                            key={duration}
+                            checked={selectedFollowUpDurations.includes(duration)}
+                            onCheckedChange={() => {
+                              const newDurations = selectedFollowUpDurations.includes(duration)
+                                ? selectedFollowUpDurations.filter((d) => d !== duration)
+                                : [...selectedFollowUpDurations, duration];
+                              setSelectedFollowUpDurations(newDurations);
+                            }}
+                          >
+                            {duration}
+                          </DropdownMenuCheckboxItem>
+                        ))}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+
+                    {selectedFollowUpDurations.length > 0 && (
+                      <div className="flex flex-wrap gap-2 pt-2 justify-end">
+                        {selectedFollowUpDurations.map((duration) => (
+                          <Badge key={duration} variant="secondary" className="px-2 py-1">
+                            <span>{duration}</span>
+                            <button
+                              type="button"
+                              aria-label={`Remove ${duration}`}
+                              className="ml-1 inline-flex h-4 w-4 items-center justify-center rounded hover:bg-muted/70"
+                              onClick={() => {
+                                const newDurations = selectedFollowUpDurations.filter((d) => d !== duration);
+                                setSelectedFollowUpDurations(newDurations);
+                              }}
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Status Check Duration</Label>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" className="w-full justify-between">
+                          {selectedStatusCheckDurations.length ? `${selectedStatusCheckDurations.length} selected` : "All Durations"}
+                          <Filter className="ml-2 h-4 w-4 opacity-60" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent className="w-56">
+                        <DropdownMenuLabel>Filter by status check duration</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuCheckboxItem
+                          checked={selectedStatusCheckDurations.length === 0}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setSelectedStatusCheckDurations([]);
+                            }
+                          }}
+                        >
+                          All Durations
+                        </DropdownMenuCheckboxItem>
+                        <DropdownMenuSeparator />
+                        {durations.map((duration) => (
+                          <DropdownMenuCheckboxItem
+                            key={duration}
+                            checked={selectedStatusCheckDurations.includes(duration)}
+                            onCheckedChange={() => {
+                              const newDurations = selectedStatusCheckDurations.includes(duration)
+                                ? selectedStatusCheckDurations.filter((d) => d !== duration)
+                                : [...selectedStatusCheckDurations, duration];
+                              setSelectedStatusCheckDurations(newDurations);
+                            }}
+                          >
+                            {duration}
+                          </DropdownMenuCheckboxItem>
+                        ))}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+
+                    {selectedStatusCheckDurations.length > 0 && (
+                      <div className="flex flex-wrap gap-2 pt-2 justify-end">
+                        {selectedStatusCheckDurations.map((duration) => (
+                          <Badge key={duration} variant="secondary" className="px-2 py-1">
+                            <span>{duration}</span>
+                            <button
+                              type="button"
+                              aria-label={`Remove ${duration}`}
+                              className="ml-1 inline-flex h-4 w-4 items-center justify-center rounded hover:bg-muted/70"
+                              onClick={() => {
+                                const newDurations = selectedStatusCheckDurations.filter((d) => d !== duration);
+                                setSelectedStatusCheckDurations(newDurations);
+                              }}
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
 
                 {/* Results Summary */}
-                <div className="flex items-center justify-end gap-2 text-xs sm:text-sm text-muted-foreground">
+                <div className="flex items-center justify-end gap-2 text-sm text-muted-foreground">
                   <Button
-                    onClick={resetFilter}
-                    className="cursor-pointer hover:text-white text-white bg-[#f42b03] hover:bg-[#f42b03] rounded-lg px-3 sm:px-4 py-2 text-xs sm:text-sm shadow-none hover:shadow-lg transition-shadow duration-300"
+                    onClick={() => {
+                      setSearchTerm("");
+                      setSelectedPriorities([]);
+                      setSelectedStatuses([]);
+                      setSelectedFollowUpDurations([]);
+                      setSelectedStatusCheckDurations([]);
+                      updateUrlFilters([], [], "");
+                    }}
+                    className="cursor-pointer hover:text-white text-white bg-[#f42b03] hover:bg-[#f42b03] rounded-lg px-4 py-2 shadow-none hover:shadow-lg transition-shadow duration-300"
                     variant="outline"
                   >
                     Clear
@@ -311,11 +586,42 @@ export default function TasksTable() {
 
       <Card>
         <CardHeader>
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
-              <FileText className="h-5 w-5 flex-shrink-0" />
-              <span className="truncate">Tasks ({sortedTasks.length})</span>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              Tasks ({sortedTasks.length})
             </CardTitle>
+            {/* <div className="flex items-center gap-2">
+              <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
+              <Select value={sortBy} onValueChange={setSortBy}>
+                <SelectTrigger className="w-32">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="a-z">A-Z</SelectItem>
+                  <SelectItem value="z-a">Z-A</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select  >
+                <SelectTrigger className="w-28">
+                  <SelectValue className="text-black" placeholder="Priority" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="low">Low</SelectItem>
+                  <SelectItem value="medium">Medium</SelectItem>
+                  <SelectItem value="high">High</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select defaultValue="newest">
+                <SelectTrigger className="w-32">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="newest">Newest</SelectItem>
+                  <SelectItem value="oldest">Oldest</SelectItem>
+                </SelectContent>
+              </Select>
+            </div> */}
           </div>
         </CardHeader>
 
@@ -327,7 +633,23 @@ export default function TasksTable() {
           <>
             <CardContent>
               <div className="rounded-md border">
-                <Table>
+                <Table className="table-fixed min-w-[900px]">
+                  <colgroup>
+                    {/* Task */}
+                    <col className="w-[200px]" />
+                    {/* Client */}
+                    <col className="w-[140px]" />
+                    {/* Ownership to */}
+                    <col className="w-[140px]" />
+                    {/* Priority */}
+                    <col className="w-[100px]" />
+                    {/* Due Date */}
+                    <col className="w-[120px]" />
+                    {/* Progress */}
+                    <col className="w-[100px]" />
+                    {/* Actions */}
+                    <col className="w-[70px]" />
+                  </colgroup>
                   <TableHeader>
                     <TableRow>
                       <TableHead>Task</TableHead>
@@ -344,22 +666,33 @@ export default function TasksTable() {
                   <TableBody>
                     {currentTasks.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                        <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                           No tasks found matching your criteria.
                         </TableCell>
                       </TableRow>
                     ) : (
                       currentTasks.map((task) => {
+                        const clientName = task.client
+                          ? (task.client.clientType === "individual"
+                              ? `${task.client.firstName} ${task.client.lastName}`
+                              : (task.client.organizationName ?? "N/A"))
+                          : "N/A";
+                        const clientEmail = task.client?.email ?? "";
+                        const ownerName = task.assignedTo?.name ?? "";
+                        const ownerType = task.assignedTo?.agentType ?? "";
                         return (
                           <TableRow
                             key={task.id}
                             onClick={() => router.push(`/task/${task.id}`)}
-                            className={`cursor-pointer hover:bg-muted/50  ${isOverdue(task.dueDate, task.status) ? "bg-red-50" : ""
-                              }`}
+                            className={`cursor-pointer hover:bg-muted/50 ${
+                              isOverdue(task.dueDate, task.status) ? "bg-red-50" : 
+                              task.followUpDuration && task.followUpDuration !== 'None' ? "bg-blue-50" :
+                              task.statusCheckDuration && task.statusCheckDuration !== 'None' ? "bg-green-50" : ""
+                            }`}
                           >
-                            <TableCell className="max-w-36 truncate overflow-hidden whitespace-nowrap">
+                            <TableCell className="overflow-hidden">
                               <div className="space-y-1">
-                                <div className="font-medium">{task.title}</div>
+                                <div className="font-medium truncate" title={task.title}>{task.title}</div>
                                 {/* Show approved category only */}
                                 {task.category && task.category.status === 'approved' && (
                                   <div className="text-xs mt-1">
@@ -370,19 +703,15 @@ export default function TasksTable() {
                                 )}
                               </div>
                             </TableCell>
-                            <TableCell>
+                            <TableCell className="overflow-hidden">
                               <div className="space-y-1">
-                                <div className="font-medium">
-                                  {task.client
-                                    ? task.client.clientType === "individual"
-                                      ? `${task.client.firstName} ${task.client.lastName}`
-                                      : task.client.organizationName
-                                    : "N/A"}
+                                <div className="font-medium truncate" title={clientName === "N/A" ? undefined : clientName}>
+                                  {clientName}
                                 </div>
-                                <div className="text-sm text-muted-foreground">{task.client?.email}</div>
+                                <div className="text-sm text-muted-foreground truncate" title={clientEmail}>{clientEmail}</div>
                               </div>
                             </TableCell>
-                            <TableCell>
+                            <TableCell className="overflow-hidden">
                               <div className="flex items-center space-x-2">
                                 <Avatar className="h-8 w-8">
                                   <AvatarFallback className="text-xs">
@@ -394,8 +723,8 @@ export default function TasksTable() {
                                   </AvatarFallback>
                                 </Avatar>
                                 <div>
-                                  <div className="font-medium text-sm">{task.assignedTo?.name}</div>
-                                  <div className="text-xs text-muted-foreground">{task.assignedTo?.agentType}</div>
+                                  <div className="font-medium text-sm truncate" title={ownerName || undefined}>{ownerName}</div>
+                                  <div className="text-xs text-muted-foreground truncate" title={ownerType || undefined}>{ownerType}</div>
                                 </div>
                               </div>
                             </TableCell>
@@ -421,7 +750,7 @@ export default function TasksTable() {
                               </div>
                             </TableCell>
                             <TableCell
-                              className="text-right"
+                              className="text-right overflow-visible"
                               onClick={(e) => e.stopPropagation()}
                             >
                               <DropdownMenu>

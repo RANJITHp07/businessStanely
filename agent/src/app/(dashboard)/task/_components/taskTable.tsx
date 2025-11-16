@@ -52,6 +52,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { DropdownMenuCheckboxItem } from "@/components/ui/dropdown-menu";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -62,25 +63,67 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { FileText, Search, Filter } from "lucide-react";
+import { FileText, Search, Filter, ArrowUpDown } from "lucide-react";
 import Link from "next/link";
 
 import { Task } from "@/types";
 import { useEffect } from "react";
+import { useSearchParams } from "next/navigation";
+import { X } from "lucide-react";
 
 const priorities = ["All Priorities", "Low", "Medium", "High"];
 const statuses = ["All Status", "To Do", "In Progress", "Hold", "Completed"];
+const durations = ["24hr", "48hr", "1w"];
 
 export default function TasksTable() {
   const router = useRouter();
   const [tasks, setTasks] = useState<Task[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedPriority, setSelectedPriority] = useState("All Priorities");
-  const [selectedStatus, setSelectedStatus] = useState("All Status");
+  // Multi-select priorities (empty = all priorities)
+  const [selectedPriorities, setSelectedPriorities] = useState<string[]>([]);
+  // Multi-select statuses (empty = all statuses)
+  const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
+  // Multi-select follow up durations
+  const [selectedFollowUpDurations, setSelectedFollowUpDurations] = useState<string[]>([]);
+  // Multi-select status check durations
+  const [selectedStatusCheckDurations, setSelectedStatusCheckDurations] = useState<string[]>([]);
+  const [sortBy, setSortBy] = useState("a-z");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
   const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
+
+  // Map a status query param into the select label used by this component
+  const mapQueryToStatusLabel = (q: string | null) => {
+    if (!q) return "All Status";
+    const k = q.toLowerCase().replace(/[-_\s]/g, "");
+    if (k.includes("todo") || k === "to") return "To Do";
+    if (k.includes("progress") || k.includes("inprogress"))
+      return "In Progress";
+    if (k.includes("completed")) return "Completed";
+    if (k.includes("hold")) return "Hold";
+    // Fallback: title-case the provided value
+    return q
+      .split(/[-_\s]/)
+      .map((s) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase())
+      .join(" ");
+  };
+
+  // Read ?status=... from the URL and apply it to the status filter on mount
+  const searchParams = useSearchParams();
+  useEffect(() => {
+    try {
+      const q = searchParams?.get("status");
+      if (q) {
+        const mapped = mapQueryToStatusLabel(q);
+        setSelectedStatuses([mapped]);
+        setCurrentPage(1);
+      }
+    } catch (e) {
+      // ignore
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   const handleDelete = async () => {
     if (!taskToDelete) return;
@@ -121,6 +164,18 @@ export default function TasksTable() {
     fetchTasks();
   }, []);
 
+  // Sort function
+  const sortTasks = (tasks: Task[], sortBy: string) => {
+    return [...tasks].sort((a, b) => {
+      if (sortBy === "a-z") {
+        return a.title.localeCompare(b.title);
+      } else if (sortBy === "z-a") {
+        return b.title.localeCompare(a.title);
+      }
+      return 0;
+    });
+  };
+
   // Filter tasks based on search and filters only (backend already filters approved tasks)
   const filteredTasks = (tasks || []).filter((task) => {
     const matchesSearch =
@@ -140,12 +195,14 @@ export default function TasksTable() {
         task.description.toLowerCase().includes(searchTerm.toLowerCase()));
 
     const matchesPriority =
-      selectedPriority === "All Priorities" ||
-      task.priority.toLowerCase() === selectedPriority.toLowerCase();
+      selectedPriorities.length === 0 ||
+      selectedPriorities.map((p) => p.toLowerCase()).includes((task.priority || "").toLowerCase());
     const matchesStatus =
-      selectedStatus === "All Status" || task.status === selectedStatus;
+      selectedStatuses.length === 0 || selectedStatuses.includes(task.status);
+    const matchesFollowUp = selectedFollowUpDurations.length === 0 || (task.followUpDuration && selectedFollowUpDurations.includes(task.followUpDuration));
+    const matchesStatusCheck = selectedStatusCheckDurations.length === 0 || (task.statusCheckDuration && selectedStatusCheckDurations.includes(task.statusCheckDuration));
 
-    return matchesSearch && matchesPriority && matchesStatus;
+    return matchesSearch && matchesPriority && matchesStatus && matchesFollowUp && matchesStatusCheck;
   });
 
   // Apply sorting to filtered tasks
@@ -165,6 +222,32 @@ export default function TasksTable() {
     setItemsPerPage(Number.parseInt(value));
     setCurrentPage(1);
   };
+
+  // Update URL when filters change
+  const updateUrlFilters = (priorities: string[], statuses: string[], search: string) => {
+    const params = new URLSearchParams();
+    if (search) params.set("search", search);
+    if (priorities.length > 0) params.set("priorities", priorities.join(","));
+    if (statuses.length > 0) params.set("statuses", statuses.join(","));
+    
+    const newUrl = params.toString() ? `?${params.toString()}` : window.location.pathname;
+    window.history.replaceState({}, "", newUrl);
+  };
+
+  // Load filters from URL on mount
+  useEffect(() => {
+    try {
+      const urlSearch = searchParams?.get("search");
+      const urlPriorities = searchParams?.get("priorities");
+      const urlStatuses = searchParams?.get("statuses");
+      
+      if (urlSearch) setSearchTerm(urlSearch);
+      if (urlPriorities) setSelectedPriorities(urlPriorities.split(","));
+      if (urlStatuses) setSelectedStatuses(urlStatuses.split(","));
+    } catch (e) {
+      // ignore
+    }
+  }, []);
 
   const getPriorityBadge = (priority: string) => {
     const colors = {
@@ -198,8 +281,16 @@ export default function TasksTable() {
 
   const resetFilter = () => {
     setSearchTerm("");
-    setSelectedPriority("All Priorities");
-    setSelectedStatus("All Status");
+    setSelectedPriorities([]);
+    setSelectedStatuses([]);
+  };
+
+  // Multi-select status helpers
+  const statusOptions = statuses.filter((s) => s !== "All Status");
+  const toggleStatus = (status: string) => {
+    setSelectedStatuses((prev) =>
+      prev.includes(status) ? prev.filter((s) => s !== status) : [...prev, status]
+    );
   };
 
   const isOverdue = (dueDate: string | undefined, status: string) => {
@@ -263,68 +354,296 @@ export default function TasksTable() {
 
                 <CardContent className="space-y-4">
                   {/* Search */}
-                  <div className="flex items-start gap-2 md:gap-4 flex-col">
-                    <div className="w-full flex-1">
-                      <Label htmlFor="search" className="text-sm sm:text-base">Search Tasks</Label>
-                      <div className="relative mt-2">
+                  <div className="flex items-center gap-4">
+                    <div className="flex-1">
+                      <Label htmlFor="search">Search Tasks</Label>
+                      <div className="relative my-2">
                         <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                         <Input
                           id="search"
                           placeholder="Search by task name, client, agent, or description..."
                           value={searchTerm}
-                          onChange={(e) => setSearchTerm(e.target.value)}
-                          className="pl-10 text-sm"
+                          onChange={(e) => {
+                            setSearchTerm(e.target.value);
+                            updateUrlFilters(selectedPriorities, selectedStatuses, e.target.value);
+                          }}
+                          className="pl-10"
                         />
                       </div>
                     </div>
                   </div>
 
                   {/* Filter Controls */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div className="space-y-2">
-                      <Label className="text-sm sm:text-base">Priority</Label>
-                      <Select
-                        value={selectedPriority}
-                        onValueChange={setSelectedPriority}
-                      >
-                        <SelectTrigger className="w-full text-sm">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {priorities.map((priority) => (
-                            <SelectItem key={priority} value={priority} className="text-sm">
-                              {priority}
-                            </SelectItem>
+                      <Label>Priority</Label>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="outline" className="w-full justify-between">
+                            {selectedPriorities.length ? `${selectedPriorities.length} selected` : "All Priorities"}
+                            <Filter className="ml-2 h-4 w-4 opacity-60" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent className="w-56">
+                          <DropdownMenuLabel>Filter by priority</DropdownMenuLabel>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuCheckboxItem
+                            checked={selectedPriorities.length === 0}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setSelectedPriorities([]);
+                                updateUrlFilters([], selectedStatuses, searchTerm);
+                              }
+                            }}
+                          >
+                            All Priorities
+                          </DropdownMenuCheckboxItem>
+                          <DropdownMenuSeparator />
+                          {priorities
+                            .filter((p) => p !== "All Priorities")
+                            .map((priority) => (
+                              <DropdownMenuCheckboxItem
+                                key={priority}
+                                checked={selectedPriorities.includes(priority)}
+                                onCheckedChange={() => {
+                                  const newPriorities = selectedPriorities.includes(priority)
+                                    ? selectedPriorities.filter((p) => p !== priority)
+                                    : [...selectedPriorities, priority];
+                                  setSelectedPriorities(newPriorities);
+                                  updateUrlFilters(newPriorities, selectedStatuses, searchTerm);
+                                }}
+                              >
+                                {priority}
+                              </DropdownMenuCheckboxItem>
+                            ))}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+
+                      {selectedPriorities.length > 0 && (
+                        <div className="flex flex-wrap gap-2 pt-2 justify-end">
+                          {selectedPriorities.map((priority) => (
+                            <Badge key={priority} variant="secondary" className="px-2 py-1">
+                              <span>{priority}</span>
+                              <button
+                                type="button"
+                                aria-label={`Remove ${priority}`}
+                                className="ml-1 inline-flex h-4 w-4 items-center justify-center rounded hover:bg-muted/70"
+                                onClick={() => {
+                                  const newPriorities = selectedPriorities.filter((p) => p !== priority);
+                                  setSelectedPriorities(newPriorities);
+                                  updateUrlFilters(newPriorities, selectedStatuses, searchTerm);
+                                }}
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </Badge>
                           ))}
-                        </SelectContent>
-                      </Select>
+                        </div>
+                      )}
                     </div>
 
                     <div className="space-y-2">
-                      <Label className="text-sm sm:text-base">Status</Label>
-                      <Select
-                        value={selectedStatus}
-                        onValueChange={setSelectedStatus}
-                      >
-                        <SelectTrigger className="w-full text-sm">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {statuses.map((status) => (
-                            <SelectItem key={status} value={status} className="text-sm">
+                      <Label>Status</Label>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="outline" className="w-full justify-between">
+                            {selectedStatuses.length ? `${selectedStatuses.length} selected` : "All Status"}
+                            <Filter className="ml-2 h-4 w-4 opacity-60" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent className="w-56">
+                          <DropdownMenuLabel>Filter by status</DropdownMenuLabel>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuCheckboxItem
+                            checked={selectedStatuses.length === 0}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setSelectedStatuses([]);
+                                updateUrlFilters(selectedPriorities, [], searchTerm);
+                              }
+                            }}
+                          >
+                            All Status
+                          </DropdownMenuCheckboxItem>
+                          <DropdownMenuSeparator />
+                          {statusOptions.map((status) => (
+                            <DropdownMenuCheckboxItem
+                              key={status}
+                              checked={selectedStatuses.includes(status)}
+                              onCheckedChange={() => {
+                                const newStatuses = selectedStatuses.includes(status)
+                                  ? selectedStatuses.filter((s) => s !== status)
+                                  : [...selectedStatuses, status];
+                                setSelectedStatuses(newStatuses);
+                                updateUrlFilters(selectedPriorities, newStatuses, searchTerm);
+                              }}
+                            >
                               {status}
-                            </SelectItem>
+                            </DropdownMenuCheckboxItem>
                           ))}
-                        </SelectContent>
-                      </Select>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+
+                      {selectedStatuses.length > 0 && (
+                        <div className="flex flex-wrap gap-2 pt-2 justify-end">
+                          {selectedStatuses.map((status) => (
+                            <Badge key={status} variant="secondary" className="px-2 py-1">
+                              <span>{status}</span>
+                              <button
+                                type="button"
+                                aria-label={`Remove ${status}`}
+                                className="ml-1 inline-flex h-4 w-4 items-center justify-center rounded hover:bg-muted/70"
+                                onClick={() => {
+                                  const newStatuses = selectedStatuses.filter((s) => s !== status);
+                                  setSelectedStatuses(newStatuses);
+                                  updateUrlFilters(selectedPriorities, newStatuses, searchTerm);
+                                }}
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Follow Up Duration</Label>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="outline" className="w-full justify-between">
+                            {selectedFollowUpDurations.length ? `${selectedFollowUpDurations.length} selected` : "All Durations"}
+                            <Filter className="ml-2 h-4 w-4 opacity-60" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent className="w-56">
+                          <DropdownMenuLabel>Filter by follow up duration</DropdownMenuLabel>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuCheckboxItem
+                            checked={selectedFollowUpDurations.length === 0}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setSelectedFollowUpDurations([]);
+                              }
+                            }}
+                          >
+                            All Durations
+                          </DropdownMenuCheckboxItem>
+                          <DropdownMenuSeparator />
+                          {durations.map((duration) => (
+                            <DropdownMenuCheckboxItem
+                              key={duration}
+                              checked={selectedFollowUpDurations.includes(duration)}
+                              onCheckedChange={() => {
+                                const newDurations = selectedFollowUpDurations.includes(duration)
+                                  ? selectedFollowUpDurations.filter((d) => d !== duration)
+                                  : [...selectedFollowUpDurations, duration];
+                                setSelectedFollowUpDurations(newDurations);
+                              }}
+                            >
+                              {duration}
+                            </DropdownMenuCheckboxItem>
+                          ))}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+
+                      {selectedFollowUpDurations.length > 0 && (
+                        <div className="flex flex-wrap gap-2 pt-2 justify-end">
+                          {selectedFollowUpDurations.map((duration) => (
+                            <Badge key={duration} variant="secondary" className="px-2 py-1">
+                              <span>{duration}</span>
+                              <button
+                                type="button"
+                                aria-label={`Remove ${duration}`}
+                                className="ml-1 inline-flex h-4 w-4 items-center justify-center rounded hover:bg-muted/70"
+                                onClick={() => {
+                                  const newDurations = selectedFollowUpDurations.filter((d) => d !== duration);
+                                  setSelectedFollowUpDurations(newDurations);
+                                }}
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Status Check Duration</Label>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="outline" className="w-full justify-between">
+                            {selectedStatusCheckDurations.length ? `${selectedStatusCheckDurations.length} selected` : "All Durations"}
+                            <Filter className="ml-2 h-4 w-4 opacity-60" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent className="w-56">
+                          <DropdownMenuLabel>Filter by status check duration</DropdownMenuLabel>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuCheckboxItem
+                            checked={selectedStatusCheckDurations.length === 0}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setSelectedStatusCheckDurations([]);
+                              }
+                            }}
+                          >
+                            All Durations
+                          </DropdownMenuCheckboxItem>
+                          <DropdownMenuSeparator />
+                          {durations.map((duration) => (
+                            <DropdownMenuCheckboxItem
+                              key={duration}
+                              checked={selectedStatusCheckDurations.includes(duration)}
+                              onCheckedChange={() => {
+                                const newDurations = selectedStatusCheckDurations.includes(duration)
+                                  ? selectedStatusCheckDurations.filter((d) => d !== duration)
+                                  : [...selectedStatusCheckDurations, duration];
+                                setSelectedStatusCheckDurations(newDurations);
+                              }}
+                            >
+                              {duration}
+                            </DropdownMenuCheckboxItem>
+                          ))}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+
+                      {selectedStatusCheckDurations.length > 0 && (
+                        <div className="flex flex-wrap gap-2 pt-2 justify-end">
+                          {selectedStatusCheckDurations.map((duration) => (
+                            <Badge key={duration} variant="secondary" className="px-2 py-1">
+                              <span>{duration}</span>
+                              <button
+                                type="button"
+                                aria-label={`Remove ${duration}`}
+                                className="ml-1 inline-flex h-4 w-4 items-center justify-center rounded hover:bg-muted/70"
+                                onClick={() => {
+                                  const newDurations = selectedStatusCheckDurations.filter((d) => d !== duration);
+                                  setSelectedStatusCheckDurations(newDurations);
+                                }}
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
 
                   {/* Results Summary */}
-                  <div className="flex items-center justify-end gap-2 text-xs sm:text-sm text-muted-foreground">
+                  <div className="flex items-center justify-end gap-2 text-sm text-muted-foreground">
                     <Button
-                      onClick={resetFilter}
-                      className="cursor-pointer hover:text-white text-white bg-[#f42b03] hover:bg-[#f42b03] rounded-lg px-3 sm:px-4 py-2 text-xs sm:text-sm shadow-none hover:shadow-lg transition-shadow duration-300"
+                      onClick={() => {
+                        setSearchTerm("");
+                        setSelectedPriorities([]);
+                        setSelectedStatuses([]);
+                        setSelectedFollowUpDurations([]);
+                        setSelectedStatusCheckDurations([]);
+                        updateUrlFilters([], [], "");
+                      }}
+                      className="cursor-pointer hover:text-white text-white bg-[#f42b03] hover:bg-[#f42b03] rounded-lg px-4 py-2 shadow-none hover:shadow-lg transition-shadow duration-300"
                       variant="outline"
                     >
                       Clear
@@ -338,11 +657,42 @@ export default function TasksTable() {
 
         <Card>
           <CardHeader>
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
-                <FileText className="h-5 w-5 flex-shrink-0" />
-                <span className="truncate">Tasks ({sortedTasks.length})</span>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <FileText className="h-5 w-5" />
+                Tasks ({sortedTasks.length})
               </CardTitle>
+              {/* <div className="flex items-center gap-2">
+                  <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
+                  <Select value={sortBy} onValueChange={setSortBy}>
+                    <SelectTrigger className="w-32">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="a-z">A-Z</SelectItem>
+                      <SelectItem value="z-a">Z-A</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select>
+                    <SelectTrigger className="w-28">
+                      <SelectValue className="text-black" placeholder="Priority" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="low">Low</SelectItem>
+                      <SelectItem value="medium">Medium</SelectItem>
+                      <SelectItem value="high">High</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select defaultValue="newest">
+                    <SelectTrigger className="w-32">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="newest">Newest</SelectItem>
+                      <SelectItem value="oldest">Oldest</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div> */}
             </div>
           </CardHeader>
 
@@ -352,19 +702,18 @@ export default function TasksTable() {
             </div>
           ) : (
             <>
-              <CardContent className="p-3 sm:p-6">
-                {/* Desktop Table View */}
-                <div className="hidden md:block rounded-md border overflow-hidden">
+              <CardContent>
+                <div className="rounded-md border">
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="text-xs sm:text-sm">Task</TableHead>
-                        <TableHead className="text-xs sm:text-sm">Client</TableHead>
-                        <TableHead className="text-xs sm:text-sm">Assigned To</TableHead>
-                        <TableHead className="text-xs sm:text-sm">Priority</TableHead>
-                        <TableHead className="text-xs sm:text-sm">Due Date</TableHead>
-                        <TableHead className="text-xs sm:text-sm">Progress</TableHead>
-                        <TableHead className="text-xs sm:text-sm text-right">Actions</TableHead>
+                        <TableHead>Task</TableHead>
+                        <TableHead>Client</TableHead>
+                        <TableHead>Assigned To</TableHead>
+                        <TableHead>Priority</TableHead>
+                        <TableHead>Due Date</TableHead>
+                        <TableHead>Progress</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
 
@@ -373,7 +722,7 @@ export default function TasksTable() {
                         <TableRow>
                           <TableCell
                             colSpan={7}
-                            className="text-center py-8 text-sm text-muted-foreground"
+                            className="text-center py-8 text-muted-foreground"
                           >
                             No tasks found matching your criteria.
                           </TableCell>
@@ -384,42 +733,43 @@ export default function TasksTable() {
                             <TableRow
                               key={task.id}
                               onClick={() => router.push(`/task/${task.id}`)}
-                              className={`cursor-pointer hover:bg-muted/50 ${isOverdue(task.dueDate, task.status)
-                                ? "bg-red-50"
-                                : ""
-                                }`}
+                              className={`cursor-pointer hover:bg-muted/50 ${
+                                isOverdue(task.dueDate, task.status) ? "bg-red-50" : 
+                                task.followUpDuration && task.followUpDuration !== 'None' ? "bg-blue-50" :
+                                task.statusCheckDuration && task.statusCheckDuration !== 'None' ? "bg-green-50" : ""
+                              }`}
                             >
-                   <TableCell className="max-w-40">
-  <div className="space-y-1">
-    <div className="font-medium text-sm truncate">
-      {task.title}
-    </div>
-    {/* Show approved category only */}
-    {task.category &&
-      task.category.status === "approved" && (
-        <div className="text-xs mt-1">
-          <span className="inline-block px-2 py-1 rounded bg-blue-100 text-blue-800 border border-blue-200 max-w-full truncate">
-            {task.category.name}
-          </span>
-        </div>
-      )}
-  </div>
-</TableCell>
+                              <TableCell className="max-w-36 truncate overflow-hidden whitespace-nowrap">
+                                <div className="space-y-1">
+                                  <div className="font-medium">
+                                    {task.title}
+                                  </div>
+                                  {/* Show approved category only */}
+                                  {task.category &&
+                                    task.category.status === "approved" && (
+                                      <div className="text-xs mt-1">
+                                        <span className="inline-block px-2 py-1 rounded bg-blue-100 text-blue-800 border border-blue-200">
+                                          {task.category.name}
+                                        </span>
+                                      </div>
+                                    )}
+                                </div>
+                              </TableCell>
                               <TableCell>
                                 <div className="space-y-1">
-                                  <div className="font-medium text-sm truncate">
+                                  <div className="font-medium">
                                     {task.client
                                       ? task.client.name || "N/A"
                                       : "N/A"}
                                   </div>
-                                  <div className="text-xs text-muted-foreground truncate">
+                                  <div className="text-sm text-muted-foreground">
                                     {task.client?.email}
                                   </div>
                                 </div>
                               </TableCell>
                               <TableCell>
                                 <div className="flex items-center space-x-2">
-                                  <Avatar className="h-8 w-8 flex-shrink-0">
+                                  <Avatar className="h-8 w-8">
                                     <AvatarFallback className="text-xs">
                                       {task.assignedTo?.name
                                         .toUpperCase()
@@ -428,28 +778,28 @@ export default function TasksTable() {
                                         .join("")}
                                     </AvatarFallback>
                                   </Avatar>
-                                  <div className="min-w-0">
-                                    <div className="font-medium text-xs truncate">
+                                  <div>
+                                    <div className="font-medium text-sm">
                                       {task.assignedTo?.name}
                                     </div>
-                                    <div className="text-xs text-muted-foreground truncate">
+                                    <div className="text-xs text-muted-foreground">
                                       {task.assignedTo?.agentType}
                                     </div>
                                   </div>
                                 </div>
                               </TableCell>
-                              <TableCell className="text-xs">
+                              <TableCell>
                                 {getPriorityBadge(task.priority)}
                               </TableCell>
                               <TableCell>
                                 <div className="flex items-center gap-1">
-                                  <Calendar className="h-3 w-3 text-muted-foreground" />
+                                  <Calendar className="h-4 w-4 text-muted-foreground" />
                                   <span
-                                    className={`text-xs ${
+                                    className={
                                       isOverdue(task.dueDate, task.status)
                                         ? "text-red-600 font-medium"
                                         : ""
-                                    }`}
+                                    }
                                   >
                                     {task.dueDate
                                       ? formatDate(task.dueDate)
@@ -469,7 +819,7 @@ export default function TasksTable() {
                               <TableCell>
                                 <div className="space-y-2">
                                   <div className="flex items-center justify-between">
-                                    <span className="text-xs font-medium">
+                                    <span className="text-sm font-medium">
                                       {task.status}
                                     </span>
                                   </div>
@@ -490,7 +840,7 @@ export default function TasksTable() {
                                     </Button>
                                   </DropdownMenuTrigger>
                                   <DropdownMenuContent align="end">
-                                    <DropdownMenuLabel className="text-sm">
+                                    <DropdownMenuLabel>
                                       Actions
                                     </DropdownMenuLabel>
                                     <DropdownMenuItem asChild>
@@ -508,7 +858,7 @@ export default function TasksTable() {
                                     <DropdownMenuSeparator />
                                     <DropdownMenuItem
                                       onClick={() => setTaskToDelete(task)}
-                                      className="text-destructive"
+                                      className="text-red-600 focus:text-red-600"
                                     >
                                       <Trash2 className="mr-2 h-4 w-4" />
                                       Delete Task
@@ -524,128 +874,23 @@ export default function TasksTable() {
                   </Table>
                 </div>
 
-                {/* Mobile Table View */}
-                <div className="md:hidden border rounded-md overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead className="text-xs">Task</TableHead>
-                        <TableHead className="text-xs">Priority</TableHead>
-                        <TableHead className="text-xs text-right">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-
-                    <TableBody>
-                      {currentTasks.length === 0 ? (
-                        <TableRow>
-                          <TableCell
-                            colSpan={3}
-                            className="text-center py-8 text-xs text-muted-foreground"
-                          >
-                            No tasks found matching your criteria.
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        currentTasks.map((task) => {
-                          return (
-                            <TableRow
-                              key={task.id}
-                              onClick={() => router.push(`/task/${task.id}`)}
-                              className={`cursor-pointer hover:bg-muted/50 ${isOverdue(task.dueDate, task.status)
-                                ? "bg-red-50"
-                                : ""
-                                }`}
-                            >
-                              <TableCell>
-                                <div className="space-y-1">
-                                  <div className="font-medium text-xs truncate">
-                                    {task.title}
-                                  </div>
-                                  <div className="text-xs text-muted-foreground">
-                                    <div>{task.client?.name || "N/A"}</div>
-                                    {task.dueDate && (
-                                      <div className="flex items-center gap-1 mt-1">
-                                        <Calendar className="h-3 w-3" />
-                                        <span className={isOverdue(task.dueDate, task.status) ? "text-red-600 font-medium" : ""}>
-                                          {formatDate(task.dueDate)}
-                                        </span>
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              </TableCell>
-                              <TableCell className="text-xs">
-                                <div className="space-y-1">
-                                  {getPriorityBadge(task.priority)}
-                                  <div className="text-xs font-medium">{task.status}</div>
-                                </div>
-                              </TableCell>
-                              <TableCell
-                                className="text-right"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild>
-                                    <Button
-                                      variant="ghost"
-                                      className="h-7 w-7 p-0"
-                                    >
-                                      <span className="sr-only">Open menu</span>
-                                      <MoreHorizontal className="h-3 w-3" />
-                                    </Button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end">
-                                    <DropdownMenuLabel className="text-xs">
-                                      Actions
-                                    </DropdownMenuLabel>
-                                    <DropdownMenuItem asChild>
-                                      <Link href={`/task/${task.id}`}>
-                                        <Eye className="mr-2 h-3 w-3" />
-                                        <span className="text-xs">View Details</span>
-                                      </Link>
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem asChild>
-                                      <Link href={`/task/${task.id}/edit`}>
-                                        <Edit className="mr-2 h-3 w-3" />
-                                        <span className="text-xs">Edit Task</span>
-                                      </Link>
-                                    </DropdownMenuItem>
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuItem
-                                      onClick={() => setTaskToDelete(task)}
-                                      className="text-destructive text-xs"
-                                    >
-                                      <Trash2 className="mr-2 h-3 w-3" />
-                                      Delete Task
-                                    </DropdownMenuItem>
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })
-                      )}
-                    </TableBody>
-                  </Table>
-                </div>
-
                 {/* Pagination */}
                 {totalPages > 1 && (
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mt-6 pt-4 border-t">
-                    <div className="text-xs sm:text-sm text-muted-foreground">
+                  <div className="flex items-center justify-between space-x-2 py-4">
+                    <div className="text-sm text-muted-foreground">
                       Page {currentPage} of {totalPages}
                     </div>
-                    <div className="flex items-center flex-wrap gap-2">
+                    <div className="flex items-center space-x-2">
                       <Select
                         value={itemsPerPage.toString()}
                         onValueChange={handleItemsPerPageChange}
                       >
-                        <SelectTrigger className="w-24 text-xs sm:text-sm">
+                        <SelectTrigger className="w-24">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
                           {[5, 10, 20, 50].map((value) => (
-                            <SelectItem key={value} value={value.toString()} className="text-xs sm:text-sm">
+                            <SelectItem key={value} value={value.toString()}>
                               {value} / page
                             </SelectItem>
                           ))}
@@ -656,7 +901,6 @@ export default function TasksTable() {
                         size="sm"
                         onClick={() => handlePageChange(1)}
                         disabled={currentPage === 1}
-                        className="text-xs"
                       >
                         <ChevronsLeft className="h-4 w-4" />
                       </Button>
@@ -665,49 +909,44 @@ export default function TasksTable() {
                         size="sm"
                         onClick={() => handlePageChange(currentPage - 1)}
                         disabled={currentPage === 1}
-                        className="text-xs"
                       >
                         <ChevronLeft className="h-4 w-4" />
                       </Button>
 
-                      {/* Page Numbers - Hidden on mobile */}
-                      <div className="hidden sm:flex items-center gap-1">
-                        {Array.from(
-                          { length: Math.min(5, totalPages) },
-                          (_, i) => {
-                            const pageNumber =
-                              Math.max(
-                                1,
-                                Math.min(totalPages - 4, currentPage - 2)
-                              ) + i;
-                            if (pageNumber <= totalPages) {
-                              return (
-                                <Button
-                                  key={pageNumber}
-                                  variant={
-                                    currentPage === pageNumber
-                                      ? "default"
-                                      : "outline"
-                                  }
-                                  size="sm"
-                                  onClick={() => handlePageChange(pageNumber)}
-                                  className="text-xs"
-                                >
-                                  {pageNumber}
-                                </Button>
-                              );
-                            }
-                            return null;
+                      {/* Page Numbers */}
+                      {Array.from(
+                        { length: Math.min(5, totalPages) },
+                        (_, i) => {
+                          const pageNumber =
+                            Math.max(
+                              1,
+                              Math.min(totalPages - 4, currentPage - 2)
+                            ) + i;
+                          if (pageNumber <= totalPages) {
+                            return (
+                              <Button
+                                key={pageNumber}
+                                variant={
+                                  currentPage === pageNumber
+                                    ? "default"
+                                    : "outline"
+                                }
+                                size="sm"
+                                onClick={() => handlePageChange(pageNumber)}
+                              >
+                                {pageNumber}
+                              </Button>
+                            );
                           }
-                        )}
-                      </div>
+                          return null;
+                        }
+                      )}
 
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => handlePageChange(currentPage + 1)}
                         disabled={currentPage === totalPages}
-                        className="text-xs"
                       >
                         <ChevronRight className="h-4 w-4" />
                       </Button>
@@ -716,7 +955,6 @@ export default function TasksTable() {
                         size="sm"
                         onClick={() => handlePageChange(totalPages)}
                         disabled={currentPage === totalPages}
-                        className="text-xs"
                       >
                         <ChevronsRight className="h-4 w-4" />
                       </Button>

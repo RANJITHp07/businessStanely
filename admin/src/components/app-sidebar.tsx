@@ -54,9 +54,14 @@ const items = [
     url: "/client",
     icon: UserSearch,
   },
-  {
+  // {
+  //   title: "Task",
+  //   url: "/task",
+  //   icon: ClipboardCheck,
+  // },
+   {
     title: "Task",
-    url: "/task",
+    url: "/my-task",
     icon: ClipboardCheck,
   },
   {

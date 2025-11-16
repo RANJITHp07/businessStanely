@@ -82,6 +82,8 @@ export interface Task {
   dueDate?: string;
   progress?: number;
   followUpRequired?: boolean;
+  followUpDuration?: string; // e.g., '24hr', '48hr', '1w', 'None'
+  statusCheckDuration?: string; // e.g., '24hr', '48hr', '1w', 'None'
   completed?: boolean;
   recurring?: number; // Recurring in months (1-12), undefined/null means not recurring
   createdAt: string;

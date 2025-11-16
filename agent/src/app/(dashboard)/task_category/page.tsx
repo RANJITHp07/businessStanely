@@ -378,9 +378,12 @@ export default function TaskCategoryTable() {
                                                                         </AvatarFallback>
                                                                     </Avatar>
                                                                     <div>
-                                                                        <div className="font-medium">
-                                                                            {category.name.charAt(0).toUpperCase() + category.name.slice(1)}
-                                                                        </div>
+<div className="font-medium">
+  {category.name.length > 35 
+    ? category.name.charAt(0).toUpperCase() + category.name.slice(1, 35) + '...'
+    : category.name.charAt(0).toUpperCase() + category.name.slice(1)
+  }
+</div>
                                                                         <div className="text-sm text-muted-foreground">
                                                                             Created: {new Date(category.createdAt).toLocaleDateString()}
                                                                         </div>

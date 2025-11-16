@@ -389,22 +389,22 @@ export default function TasksTable() {
                                 : ""
                                 }`}
                             >
-                              <TableCell className="max-w-36">
-                                <div className="space-y-1">
-                                  <div className="font-medium text-sm truncate">
-                                    {task.title}
-                                  </div>
-                                  {/* Show approved category only */}
-                                  {task.category &&
-                                    task.category.status === "approved" && (
-                                      <div className="text-xs mt-1">
-                                        <span className="inline-block px-2 py-1 rounded bg-blue-100 text-blue-800 border border-blue-200">
-                                          {task.category.name}
-                                        </span>
-                                      </div>
-                                    )}
-                                </div>
-                              </TableCell>
+                   <TableCell className="max-w-40">
+  <div className="space-y-1">
+    <div className="font-medium text-sm truncate">
+      {task.title}
+    </div>
+    {/* Show approved category only */}
+    {task.category &&
+      task.category.status === "approved" && (
+        <div className="text-xs mt-1">
+          <span className="inline-block px-2 py-1 rounded bg-blue-100 text-blue-800 border border-blue-200 max-w-full truncate">
+            {task.category.name}
+          </span>
+        </div>
+      )}
+  </div>
+</TableCell>
                               <TableCell>
                                 <div className="space-y-1">
                                   <div className="font-medium text-sm truncate">

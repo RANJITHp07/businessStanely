@@ -254,8 +254,20 @@ export default function RetainershipDetail({ params }: { params: Promise<{ id: s
                                                 onClick={() => router.push(`/legislation/${legislation.id}`)}
                                                 className="cursor-pointer hover:bg-muted/50"
                                             >
-                                                <TableCell>{legislation.title}</TableCell>
-                                                <TableCell>{legislation.description}</TableCell>
+ <TableCell>
+  {legislation.title.length > 30 
+    ? legislation.title.slice(0, 42) + '...'
+    : legislation.title
+  }
+</TableCell>
+<TableCell>
+  {legislation.description
+    ? legislation.description.length > 30 
+      ? legislation.description.slice(0, 45) + '...'
+      : legislation.description
+    : 'N/A'
+  }
+</TableCell>
                                                 <TableCell>{legislation.assignedAgent?.name || "Unknown"}</TableCell>
                                                 <TableCell className="text-right">
                                                   <DropdownMenu>

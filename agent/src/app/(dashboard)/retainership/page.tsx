@@ -412,15 +412,24 @@ export default function RetainershipTable() {
                                                             </TableCell>
                                                             <TableCell>
                                                                 <div className="max-w-xs">
-                                                                    <p className="text-sm truncate" title={retainership.description}>
-                                                                        {retainership.description}
-                                                                    </p>
+                                                                  <p className="text-sm truncate" title={retainership.description}>
+  {retainership.description.length > 30 
+    ? retainership.description.slice(0, 35) + '...'
+    : retainership.description
+  }
+</p>
                                                                 </div>
                                                             </TableCell>
                                                             <TableCell>
                                                                 <div className="text-sm">
-                                                                    <p>{retainership.client?.name || "N/A"}</p>
-                                                                    <p className="text-muted-foreground text-xs">{retainership.client?.email || "N/A"}</p>
+<p>
+  {retainership.client?.name 
+    ? retainership.client.name.length > 30 
+      ? retainership.client.name.slice(0, 30) + '...'
+      : retainership.client.name
+    : "N/A"
+  }
+</p>                                                                    <p className="text-muted-foreground text-xs">{retainership.client?.email || "N/A"}</p>
                                                                 </div>
                                                             </TableCell>
                                                             <TableCell>

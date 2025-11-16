@@ -251,9 +251,19 @@ export default function RetainershipDetail({ params }: { params: Promise<{ id: s
                                     ) : (
                                         retainership?.legislation?.map((legislation) => (
                                             <TableRow key={legislation.id}>
-                                                <TableCell>{legislation.title}</TableCell>
-                                                <TableCell>{legislation.description}</TableCell>
                                                 <TableCell>
+  <div title={legislation.title || ""}>
+    {legislation.title 
+      ? (legislation.title.length > 40 
+          ? `${legislation.title.slice(0, 40)}...` 
+          : legislation.title)
+      : "N/A"}
+  </div>
+</TableCell>
+<TableCell title={legislation.description || ""}>
+  {legislation.description?.slice(0, 60)}
+  {(legislation.description?.length ?? 0) > 60 && '...'}
+</TableCell>                                                <TableCell>
                                                   {typeof legislation.assignedAgent === "string"
                                                     ? legislation.assignedAgent
                                                     : legislation.assignedAgent?.name || "Unknown"}

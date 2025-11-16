@@ -599,8 +599,9 @@ export default function AgentDetails() {
                   </p>
                 </div>
               ) : (
-                <div className="rounded-md border">
-                  <Table>
+                <div className="rounded-md border overflow-x-auto">
+                  <div className="w-full">
+                    <Table>
                     <TableHeader>
                       <TableRow>
                         <TableHead>Task</TableHead>
@@ -621,26 +622,39 @@ export default function AgentDetails() {
                         >
                           <TableCell>
                             <div className="space-y-1">
-                              <div className="font-medium">{task.title}</div>
+                              <div className="font-medium truncate max-w-xs" title={task.title}>
+                                {task.title.length > 40 ? `${task.title.slice(0, 30)}...` : task.title}
+                              </div>
                               {task.description && (
-                                <div className="text-sm text-muted-foreground">
-                                  {task.description}
+                                <div className="text-sm text-muted-foreground truncate max-w-xs" title={task.description}>
+                                  {task.description.length > 50 ? `${task.description.slice(0, 40)}...` : task.description}
                                 </div>
                               )}
                             </div>
                           </TableCell>
-                          <TableCell>
-                            <div className="font-medium">
-                              {task.client
-                                ? task.client.clientType === "Individual"
-                                  ? `${task.client.firstName} ${task.client.lastName}`
-                                  : task.client.organizationName
-                                : "No Client"}
-                            </div>
-                            <div className="text-sm text-muted-foreground">
-                              Created: {formatDate(task.createdAt)}
-                            </div>
-                          </TableCell>
+               <TableCell>
+  <div className="space-y-1">
+    <div 
+      className="font-medium truncate max-w-xs" 
+      title={
+        task.client
+          ? task.client.clientType === "Individual"
+            ? `${task.client.firstName} ${task.client.lastName}`
+            : task.client.organizationName ?? "No Client"
+          : "No Client"
+      }
+    >
+      {task.client
+        ? task.client.clientType === "Individual"
+          ? `${task.client.firstName} ${task.client.lastName}`
+          : task.client.organizationName ?? "No Client"
+        : "No Client"}
+    </div>
+    <div className="text-sm text-muted-foreground">
+      Created: {formatDate(task.createdAt)}
+    </div>
+  </div>
+</TableCell>
                           <TableCell>
                             {getPriorityBadge(task.priority)}
                           </TableCell>
@@ -709,7 +723,8 @@ export default function AgentDetails() {
                         </TableRow>
                       ))}
                     </TableBody>
-                  </Table>
+                    </Table>
+                  </div>
                 </div>
               )}
             </CardContent>

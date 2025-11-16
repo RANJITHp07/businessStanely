@@ -1,4 +1,35 @@
 import nodemailer from "nodemailer";
+import prisma from "@/lib/prisma";
+// Send notification to all admins and owners
+export async function sendAdminOwnerNotification({ subject, html, text }: { subject: string, html: string, text: string }) {
+  // Get all admins and owners
+  const users = await prisma.user.findMany({
+    where: {
+      adminType: { in: ["admin", "owner"] },
+      status: "active"
+    },
+    select: { email: true, username: true }
+  });
+  if (!users.length) return { success: false, error: "No admins/owners found" };
+  const transporter = createTransporter();
+  const results = [];
+  for (const user of users) {
+    try {
+      const mailOptions = {
+        from: `"${process.env.COMPANY_NAME || "LegalStanley"}" <${process.env.EMAIL_USER}>`,
+        to: user.email,
+        subject,
+        html,
+        text,
+      };
+      const result = await transporter.sendMail(mailOptions);
+      results.push({ email: user.email, success: true, messageId: result.messageId });
+    } catch (error) {
+      results.push({ email: user.email, success: false, error: error instanceof Error ? error.message : "Unknown error" });
+    }
+  }
+  return results;
+}
 
 export const createTransporter = () => {
   return nodemailer.createTransport({

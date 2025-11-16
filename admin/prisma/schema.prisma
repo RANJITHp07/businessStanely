@@ -131,6 +131,7 @@ model Task {
   priority         String    @default("Medium") // e.g., Low, Medium, High
   dueDate          DateTime?
   progress         Int?      @default(0) // Progress percentage (0-100)
+  statusProgressMap Json?     // Map of status to progress percentage, e.g. {"To Do": 10, "In Progress": 50, "Completed": 100}
   followUpRequired Boolean   @default(false)
   followUpDuration     String? // e.g., "24hr", "48hr", "1w", "None"
   statusCheckDuration  String? // e.g., "24hr", "48hr", "1w", "None"

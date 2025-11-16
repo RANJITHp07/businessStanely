@@ -85,10 +85,10 @@ export async function PUT(
       return NextResponse.json({ error: "Task not found" }, { status: 404 });
     }
     
-    // Only pick allowed fields from body
+    // Only pick allowed fields from body, now including statusProgressMap
     const allowedFields = [
       "title", "description", "status", "priority", "dueDate", "progress", "followUpRequired", "completed", "recurring",
-      "followUpDuration", "statusCheckDuration"
+      "followUpDuration", "statusCheckDuration", "statusProgressMap"
     ];
     const data: Record<string, unknown> = {};
     for (const key of allowedFields) {
@@ -97,6 +97,9 @@ export async function PUT(
           // Handle recurring field conversion
           const recurringValue = body[key] as string;
           data[key] = recurringValue && recurringValue !== "0" ? parseInt(recurringValue) : null;
+        } else if (key === "statusProgressMap") {
+          // Ensure statusProgressMap is stored as JSON
+          data[key] = body[key];
         } else {
           data[key] = body[key];
         }

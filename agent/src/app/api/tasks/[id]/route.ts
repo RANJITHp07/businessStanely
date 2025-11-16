@@ -276,6 +276,10 @@ export async function PUT(
       ...body,
       updatedAt: new Date(),
     };
+  // Only allow statusProgressMap if present
+  if (body.statusProgressMap !== undefined) {
+    updateData.statusProgressMap = body.statusProgressMap;
+  }
     if (updateData.clientId) {
       updateData.client = { connect: { id: updateData.clientId } };
       delete updateData.clientId;

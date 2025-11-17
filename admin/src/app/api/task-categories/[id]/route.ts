@@ -129,6 +129,7 @@ export async function GET(
       isOwner: currentAdmin.adminType === "owner",
       photo,
       timePeriod: category.timePeriod ?? null,
+      agentCanEditDays: category.agentCanEditDays ?? false,
     };
     return NextResponse.json(formattedCategory);
   } catch (error) {
@@ -165,7 +166,7 @@ export async function PUT(
 
   const { id } = params;
   const body = await req.json();
-  const { name, description, color, timePeriod, notes, processFlow } = body;
+  const { name, description, color, timePeriod, notes, processFlow, agentCanEditDays } = body;
 
     // Validate required fields
     if (!name) {
@@ -197,6 +198,7 @@ export async function PUT(
         processFlow: processFlow || "",
         color: color || "blue",
         timePeriod: typeof timePeriod === 'number' ? timePeriod : (timePeriod ? parseInt(timePeriod, 10) : null),
+        agentCanEditDays: agentCanEditDays ?? false,
       },
       include: {
         createdByUser: {

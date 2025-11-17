@@ -21,6 +21,7 @@ interface CreateProps {
         timePeriod?: number;
         notes?: string;
         processFlow?: string;
+        agentCanEditDays?: boolean;
     };
 }
 
@@ -31,10 +32,12 @@ function Create({ admin, initialData }: CreateProps) {
         timePeriod: initialData?.timePeriod !== undefined && initialData?.timePeriod !== null ? String(initialData.timePeriod) : "",
         notes: initialData?.notes || "",
         processFlow: initialData?.processFlow || "",
+        agentCanEditDays: initialData?.agentCanEditDays ?? false,
     })
     const [isSubmitting, setIsSubmitting] = useState(false)
     const router = useRouter()
 
+    // ...existing code...
     // Handle form submission
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -56,7 +59,7 @@ function Create({ admin, initialData }: CreateProps) {
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({ ...formData, timePeriod: parseInt(formData.timePeriod, 10) }), // Ensure timePeriod is sent as a number
+                    body: JSON.stringify({ ...formData, timePeriod: parseInt(formData.timePeriod, 10), agentCanEditDays: formData.agentCanEditDays }), // Ensure timePeriod is sent as a number and include agentCanEditDays
                 }
             )
 
@@ -149,6 +152,18 @@ function Create({ admin, initialData }: CreateProps) {
                                     placeholder="Enter process flow (optional)"
                                     rows={2}
                                 />
+                            </div>
+                            <div className="flex items-center mt-4">
+                                <input
+                                    id="agentCanEditDays"
+                                    type="checkbox"
+                                    checked={formData.agentCanEditDays}
+                                    onChange={e => setFormData(prev => ({ ...prev, agentCanEditDays: e.target.checked }))}
+                                    className="mr-2"
+                                />
+                                <Label htmlFor="agentCanEditDays" className="cursor-pointer">
+                                    Check to allow agents to edit days; uncheck to lock.
+                                </Label>
                             </div>
                         </div>
                     </CardContent>

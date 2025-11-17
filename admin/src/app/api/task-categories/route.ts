@@ -136,7 +136,7 @@ export async function POST(req: NextRequest) {
 
     // Parse request body
     const body = await req.json();
-  const { name, description, color, timePeriod, notes, processFlow } = body; // Include timePeriod, notes, processFlow
+  const { name, description, color, timePeriod, notes, processFlow, agentCanEditDays } = body; // Include agentCanEditDays
 
     // Convert timePeriod to an integer
     const parsedTimePeriod = timePeriod ? parseInt(timePeriod, 10) : null;
@@ -164,6 +164,7 @@ export async function POST(req: NextRequest) {
         processFlow: processFlow || "",
         color: color || "blue",
         timePeriod: parsedTimePeriod, // Use parsed integer value
+        agentCanEditDays: agentCanEditDays ?? false,
         status,
         createdByUserId: currentAdmin.id,
         approvedById,
@@ -203,6 +204,7 @@ export async function POST(req: NextRequest) {
       approvedAt: newCategory.approvedAt?.toISOString() || null,
       taskCount: 0,
       timePeriod: newCategory.timePeriod, // Include timePeriod in the response
+      agentCanEditDays: newCategory.agentCanEditDays ?? false,
     };
 
     return NextResponse.json(transformedCategory, { status: 201 });

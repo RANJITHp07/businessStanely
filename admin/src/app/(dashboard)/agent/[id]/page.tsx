@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, Fragment } from "react";
-import { notFound, useParams, useRouter } from "next/navigation";
+import { notFound, useParams, useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -76,13 +76,22 @@ function formatDateDMY(dateString: string) {
 export default function AgentDetails() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const id = params.id as string;
   const [agent, setAgent] = useState<Agent | null>(null);
   const [agentTasks, setAgentTasks] = useState<Task[]>([]);
   const [teamMembers, setTeamMembers] = useState<Agent[]>([]);
   const [loading, setLoading] = useState(true);
   const [tasksLoading, setTasksLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("details");
+  const [activeTab, setActiveTab] = useState<string>(searchParams.get("tab") || "details");
+
+  // Keep activeTab in sync with the tab query param
+  useEffect(() => {
+    const tabParam = searchParams.get("tab");
+    if (tabParam && tabParam !== activeTab) {
+      setActiveTab(tabParam);
+    }
+  }, [searchParams, activeTab]);
   const [activities, setActivities] = useState<AgentActivity[]>([]);
   const [activitiesLoading, setActivitiesLoading] = useState(true);
 
@@ -395,7 +404,13 @@ export default function AgentDetails() {
       {/* Tabs */}
       <Tabs
         value={activeTab}
-        onValueChange={setActiveTab}
+        onValueChange={(value) => {
+          setActiveTab(value);
+          // Update URL to include the active tab
+          const url = new URL(window.location.href);
+          url.searchParams.set('tab', value);
+          window.history.replaceState({}, '', url.toString());
+        }}
         className="space-y-6"
       >
         <TabsList className="grid w-full grid-cols-4">
@@ -617,7 +632,7 @@ export default function AgentDetails() {
                         <TableRow
                           key={task.id}
                           className="cursor-pointer hover:bg-muted/50 transition-colors"
-                          onClick={() => router.push(`/task/${task.id}`)}
+                          onClick={() => router.push(`/task/${task.id}?agentId=${id}&tab=tasks`)}
                         >
                           <TableCell>
                             <div className="space-y-1">
@@ -692,13 +707,13 @@ export default function AgentDetails() {
                               <DropdownMenuContent align="end">
                                 <DropdownMenuLabel>Actions</DropdownMenuLabel>
                                 <DropdownMenuItem asChild>
-                                  <Link href={`/task/${task.id}`}>
+                                  <Link href={`/task/${task.id}?agentId=${id}&tab=tasks`}>
                                     <Eye className="mr-2 h-4 w-4" />
                                     View Task
                                   </Link>
                                 </DropdownMenuItem>
                                 <DropdownMenuItem asChild>
-                                  <Link href={`/task/${task.id}/edit`}>
+                                  <Link href={`/task/${task.id}/edit?agentId=${id}&tab=tasks`}>
                                     <Edit className="mr-2 h-4 w-4" />
                                     Edit Task
                                   </Link>
@@ -874,7 +889,11 @@ export default function AgentDetails() {
                                 <TableRow key={idx}>
                                   <TableCell className="break-words whitespace-pre-line align-top" style={{ wordBreak: 'break-word', whiteSpace: 'pre-line', width: '33%', minWidth: 120, maxWidth: 240 }}>
                                     {activity.taskTitle ? (
-                                      <Link href={`/task/${activity.taskId}`} className="text-blue-600 hover:underline break-words whitespace-pre-line block" style={{ wordBreak: 'break-word', whiteSpace: 'pre-line' }}>
+                                      <Link 
+                                        href={`/task/${activity.taskId}?agentId=${id}`}
+                                        className="text-blue-600 hover:underline break-words whitespace-pre-line block"
+                                        style={{ wordBreak: 'break-word', whiteSpace: 'pre-line' }}
+                                      >
                                         {activity.taskTitle}
                                       </Link>
                                     ) : (

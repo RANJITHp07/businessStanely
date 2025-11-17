@@ -271,11 +271,27 @@ export async function PUT(
 
 
 
+    // Enforce mutual exclusivity for followUpDuration and statusCheckDuration
+    let { followUpDuration, statusCheckDuration } = body;
+    if (followUpDuration && followUpDuration !== "None" && statusCheckDuration && statusCheckDuration !== "None") {
+      // If both are non-None, prioritize the one being changed (frontend always sends both)
+      // If followUpDuration is being set, set statusCheckDuration to 'None'
+      statusCheckDuration = "None";
+    } else if (statusCheckDuration && statusCheckDuration !== "None" && followUpDuration && followUpDuration !== "None") {
+      // If statusCheckDuration is being set, set followUpDuration to 'None'
+      followUpDuration = "None";
+    }
     // Transform relation IDs to nested connect objects for Prisma
-  const updateData: Record<string, unknown> = {
+    const updateData: Record<string, unknown> = {
       ...body,
+      followUpDuration,
+      statusCheckDuration,
       updatedAt: new Date(),
     };
+    // Only allow statusProgressMap if present
+    if (body.statusProgressMap !== undefined) {
+      updateData.statusProgressMap = body.statusProgressMap;
+    }
     if (updateData.clientId) {
       updateData.client = { connect: { id: updateData.clientId } };
       delete updateData.clientId;

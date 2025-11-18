@@ -653,14 +653,14 @@ export default function AgentDetails() {
       className="font-medium truncate max-w-xs" 
       title={
         task.client
-          ? task.client.clientType === "Individual"
+          ? task.client.clientType === "individual"
             ? `${task.client.firstName} ${task.client.lastName}`
             : task.client.organizationName ?? "No Client"
           : "No Client"
       }
     >
       {task.client
-        ? task.client.clientType === "Individual"
+        ? task.client.clientType === "individual"
           ? `${task.client.firstName} ${task.client.lastName}`
           : task.client.organizationName ?? "No Client"
         : "No Client"}

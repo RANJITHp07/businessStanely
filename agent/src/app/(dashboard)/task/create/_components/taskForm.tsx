@@ -59,6 +59,7 @@ interface Category {
   description?: string;
   status: string;
   timePeriod?: number; // Added timePeriod property
+  agentCanEditDays?: boolean;
 }
 import { useRouter } from "next/navigation";
 import { toast } from "react-toastify";
@@ -100,10 +101,21 @@ export default function TaskForm({ id }: TaskFormProps) {
   const [clients, setClients] = useState<Client[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   const [dueDate, setDueDate] = useState<Date>();
-  // Disable due date if a service/category is selected
-  const isDueDateDisabled = !!formData.categoryId;
+  // Find the selected category object
+  useEffect(() => {
+    if (formData.categoryId && categories.length > 0) {
+      const cat = categories.find((c) => c.id === formData.categoryId) || null;
+      setSelectedCategory(cat);
+    } else {
+      setSelectedCategory(null);
+    }
+  }, [formData.categoryId, categories]);
+
+  // Disable due date if agentCanEditDays is false for the selected category
+  const isDueDateDisabled = !!(selectedCategory && selectedCategory.agentCanEditDays === false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedClientType, setSelectedClientType] = useState("");
@@ -172,7 +184,12 @@ export default function TaskForm({ id }: TaskFormProps) {
       });
 
       if (response.ok) {
-        const newCategory = await response.json();
+        const newCategoryRaw = await response.json();
+        // Patch: ensure agentCanEditDays is present (default false if missing)
+        const newCategory = {
+          ...newCategoryRaw,
+          agentCanEditDays: typeof newCategoryRaw.agentCanEditDays === 'boolean' ? newCategoryRaw.agentCanEditDays : false,
+        };
         setCategories((prev) => [newCategory, ...prev]);
         setFormData((prev) => ({ ...prev, categoryId: newCategory.id }));
         setCategorySearchQuery(newCategory.name);
@@ -645,6 +662,7 @@ export default function TaskForm({ id }: TaskFormProps) {
     setFormData((prev) => ({ ...prev, categoryId: category.id, timePeriod: category.timePeriod }));
     setCategorySearchQuery(category.name);
     setShowCategorySuggestions(false);
+    setSelectedCategory(category);
     // Automatically set due date based on category's time period
     if (category.timePeriod) {
       const calculatedDueDate = new Date();
@@ -1463,12 +1481,15 @@ export default function TaskForm({ id }: TaskFormProps) {
                       onSelect={isDueDateDisabled ? undefined : setDueDate}
                       fromDate={new Date()}
                       initialFocus
-                      disabled={isDueDateDisabled}
+                      disabled={Boolean(isDueDateDisabled)}
                     />
                   </PopoverContent>
                 </Popover>
-                {/* Remove or update the helper text so it does not show when due date is disabled */}
-                {!isDueDateDisabled && (
+                {isDueDateDisabled ? (
+                  <p className="text-xs text-red-500 flex items-center gap-1">
+                    <span className="font-semibold">Locked:</span> The admin has locked the days for this service. You cannot change the completion date.
+                  </p>
+                ) : (
                   <p className="text-xs text-muted-foreground">
                     Choose the date when this task should be completed (required)
                   </p>

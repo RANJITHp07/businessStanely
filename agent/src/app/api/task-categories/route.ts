@@ -107,6 +107,7 @@ export async function GET(req: NextRequest) {
         taskCount: taskCount,
         isOwner: false,
         timePeriod: category.timePeriod,
+        agentCanEditDays: category.agentCanEditDays ?? false,
       };
     }));
 

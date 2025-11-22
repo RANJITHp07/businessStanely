@@ -16,6 +16,7 @@ interface Category {
     timePeriod?: number
     notes?: string
     processFlow?: string
+    agentCanEditDays?: boolean
 }
 
 export default function EditCategory({ params }: { params: Promise<{ id: string }> | { id: string } }) {
@@ -55,6 +56,7 @@ export default function EditCategory({ params }: { params: Promise<{ id: string 
         return null
     }
 
+
     const initialData = {
         id: category.id,
         name: category.name,
@@ -62,6 +64,7 @@ export default function EditCategory({ params }: { params: Promise<{ id: string 
         timePeriod: category.timePeriod,
         notes: category.notes || "",
         processFlow: category.processFlow || "",
+        agentCanEditDays: category.agentCanEditDays ?? false,
     }
 
     return (

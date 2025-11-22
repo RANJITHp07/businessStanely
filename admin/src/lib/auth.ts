@@ -51,8 +51,12 @@ export async function verifyAuth(req: NextRequest): Promise<JWTPayload | null> {
         where: { id: decoded.userId },
         select: { currentSessionToken: true },
       });
-      if (!user || user.currentSessionToken !== decoded.sessionToken) {
-        console.error("Session token mismatch or missing in DB. Forcing logout.");
+      if (!user) {
+        console.error("User not found in DB. User ID:", decoded.userId);
+        return null;
+      }
+      if (user.currentSessionToken !== decoded.sessionToken) {
+        console.error("Session token mismatch. DB token:", user.currentSessionToken, "JWT token:", decoded.sessionToken);
         return null;
       }
     }

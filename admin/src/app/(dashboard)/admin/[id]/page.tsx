@@ -4,7 +4,7 @@ import React, { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Edit, Loader2, Shield, User } from "lucide-react";
+import { ArrowLeft, Edit, Shield, User } from "lucide-react";
 import { toast } from "react-toastify";
 import Link from "next/link";
 import { Skeleton } from "@/components/ui/skeleton";

@@ -32,6 +32,9 @@ model User {
   approvedRetainerships Retainership[] @relation("RetainershipApprovals")
   rejectedRetainerships Retainership[] @relation("RetainershipRejections")
 
+  // Service Records relation
+  serviceRecords ServiceRecord[] @relation("UserServiceRecords")
+
   // OTP fields for password reset
   resetOtp            String?
   otpExpiry           DateTime?
@@ -112,6 +115,9 @@ model Agent {
 
   // Legislation relations
   legislations Legislation[] @relation("AgentLegislations")
+
+  // Service Records relation
+  serviceRecords ServiceRecord[] @relation("AgentServiceRecords")
 }
 
 model AgentSuperior {
@@ -297,4 +303,17 @@ model TimeLog {
 
   agentId String @db.ObjectId
   agent   Agent  @relation("TimeLogAgent", fields: [agentId], references: [id])
+}
+
+model ServiceRecord {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  note      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  agentId String @db.ObjectId
+  agent   Agent  @relation("AgentServiceRecords", fields: [agentId], references: [id], onDelete: Cascade)
+
+  createdBy     String @db.ObjectId
+  createdByUser User   @relation("UserServiceRecords", fields: [createdBy], references: [id])
 }

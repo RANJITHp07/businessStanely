@@ -48,12 +48,31 @@ import {
 } from "lucide-react";
 import { Agent, Task } from "@/types";
 import Link from "next/link";
+import { fetchWithAuth } from "@/lib/fetchWithAuth";
 
 interface AgentActivity {
   taskId: string;
   taskTitle: string;
   content: string;
   createdAt: string;
+}
+
+interface ServiceRecord {
+  id: string;
+  note: string;
+  createdAt: string;
+  createdBy: {
+    id: string;
+    username: string;
+    adminType: string;
+  };
+}
+
+interface CurrentUser {
+  id: string;
+  username: string;
+  email: string;
+  adminType: "owner" | "admin";
 }
 
 function groupActivitiesByDate(activities: AgentActivity[]) {
@@ -67,10 +86,10 @@ function groupActivitiesByDate(activities: AgentActivity[]) {
 
 function formatDateDMY(dateString: string) {
   const d = new Date(dateString);
-  const day = String(d.getDate()).padStart(2, "0");
-  const month = d.toLocaleString("en-US", { month: "short" });
+  const day = d.getDate();
+  const month = d.toLocaleString("en-US", { month: "long" });
   const year = d.getFullYear();
-  return `${day}/${month}/${year}`;
+  return `${month} ${day}, ${year}`;
 }
 
 export default function AgentDetails() {
@@ -94,6 +113,24 @@ export default function AgentDetails() {
   }, [searchParams, activeTab]);
   const [activities, setActivities] = useState<AgentActivity[]>([]);
   const [activitiesLoading, setActivitiesLoading] = useState(true);
+  const [serviceRecords, setServiceRecords] = useState<ServiceRecord[]>([]);
+  const [serviceRecordsLoading, setServiceRecordsLoading] = useState(true);
+  const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
+  const [newNote, setNewNote] = useState("");
+  const [addingNote, setAddingNote] = useState(false);
+
+  useEffect(() => {
+    // Load current user from localStorage
+    const userStr = localStorage.getItem("user");
+    if (userStr) {
+      try {
+        const userData = JSON.parse(userStr);
+        setCurrentUser(userData);
+      } catch (err) {
+        console.error("Error parsing user data:", err);
+      }
+    }
+  }, []);
 
   useEffect(() => {
     if (!id) return;
@@ -148,9 +185,33 @@ export default function AgentDetails() {
       }
     };
 
+    const fetchServiceRecords = async () => {
+      try {
+        setServiceRecordsLoading(true);
+        const response = await fetchWithAuth(`/api/agents/${id}/service-records`);
+        
+        if (response.ok) {
+          const data = await response.json();
+          setServiceRecords(data.serviceRecords || []);
+        } else if (response.status === 401) {
+          console.error('Unauthorized access to service records');
+          setServiceRecords([]);
+        } else {
+          console.error('Failed to fetch service records');
+          setServiceRecords([]);
+        }
+      } catch (error) {
+        console.error("Error fetching service records:", error);
+        setServiceRecords([]);
+      } finally {
+        setServiceRecordsLoading(false);
+      }
+    };
+
     fetchAgent();
     fetchAgentTasks();
     fetchAgentActivities();
+    fetchServiceRecords();
   }, [id]);
 
   const getPriorityBadge = (priority: string) => {
@@ -231,10 +292,45 @@ export default function AgentDetails() {
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
       year: "numeric",
+      month: "long",
+      day: "numeric",
     });
+  };
+
+  const handleAddNote = async () => {
+    if (!newNote.trim() || !currentUser) return;
+
+    setAddingNote(true);
+    try {
+      const response = await fetchWithAuth(`/api/agents/${id}/service-records`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          note: newNote
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setServiceRecords([data.serviceRecord, ...serviceRecords]);
+        setNewNote("");
+      } else {
+        const errorData = await response.json().catch(() => ({ error: "Unknown error" }));
+        console.error("Failed to add service record:", errorData.error);
+        alert(errorData.error || "Failed to add service record");
+      }
+    } catch (error) {
+      console.error("Error adding service record:", error);
+      if (error instanceof Error && error.message !== "Unauthorized") {
+        alert("Error adding service record. Please try again.");
+      }
+      // Don't show alert for Unauthorized as fetchWithAuth handles the redirect
+    } finally {
+      setAddingNote(false);
+    }
   };
 
   if (loading) {
@@ -413,28 +509,30 @@ export default function AgentDetails() {
         }}
         className="space-y-6"
       >
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="details" className="flex items-center gap-2">
             <User className="h-4 w-4 hidden md:block" />
-            <p className="text-[12px] md:text-[14px]">Agent Details</p>
+            <p className="text-[10px] md:text-[12px]">Agent Details</p>
           </TabsTrigger>
           <TabsTrigger value="tasks" className="flex items-center gap-2">
             <FileText className="h-4 w-4 hidden md:block" />
-            <p className="text-[12px] md:text-[14px]">
-              {" "}
-              Tasks ({agentTasks.length}){" "}
+            <p className="text-[10px] md:text-[12px]">
+              Tasks ({agentTasks.length})
             </p>
           </TabsTrigger>
           <TabsTrigger value="team" className="flex items-center gap-2">
             <Users className="h-4 w-4 hidden md:block" />
-            <p className="text-[12px] md:text-[14px]">
-              {" "}
-              Team ({teamMembers.length}){" "}
+            <p className="text-[10px] md:text-[12px]">
+              Team ({teamMembers.length})
             </p>
           </TabsTrigger>
           <TabsTrigger value="activities" className="flex items-center gap-2">
             <Clock className="h-4 w-4 hidden md:block" />
-            <p className="text-[12px] md:text-[14px]">Activities</p>
+            <p className="text-[10px] md:text-[12px]">Activities</p>
+          </TabsTrigger>
+          <TabsTrigger value="service-records" className="flex items-center gap-2">
+            <FileText className="h-4 w-4 hidden md:block" />
+            <p className="text-[10px] md:text-[12px]">Service Records</p>
           </TabsTrigger>
         </TabsList>
 
@@ -923,6 +1021,97 @@ export default function AgentDetails() {
                               ))}
                             </TableBody>
                           </Table>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Service Records Tab */}
+        <TabsContent value="service-records" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Service Records</CardTitle>
+              <CardDescription>
+                Administrative notes and remarks for {agent.name}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {/* Add Note Section - Only for Admin/Owner */}
+              {currentUser && (currentUser.adminType === "admin" || currentUser.adminType === "owner") && (
+                <Card className="mb-6">
+                  <CardHeader>
+                    <CardTitle className="text-base">Add Note</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div>
+                      <textarea
+                        id="note"
+                        className="w-full min-h-[100px] p-3 border rounded-md resize-vertical"
+                        placeholder="Enter your note or remark here..."
+                        value={newNote}
+                        onChange={(e) => setNewNote(e.target.value)}
+                      />
+                    </div>
+                    <Button 
+                      onClick={handleAddNote}
+                      disabled={!newNote.trim() || addingNote}
+                      className="bg-[#003459] hover:bg-[#003459] text-white"
+                    >
+                      {addingNote ? "Adding..." : "Add Note"}
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Service Records List */}
+              {serviceRecordsLoading ? (
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground">Loading service records...</p>
+                </div>
+              ) : serviceRecords.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground">
+                    No service records found for this agent.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {serviceRecords.map((record) => (
+                    <Card key={record.id} className="border-l-4 border-l-blue-500">
+                      <CardContent className="p-4">
+                        <div className="flex justify-between items-start mb-2">
+                          <div className="flex items-center gap-2">
+                            <Avatar className="h-8 w-8">
+                              <AvatarFallback className="text-xs">
+                                {record.createdBy?.username?.charAt(0)?.toUpperCase() || "U"}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <p className="font-medium text-sm">{record.createdBy?.username || "Unknown"}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {record.createdBy?.adminType === "owner" ? "Owner" : "Admin"}
+                              </p>
+                            </div>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            {new Date(record.createdAt).toLocaleDateString("en-US", {
+                              year: "numeric",
+                              month: "long",
+                              day: "numeric",
+                            })} at{" "}
+                            {new Date(record.createdAt).toLocaleTimeString([], {
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </p>
+                        </div>
+                        <div className="mt-3">
+                          <p className="text-sm whitespace-pre-wrap">{record.note}</p>
                         </div>
                       </CardContent>
                     </Card>

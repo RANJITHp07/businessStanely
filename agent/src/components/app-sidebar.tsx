@@ -8,7 +8,8 @@ import {
   UserRoundPen,
   Boxes,
   ClipboardList,
-  UserSearch
+  UserSearch,
+  FileText
 } from "lucide-react";
 import { useState } from "react";
 import Link from "next/link";
@@ -74,6 +75,11 @@ const items = [
     title: "Services",
     url: "/task_category",
     icon: Boxes,
+  },
+  {
+    title: "Service Records",
+    url: "/service-records",
+    icon: FileText,
   },
     {
     title: "Retainership",

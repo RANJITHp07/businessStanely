@@ -32,6 +32,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+} from "@/components/ui/tooltip";
+import {
   User,
   Mail,
   Phone,
@@ -84,12 +89,384 @@ function groupActivitiesByDate(activities: AgentActivity[]) {
   }, {} as Record<string, AgentActivity[]>);
 }
 
-function formatDateDMY(dateString: string) {
+function formatDateDMY(dateString?: string) {
+  if (!dateString) return "-";
   const d = new Date(dateString);
-  const day = d.getDate();
-  const month = d.toLocaleString("en-US", { month: "long" });
-  const year = d.getFullYear();
-  return `${month} ${day}, ${year}`;
+  if (isNaN(d.getTime())) return "-";
+  return d.toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+}
+
+function statusKey(s?: string) {
+  const k = (s || "").toLowerCase().replace(/\s+/g, "");
+  if (["todo", "pending"].includes(k)) return "todo";
+  if (["inprogress", "progress"].includes(k)) return "inprogress";
+  if (["completed"].includes(k)) return "completed";
+  return k || "todo";
+}
+
+function sectionLabelToStatus(label: string) {
+  const l = label.toLowerCase();
+  if (l.includes("progress")) return "In Progress";
+  if (l.includes("completed")) return "Completed";
+  return "To Do";
+}
+
+interface SectionTableProps {
+  label: string;
+  tasks: Task[];
+  agentId: string;
+}
+
+function SectionTable({ label, tasks, agentId }: SectionTableProps) {
+  const labelColor = (() => {
+    const l = label.toLowerCase();
+    if (l.includes("progress")) return "text-sky-600";
+    if (l.includes("completed")) return "text-green-600";
+    return "text-blue-600";
+  })();
+
+  return (
+    <>
+      <div className="flex items-center gap-4 min-w-0">
+        {/* Rotated label column shown on md+ */}
+        <div className="w-[96px] h-auto hidden md:flex items-center justify-center self-stretch flex-shrink-0 bg-white rounded-lg py-6 px-2">
+          <span
+            className={`block rotate-[-90deg] origin-center whitespace-nowrap tracking-widest font-semibold select-none text-[24px] ${labelColor}`}
+          >
+            {label}
+          </span>
+        </div>
+
+        <div className="flex-1 min-w-0">
+          <Card className="min-h-[250px] py-0 gap-0 rounded-md shadow-sm">
+            <CardContent className="p-0">
+              {/* Mobile heading */}
+              <div
+                className={`md:hidden flex items-center justify-center px-4 py-4 rounded-lg shadow-sm border border-gray-100 font-semibold ${labelColor} text-2xl tracking-widest`}
+              >
+                {label}
+              </div>
+
+              {/* Desktop table */}
+              <div className="rounded-md overflow-hidden hidden md:block bg-white shadow-sm">
+                <Table className="w-full table-fixed text-sm [&_th]:py-3 [&_th]:h-12 [&_td]:py-3">
+                  <colgroup>
+                    <col className="w-[180px]" />
+                    <col className="w-[130px]" />
+                    <col className="w-[90px]" />
+                    <col className="w-[100px]" />
+                    <col className="w-[110px]" />
+                    <col className="w-[60px]" />
+                  </colgroup>
+                  <TableHeader>
+                    <TableRow >
+                      <TableHead className="text-white">Task</TableHead>
+                      <TableHead className="text-white">Client</TableHead>
+                      <TableHead className="text-white">Priority</TableHead>
+                      <TableHead className="text-white">Due Date</TableHead>
+                      <TableHead className="text-white">Progress</TableHead>
+                      <TableHead className="text-right text-white">
+                        Actions
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {tasks.length === 0 ? (
+                      <TableRow>
+                        <TableCell
+                          colSpan={6}
+                          className="text-center py-4 text-muted-foreground"
+                        >
+                          No tasks found.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      tasks.map((t) => {
+                        const clientName = t.client
+                          ? t.client.clientType === "individual"
+                            ? `${t.client.firstName ?? ""} ${
+                                t.client.lastName ?? ""
+                              }`.trim()
+                            : t.client.organizationName ?? ""
+                          : "-";
+                        const shortId = `T-${t.id.slice(0, 6).toUpperCase()}`;
+                        const categoryName = t.category?.name;
+                        const clientEmail = t.client?.email ?? "";
+                        const priority = (t.priority || "").toLowerCase();
+                        const isOverdue = t.dueDate
+                          ? new Date(t.dueDate) < new Date() &&
+                            statusKey(t.status) !== "completed"
+                          : false;
+                        const statusLabel = (() => {
+                          const k = statusKey(t.status);
+                          if (k === "completed") return "Completed";
+                          if (k === "inprogress") return "In Progress";
+                          return "To Do";
+                        })();
+
+                        const priorityBadge = (p: string) => {
+                          if (!p)
+                            return (
+                              <span className="text-muted-foreground">-</span>
+                            );
+                          if (p.includes("high"))
+                            return (
+                              <span className="inline-flex items-center gap-2 bg-red-100 text-red-700 px-3 py-1 rounded-full text-sm">
+                                <span className="text-xs">❗</span> High
+                              </span>
+                            );
+                          if (p.includes("medium"))
+                            return (
+                              <span className="inline-flex items-center gap-2 bg-amber-100 text-amber-800 px-3 py-1 rounded-full text-sm">
+                                <span className="text-xs">⚠️</span> Medium
+                              </span>
+                            );
+                          return (
+                            <span className="inline-flex items-center gap-2 bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm">
+                              Low
+                            </span>
+                          );
+                        };
+
+                        return (
+                          <TableRow
+                            key={t.id}
+                            className="even:bg-muted/30"
+                          >
+                            <TableCell
+                              className="truncate max-w-[260px] align-top"
+                              title={t.title || shortId}
+                            >
+                              <div className="flex flex-col">
+                                <Link
+                                  href={`/task/${t.id}?agentId=${agentId}&tab=tasks`}
+                                  className="text-foreground font-medium hover:underline truncate"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  {t.title || shortId}
+                                </Link>
+                                {categoryName ? (
+                                  <div className="mt-2">
+                                    <span className="inline-block bg-blue-50 text-blue-600 px-2 py-1 rounded-md text-xs">
+                                      {categoryName}
+                                    </span>
+                                  </div>
+                                ) : null}
+                              </div>
+                            </TableCell>
+
+                            <TableCell
+                              className="truncate max-w-[180px] align-top"
+                              title={clientName || clientEmail}
+                            >
+                              <div className="flex flex-col">
+                                <span className="font-medium truncate">
+                                  {clientName || "-"}
+                                </span>
+                                {clientEmail ? (
+                                  <span className="text-muted-foreground text-sm truncate">
+                                    {clientEmail}
+                                  </span>
+                                ) : null}
+                              </div>
+                            </TableCell>
+
+                            <TableCell className="whitespace-nowrap align-top">
+                              {priorityBadge(priority)}
+                            </TableCell>
+
+                            <TableCell
+                              className="whitespace-nowrap align-top"
+                              title={t.dueDate || ""}
+                            >
+                              <div className="flex flex-col">
+                                <div className="flex items-center gap-2">
+                                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                                  <span
+                                    className={`${
+                                      isOverdue
+                                        ? "text-red-600 font-semibold"
+                                        : "text-foreground"
+                                    }`}
+                                  >
+                                    {formatDateDMY(t.dueDate)}
+                                  </span>
+                                </div>
+                                {isOverdue ? (
+                                  <div className="mt-2">
+                                    <span className="inline-block bg-red-600 text-white text-xs px-2 py-0.5 rounded-full">
+                                      Overdue
+                                    </span>
+                                  </div>
+                                ) : null}
+                              </div>
+                            </TableCell>
+
+                            <TableCell
+                              className="truncate max-w-[160px] align-top"
+                              title={statusLabel}
+                            >
+                              <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-sm font-medium">
+                                    {statusLabel}
+                                  </span>
+                                </div>
+                                <Progress
+                                  value={t.progress ?? 0}
+                                  className="h-2"
+                                />
+                              </div>
+                            </TableCell>
+
+                            <TableCell className="text-right align-top" onClick={(e) => e.stopPropagation()}>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Link
+                                    href={`/task/${t.id}?agentId=${agentId}&tab=tasks`}
+                                    className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-muted"
+                                    aria-label="View task"
+                                  >
+                                    <Eye className="h-5 w-5" />
+                                  </Link>
+                                </TooltipTrigger>
+                                <TooltipContent sideOffset={6}>
+                                  View task
+                                </TooltipContent>
+                              </Tooltip>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {/* Mobile list */}
+              <div className="md:hidden px-4 pb-4 space-y-3">
+                {tasks.length === 0 ? (
+                  <div className="text-center py-6 text-muted-foreground">
+                    No tasks found.
+                  </div>
+                ) : (
+                  tasks.map((t) => {
+                    const clientName = t.client
+                      ? t.client.clientType === "individual"
+                        ? `${t.client.firstName ?? ""} ${
+                            t.client.lastName ?? ""
+                          }`.trim()
+                        : t.client.organizationName ?? ""
+                      : "-";
+                    const shortId = `T-${t.id.slice(0, 6).toUpperCase()}`;
+                    return (
+                      <div
+                        key={t.id}
+                        className="rounded-md border bg-white p-3 shadow-sm"
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex flex-col">
+                            <Link
+                              href={`/task/${t.id}?agentId=${agentId}&tab=tasks`}
+                              className="font-medium text-[#1f7aff]"
+                            >
+                              {shortId}
+                            </Link>
+                            <span className="text-xs text-muted-foreground">
+                              {t.title || "-"}
+                            </span>
+                          </div>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Link
+                                href={`/task/${t.id}?agentId=${agentId}&tab=tasks`}
+                                className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-muted"
+                                aria-label="View task"
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Link>
+                            </TooltipTrigger>
+                            <TooltipContent sideOffset={6}>
+                              View task
+                            </TooltipContent>
+                          </Tooltip>
+                        </div>
+
+                        <div className="mt-3 grid grid-cols-2 gap-2 text-sm text-muted-foreground">
+                          <div>
+                            <div className="font-medium text-foreground">
+                              Client
+                            </div>
+                            <div
+                              className="truncate max-w-[160px]"
+                              title={clientName}
+                            >
+                              {clientName || "-"}
+                            </div>
+                          </div>
+                          <div>
+                            <div className="font-medium text-foreground">
+                              Priority
+                            </div>
+                            <div className="truncate max-w-[160px]">
+                              {t.priority || "-"}
+                            </div>
+                          </div>
+
+                          <div>
+                            <div className="font-medium text-foreground">
+                              Due Date
+                            </div>
+                            <div>{formatDateDMY(t.dueDate)}</div>
+                          </div>
+                          <div>
+                            <div className="font-medium text-foreground">
+                              Status
+                            </div>
+                            <div className="truncate max-w-[160px]">
+                              {statusKey(t.status) === "completed"
+                                ? "Completed"
+                                : statusKey(t.status) === "inprogress"
+                                ? "In Progress"
+                                : "To Do"}
+                            </div>
+                          </div>
+
+                          <div className="col-span-2">
+                            <div className="font-medium text-foreground">
+                              Progress
+                            </div>
+                            <div className="mt-1 w-full">
+                              <Progress value={t.progress ?? 0} />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      <div className="flex justify-end">
+        <Link
+          href={`/task?status=${encodeURIComponent(
+            sectionLabelToStatus(label)
+          )}&assignedToId=${agentId}`}
+          className="bg-[#003459] cursor-pointer text-white text-[14px] py-[10px] mt-[10px] px-[10px] rounded-[5px] inline-block"
+        >
+          View more
+        </Link>
+      </div>
+    </>
+  );
 }
 
 export default function AgentDetails() {
@@ -693,155 +1070,46 @@ export default function AgentDetails() {
 
         {/* Tasks Tab */}
         <TabsContent value="tasks" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Assigned Tasks</CardTitle>
-              <CardDescription>
-                All tasks currently Ownership to {agent.name}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {tasksLoading ? (
-                <div className="text-center py-8">
-                  <p className="text-muted-foreground">Loading tasks...</p>
-                </div>
-              ) : agentTasks.length === 0 ? (
-                <div className="text-center py-8">
-                  <p className="text-muted-foreground">
-                    No tasks Ownership to this agent.
-                  </p>
-                </div>
-              ) : (
-                <div className="rounded-md border overflow-x-auto">
-                  <div className="w-full">
-                    <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Task</TableHead>
-                        <TableHead>Client</TableHead>
-                        <TableHead>Priority</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Due Date</TableHead>
-                        <TableHead>Progress</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {agentTasks.map((task) => (
-                        <TableRow
-                          key={task.id}
-                          className="cursor-pointer hover:bg-muted/50 transition-colors"
-                          onClick={() => router.push(`/task/${task.id}?agentId=${id}&tab=tasks`)}
-                        >
-                          <TableCell>
-                            <div className="space-y-1">
-                              <div className="font-medium truncate max-w-xs" title={task.title}>
-                                {task.title.length > 40 ? `${task.title.slice(0, 30)}...` : task.title}
-                              </div>
-                              {task.description && (
-                                <div className="text-sm text-muted-foreground truncate max-w-xs" title={task.description}>
-                                  {task.description.length > 50 ? `${task.description.slice(0, 40)}...` : task.description}
-                                </div>
-                              )}
-                            </div>
-                          </TableCell>
-               <TableCell>
-  <div className="space-y-1">
-    <div 
-      className="font-medium truncate max-w-xs" 
-      title={
-        task.client
-          ? task.client.clientType === "individual"
-            ? `${task.client.firstName} ${task.client.lastName}`
-            : task.client.organizationName ?? "No Client"
-          : "No Client"
-      }
-    >
-      {task.client
-        ? task.client.clientType === "individual"
-          ? `${task.client.firstName} ${task.client.lastName}`
-          : task.client.organizationName ?? "No Client"
-        : "No Client"}
-    </div>
-    <div className="text-sm text-muted-foreground">
-      Created: {formatDate(task.createdAt)}
-    </div>
-  </div>
-</TableCell>
-                          <TableCell>
-                            {getPriorityBadge(task.priority)}
-                          </TableCell>
-                          <TableCell>{getStatusBadge(task.status)}</TableCell>
-                          <TableCell>
-                            {task.dueDate ? (
-                              <div className="flex items-center gap-1">
-                                <Calendar className="h-4 w-4 text-muted-foreground" />
-                                <span>{formatDate(task.dueDate)}</span>
-                              </div>
-                            ) : (
-                              <span className="text-muted-foreground">
-                                No due date
-                              </span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <div className="space-y-2">
-                              <div className="flex items-center justify-between">
-                                <span className="text-sm font-medium">
-                                  {task.status === "Completed" ||
-                                  task.status === "Done"
-                                    ? "100%"
-                                    : task.status === "In Progress"
-                                    ? "50%"
-                                    : "0%"}
-                                </span>
-                              </div>
-                              <Progress
-                                value={
-                                  task.status === "Completed" ||
-                                  task.status === "Done"
-                                    ? 100
-                                    : task.status === "In Progress"
-                                    ? 50
-                                    : 0
-                                }
-                                className="h-2"
-                              />
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" className="h-8 w-8 p-0">
-                                  <MoreHorizontal className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                <DropdownMenuItem asChild>
-                                  <Link href={`/task/${task.id}?agentId=${id}&tab=tasks`}>
-                                    <Eye className="mr-2 h-4 w-4" />
-                                    View Task
-                                  </Link>
-                                </DropdownMenuItem>
-                                <DropdownMenuItem asChild>
-                                  <Link href={`/task/${task.id}/edit?agentId=${id}&tab=tasks`}>
-                                    <Edit className="mr-2 h-4 w-4" />
-                                    Edit Task
-                                  </Link>
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                    </Table>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-semibold">Task Management</h2>
+              <p className="text-muted-foreground text-sm">
+                Manage and track tasks assigned to {agent.name}
+              </p>
+            </div>
+          </div>
+
+          {tasksLoading ? (
+            <div className="flex justify-center items-center py-16 text-muted-foreground">
+              <Clock className="h-6 w-6 animate-spin mr-2" /> Loading tasks...
+            </div>
+          ) : agentTasks.length === 0 ? (
+            <Card>
+              <CardContent className="text-center py-8">
+                <p className="text-muted-foreground">
+                  No tasks assigned to this agent.
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-[40px]">
+              <SectionTable 
+                label="New Task" 
+                tasks={agentTasks.filter((t) => ["todo"].includes(statusKey(t.status))).slice(0, 3)} 
+                agentId={id}
+              />
+              <SectionTable 
+                label="In Progress" 
+                tasks={agentTasks.filter((t) => ["inprogress"].includes(statusKey(t.status))).slice(0, 3)} 
+                agentId={id}
+              />
+              <SectionTable 
+                label="Completed" 
+                tasks={agentTasks.filter((t) => ["completed"].includes(statusKey(t.status))).slice(0, 3)} 
+                agentId={id}
+              />
+            </div>
+          )}
         </TabsContent>
 
         {/* Team Tab */}

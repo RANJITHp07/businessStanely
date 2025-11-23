@@ -213,13 +213,7 @@ function SectionTable({ label, tasks }: { label: string; tasks: Task[] }) {
                       </TableRow>
                     ) : (
                       tasks.map((t) => {
-                        const clientName = t.client
-                          ? t.client.clientType === "individual"
-                            ? `${t.client.firstName ?? ""} ${
-                                t.client.lastName ?? ""
-                              }`.trim()
-                            : t.client.organizationName ?? ""
-                          : "-";
+                        const clientName = t.client?.name ?? "-";
                         const ownerName = t.assignedTo?.name ?? "-";
                         const shortId = `T-${t.id.slice(0, 6).toUpperCase()}`;
                         // build richer cells: category badge, client email, assigned role, priority badge, due date with overdue
@@ -406,13 +400,7 @@ function SectionTable({ label, tasks }: { label: string; tasks: Task[] }) {
                   </div>
                 ) : (
                   tasks.map((t) => {
-                    const clientName = t.client
-                      ? t.client.clientType === "individual"
-                        ? `${t.client.firstName ?? ""} ${
-                            t.client.lastName ?? ""
-                          }`.trim()
-                        : t.client.organizationName ?? ""
-                      : "-";
+                    const clientName = t.client?.name ?? "-";
                     const ownerName = t.assignedTo?.name ?? "-";
                     const shortId = `T-${t.id.slice(0, 6).toUpperCase()}`;
                     return (
@@ -524,7 +512,7 @@ function SectionTable({ label, tasks }: { label: string; tasks: Task[] }) {
           href={`/task?status=${encodeURIComponent(
             sectionLabelToStatus(label)
           )}`}
-          className="bg-[#003459] cursor-pointer text-white text-[14px] py-[10px] mt-[10px] px-[10px] rounded-[5px] inline-block"
+          className="bg-[#002FFF] cursor-pointer text-white text-[14px] py-[10px] mt-[10px] px-[10px] rounded-[5px] inline-block"
         >
           View more
         </Link>
@@ -628,7 +616,7 @@ export default function MyTasksPage() {
           </p>
         </div>
         <Link href="/task/create">
-          <Button className="bg-[#003459] cursor-pointer hover:bg-[#003459] text-white">
+          <Button className="bg-[#002FFF] cursor-pointer  text-white">
             <Plus className="h-4 w-4 mr-2" /> Add New Task
           </Button>
         </Link>
@@ -641,12 +629,12 @@ export default function MyTasksPage() {
         </div>
       ) : (
         <div className="space-y-[40px]">
-          <SectionTable label="New Task" tasks={tasksNew.slice(0, 3)} />
+          <SectionTable label="New Task" tasks={tasksNew.slice(0, 4)} />
           <SectionTable
             label="In Progress"
-            tasks={tasksInProgress.slice(0, 3)}
+            tasks={tasksInProgress.slice(0, 4)}
           />
-          <SectionTable label="Completed" tasks={tasksCompleted.slice(0, 3)} />
+          <SectionTable label="Completed" tasks={tasksCompleted.slice(0, 4)} />
         </div>
       )}
     </section>

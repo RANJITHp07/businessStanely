@@ -52,6 +52,7 @@ export interface Client {
   authorizedPersonName: string | null;
   designation: string | null;
   contactEmail: string | null;
+  taskCount?: number;
 }
 
 export interface Task {

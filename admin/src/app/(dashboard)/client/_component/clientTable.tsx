@@ -392,7 +392,8 @@ export default function ClientsTable() {
                                         <TableHead className="text-xs sm:text-sm">Client</TableHead>
                                         <TableHead className="text-xs sm:text-sm">Type</TableHead>
                                         <TableHead className="text-xs sm:text-sm">Contact Info</TableHead>
-                                        <TableHead className="text-xs sm:text-sm">Communication</TableHead>
+                                        <TableHead className="text-xs sm:text-sm">Communication</TableHead> {/* Communication column */}
+                                        <TableHead className="text-xs sm:text-sm">Tasks</TableHead> {/* Tasks column */}
                                         <TableHead className="text-xs sm:text-sm text-right">Actions</TableHead>
                                     </TableRow>
                                 </TableHeader>
@@ -400,7 +401,7 @@ export default function ClientsTable() {
                                 <TableBody>
                                     {currentClients.length === 0 ? (
                                         <TableRow>
-                                            <TableCell colSpan={5} className="text-center py-8 text-sm text-muted-foreground">
+                                            <TableCell colSpan={6} className="text-center py-8 text-sm text-muted-foreground">
                                                 No clients found matching your criteria.
                                             </TableCell>
                                         </TableRow>
@@ -448,6 +449,7 @@ export default function ClientsTable() {
                                                     </div>
                                                 </TableCell>
                                                 <TableCell>{getCommunicationBadge(client.preferredCommunication || "")}</TableCell>
+                                                <TableCell>{client.taskCount ?? 0}</TableCell>
                                                 <TableCell className="text-right">
                                                     <DropdownMenu>
                                                         <DropdownMenuTrigger asChild>

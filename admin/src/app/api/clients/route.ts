@@ -49,12 +49,18 @@ export async function GET() {
       orderBy: {
         createdAt: 'desc',
       },
+      include: {
+        _count: {
+          select: { tasks: true }, // Include task count for each client
+        },
+      },
     });
 
     // Add a `name` field prioritizing `organizationName` for organizations
     const clientsWithName = clients.map(client => ({
       ...client,
       name: client.organizationName || `${client.firstName || ''} ${client.lastName || ''}`.trim() || 'Unknown Name',
+      taskCount: client._count.tasks, // Add task count to the response
     }));
 
     return NextResponse.json(clientsWithName);

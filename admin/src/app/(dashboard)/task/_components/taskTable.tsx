@@ -77,6 +77,8 @@ export default function TasksTable() {
 
   const router = useRouter();
   const searchParams = useSearchParams();
+  const assignedToId = searchParams?.get("assignedToId");
+  const initialStatus = searchParams?.get("status");
 
   // Update URL when filters change
   const updateUrlFilters = (priorities: string[], statuses: string[], search: string) => {
@@ -84,6 +86,8 @@ export default function TasksTable() {
     if (search) params.set("search", search);
     if (priorities.length > 0) params.set("priorities", priorities.join(","));
     if (statuses.length > 0) params.set("statuses", statuses.join(","));
+    if (assignedToId) params.set("assignedToId", assignedToId);
+    if (initialStatus && statuses.length === 0) params.set("status", initialStatus); // Preserve initial status filter
     
     const newUrl = params.toString() ? `?${params.toString()}` : window.location.pathname;
     window.history.replaceState({}, "", newUrl);
@@ -95,14 +99,20 @@ export default function TasksTable() {
       const urlSearch = searchParams?.get("search");
       const urlPriorities = searchParams?.get("priorities");
       const urlStatuses = searchParams?.get("statuses");
+      const urlStatus = searchParams?.get("status"); // Single status parameter
       
       if (urlSearch) setSearchTerm(urlSearch);
       if (urlPriorities) setSelectedPriorities(urlPriorities.split(","));
-      if (urlStatuses) setSelectedStatuses(urlStatuses.split(","));
+      if (urlStatuses) {
+        setSelectedStatuses(urlStatuses.split(","));
+      } else if (urlStatus) {
+        // Handle single status parameter from agent view
+        setSelectedStatuses([urlStatus]);
+      }
     } catch (e) {
       // ignore
     }
-  }, []);
+  }, [searchParams]);
 
   useEffect(() => {
     const fetchTasks = async () => {
@@ -164,8 +174,9 @@ export default function TasksTable() {
     const matchesStatus = selectedStatuses.length === 0 || selectedStatuses.includes(task.status);
     const matchesFollowUp = selectedFollowUpDurations.length === 0 || (task.followUpDuration && selectedFollowUpDurations.includes(task.followUpDuration));
     const matchesStatusCheck = selectedStatusCheckDurations.length === 0 || (task.statusCheckDuration && selectedStatusCheckDurations.includes(task.statusCheckDuration));
+    const matchesAssignedTo = !assignedToId || task.assignedTo?.id === assignedToId;
 
-    return matchesSearch && matchesPriority && matchesStatus && matchesFollowUp && matchesStatusCheck;
+    return matchesSearch && matchesPriority && matchesStatus && matchesFollowUp && matchesStatusCheck && matchesAssignedTo;
   });
 
   // Apply sorting to filtered tasks

@@ -66,13 +66,12 @@ interface Task {
   priority: string;
   status: string;
   progress: number;
-  statusProgressMap?: Record<string, number>;
   createdAt: string;
   dueDate: string;
   updatedAt: string;
   followUpRequired: boolean;
-  followUpDuration?: string;
-  statusCheckDuration?: string;
+  followUpDuration?: string; // e.g., '24hr', '48hr', '1w', 'None'
+  statusCheckDuration?: string; // e.g., '24hr', '48hr', '1w', 'None'
   completed: boolean;
   recurring?: number;
   assignedTo?: {
@@ -438,22 +437,16 @@ export default function TaskDetails() {
   };
 
   // Optimistic UI update for status
-  // When status changes, restore progress for that status from statusProgressMap
   const handleStatusChange = async (newStatus: string) => {
     if (!task) return;
     const prevTask = { ...task };
-    const map = task.statusProgressMap || {};
-    // If switching to Completed, force 100; else restore last progress for that status
+    // Only update status and progress, do not auto-toggle completed
     const isCompleted = newStatus === "Completed";
-    const restoredProgress = isCompleted ? 100 : (typeof map[newStatus] === "number" ? map[newStatus] : 0);
-    // Update local state
     setTask({
       ...task,
       status: newStatus,
-      progress: restoredProgress,
+      progress: isCompleted ? 100 : 0,
     });
-    setProgressInput(restoredProgress > 0 ? String(restoredProgress) : "");
-    // Update backend
     try {
       const response = await fetch(`/api/tasks/${task.id}`, {
         method: "PUT",
@@ -462,8 +455,7 @@ export default function TaskDetails() {
         },
         body: JSON.stringify({
           status: newStatus,
-          progress: restoredProgress,
-          statusProgressMap: { ...map, [newStatus]: restoredProgress },
+          progress: isCompleted ? 100 : 0,
         }),
       });
       if (response.ok) {
@@ -492,15 +484,10 @@ export default function TaskDetails() {
 
 
   // Local state for progress input for smooth UX
-  // Per-status progress input
   const [progressInput, setProgressInput] = useState<string>("");
   useEffect(() => {
     if (task) {
-      // Use per-status progress if available
-      const map = task.statusProgressMap || {};
-      const status = task.status;
-      const progress = typeof map[status] === "number" ? map[status] : task.progress;
-      setProgressInput(progress && progress > 0 ? String(progress) : "");
+      setProgressInput(task.progress && task.progress > 0 ? String(task.progress) : "");
     }
   }, [task]);
 
@@ -511,26 +498,23 @@ export default function TaskDetails() {
   const debounceTimeout = useRef<NodeJS.Timeout | null>(null);
   const lastProgressSent = useRef<number | null>(null);
 
-  // Update per-status progress in backend and local state
   const updateProgressBackend = async (newProgress: number) => {
     if (!task) return;
     const prevTask = { ...task };
-    const status = task.status;
-    // Update local statusProgressMap
-    const newMap = { ...(task.statusProgressMap || {}) };
-    newMap[status] = newProgress;
-    setTask({ ...task, progress: newProgress, statusProgressMap: newMap });
+    setTask({ ...task, progress: newProgress });
     try {
       const response = await fetch(`/api/tasks/${task.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ progress: newProgress, statusProgressMap: newMap }),
+        body: JSON.stringify({ progress: newProgress }),
       });
       if (response.ok) {
         const data = await response.json();
+        // Preserve existing related data and only update the fields that were changed
         setTask(prevTaskState => ({
           ...prevTaskState!,
           ...data.task,
+          // Preserve these fields that might not be in the API response
           comments: prevTaskState!.comments,
           assignedTo: prevTaskState!.assignedTo,
           client: prevTaskState!.client,
@@ -595,16 +579,12 @@ export default function TaskDetails() {
   const handleFollowUpDurationChange = async (value: string) => {
     if (!task) return;
     taskRef.current = task;
-    let newStatusCheckDuration = task.statusCheckDuration;
-    if (value !== "None" && task.statusCheckDuration !== "None") {
-      newStatusCheckDuration = "None";
-    }
-    setTask({ ...task, followUpDuration: value, statusCheckDuration: newStatusCheckDuration });
+    setTask({ ...task, followUpDuration: value });
     try {
       const response = await fetch(`/api/tasks/${task.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ followUpDuration: value, statusCheckDuration: newStatusCheckDuration }),
+        body: JSON.stringify({ followUpDuration: value }),
       });
       if (response.ok) {
         const data = await response.json();
@@ -631,16 +611,12 @@ export default function TaskDetails() {
   const handleStatusCheckDurationChange = async (value: string) => {
     if (!task) return;
     taskRef.current = task;
-    let newFollowUpDuration = task.followUpDuration;
-    if (value !== "None" && task.followUpDuration !== "None") {
-      newFollowUpDuration = "None";
-    }
-    setTask({ ...task, statusCheckDuration: value, followUpDuration: newFollowUpDuration });
+    setTask({ ...task, statusCheckDuration: value });
     try {
       const response = await fetch(`/api/tasks/${task.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ statusCheckDuration: value, followUpDuration: newFollowUpDuration }),
+        body: JSON.stringify({ statusCheckDuration: value }),
       });
       if (response.ok) {
         const data = await response.json();

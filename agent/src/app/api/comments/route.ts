@@ -32,26 +32,18 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Verify the task exists and agent has access to it (creator, assigned, or superior of assigned)
-    const task = await prisma.task.findUnique({
-      where: { id: taskId },
-      select: { createdById: true, assignedToId: true },
+    // Verify the task exists and agent has access to it
+    const task = await prisma.task.findFirst({
+      where: {
+        id: taskId,
+        OR: [
+          { createdById: agent.id },
+          { assignedToId: agent.id },
+        ],
+      },
     });
 
-    let isAuthorized = false;
-    if (task?.createdById === agent.id || task?.assignedToId === agent.id) {
-      isAuthorized = true;
-    } else if (task?.assignedToId) {
-      // Check if agent is a superior of the assigned agent
-      const superiorLink = await prisma.agentSuperior.findFirst({
-        where: {
-          superiorId: agent.id,
-          subordinateId: task.assignedToId,
-        },
-      });
-      if (superiorLink) isAuthorized = true;
-    }
-    if (!task || !isAuthorized) {
+    if (!task) {
       return NextResponse.json(
         { error: "Task not found or access denied" },
         { status: 404 }

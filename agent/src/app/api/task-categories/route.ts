@@ -179,19 +179,6 @@ export async function POST(req: NextRequest) {
       }
     });
 
-
-    // Send notification email to all admins/owners
-    try {
-      const { sendAdminOwnerNotification } = await import("@/lib/email");
-      await sendAdminOwnerNotification({
-        subject: `New Service Created: ${newCategory.name}`,
-        html: `<p>A new service has been created by agent <b>${currentAgent.name}</b>.<br><br><b>Service Name:</b> ${newCategory.name}<br><b>Description:</b> ${newCategory.description || "-"}</p>`,
-        text: `A new service has been created by agent ${currentAgent.name}.\nService Name: ${newCategory.name}\nDescription: ${newCategory.description || "-"}`
-      });
-    } catch (e) {
-      console.error("Failed to send admin/owner notification email:", e);
-    }
-
     // Transform data for frontend
     const transformedCategory = {
       id: newCategory.id,
@@ -207,7 +194,7 @@ export async function POST(req: NextRequest) {
       approvedBy: newCategory.approvedBy?.username || null,
       approvedAt: newCategory.approvedAt?.toISOString() || null,
       taskCount: 0,
-      timePeriod: newCategory.timePeriod // Include timePeriod in the response
+      timePeriod: newCategory.timePeriod, // Include timePeriod in the response
     };
 
     return NextResponse.json(transformedCategory, { status: 201 });

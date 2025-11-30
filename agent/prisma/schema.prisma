@@ -174,9 +174,6 @@ model Task {
   // Add this to the Task model
   retainershipId String? @db.ObjectId
   retainership   Retainership? @relation("RetainershipTasks", fields: [retainershipId], references: [id])
-
-  // Per-status progress tracking
-  statusProgressMap Json?
 }
 
 model Legislation {

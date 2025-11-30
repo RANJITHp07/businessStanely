@@ -4,6 +4,16 @@ import { useState, useEffect, Fragment } from "react";
 import { notFound, useParams, useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 import {
   Card,
@@ -45,6 +55,7 @@ import {
   Clock,
   AlertTriangle,
   TrendingUp,
+  Trash,
 } from "lucide-react";
 import { Agent, Task } from "@/types";
 import Link from "next/link";
@@ -118,6 +129,8 @@ export default function AgentDetails() {
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
   const [newNote, setNewNote] = useState("");
   const [addingNote, setAddingNote] = useState(false);
+  const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     // Load current user from localStorage
@@ -479,8 +492,7 @@ export default function AgentDetails() {
                             (agentTasks.filter(
                               (task) =>
                                 task.status === "Completed"
-                            ).length /
-                              agentTasks.length) *
+                            ).length / agentTasks.length) *
                               100
                           )
                         : 0}
@@ -830,6 +842,12 @@ export default function AgentDetails() {
                                     Edit Task
                                   </Link>
                                 </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={() => setTaskToDelete(task)}
+                                >
+                                  <Trash className="mr-2 h-4 w-4 text-red-600" />
+                                  Delete Task
+                                </DropdownMenuItem>
                               </DropdownMenuContent>
                             </DropdownMenu>
                           </TableCell>
@@ -1122,6 +1140,49 @@ export default function AgentDetails() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* AlertDialog for Delete Confirmation */}
+      {taskToDelete && (
+        <AlertDialog open={!!taskToDelete} onOpenChange={() => setTaskToDelete(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This action cannot be undone. This will permanently delete the task &quot;{taskToDelete?.title}&quot;.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setTaskToDelete(null)}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={async () => {
+                  if (!taskToDelete) return; // Ensure taskToDelete is not null
+                  setIsDeleting(true);
+                  try {
+                    const response = await fetch(`/api/tasks/${taskToDelete.id}`, {
+                      method: "DELETE",
+                    });
+                    if (response.ok) {
+                      setAgentTasks((prevTasks) => prevTasks.filter((t) => t.id !== taskToDelete.id));
+                      router.push(`/agent/${id}?tab=tasks`); // Redirect back to tasks tab
+                    } else {
+                      alert("Failed to delete the task. Please try again.");
+                    }
+                  } catch (error) {
+                    console.error("Error deleting task:", error);
+                    alert("An error occurred while deleting the task.");
+                  } finally {
+                    setIsDeleting(false);
+                    setTaskToDelete(null);
+                  }
+                }}
+                disabled={isDeleting}
+              >
+                {isDeleting ? "Deleting..." : "Delete"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
     </div>
   );
 }

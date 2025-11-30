@@ -145,6 +145,14 @@ export async function GET(
           },
         },
         legislation: true,
+        category: {
+          select: {
+            id: true,
+            name: true,
+            description: true,
+            color: true,
+          },
+        },
       },
     });
 
@@ -188,28 +196,13 @@ export async function GET(
       );
     }
 
-    // Fetch category separately if needed
-    let category = null;
-    const taskWithFields = task as typeof task & TaskWithFields;
-    if (taskWithFields.categoryId) {
-      category = await prisma.taskCategory.findUnique({
-        where: { id: taskWithFields.categoryId },
-        select: {
-          id: true,
-          name: true,
-          description: true,
-          color: true,
-        },
-      });
-    }
-
     return NextResponse.json({
       task: {
         ...task,
         assignedTo: task?.assignedTo
           ? { ...task.assignedTo, subordinates: assignedAgentSubordinates }
           : null,
-        category
+        service: task.category ? [task.category] : [], // Map category to service field
       }
     });
   } catch (error) {

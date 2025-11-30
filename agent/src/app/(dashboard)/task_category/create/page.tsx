@@ -26,10 +26,16 @@ interface CreateProps {
 }
 
 function Create({ admin, initialData }: CreateProps) {
-    const [formData, setFormData] = useState({
+    const [formData, setFormData] = useState<{
+        name: string;
+        description: string;
+        timePeriod: number | null; // Allow null for cleared input
+        notes: string;
+        processFlow: string;
+    }>({
         name: initialData?.name || "",
         description: initialData?.description || "",
-        timePeriod: initialData?.timePeriod || 0, // Default to 0 if not provided
+        timePeriod: initialData?.timePeriod ?? 5, // Default to 5 if not provided
         notes: initialData?.notes || "",
         processFlow: initialData?.processFlow || "",
     })
@@ -126,8 +132,14 @@ function Create({ admin, initialData }: CreateProps) {
                                 <Input
                                     id="timePeriod"
                                     type="number"
-                                    value={formData.timePeriod}
-                                    onChange={(e) => setFormData((prev) => ({ ...prev, timePeriod: parseInt(e.target.value, 10) || 0 }))}
+                                    value={formData.timePeriod !== null ? formData.timePeriod : ""} // Allow clearing the input
+                                    onChange={(e) => {
+                                        const value = e.target.value;
+                                        setFormData((prev) => ({
+                                            ...prev,
+                                            timePeriod: value === "" ? null : parseInt(value, 10) || 0, // Set to null when cleared
+                                        }));
+                                    }}
                                     placeholder="Enter time period in days"
                                     required
                                 />

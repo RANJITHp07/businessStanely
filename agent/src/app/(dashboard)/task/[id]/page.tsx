@@ -109,6 +109,11 @@ interface Task {
   legislation?: {
     title?: string;
   };
+  service?: {
+    id: string;
+    name: string;
+    description?: string;
+  }[];
 }
 
 interface Comment {
@@ -1111,6 +1116,24 @@ export default function TaskDetails() {
                       </a>
                     </div>
                   </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Associated Service</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {task.service && task.service.length > 0 ? (
+                    task.service.map((service) => (
+                      <div key={service.id}>
+                        <p className="font-medium">{service.name}</p>
+                        <p className="text-sm text-muted-foreground">{service.description || "No description available"}</p>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No associated services available.</p>
+                  )}
                 </CardContent>
               </Card>
             </div>

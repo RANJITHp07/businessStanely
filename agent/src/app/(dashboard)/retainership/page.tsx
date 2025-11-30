@@ -69,7 +69,7 @@ interface DashboardRetainership {
     client?: {
         id: string;
         name: string;
-        email: string;
+        email: string; 
     };
     photo?: string;
     taskCount?: number;
@@ -85,6 +85,9 @@ export default function RetainershipTable() {
     const [loading, setLoading] = useState(true)
     const [activeTab, setActiveTab] = useState("approved")
     const [currentUserRole, setCurrentUserRole] = useState<string>("")
+
+    const [myRetainerships, setMyRetainerships] = useState<DashboardRetainership[]>([]);
+    const [myClients, setMyClients] = useState<DashboardRetainership[]>([]);
 
     const router = useRouter()
 
@@ -155,6 +158,57 @@ export default function RetainershipTable() {
         }
         fetchRetainerships()
     }, [activeTab])
+
+    // Fetch retainerships and clients assigned to the agent
+    useEffect(() => {
+        const fetchMyRetainerships = async () => {
+            if (activeTab === 'my-retainerships') {
+                try {
+                    setLoading(true);
+                    const response = await fetchWithAuth(`/api/retainerships?assignedTo=me`);
+
+                    if (!response.ok) {
+                        throw new Error('Failed to fetch my retainerships');
+                    }
+
+                    const data = await response.json();
+                    setMyRetainerships(data || []);
+                } catch (error) {
+                    console.error("Error fetching my retainerships:", error);
+                    setMyRetainerships([]);
+                } finally {
+                    setLoading(false);
+                }
+            }
+        };
+
+        const fetchMyClients = async () => {
+            if (activeTab === 'my-clients') {
+                try {
+                    setLoading(true);
+                    const response = await fetchWithAuth(`/api/clients?assignedTo=me`);
+
+                    if (!response.ok) {
+                        throw new Error('Failed to fetch my clients');
+                    }
+
+                    const data = await response.json();
+                    setMyClients(data || []);
+                } catch (error) {
+                    console.error("Error fetching my clients:", error);
+                    setMyClients([]);
+                } finally {
+                    setLoading(false);
+                }
+            }
+        };
+
+        if (activeTab === 'my-retainerships') {
+            fetchMyRetainerships();
+        } else if (activeTab === 'my-clients') {
+            fetchMyClients();
+        }
+    }, [activeTab]);
 
     // Updated filtering logic to normalize status field for case-insensitive comparison
     const filteredRetainerships = (retainerships || []).filter((retainership) => {
@@ -319,7 +373,7 @@ export default function RetainershipTable() {
 
             {/* Retainerships Table with Tabs */}
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-                <TabsList className="grid w-full grid-cols-2">
+                <TabsList className="grid w-full grid-cols-4">
                     <TabsTrigger value="approved" className="flex items-center gap-2">
                         <CheckCircle className="h-4 w-4" />
                         Approved Retainerships ({approvedCount})
@@ -327,6 +381,14 @@ export default function RetainershipTable() {
                     <TabsTrigger value="pending" className="flex items-center gap-2">
                         <Clock className="h-4 w-4" />
                         Pending Retainerships ({pendingCount})
+                    </TabsTrigger>
+                    <TabsTrigger value="my-retainerships" className="flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4" />
+                        My Retainerships ({myRetainerships.length})
+                    </TabsTrigger>
+                    <TabsTrigger value="my-clients" className="flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4" />
+                        My Clients ({myClients.length})
                     </TabsTrigger>
                 </TabsList>
 
@@ -762,6 +824,80 @@ export default function RetainershipTable() {
                                 </CardContent>
                             </>
                         )}
+                    </Card>
+                </TabsContent>
+
+                <TabsContent value="my-retainerships">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>My Retainerships</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            {loading ? (
+                                <div className="flex justify-center items-center py-8">
+                                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                                </div>
+                            ) : myRetainerships.length === 0 ? (
+                                <p className="text-center text-muted-foreground">No retainerships assigned to you.</p>
+                            ) : (
+                                <div className="rounded-md border">
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow>
+                                                <TableHead>Retainership</TableHead>
+                                                <TableHead>Description</TableHead>
+                                                <TableHead>Client</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {myRetainerships.map((retainership) => (
+                                                <TableRow key={retainership.id}>
+                                                    <TableCell>{retainership.name}</TableCell>
+                                                    <TableCell>{retainership.description}</TableCell>
+                                                    <TableCell>{retainership.client?.name || "N/A"}</TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                <TabsContent value="my-clients">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>My Clients</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            {loading ? (
+                                <div className="flex justify-center items-center py-8">
+                                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                                </div>
+                            ) : myClients.length === 0 ? (
+                                <p className="text-center text-muted-foreground">No clients assigned to you.</p>
+                            ) : (
+                                <div className="rounded-md border">
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow>
+                                                <TableHead>Client</TableHead>
+                                                <TableHead>Email</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {myClients.map((client) => (
+                                                <TableRow key={client.id}>
+                                                    <TableCell>{client.name}</TableCell>
+                                                    <TableCell>{client?.email || "N/A"}</TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                </div>
+                            )}
+                        </CardContent>
                     </Card>
                 </TabsContent>
             </Tabs>

@@ -125,23 +125,6 @@ export default function TasksTable() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
-  const handleDelete = async () => {
-    if (!taskToDelete) return;
-    try {
-      const response = await fetchWithAuth(`/api/tasks/${taskToDelete.id}`, {
-        method: "DELETE",
-      });
-      if (response.ok) {
-        setTasks((tasks || []).filter((task) => task.id !== taskToDelete.id));
-        setTaskToDelete(null);
-      } else {
-        console.error("Failed to delete task");
-      }
-    } catch (error) {
-      console.error("Error deleting task:", error);
-    }
-  };
-
   useEffect(() => {
     const fetchTasks = async () => {
       try {
@@ -855,14 +838,6 @@ export default function TasksTable() {
                                         Edit Task
                                       </Link>
                                     </DropdownMenuItem>
-                                    <DropdownMenuSeparator />
-                                    <DropdownMenuItem
-                                      onClick={() => setTaskToDelete(task)}
-                                      className="text-red-600 focus:text-red-600"
-                                    >
-                                      <Trash2 className="mr-2 h-4 w-4" />
-                                      Delete Task
-                                    </DropdownMenuItem>
                                   </DropdownMenuContent>
                                 </DropdownMenu>
                               </TableCell>
@@ -966,29 +941,6 @@ export default function TasksTable() {
           )}
         </Card>
       </div>
-      <AlertDialog
-        open={!!taskToDelete}
-        onOpenChange={() => setTaskToDelete(null)}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the
-              task and remove its data from our servers.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              className="bg-red-600 hover:bg-red-700"
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </>
   );
 }

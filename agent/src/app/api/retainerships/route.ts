@@ -19,9 +19,16 @@ export async function GET(req: NextRequest) {
     const statusParam = url.searchParams.get("status");
 
     // Build where clause for the query
-    const where: { status?: string } = {};
+    // Refine the type of `where` to include `createdByAgentId`
+    const where: { status?: string; createdByAgentId?: string } = {};
     if (statusParam && ["approved", "pending"].includes(statusParam)) {
       where.status = statusParam; // Filter by retainership status
+    }
+
+    // Add filtering for 'assignedTo=me'
+    const assignedTo = url.searchParams.get("assignedTo");
+    if (assignedTo === "me") {
+      where["createdByAgentId"] = currentAgent.id;
     }
 
     // Fetch retainerships from the database

@@ -64,12 +64,378 @@ function groupActivitiesByDate(activities: AgentActivity[]) {
   }, {} as Record<string, AgentActivity[]>);
 }
 
-function formatDateDMY(dateString: string) {
+function formatDateDMY(dateString?: string) {
+  if (!dateString) return "-";
   const d = new Date(dateString);
+  if (isNaN(d.getTime())) return "-";
   const day = String(d.getDate()).padStart(2, '0');
   const month = d.toLocaleString('en-US', { month: 'short' });
   const year = d.getFullYear();
   return `${day}/${month}/${year}`;
+}
+
+function statusKey(s?: string) {
+  const k = (s || "").toLowerCase().replace(/\s+/g, "");
+  if (["todo", "pending"].includes(k)) return "todo";
+  if (["inprogress", "progress"].includes(k)) return "inprogress";
+  if (["completed"].includes(k)) return "completed";
+  return k || "todo";
+}
+
+function sectionLabelToStatus(label: string) {
+  const l = label.toLowerCase();
+  if (l.includes("progress")) return "In Progress";
+  if (l.includes("completed")) return "Completed";
+  return "To Do";
+}
+
+interface SectionTableProps {
+  label: string;
+  tasks: Task[];
+  agentId: string;
+}
+
+function SectionTable({ label, tasks, agentId }: SectionTableProps) {
+  const labelColor = (() => {
+    const l = label.toLowerCase();
+    if (l.includes("progress")) return "text-sky-600";
+    if (l.includes("completed")) return "text-green-600";
+    return "text-blue-600";
+  })();
+
+  return (
+    <>
+      <div className="flex items-center gap-4 min-w-0">
+        {/* Rotated label column shown on md+ */}
+        <div className="w-[96px] h-auto hidden md:flex items-center justify-center self-stretch flex-shrink-0 bg-white rounded-lg py-6 px-2">
+          <span
+            className={`block rotate-[-90deg] origin-center whitespace-nowrap tracking-widest font-semibold select-none text-[24px] ${labelColor}`}
+          >
+            {label}
+          </span>
+        </div>
+
+        <div className="flex-1 min-w-0">
+          <Card className="min-h-[250px] py-0 gap-0 rounded-md shadow-sm">
+            <CardContent className="p-0">
+              {/* Mobile heading */}
+              <div
+                className={`md:hidden flex items-center justify-center px-4 py-4 rounded-lg shadow-sm border border-gray-100 font-semibold ${labelColor} text-2xl tracking-widest`}
+              >
+                {label}
+              </div>
+
+              {/* Desktop table */}
+              <div className="rounded-md overflow-hidden hidden md:block bg-white shadow-sm">
+                <Table className="w-full table-fixed text-sm [&_th]:py-3 [&_th]:h-12 [&_td]:py-3">
+                  <colgroup>
+                    <col className="w-[180px]" />
+                    <col className="w-[130px]" />
+                    <col className="w-[90px]" />
+                    <col className="w-[100px]" />
+                    <col className="w-[110px]" />
+                    <col className="w-[60px]" />
+                  </colgroup>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="text-white">Task</TableHead>
+                      <TableHead className="text-white">Client</TableHead>
+                      <TableHead className="text-white">Priority</TableHead>
+                      <TableHead className="text-white">Due Date</TableHead>
+                      <TableHead className="text-white">Progress</TableHead>
+                      <TableHead className="text-right text-white">
+                        Actions
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {tasks.length === 0 ? (
+                      <TableRow>
+                        <TableCell
+                          colSpan={6}
+                          className="text-center py-4 text-muted-foreground"
+                        >
+                          No tasks found.
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      tasks.map((t) => {
+                        const clientName = t.client
+                          ? t.client.name || 
+                            (t.client.clientType === "individual"
+                            ? `${t.client.firstName ?? ""} ${
+                                t.client.lastName ?? ""
+                              }`.trim()
+                            : t.client.organizationName ?? "")
+                          : "-";
+                        const shortId = `T-${t.id.slice(0, 6).toUpperCase()}`;
+                        const categoryName = t.category?.name;
+                        const clientEmail = t.client?.email ?? "";
+                        const priority = (t.priority || "").toLowerCase();
+                        const isOverdue = t.dueDate
+                          ? new Date(t.dueDate) < new Date() &&
+                            statusKey(t.status) !== "completed"
+                          : false;
+                        const statusLabel = (() => {
+                          const k = statusKey(t.status);
+                          if (k === "completed") return "Completed";
+                          if (k === "inprogress") return "In Progress";
+                          return "To Do";
+                        })();
+
+                        const priorityBadge = (p: string) => {
+                          if (!p)
+                            return (
+                              <span className="text-muted-foreground">-</span>
+                            );
+                          if (p.includes("high"))
+                            return (
+                              <span className="inline-flex items-center gap-2 bg-red-100 text-red-700 px-3 py-1 rounded-full text-sm">
+                                <span className="text-xs">❗</span> High
+                              </span>
+                            );
+                          if (p.includes("medium"))
+                            return (
+                              <span className="inline-flex items-center gap-2 bg-amber-100 text-amber-800 px-3 py-1 rounded-full text-sm">
+                                <span className="text-xs">⚠️</span> Medium
+                              </span>
+                            );
+                          return (
+                            <span className="inline-flex items-center gap-2 bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm">
+                              Low
+                            </span>
+                          );
+                        };
+
+                        return (
+                          <TableRow
+                            key={t.id}
+                            className="even:bg-muted/30"
+                          >
+                            <TableCell
+                              className="truncate max-w-[260px] align-top"
+                              title={t.title || shortId}
+                            >
+                              <div className="flex flex-col">
+                                <Link
+                                  href={`/task/${t.id}?agentId=${agentId}&tab=tasks`}
+                                  className="text-foreground font-medium hover:underline truncate"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  {t.title || shortId}
+                                </Link>
+                                {categoryName ? (
+                                  <div className="mt-2">
+                                    <span className="inline-block bg-blue-50 text-blue-600 px-2 py-1 rounded-md text-xs">
+                                      {categoryName}
+                                    </span>
+                                  </div>
+                                ) : null}
+                              </div>
+                            </TableCell>
+
+                            <TableCell
+                              className="truncate max-w-[180px] align-top"
+                              title={clientName || clientEmail}
+                            >
+                              <div className="flex flex-col">
+                                <span className="font-medium truncate">
+                                  {clientName || "-"}
+                                </span>
+                                {clientEmail ? (
+                                  <span className="text-muted-foreground text-sm truncate">
+                                    {clientEmail}
+                                  </span>
+                                ) : null}
+                              </div>
+                            </TableCell>
+
+                            <TableCell className="whitespace-nowrap align-top">
+                              {priorityBadge(priority)}
+                            </TableCell>
+
+                            <TableCell
+                              className="whitespace-nowrap align-top"
+                              title={t.dueDate || ""}
+                            >
+                              <div className="flex flex-col">
+                                <div className="flex items-center gap-2">
+                                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                                  <span
+                                    className={`${
+                                      isOverdue
+                                        ? "text-red-600 font-semibold"
+                                        : "text-foreground"
+                                    }`}
+                                  >
+                                    {formatDateDMY(t.dueDate)}
+                                  </span>
+                                </div>
+                                {isOverdue ? (
+                                  <div className="mt-2">
+                                    <span className="inline-block bg-red-600 text-white text-xs px-2 py-0.5 rounded-full">
+                                      Overdue
+                                    </span>
+                                  </div>
+                                ) : null}
+                              </div>
+                            </TableCell>
+
+                            <TableCell
+                              className="truncate max-w-[160px] align-top"
+                              title={statusLabel}
+                            >
+                              <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-sm font-medium">
+                                    {statusLabel}
+                                  </span>
+                                </div>
+                                <Progress
+                                  value={
+                                    statusLabel === "Completed"
+                                      ? 100
+                                      : statusLabel === "In Progress"
+                                      ? 50
+                                      : 0
+                                  }
+                                  className="h-1"
+                                />
+                              </div>
+                            </TableCell>
+
+                            <TableCell className="text-right align-top">
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    className="h-8 w-8 p-0"
+                                  >
+                                    <span className="sr-only">Open menu</span>
+                                    <MoreHorizontal className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                  <DropdownMenuItem asChild>
+                                    <Link href={`/task/${t.id}`}>
+                                      <Eye className="mr-2 h-4 w-4" />
+                                      View Details
+                                    </Link>
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem asChild>
+                                    <Link href={`/task/${t.id}/edit`}>
+                                      <Edit className="mr-2 h-4 w-4" />
+                                      Edit Task
+                                    </Link>
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
+                    )}
+                  </TableBody>
+                </Table>
+              </div>
+
+              {/* Mobile list */}
+              <div className="md:hidden px-4 pb-4 space-y-3">
+                {tasks.length === 0 ? (
+                  <div className="text-center py-6 text-muted-foreground">
+                    No tasks found.
+                  </div>
+                ) : (
+                  tasks.map((t) => {
+                    const clientName = t.client
+                      ? t.client.name || 
+                        (t.client.clientType === "individual"
+                        ? `${t.client.firstName ?? ""} ${
+                            t.client.lastName ?? ""
+                          }`.trim()
+                        : t.client.organizationName ?? "")
+                      : "-";
+                    const shortId = `T-${t.id.slice(0, 6).toUpperCase()}`;
+                    return (
+                      <div
+                        key={t.id}
+                        className="rounded-md border bg-white p-3 shadow-sm"
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex-1 min-w-0">
+                            <Link
+                              href={`/task/${t.id}`}
+                              className="text-foreground font-medium hover:underline truncate block"
+                            >
+                              {t.title || shortId}
+                            </Link>
+                            <div className="text-sm text-muted-foreground mt-1">
+                              {clientName}
+                            </div>
+                          </div>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                className="h-8 w-8 p-0 flex-shrink-0"
+                              >
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                              <DropdownMenuItem asChild>
+                                <Link href={`/task/${t.id}`}>
+                                  <Eye className="mr-2 h-4 w-4" />
+                                  View Details
+                                </Link>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem asChild>
+                                <Link href={`/task/${t.id}/edit`}>
+                                  <Edit className="mr-2 h-4 w-4" />
+                                  Edit Task
+                                </Link>
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+
+                        <div className="mt-3 grid grid-cols-2 gap-2 text-sm text-muted-foreground">
+                          <div className="flex items-center gap-1">
+                            <Calendar className="h-3 w-3" />
+                            {formatDateDMY(t.dueDate)}
+                          </div>
+                          <div className="text-right">
+                            {statusKey(t.status) === "completed"
+                              ? "Completed"
+                              : statusKey(t.status) === "inprogress"
+                              ? "In Progress"
+                              : "To Do"}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      <div className="flex justify-end">
+        <Link
+          href={`/task?status=${encodeURIComponent(
+            sectionLabelToStatus(label)
+          )}&assignedToId=${agentId}`}
+          className="bg-[#002fff] cursor-pointer text-white text-[14px] py-[10px] mt-[10px] px-[10px] rounded-[5px] inline-block"
+        >
+          View more
+        </Link>
+      </div>
+    </>
+  );
 }
 
 export default function AgentDetails() {
@@ -574,137 +940,46 @@ export default function AgentDetails() {
 
         {/* Tasks Tab */}
         <TabsContent value="tasks" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Assigned Tasks</CardTitle>
-              <CardDescription>
-                All tasks currently assigned to {agent.name}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {tasksLoading ? (
-                <div className="text-center py-8">
-                  <p className="text-muted-foreground">Loading tasks...</p>
-                </div>
-              ) : agentTasks.length === 0 ? (
-                <div className="text-center py-8">
-                  <p className="text-muted-foreground">
-                    No tasks assigned to this agent.
-                  </p>
-                </div>
-              ) : (
-                <div className="rounded-md border">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Task</TableHead>
-                        <TableHead>Client</TableHead>
-                        <TableHead>Assigned To</TableHead>
-                        <TableHead>Priority</TableHead>
-                        <TableHead>Due Date</TableHead>
-                        <TableHead>Progress</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {agentTasks.map((task) => (
-                        <TableRow key={task.id}>
-                          <TableCell className="max-w-36 truncate overflow-hidden whitespace-nowrap">
-                            <div className="space-y-1">
-                              <div className="font-medium">{task.title}</div>
-                              {task.category && task.category.status === "approved" && (
-                                <div className="text-xs mt-1">
-                                  <span className="inline-block px-2 py-1 rounded bg-blue-100 text-blue-800 border border-blue-200">
-                                    {task.category.name}
-                                  </span>
-                                </div>
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <div className="font-medium">
-                              {task.client
-                                ? task.client.name || (task.client.clientType === "individual"
-                                  ? `${task.client.firstName} ${task.client.lastName}`
-                                  : task.client.organizationName)
-                                : "N/A"}
-                            </div>
-                            <div className="text-sm text-muted-foreground">
-                              {task.client?.email}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center space-x-2">
-                              <Avatar className="h-8 w-8">
-                                <AvatarFallback className="text-xs">
-                                  {task.assignedTo?.name
-                                    ? task.assignedTo.name.toUpperCase().split(" ").map((n) => n[0]).join("")
-                                    : "-"}
-                                </AvatarFallback>
-                              </Avatar>
-                              <div>
-                                <div className="font-medium text-sm">
-                                  {task.assignedTo?.name || "-"}
-                                </div>
-                                <div className="text-xs text-muted-foreground">
-                                  {task.assignedTo?.agentType}
-                                </div>
-                              </div>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            {getPriorityBadge(task.priority)}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-1">
-                              <Calendar className="h-4 w-4 text-muted-foreground" />
-                              <span>
-                                {task.dueDate ? formatDate(task.dueDate) : "N/A"}
-                              </span>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <div className="space-y-2">
-                              <div className="flex items-center justify-between">
-                                <span className="text-sm font-medium">
-                                  {task.status}
-                                </span>
-                              </div>
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" className="h-8 w-8 p-0">
-                                  <span className="sr-only">Open menu</span>
-                                  <MoreHorizontal className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                <DropdownMenuItem asChild>
-                                  <Link href={`/task/${task.id}`}>
-                                    <Eye className="mr-2 h-4 w-4" />
-                                    View Details
-                                  </Link>
-                                </DropdownMenuItem>
-                                <DropdownMenuItem asChild>
-                                  <Link href={`/task/${task.id}/edit`}>
-                                    <Edit className="mr-2 h-4 w-4" />
-                                    Edit Task
-                                  </Link>
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-semibold">Task Management</h2>
+              <p className="text-muted-foreground text-sm">
+                Manage and track tasks assigned to {agent.name}
+              </p>
+            </div>
+          </div>
+
+          {tasksLoading ? (
+            <div className="flex justify-center items-center py-16 text-muted-foreground">
+              <Clock className="h-6 w-6 animate-spin mr-2" /> Loading tasks...
+            </div>
+          ) : agentTasks.length === 0 ? (
+            <Card>
+              <CardContent className="text-center py-8">
+                <p className="text-muted-foreground">
+                  No tasks assigned to this agent.
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-[40px]">
+              <SectionTable 
+                label="New Task" 
+                tasks={agentTasks.filter((t) => ["todo"].includes(statusKey(t.status))).slice(0, 3)} 
+                agentId={id}
+              />
+              <SectionTable 
+                label="In Progress" 
+                tasks={agentTasks.filter((t) => ["inprogress"].includes(statusKey(t.status))).slice(0, 3)} 
+                agentId={id}
+              />
+              <SectionTable 
+                label="Completed" 
+                tasks={agentTasks.filter((t) => ["completed"].includes(statusKey(t.status))).slice(0, 3)} 
+                agentId={id}
+              />
+            </div>
+          )}
         </TabsContent>
 
         {/* Team Tab */}

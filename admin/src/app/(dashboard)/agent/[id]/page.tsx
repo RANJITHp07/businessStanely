@@ -1082,161 +1082,46 @@ export default function AgentDetails() {
 
         {/* Tasks Tab */}
         <TabsContent value="tasks" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Assigned Tasks</CardTitle>
-              <CardDescription>
-                All tasks currently Ownership to {agent.name}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {tasksLoading ? (
-                <div className="text-center py-8">
-                  <p className="text-muted-foreground">Loading tasks...</p>
-                </div>
-              ) : agentTasks.length === 0 ? (
-                <div className="text-center py-8">
-                  <p className="text-muted-foreground">
-                    No tasks Ownership to this agent.
-                  </p>
-                </div>
-              ) : (
-                <div className="rounded-md border overflow-x-auto">
-                  <div className="w-full">
-                    <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Task</TableHead>
-                        <TableHead>Client</TableHead>
-                        <TableHead>Priority</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Due Date</TableHead>
-                        <TableHead>Progress</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {agentTasks.map((task) => (
-                        <TableRow
-                          key={task.id}
-                          className="cursor-pointer hover:bg-muted/50 transition-colors"
-                          onClick={() => router.push(`/task/${task.id}?agentId=${id}&tab=tasks`)}
-                        >
-                          <TableCell>
-                            <div className="space-y-1">
-                              <div className="font-medium truncate max-w-xs" title={task.title}>
-                                {task.title.length > 40 ? `${task.title.slice(0, 30)}...` : task.title}
-                              </div>
-                              {task.description && (
-                                <div className="text-sm text-muted-foreground truncate max-w-xs" title={task.description}>
-                                  {task.description.length > 50 ? `${task.description.slice(0, 40)}...` : task.description}
-                                </div>
-                              )}
-                            </div>
-                          </TableCell>
-               <TableCell>
-  <div className="space-y-1">
-    <div 
-      className="font-medium truncate max-w-xs" 
-      title={
-        task.client
-          ? task.client.clientType === "individual"
-            ? `${task.client.firstName} ${task.client.lastName}`
-            : task.client.organizationName ?? "No Client"
-          : "No Client"
-      }
-    >
-      {task.client
-        ? task.client.clientType === "individual"
-          ? `${task.client.firstName} ${task.client.lastName}`
-          : task.client.organizationName ?? "No Client"
-        : "No Client"}
-    </div>
-    <div className="text-sm text-muted-foreground">
-      Created: {formatDate(task.createdAt)}
-    </div>
-  </div>
-</TableCell>
-                          <TableCell>
-                            {getPriorityBadge(task.priority)}
-                          </TableCell>
-                          <TableCell>{getStatusBadge(task.status)}</TableCell>
-                          <TableCell>
-                            {task.dueDate ? (
-                              <div className="flex items-center gap-1">
-                                <Calendar className="h-4 w-4 text-muted-foreground" />
-                                <span>{formatDate(task.dueDate)}</span>
-                              </div>
-                            ) : (
-                              <span className="text-muted-foreground">
-                                No due date
-                              </span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <div className="space-y-2">
-                              <div className="flex items-center justify-between">
-                                <span className="text-sm font-medium">
-                                  {task.status === "Completed" ||
-                                  task.status === "Done"
-                                    ? "100%"
-                                    : task.status === "In Progress"
-                                    ? "50%"
-                                    : "0%"}
-                                </span>
-                              </div>
-                              <Progress
-                                value={
-                                  task.status === "Completed" ||
-                                  task.status === "Done"
-                                    ? 100
-                                    : task.status === "In Progress"
-                                    ? 50
-                                    : 0
-                                }
-                                className="h-2"
-                              />
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" className="h-8 w-8 p-0">
-                                  <MoreHorizontal className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                <DropdownMenuItem asChild>
-                                  <Link href={`/task/${task.id}?agentId=${id}&tab=tasks`}>
-                                    <Eye className="mr-2 h-4 w-4" />
-                                    View Task
-                                  </Link>
-                                </DropdownMenuItem>
-                                <DropdownMenuItem asChild>
-                                  <Link href={`/task/${task.id}/edit?agentId=${id}&tab=tasks`}>
-                                    <Edit className="mr-2 h-4 w-4" />
-                                    Edit Task
-                                  </Link>
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  onClick={() => setTaskToDelete(task)}
-                                >
-                                  <Trash className="mr-2 h-4 w-4 text-red-600" />
-                                  Delete Task
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                    </Table>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-semibold">Task Management</h2>
+              <p className="text-muted-foreground text-sm">
+                Manage and track tasks assigned to {agent.name}
+              </p>
+            </div>
+          </div>
+
+          {tasksLoading ? (
+            <div className="flex justify-center items-center py-16 text-muted-foreground">
+              <Clock className="h-6 w-6 animate-spin mr-2" /> Loading tasks...
+            </div>
+          ) : agentTasks.length === 0 ? (
+            <Card>
+              <CardContent className="text-center py-8">
+                <p className="text-muted-foreground">
+                  No tasks assigned to this agent.
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-[40px]">
+              <SectionTable 
+                label="New Task" 
+                tasks={agentTasks.filter((t) => ["todo"].includes(statusKey(t.status))).slice(0, 3)} 
+                agentId={id}
+              />
+              <SectionTable 
+                label="In Progress" 
+                tasks={agentTasks.filter((t) => ["inprogress"].includes(statusKey(t.status))).slice(0, 3)} 
+                agentId={id}
+              />
+              <SectionTable 
+                label="Completed" 
+                tasks={agentTasks.filter((t) => ["completed"].includes(statusKey(t.status))).slice(0, 3)} 
+                agentId={id}
+              />
+            </div>
+          )}
         </TabsContent>
 
         {/* Team Tab */}

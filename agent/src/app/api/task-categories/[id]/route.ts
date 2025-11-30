@@ -123,6 +123,8 @@ export async function GET(
       taskCount: taskCount,
       isOwner: creatorRole === "owner",
       photo,
+      processFlow: category.processFlow || null,
+      notes: category.notes || null,
     };
     return NextResponse.json(formattedCategory);
   } catch (error) {

@@ -62,6 +62,8 @@ export interface TaskCategory {
     rejectedAt?: string | null
     rejectionReason?: string | null
     photo?: string
+    processFlow?: string;
+    notes?: string;
 }
 
 
@@ -111,8 +113,6 @@ export default function CategoryDetail({ params }: { params: Promise<{ id: strin
     const resolvedParams = params instanceof Promise ? use(params) : params
     const [category, setCategory] = useState<TaskCategory | null>(null)
     const [tasks, setTasks] = useState<Task[]>([])
-    const [sortBy] = useState("a-z")
-    const [sortByDate] = useState("newest")
     const [currentPage, setCurrentPage] = useState(1)
     const [itemsPerPage, setItemsPerPage] = useState(20)
     const [loading, setLoading] = useState(true)
@@ -156,34 +156,11 @@ export default function CategoryDetail({ params }: { params: Promise<{ id: strin
         fetchData()
     }, [resolvedParams.id])
 
-    // Sort function
-    const sortTasks = (tasks: Task[] | undefined, sortBy: string, sortByDate: string) => {
-        const safeTasks = Array.isArray(tasks) ? tasks : [];
-        return [...safeTasks].sort((a, b) => {
-            if (sortBy === "a-z") {
-                return a.title.localeCompare(b.title)
-            } else if (sortBy === "z-a") {
-                return b.title.localeCompare(a.title)
-            }
-
-            if (sortByDate === "newest") {
-                return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-            } else if (sortByDate === "oldest") {
-                return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-            }
-
-            return 0
-        })
-    }
-
-    // Apply sorting to tasks
-    const sortedTasks = tasks
-
     // Pagination logic
-    const totalPages = Math.ceil(sortedTasks.length / itemsPerPage)
+    const totalPages = Math.ceil(tasks.length / itemsPerPage)
     const startIndex = (currentPage - 1) * itemsPerPage
     const endIndex = startIndex + itemsPerPage
-    const currentTasks = sortedTasks.slice(startIndex, endIndex)
+    const currentTasks = tasks.slice(startIndex, endIndex)
 
     const handlePageChange = (page: number) => {
         setCurrentPage(page)
@@ -193,8 +170,6 @@ export default function CategoryDetail({ params }: { params: Promise<{ id: strin
         setItemsPerPage(Number.parseInt(value))
         setCurrentPage(1)
     }
-
-    // These functions were for approval/rejection and aren't needed in the detail view page
 
     // Only keeping the priority badge function that's actually used
     const getPriorityBadge = (priority: string) => {
@@ -348,6 +323,14 @@ export default function CategoryDetail({ params }: { params: Promise<{ id: strin
                                             <div className="flex items-center gap-2">
                                                 <Tag className="h-4 w-4 text-muted-foreground" />
                                                 <span>Tasks: {tasks.length}</span>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <FileText className="h-4 w-4 text-muted-foreground" />
+                                                <span>Process Flow: {category.processFlow || "No process flow available for this service."}</span>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <FileText className="h-4 w-4 text-muted-foreground" />
+                                                <span>Notes: {category.notes || "No notes available for this service."}</span>
                                             </div>
                                         </div>
                                     </div>

@@ -570,7 +570,7 @@ export default function TaskDetails() {
                   </select>
                 </div>
                 <div className="text-xs text-muted-foreground md:ml-auto">
-                  Last updated: {formatDateTime(taskData.updatedAt)}
+                  Last updated: {formatDateTime(taskData.updatedAt, true)}
                 </div>
               </div>
             </div>
@@ -867,7 +867,7 @@ export default function TaskDetails() {
                     <div>
                       <div className="text-sm font-medium">Created</div>
                       <div className="text-sm text-muted-foreground">
-                        {formatDateTime(taskData.createdAt)}
+                        {formatDateTime(taskData.createdAt, true)}
                       </div>
                     </div>
                   </div>
@@ -876,7 +876,7 @@ export default function TaskDetails() {
                     <div>
                       <div className="text-sm font-medium">Due Date</div>
                       <div className="text-sm text-muted-foreground">
-                        {formatDateTime(taskData.dueDate)}
+                        {formatDateTime(taskData.dueDate, true)}
                       </div>
                     </div>
                   </div>
@@ -999,7 +999,7 @@ export default function TaskDetails() {
                                 : comment.agent?.name}
                             </span>
                             <span className="text-xs text-muted-foreground">
-                              {formatDateTime(comment.createdAt)}
+                              {formatDateTime(comment.createdAt, true)}
                             </span>
                           </div>
                           <p className="text-sm">{comment.content}</p>

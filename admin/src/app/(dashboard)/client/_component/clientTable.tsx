@@ -154,7 +154,7 @@ export default function ClientsTable() {
 
 
     const handleDelete = async () => {
-        if (!clientToDelete) return
+        if (!clientToDelete) return;
 
         try {
             const response = await fetch(`/api/clients/${clientToDelete.id}`, {
@@ -164,13 +164,23 @@ export default function ClientsTable() {
             if (response.ok) {
                 setClients(clients.filter((client) => client.id !== clientToDelete.id));
                 setClientToDelete(null);
+                router.push('/client'); // Redirect to the client list page after deletion
             } else {
                 console.error("Failed to delete client");
             }
         } catch (error) {
             console.error("Error deleting client:", error);
         }
-    }
+    };
+
+    // Prevent navigation for deleted clients
+    const handleRowClick = (client: Client) => {
+        if (!clients.find((c) => c.id === client.id)) {
+            console.warn("Attempted to navigate to a deleted client.");
+            return;
+        }
+        router.push(`/client/${client.id}/edit`);
+    };
 
     const getClientTypeBadge = (type: string) => {
         const colors = {
@@ -396,7 +406,7 @@ export default function ClientsTable() {
                                         </TableRow>
                                     ) : (
                                         currentClients.map((client) => (
-                                            <TableRow className="cursor-pointer hover:bg-muted/50" key={client.id} onClick={() => router.push(`/client/${client.id}/edit`)}>
+                                            <TableRow className="cursor-pointer hover:bg-muted/50" key={client.id} onClick={() => handleRowClick(client)}>
                                                 <TableCell>
                                                     <div className="flex items-center space-x-3">
                                                         <Avatar className="h-10 w-10 flex-shrink-0">
@@ -457,7 +467,10 @@ export default function ClientsTable() {
                                                             <DropdownMenuSeparator />
                                                             <DropdownMenuItem
                                                                 className="text-destructive"
-                                                                onClick={() => setClientToDelete(client)}
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation(); // Prevent row click event
+                                                                    setClientToDelete(client);
+                                                                }}
                                                             >
                                                                 <Trash2 className="mr-2 h-4 w-4" />
                                                                 Delete Client
@@ -493,7 +506,7 @@ export default function ClientsTable() {
                                         </TableRow>
                                     ) : (
                                         currentClients.map((client) => (
-                                            <TableRow className="cursor-pointer hover:bg-muted/50" key={client.id} onClick={() => router.push(`/client/${client.id}/edit`)}>
+                                            <TableRow className="cursor-pointer hover:bg-muted/50" key={client.id} onClick={() => handleRowClick(client)}>
                                                 <TableCell>
                                                     <div className="flex items-center space-x-2">
                                                         <Avatar className="h-8 w-8 flex-shrink-0">

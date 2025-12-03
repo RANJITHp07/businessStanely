@@ -364,6 +364,27 @@ export async function PUT(
       });
     }
 
+    // Check if the status is being updated to "Hold"
+    if (body.status === "Hold") {
+      const taskDetails = await prisma.task.findUnique({
+        where: { id: taskId },
+        select: { dueDate: true, updatedAt: true },
+      });
+
+      const currentDate = new Date(); // Define currentDate
+      if (taskDetails?.dueDate) {
+        const dueDate = new Date(taskDetails.dueDate);
+        if (currentDate < dueDate) {
+          const remainingDays = Math.ceil(
+            (dueDate.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24)
+          );
+          updateData.dueDate = new Date(
+            currentDate.getTime() + remainingDays * 24 * 60 * 60 * 1000
+          );
+        }
+      }
+    }
+
     return NextResponse.json({
       task: {
         ...updatedTask,

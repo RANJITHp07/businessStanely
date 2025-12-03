@@ -307,6 +307,7 @@ export default function TaskDetails() {
   const calculateDaysRemaining = () => {
     if (!task?.dueDate) return 0;
     const dueDate = new Date(task.dueDate);
+    if (isNaN(dueDate.getTime())) return 0; // Handle invalid dates
     const today = new Date();
     const diffTime = dueDate.getTime() - today.getTime();
     return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
@@ -468,7 +469,7 @@ export default function TaskDetails() {
       });
       if (response.ok) {
         const data = await response.json();
-        setTask(prevTaskState => ({
+        setTask((prevTaskState) => ({
           ...prevTaskState!,
           ...data.task,
           comments: prevTaskState!.comments,
@@ -477,6 +478,7 @@ export default function TaskDetails() {
           category: data.task.category || prevTaskState!.category,
           timeLogs: prevTaskState!.timeLogs,
           legislation: prevTaskState!.legislation,
+          dueDate: data.task.dueDate, // Update due date dynamically
         }));
       } else {
         setTask(prevTask); // revert
@@ -1155,7 +1157,7 @@ export default function TaskDetails() {
                         <p className="text-sm text-muted-foreground">{service.description || "No description available"}</p>
                       </div>
                     ))
-                  ) : (
+                   ) : (
                     <p className="text-sm text-muted-foreground">No associated services available.</p>
                   )}
                 </CardContent>
@@ -1508,8 +1510,7 @@ export default function TaskDetails() {
                           {log.description}
                         </div>
                         <div className="text-xs text-gray-500">
-                          By {log.agent.name} on{" "}
-                          {formatDateISTDisplay(log.date)}
+                          By {log.agent.name} on {formatDateISTDisplay(log.date)}
                         </div>
                       </div>
                       <div className="flex items-center gap-2">

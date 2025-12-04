@@ -108,6 +108,7 @@ export interface Task {
     createdAt: string;
     updatedAt: string;
   }; // Added legislation object to include detailed information
+  triggerDate?: string; // Added triggerDate property to Task interface
 }
 
 export interface Comment {

@@ -149,6 +149,9 @@ model Task {
   completionHistory    Json?     // Array of completion dates for tracking
   currentPeriodStart   DateTime? // Start of current recurring period
 
+  // Optional field for recurring tasks
+  triggerDate      DateTime?
+
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 

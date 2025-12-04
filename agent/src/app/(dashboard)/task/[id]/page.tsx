@@ -66,12 +66,13 @@ interface Task {
   priority: string;
   status: string;
   progress: number;
+  statusProgressMap?: Record<string, number>;
   createdAt: string;
   dueDate: string;
   updatedAt: string;
   followUpRequired: boolean;
-  followUpDuration?: string; // e.g., '24hr', '48hr', '1w', 'None'
-  statusCheckDuration?: string; // e.g., '24hr', '48hr', '1w', 'None'
+  followUpDuration?: string;
+  statusCheckDuration?: string;
   completed: boolean;
   recurring?: number;
   assignedTo?: {
@@ -306,6 +307,7 @@ export default function TaskDetails() {
   const calculateDaysRemaining = () => {
     if (!task?.dueDate) return 0;
     const dueDate = new Date(task.dueDate);
+    if (isNaN(dueDate.getTime())) return 0; // Handle invalid dates
     const today = new Date();
     const diffTime = dueDate.getTime() - today.getTime();
     return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
@@ -437,16 +439,43 @@ export default function TaskDetails() {
   };
 
   // Optimistic UI update for status
+  // When status changes, restore progress for that status from statusProgressMap
+  const calculateNewDueDate = (holdDuration: string, currentDueDate: string) => {
+    if (!holdDuration || holdDuration === "None") return currentDueDate;
+
+    const durationMap: Record<string, number> = {
+      "24hr": 1,
+      "48hr": 2,
+      "1w": 7,
+    };
+
+    const daysToAdd = durationMap[holdDuration] || 0;
+    const dueDate = new Date(currentDueDate);
+    dueDate.setDate(dueDate.getDate() + daysToAdd);
+
+    return dueDate.toISOString();
+  };
+
   const handleStatusChange = async (newStatus: string) => {
     if (!task) return;
     const prevTask = { ...task };
-    // Only update status and progress, do not auto-toggle completed
+    const map = task.statusProgressMap || {};
     const isCompleted = newStatus === "Completed";
+    const restoredProgress = isCompleted ? 100 : (typeof map[newStatus] === "number" ? map[newStatus] : 0);
+
+    let updatedDueDate = task.dueDate;
+    if (newStatus === "Hold") {
+      updatedDueDate = calculateNewDueDate(task.followUpDuration || "None", task.dueDate);
+    }
+
     setTask({
       ...task,
       status: newStatus,
-      progress: isCompleted ? 100 : 0,
+      progress: restoredProgress,
+      dueDate: updatedDueDate,
     });
+    setProgressInput(restoredProgress > 0 ? String(restoredProgress) : "");
+
     try {
       const response = await fetch(`/api/tasks/${task.id}`, {
         method: "PUT",
@@ -455,12 +484,15 @@ export default function TaskDetails() {
         },
         body: JSON.stringify({
           status: newStatus,
-          progress: isCompleted ? 100 : 0,
+          progress: restoredProgress,
+          statusProgressMap: { ...map, [newStatus]: restoredProgress },
+          dueDate: updatedDueDate,
         }),
       });
+
       if (response.ok) {
         const data = await response.json();
-        setTask(prevTaskState => ({
+        setTask((prevTaskState) => ({
           ...prevTaskState!,
           ...data.task,
           comments: prevTaskState!.comments,
@@ -469,13 +501,14 @@ export default function TaskDetails() {
           category: data.task.category || prevTaskState!.category,
           timeLogs: prevTaskState!.timeLogs,
           legislation: prevTaskState!.legislation,
+          dueDate: data.task.dueDate,
         }));
       } else {
-        setTask(prevTask); // revert
+        setTask(prevTask);
         console.error("Failed to update task status");
       }
     } catch (error) {
-      setTask(prevTask); // revert
+      setTask(prevTask);
       console.error("Error updating task status:", error);
     }
   };
@@ -484,10 +517,15 @@ export default function TaskDetails() {
 
 
   // Local state for progress input for smooth UX
+  // Per-status progress input
   const [progressInput, setProgressInput] = useState<string>("");
   useEffect(() => {
     if (task) {
-      setProgressInput(task.progress && task.progress > 0 ? String(task.progress) : "");
+      // Use per-status progress if available
+      const map = task.statusProgressMap || {};
+      const status = task.status;
+      const progress = typeof map[status] === "number" ? map[status] : task.progress;
+      setProgressInput(progress && progress > 0 ? String(progress) : "");
     }
   }, [task]);
 
@@ -498,23 +536,26 @@ export default function TaskDetails() {
   const debounceTimeout = useRef<NodeJS.Timeout | null>(null);
   const lastProgressSent = useRef<number | null>(null);
 
+  // Update per-status progress in backend and local state
   const updateProgressBackend = async (newProgress: number) => {
     if (!task) return;
     const prevTask = { ...task };
-    setTask({ ...task, progress: newProgress });
+    const status = task.status;
+    // Update local statusProgressMap
+    const newMap = { ...(task.statusProgressMap || {}) };
+    newMap[status] = newProgress;
+    setTask({ ...task, progress: newProgress, statusProgressMap: newMap });
     try {
       const response = await fetch(`/api/tasks/${task.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ progress: newProgress }),
+        body: JSON.stringify({ progress: newProgress, statusProgressMap: newMap }),
       });
       if (response.ok) {
         const data = await response.json();
-        // Preserve existing related data and only update the fields that were changed
         setTask(prevTaskState => ({
           ...prevTaskState!,
           ...data.task,
-          // Preserve these fields that might not be in the API response
           comments: prevTaskState!.comments,
           assignedTo: prevTaskState!.assignedTo,
           client: prevTaskState!.client,
@@ -579,12 +620,16 @@ export default function TaskDetails() {
   const handleFollowUpDurationChange = async (value: string) => {
     if (!task) return;
     taskRef.current = task;
-    setTask({ ...task, followUpDuration: value });
+    let newStatusCheckDuration = task.statusCheckDuration;
+    if (value !== "None" && task.statusCheckDuration !== "None") {
+      newStatusCheckDuration = "None";
+    }
+    setTask({ ...task, followUpDuration: value, statusCheckDuration: newStatusCheckDuration });
     try {
       const response = await fetch(`/api/tasks/${task.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ followUpDuration: value }),
+        body: JSON.stringify({ followUpDuration: value, statusCheckDuration: newStatusCheckDuration }),
       });
       if (response.ok) {
         const data = await response.json();
@@ -611,12 +656,16 @@ export default function TaskDetails() {
   const handleStatusCheckDurationChange = async (value: string) => {
     if (!task) return;
     taskRef.current = task;
-    setTask({ ...task, statusCheckDuration: value });
+    let newFollowUpDuration = task.followUpDuration;
+    if (value !== "None" && task.followUpDuration !== "None") {
+      newFollowUpDuration = "None";
+    }
+    setTask({ ...task, statusCheckDuration: value, followUpDuration: newFollowUpDuration });
     try {
       const response = await fetch(`/api/tasks/${task.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ statusCheckDuration: value }),
+        body: JSON.stringify({ statusCheckDuration: value, followUpDuration: newFollowUpDuration }),
       });
       if (response.ok) {
         const data = await response.json();
@@ -1131,7 +1180,7 @@ export default function TaskDetails() {
                         <p className="text-sm text-muted-foreground">{service.description || "No description available"}</p>
                       </div>
                     ))
-                  ) : (
+                   ) : (
                     <p className="text-sm text-muted-foreground">No associated services available.</p>
                   )}
                 </CardContent>
@@ -1484,8 +1533,7 @@ export default function TaskDetails() {
                           {log.description}
                         </div>
                         <div className="text-xs text-gray-500">
-                          By {log.agent.name} on{" "}
-                          {formatDateISTDisplay(log.date)}
+                          By {log.agent.name} on {formatDateISTDisplay(log.date)}
                         </div>
                       </div>
                       <div className="flex items-center gap-2">

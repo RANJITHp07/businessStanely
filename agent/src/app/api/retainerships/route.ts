@@ -157,6 +157,18 @@ export async function POST(req: NextRequest) {
       },
     });
 
+    // Send notification email to all admins/owners
+    try {
+      const { sendAdminOwnerNotification } = await import("@/lib/email");
+      await sendAdminOwnerNotification({
+        subject: `New Retainership Created: ${newRetainership.name}`,
+        html: `<p>A new retainership has been created by agent <b>${currentAgent.name}</b>.<br><br><b>Retainership Name:</b> ${newRetainership.name}<br><b>Description:</b> ${newRetainership.description || "-"}</p>`,
+        text: `A new retainership has been created by agent ${currentAgent.name}.\nRetainership Name: ${newRetainership.name}\nDescription: ${newRetainership.description || "-"}`
+      });
+    } catch (e) {
+      console.error("Failed to send admin/owner notification email:", e);
+    }
+
     // Create legislations if provided
     if (legislation && Array.isArray(legislation)) {
       for (const leg of legislation) {
@@ -196,6 +208,7 @@ export async function POST(req: NextRequest) {
         { status: 409 }
       );
     }
+
 
     const errorMessage = error instanceof Error ? error.message : "Internal server error";
     return NextResponse.json(

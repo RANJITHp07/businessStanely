@@ -149,6 +149,9 @@ model Task {
   completionHistory    Json?     // Array of completion dates for tracking
   currentPeriodStart   DateTime? // Start of current recurring period
 
+  // Optional field for recurring tasks
+  triggerDate      DateTime?
+
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
@@ -174,6 +177,9 @@ model Task {
   // Add this to the Task model
   retainershipId String? @db.ObjectId
   retainership   Retainership? @relation("RetainershipTasks", fields: [retainershipId], references: [id])
+
+  // Per-status progress tracking
+  statusProgressMap Json?
 }
 
 model Legislation {

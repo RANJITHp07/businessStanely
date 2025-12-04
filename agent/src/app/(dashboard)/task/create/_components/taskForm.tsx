@@ -97,6 +97,7 @@ export default function TaskForm({ id }: TaskFormProps) {
     legislationId: "",
     legislationName: "",
     recurring: "0",
+    triggerDate: "", // Added triggerDate to formData
   });
   const [clients, setClients] = useState<Client[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
@@ -358,6 +359,7 @@ export default function TaskForm({ id }: TaskFormProps) {
               legislationId: task.legislationId || "",
               legislationName: task.legislation?.title || "",
               recurring: task.recurring ? task.recurring.toString() : "0",
+              triggerDate: task.triggerDate || "", // Ensure triggerDate is included
             });
             if (task.category) {
               setCategorySearchQuery(task.category.name);
@@ -1451,6 +1453,28 @@ export default function TaskForm({ id }: TaskFormProps) {
                 </div>
               </div>
 
+              {/* Trigger Date Field - Shown only when recurring is set */}
+              {formData.recurring && formData.recurring !== "0" && (
+                <div className="space-y-2">
+                  <Label htmlFor="triggerDate">Trigger Date</Label>
+                  <Input
+                    id="triggerDate"
+                    type="date"
+                    value={formData.triggerDate || format(new Date(), "yyyy-MM-dd")}
+                    min={format(new Date(), "yyyy-MM-dd")}
+                    onChange={(e) => {
+                      const newTriggerDate = e.target.value;
+                      handleInputChange("triggerDate", newTriggerDate);
+
+                      // Ensure Completion Date is not earlier than Trigger Date
+                      if (dueDate && new Date(newTriggerDate) > new Date(dueDate)) {
+                        setDueDate(new Date(newTriggerDate));
+                      }
+                    }}
+                  />
+                </div>
+              )}
+
               {/* Completion Date */}
               <div className="space-y-2">
                 <Label className="flex items-center gap-1">
@@ -1478,8 +1502,12 @@ export default function TaskForm({ id }: TaskFormProps) {
                     <Calendar
                       mode="single"
                       selected={dueDate}
-                      onSelect={isDueDateDisabled ? undefined : setDueDate}
-                      fromDate={new Date()}
+                      onSelect={(date) => {
+                        if (date && new Date(date) >= new Date(formData.triggerDate || new Date())) {
+                          setDueDate(date);
+                        }
+                      }}
+                      fromDate={new Date(formData.triggerDate || new Date())}
                       initialFocus
                       disabled={Boolean(isDueDateDisabled)}
                     />

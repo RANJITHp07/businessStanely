@@ -364,6 +364,15 @@ export default function TaskDetails() {
     }
   };
 
+  const calculateRemainingDays = (dueDate: string | null | undefined): number => {
+    if (!dueDate) return 0;
+    const dueDateObj = new Date(dueDate);
+    if (isNaN(dueDateObj.getTime())) return 0; // Handle invalid dates
+    const today = new Date();
+    const diffTime = dueDateObj.getTime() - today.getTime();
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  };
+
   if (loading) {
     return (
       <div className="container mx-auto p-6 max-w-7xl">
@@ -506,13 +515,7 @@ export default function TaskDetails() {
                 <div className="flex items-center gap-2 text-sm">
                   <Calendar className="h-4 w-4 text-gray-500" />
                   <span className="text-gray-600">
-                    Due in {(() => {
-                      if (!taskData.dueDate) return 0;
-                      const dueDate = new Date(taskData.dueDate);
-                      const today = new Date();
-                      const diffTime = dueDate.getTime() - today.getTime();
-                      return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                    })()} days
+                    Due in {calculateRemainingDays(taskData?.dueDate)} days
                   </span>
                 </div>
                 <div className="flex items-center gap-2 text-sm">

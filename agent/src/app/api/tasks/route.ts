@@ -167,8 +167,9 @@ export async function POST(req: NextRequest) {
       clientId,
       assignedToId,
       categoryId,
-      legislationId, // Add legislationId to the destructured fields
+      legislationId,
       recurring,
+      triggerDate, // Added triggerDate to destructured fields
     } = body;
 
     // Validate required fields
@@ -179,9 +180,17 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    if (recurring && !triggerDate) {
+      return NextResponse.json(
+        { error: "Trigger Date is required for recurring tasks" },
+        { status: 400 }
+      );
+    }
+
     const recurringValue = recurring && recurring !== "0" ? parseInt(recurring) : null;
     const taskDueDate = dueDate ? new Date(dueDate) : null;
-    
+    const taskTriggerDate = triggerDate ? new Date(triggerDate) : null;
+
     // Create new task
     const newTask = await prisma.task.create({
       data: {
@@ -190,6 +199,7 @@ export async function POST(req: NextRequest) {
         status: status || "To Do",
         priority: priority || "Medium",
         dueDate: taskDueDate,
+        triggerDate: taskTriggerDate, // Save triggerDate
         clientId: clientId || null,
         createdById: agent.id,
         assignedToId: assignedToId || agent.id,
@@ -205,6 +215,7 @@ export async function POST(req: NextRequest) {
             lastName: true,
             organizationName: true,
             clientType: true,
+            email: true,
           },
         },
         createdBy: {
@@ -243,6 +254,7 @@ export async function POST(req: NextRequest) {
       status: newTask.status,
       priority: newTask.priority,
       dueDate: newTask.dueDate,
+      triggerDate: newTask.triggerDate || null, // Ensure triggerDate is included
       progress: taskWithFields.progress,
       followUpRequired: taskWithFields.followUpRequired,
       completed: taskWithFields.completed,
@@ -255,10 +267,19 @@ export async function POST(req: NextRequest) {
           ? `${newTask.client.firstName} ${newTask.client.lastName}`.trim()
           : newTask.client.organizationName,
         type: newTask.client.clientType,
+        email: newTask.client.email,
       } : null,
       category: null, // Will be fetched separately if needed
-      createdBy: newTask.createdBy,
-      assignedTo: newTask.assignedTo,
+      createdBy: newTask.createdBy ? {
+        id: newTask.createdBy.id,
+        name: newTask.createdBy.name,
+        email: newTask.createdBy.email,
+      } : null,
+      assignedTo: newTask.assignedTo ? {
+        id: newTask.assignedTo.id,
+        name: newTask.assignedTo.name,
+        email: newTask.assignedTo.email,
+      } : null,
       commentsCount: 0,
       recentComments: [],
     };

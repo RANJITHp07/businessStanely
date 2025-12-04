@@ -16,19 +16,19 @@ class InternalCronScheduler {
   // Start the recurring tasks scheduler
   public startRecurringTasksScheduler() {
     const taskName = 'recurring-tasks';
-    
+
     // Stop existing task if any
     this.stopTask(taskName);
-    
+
     // Schedule to run daily at 9:00 AM UTC
     const task = cron.schedule('0 9 * * *', async () => {
-      console.log('🔄 Running recurring tasks cron job at:', new Date().toISOString());
-      
+      console.log('🔄 Running recurring tasks and hold tasks cron job at:', new Date().toISOString());
+
       try {
         const { updateAllRecurringTasks } = await import('./singleTaskRecurring');
         const updatedTasks = await updateAllRecurringTasks();
-        console.log(`✅ Cron job completed. Auto-updated ${updatedTasks.length} recurring tasks.`);
-        
+        console.log(`✅ Cron job completed. Auto-updated ${updatedTasks.length} tasks.`);
+
         if (updatedTasks.length > 0) {
           console.log('📝 Updated tasks:');
           updatedTasks.forEach(task => {
@@ -36,15 +36,15 @@ class InternalCronScheduler {
           });
         }
       } catch (error) {
-        console.error('❌ Error in recurring tasks cron job:', error);
+        console.error('❌ Error in recurring tasks and hold tasks cron job:', error);
       }
     }, {
       timezone: 'UTC'
     });
 
     this.scheduledTasks.set(taskName, task);
-    
-    console.log(`🚀 Recurring tasks cron scheduler started (daily at 9:00 AM UTC)`);
+
+    console.log(`🚀 Recurring tasks and hold tasks cron scheduler started (daily at 9:00 AM UTC)`);
     return task;
   }
 
@@ -79,7 +79,7 @@ class InternalCronScheduler {
   // Run the recurring tasks job manually (for testing)
   public async runRecurringTasksManually() {
     console.log('🧪 Running recurring tasks manually...');
-    
+
     try {
       const { updateAllRecurringTasks } = await import('./singleTaskRecurring');
       const updatedTasks = await updateAllRecurringTasks();

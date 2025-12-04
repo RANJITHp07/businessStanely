@@ -54,6 +54,45 @@ export async function updateRecurringTaskSchedule(taskId: string) {
   return task; // No update needed
 }
 
+// Update due dates for tasks in "Hold" status
+export async function updateHoldTasks() {
+  const holdTasks = await prisma.task.findMany({
+    where: {
+      status: "Hold",
+      dueDate: { not: null },
+    },
+  });
+
+  const updatedTasks = [];
+
+  for (const task of holdTasks) {
+    try {
+      if (!task.dueDate) continue; // Ensure dueDate is not null
+
+      const currentDate = new Date();
+      const dueDate = new Date(task.dueDate);
+
+      // Extend due date by 1 day if the task is still on "Hold"
+      if (currentDate >= dueDate) {
+        const newDueDate = new Date(dueDate);
+        newDueDate.setDate(newDueDate.getDate() + 1);
+
+        const updatedTask = await prisma.task.update({
+          where: { id: task.id },
+          data: { dueDate: newDueDate },
+        });
+
+        updatedTasks.push(updatedTask);
+      }
+    } catch (error) {
+      console.error(`Error updating hold task ${task.id}:`, error);
+    }
+  }
+
+  console.log(`📅 Auto-updated ${updatedTasks.length} tasks in "Hold" status.`);
+  return updatedTasks;
+}
+
 // Check and update overdue recurring tasks
 export async function updateAllRecurringTasks() {
   // Find all active recurring tasks
@@ -80,7 +119,10 @@ export async function updateAllRecurringTasks() {
     }
   }
 
-  console.log(`📅 Auto-updated ${updatedTasks.length} recurring tasks based on calendar schedule`);
+  const holdTasks = await updateHoldTasks();
+  updatedTasks.push(...holdTasks);
+
+  console.log(`📅 Auto-updated ${updatedTasks.length} tasks (recurring + hold).`);
   return updatedTasks;
 }
 

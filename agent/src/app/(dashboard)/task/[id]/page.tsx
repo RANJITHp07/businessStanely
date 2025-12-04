@@ -440,21 +440,42 @@ export default function TaskDetails() {
 
   // Optimistic UI update for status
   // When status changes, restore progress for that status from statusProgressMap
+  const calculateNewDueDate = (holdDuration: string, currentDueDate: string) => {
+    if (!holdDuration || holdDuration === "None") return currentDueDate;
+
+    const durationMap: Record<string, number> = {
+      "24hr": 1,
+      "48hr": 2,
+      "1w": 7,
+    };
+
+    const daysToAdd = durationMap[holdDuration] || 0;
+    const dueDate = new Date(currentDueDate);
+    dueDate.setDate(dueDate.getDate() + daysToAdd);
+
+    return dueDate.toISOString();
+  };
+
   const handleStatusChange = async (newStatus: string) => {
     if (!task) return;
     const prevTask = { ...task };
     const map = task.statusProgressMap || {};
-    // If switching to Completed, force 100; else restore last progress for that status
     const isCompleted = newStatus === "Completed";
     const restoredProgress = isCompleted ? 100 : (typeof map[newStatus] === "number" ? map[newStatus] : 0);
-    // Update local state
+
+    let updatedDueDate = task.dueDate;
+    if (newStatus === "Hold") {
+      updatedDueDate = calculateNewDueDate(task.followUpDuration || "None", task.dueDate);
+    }
+
     setTask({
       ...task,
       status: newStatus,
       progress: restoredProgress,
+      dueDate: updatedDueDate,
     });
     setProgressInput(restoredProgress > 0 ? String(restoredProgress) : "");
-    // Update backend
+
     try {
       const response = await fetch(`/api/tasks/${task.id}`, {
         method: "PUT",
@@ -465,8 +486,10 @@ export default function TaskDetails() {
           status: newStatus,
           progress: restoredProgress,
           statusProgressMap: { ...map, [newStatus]: restoredProgress },
+          dueDate: updatedDueDate,
         }),
       });
+
       if (response.ok) {
         const data = await response.json();
         setTask((prevTaskState) => ({
@@ -478,14 +501,14 @@ export default function TaskDetails() {
           category: data.task.category || prevTaskState!.category,
           timeLogs: prevTaskState!.timeLogs,
           legislation: prevTaskState!.legislation,
-          dueDate: data.task.dueDate, // Update due date dynamically
+          dueDate: data.task.dueDate,
         }));
       } else {
-        setTask(prevTask); // revert
+        setTask(prevTask);
         console.error("Failed to update task status");
       }
     } catch (error) {
-      setTask(prevTask); // revert
+      setTask(prevTask);
       console.error("Error updating task status:", error);
     }
   };

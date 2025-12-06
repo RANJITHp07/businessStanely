@@ -180,7 +180,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (recurring && !triggerDate) {
+    if (recurring && recurring !== "0" && !triggerDate) {
       return NextResponse.json(
         { error: "Trigger Date is required for recurring tasks" },
         { status: 400 }

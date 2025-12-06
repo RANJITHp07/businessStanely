@@ -525,6 +525,12 @@ export default function TaskForm({ id }: TaskFormProps) {
       return;
     }
 
+      // Only require triggerDate if recurring is set
+      if (formData.recurring !== "0" && !formData.triggerDate) {
+        toast.error("Trigger Date is required for recurring tasks");
+        return;
+      }
+
     setIsSubmitting(true);
 
     try {

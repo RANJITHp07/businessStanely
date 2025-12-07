@@ -716,17 +716,7 @@ export default function TaskForm({ id }: TaskFormProps) {
               <CardDescription>Enter the basic task details</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="task-name">Task Name *</Label>
-                <Input
-                  id="task-name"
-                  placeholder="Enter task name (e.g., Contract Review, Legal Research)"
-                  value={formData.title}
-                  onChange={(e) => handleInputChange("title", e.target.value)}
-                  required
-                />
-              </div>
-
+              {/* Service Selection - moved to top */}
               <div>
                 <div className="w-full">
                   {/* Top-right Add Button */}
@@ -929,6 +919,19 @@ export default function TaskForm({ id }: TaskFormProps) {
                 </div>
               </div>
 
+              {/* Task Name - moved after service selection */}
+              <div className="space-y-2">
+                <Label htmlFor="task-name">Task Name *</Label>
+                <Input
+                  id="task-name"
+                  placeholder="Enter task name (e.g., Contract Review, Legal Research)"
+                  value={formData.title}
+                  onChange={(e) => handleInputChange("title", e.target.value)}
+                  required
+                />
+              </div>
+
+              {/* Task Description - moved after task name */}
               <div className="space-y-2">
                 <Label htmlFor="description">Task Description *</Label>
                 <Textarea

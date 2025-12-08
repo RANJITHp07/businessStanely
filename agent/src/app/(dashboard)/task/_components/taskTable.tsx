@@ -128,7 +128,15 @@ export default function TasksTable() {
   useEffect(() => {
     const fetchTasks = async () => {
       try {
-        const response = await fetchWithAuth("/api/tasks");
+        // Get assignedToId and status from searchParams if available
+        const assignedToId = searchParams?.get('assignedToId');
+        const status = searchParams?.get('status');
+        let url = '/api/tasks';
+        const params = [];
+        if (assignedToId) params.push(`assignedToId=${assignedToId}`);
+        if (status) params.push(`status=${encodeURIComponent(status)}`);
+        if (params.length) url += `?${params.join('&')}`;
+        const response = await fetchWithAuth(url);
         if (response.ok) {
           const data = await response.json();
           setTasks(data.tasks || data); // Handle both formats
@@ -145,7 +153,7 @@ export default function TasksTable() {
     };
 
     fetchTasks();
-  }, []);
+  }, [searchParams]);
 
   // Sort function
   const sortTasks = (tasks: Task[], sortBy: string) => {

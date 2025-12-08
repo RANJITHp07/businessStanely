@@ -1,5 +1,6 @@
 "use client";
 import React, { useEffect, useMemo, useState } from "react";
+import { useAuth } from "@/hooks/useAuth";
 import { Task } from "@/types";
 import { fetchWithAuth } from "@/lib/fetchWithAuth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -114,7 +115,7 @@ function StatCard({
   title: string;
   value: number;
   percent: number;
-  Icon: any;
+  Icon: React.ComponentType<{ className?: string }>;
   variant: StatVariant;
 }) {
   const s = STAT_STYLES[variant];
@@ -536,11 +537,18 @@ function SectionTable({ label, tasks }: { label: string; tasks: Task[] }) {
 export default function MyTasksPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
+  const { agent, isLoading: authLoading } = useAuth();
 
   useEffect(() => {
     const load = async () => {
+      if (!agent) {
+        setTasks([]);
+        setLoading(false);
+        return;
+      }
       try {
-        const res = await fetchWithAuth("/api/tasks");
+        const url = `/api/tasks?assignedToId=${encodeURIComponent(agent.id)}`;
+        const res = await fetchWithAuth(url);
         if (!res.ok) throw new Error("Failed to fetch tasks");
         const data = await res.json();
         const arr = Array.isArray(data) ? data : data.tasks ?? [];
@@ -552,8 +560,10 @@ export default function MyTasksPage() {
         setLoading(false);
       }
     };
-    load();
-  }, []);
+    if (!authLoading) {
+      load();
+    }
+  }, [agent, authLoading]);
 
   const { total, completed, inprogress, todo } = useMemo(() => {
     const counts = {

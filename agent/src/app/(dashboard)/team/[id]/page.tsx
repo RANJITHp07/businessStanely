@@ -462,9 +462,11 @@ export default function AgentDetails() {
           if (data.subordinates) {
             setTeamMembers(data.subordinates);
           }
-          // Now fetch tasks for this agent
+          // Now fetch tasks for this agent with status and assignedToId
           try {
-            const tasksResponse = await fetch(`/api/tasks?assignedToId=${id}`);
+            // Default status: To Do (can be changed as needed)
+            const status = "To Do";
+            const tasksResponse = await fetch(`/api/tasks?assignedToId=${id}&status=${encodeURIComponent(status)}`);
             if (tasksResponse.ok) {
               const tasksData = await tasksResponse.json();
               setAgentTasks(tasksData.tasks || []);

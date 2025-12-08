@@ -824,6 +824,15 @@ export default function TaskDetails() {
                   <p className="text-[16px] md:[18px] text-muted-foreground mb-4">
                     {task.description}
                   </p>
+                  {/* Show Associated Service name and description at the top */}
+                  {task.service && task.service.length > 0 && (
+                    <div className="mt-2">
+                      <div className="font-semibold text-base text-gray-900">Service: {task.service[0].name}</div>
+                      <div className="text-sm text-muted-foreground">
+                        {task.service[0].description || "No description available"}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 

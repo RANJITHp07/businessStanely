@@ -389,12 +389,7 @@ export default function ClientsTable() {
                             <Table>
                                 <TableHeader>
                                     <TableRow>
-                                        <TableHead className="text-xs sm:text-sm">Client</TableHead>
-                                        <TableHead className="text-xs sm:text-sm">Type</TableHead>
-                                        <TableHead className="text-xs sm:text-sm">Contact Info</TableHead>
-                                        <TableHead className="text-xs sm:text-sm">Communication</TableHead> {/* Communication column */}
-                                        <TableHead className="text-xs sm:text-sm">Tasks</TableHead> {/* Tasks column */}
-                                        <TableHead className="text-xs sm:text-sm text-right">Actions</TableHead>
+                                        <TableHead className="text-xs sm:text-sm">Client</TableHead><TableHead className="text-xs sm:text-sm">Type</TableHead><TableHead className="text-xs sm:text-sm">Contact Info</TableHead><TableHead className="text-xs sm:text-sm">Communication</TableHead><TableHead className="text-xs sm:text-sm">Tasks</TableHead><TableHead className="text-xs sm:text-sm text-right">Actions</TableHead>
                                     </TableRow>
                                 </TableHeader>
 
@@ -470,7 +465,7 @@ export default function ClientsTable() {
                                                             <DropdownMenuItem
                                                                 className="text-destructive"
                                                                 onClick={(e) => {
-                                                                    e.stopPropagation(); // Prevent row click event
+                                                                    e.stopPropagation();
                                                                     setClientToDelete(client);
                                                                 }}
                                                             >
@@ -492,10 +487,7 @@ export default function ClientsTable() {
                             <Table>
                                 <TableHeader>
                                     <TableRow>
-                                        <TableHead className="text-xs">Client</TableHead>
-                                        <TableHead className="text-xs">Type</TableHead>
-                                        <TableHead className="text-xs">Contact</TableHead>
-                                        <TableHead className="text-xs text-right">Actions</TableHead>
+                                        <TableHead className="text-xs">Client</TableHead><TableHead className="text-xs">Type</TableHead><TableHead className="text-xs">Contact</TableHead><TableHead className="text-xs text-right">Actions</TableHead>
                                     </TableRow>
                                 </TableHeader>
 

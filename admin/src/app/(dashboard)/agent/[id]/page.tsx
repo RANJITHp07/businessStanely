@@ -2,6 +2,7 @@
 
 import { useState, useEffect, Fragment } from "react";
 import { notFound, useParams, useRouter, useSearchParams } from "next/navigation";
+import { SectionTable } from "@/components/SectionTable";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -45,17 +46,13 @@ import {
   User,
   Mail,
   Phone,
-  Calendar,
   Users,
   FileText,
   MoreHorizontal,
   Edit,
   Eye,
-  CheckCircle,
   Clock,
-  AlertTriangle,
   TrendingUp,
-  Trash,
 } from "lucide-react";
 import { Agent, Task } from "@/types";
 import Link from "next/link";
@@ -84,6 +81,15 @@ interface CurrentUser {
   username: string;
   email: string;
   adminType: "owner" | "admin";
+}
+
+// Helper to normalize status string
+function statusKey(s?: string) {
+  const k = (s || "").toLowerCase().replace(/\s+/g, "");
+  if (["todo", "pending"].includes(k)) return "todo";
+  if (["inprogress", "progress"].includes(k)) return "inprogress";
+  if (["completed"].includes(k)) return "completed";
+  return k || "todo";
 }
 
 function groupActivitiesByDate(activities: AgentActivity[]) {
@@ -227,61 +233,61 @@ export default function AgentDetails() {
     fetchServiceRecords();
   }, [id]);
 
-  const getPriorityBadge = (priority: string) => {
-    const colors = {
-      Low: "bg-green-100 text-green-800 border-green-200",
-      Medium: "bg-yellow-100 text-yellow-800 border-yellow-200",
-      High: "bg-red-100 text-red-800 border-red-200",
-      low: "bg-green-100 text-green-800 border-green-200",
-      medium: "bg-yellow-100 text-yellow-800 border-yellow-200",
-      high: "bg-red-100 text-red-800 border-red-200",
-    };
+  // const getPriorityBadge = (priority: string) => {
+  //   const colors = {
+  //     Low: "bg-green-100 text-green-800 border-green-200",
+  //     Medium: "bg-yellow-100 text-yellow-800 border-yellow-200",
+  //     High: "bg-red-100 text-red-800 border-red-200",
+  //     low: "bg-green-100 text-green-800 border-green-200",
+  //     medium: "bg-yellow-100 text-yellow-800 border-yellow-200",
+  //     high: "bg-red-100 text-red-800 border-red-200",
+  //   };
 
-    return (
-      <Badge
-        className={`${
-          colors[priority as keyof typeof colors] ||
-          "bg-gray-100 text-gray-800 border-gray-200"
-        } border`}
-      >
-        {priority.charAt(0).toUpperCase() + priority.slice(1)}
-      </Badge>
-    );
-  };
+  //   return (
+  //     <Badge
+  //       className={`${
+  //         colors[priority as keyof typeof colors] ||
+  //         "bg-gray-100 text-gray-800 border-gray-200"
+  //       } border`}
+  //     >
+  //       {priority.charAt(0).toUpperCase() + priority.slice(1)}
+  //     </Badge>
+  //   );
+  // };
 
-  const getStatusBadge = (status: string) => {
-    const colors = {
-      "To Do": "bg-gray-100 text-gray-800 border-gray-200",
-      "In Progress": "bg-blue-100 text-blue-800 border-blue-200",
-      Completed: "bg-green-100 text-green-800 border-green-200",
-      Done: "bg-green-100 text-green-800 border-green-200",
-      Pending: "bg-yellow-100 text-yellow-800 border-yellow-200",
-      Overdue: "bg-red-100 text-red-800 border-red-200",
-    };
+  // const getStatusBadge = (status: string) => {
+  //   const colors = {
+  //     "To Do": "bg-gray-100 text-gray-800 border-gray-200",
+  //     "In Progress": "bg-blue-100 text-blue-800 border-blue-200",
+  //     Completed: "bg-green-100 text-green-800 border-green-200",
+  //     Done: "bg-green-100 text-green-800 border-green-200",
+  //     Pending: "bg-yellow-100 text-yellow-800 border-yellow-200",
+  //     Overdue: "bg-red-100 text-red-800 border-red-200",
+  //   };
 
-    const icons = {
-      "To Do": <Clock className="w-3 h-3 mr-1" />,
-      "In Progress": <AlertTriangle className="w-3 h-3 mr-1" />,
-      Completed: <CheckCircle className="w-3 h-3 mr-1" />,
-      Done: <CheckCircle className="w-3 h-3 mr-1" />,
-      Pending: <Clock className="w-3 h-3 mr-1" />,
-      Overdue: <AlertTriangle className="w-3 h-3 mr-1" />,
-    };
+  //   const icons = {
+  //     "To Do": <Clock className="w-3 h-3 mr-1" />,
+  //     "In Progress": <AlertTriangle className="w-3 h-3 mr-1" />,
+  //     Completed: <CheckCircle className="w-3 h-3 mr-1" />,
+  //     Done: <CheckCircle className="w-3 h-3 mr-1" />,
+  //     Pending: <Clock className="w-3 h-3 mr-1" />,
+  //     Overdue: <AlertTriangle className="w-3 h-3 mr-1" />,
+  //   };
 
-    return (
-      <Badge
-        className={`${
-          colors[status as keyof typeof colors] ||
-          "bg-gray-100 text-gray-800 border-gray-200"
-        } border`}
-      >
-        {icons[status as keyof typeof icons] || (
-          <Clock className="w-3 h-3 mr-1" />
-        )}
-        {status}
-      </Badge>
-    );
-  };
+  //   return (
+  //     <Badge
+  //       className={`${
+  //         colors[status as keyof typeof colors] ||
+  //         "bg-gray-100 text-gray-800 border-gray-200"
+  //       } border`}
+  //     >
+  //       {icons[status as keyof typeof icons] || (
+  //         <Clock className="w-3 h-3 mr-1" />
+  //       )}
+  //       {status}
+  //     </Badge>
+  //   );
+  // };
 
   const getAgentTypeBadge = (type: string) => {
     const colors = {
@@ -303,13 +309,13 @@ export default function AgentDetails() {
     );
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-    });
-  };
+  // const formatDate = (dateString: string) => {
+  //   return new Date(dateString).toLocaleDateString("en-US", {
+  //     year: "numeric",
+  //     month: "long",
+  //     day: "numeric",
+  //   });
+  // };
 
   const handleAddNote = async () => {
     if (!newNote.trim() || !currentUser) return;
@@ -732,7 +738,7 @@ export default function AgentDetails() {
                 label="New Task" 
                 tasks={agentTasks.filter((t) => ["todo"].includes(statusKey(t.status))).slice(0, 3)} 
                 agentId={id}
-              />
+                          />
               <SectionTable 
                 label="In Progress" 
                 tasks={agentTasks.filter((t) => ["inprogress"].includes(statusKey(t.status))).slice(0, 3)} 

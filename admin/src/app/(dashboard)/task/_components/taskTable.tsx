@@ -99,7 +99,7 @@ export default function TasksTable() {
       if (urlSearch) setSearchTerm(urlSearch);
       if (urlPriorities) setSelectedPriorities(urlPriorities.split(","));
       if (urlStatuses) setSelectedStatuses(urlStatuses.split(","));
-    } catch (e) {
+    } catch {
       // ignore
     }
   }, []);
@@ -107,24 +107,33 @@ export default function TasksTable() {
   useEffect(() => {
     const fetchTasks = async () => {
       try {
-        const response = await fetchWithAuth('/api/tasks');
+        // Get assignedToId and status from URL
+        const assignedToId = searchParams.get("assignedToId");
+        const status = searchParams.get("status");
+        // Only fetch if both are present
+        if (!assignedToId || !status) {
+          setTasks([]);
+          setLoading(false);
+          return;
+        }
+        const url = `/api/tasks?assignedToId=${encodeURIComponent(assignedToId)}&status=${encodeURIComponent(status)}`;
+        const response = await fetchWithAuth(url);
         if (response.ok) {
           const data = await response.json();
           setTasks(data);
         } else {
           console.error("Failed to fetch tasks");
-          setTasks([]); // Set to empty array on error
+          setTasks([]);
         }
       } catch (error) {
         console.error("Error fetching tasks:", error);
-        setTasks([]); // Set to empty array on error
+        setTasks([]);
       } finally {
         setLoading(false);
       }
     };
-
     fetchTasks();
-  }, []);
+  }, [searchParams]);
 
   const handleDelete = async () => {
     if (!taskToDelete) return
@@ -146,11 +155,11 @@ export default function TasksTable() {
   }
 
   // Sort function
-  const sortTasks = (tasks: Task[]) => {
-    return [...tasks].sort((a, b) => {
-      return a.title.localeCompare(b.title) // Default A-Z sorting
-    })
-  }
+  // const sortTasks = (tasks: Task[]) => {
+  //   return [...tasks].sort((a, b) => {
+  //     return a.title.localeCompare(b.title) // Default A-Z sorting
+  //   })
+  // }
 
   // Filter tasks based on search and filters only (backend already filters approved tasks)
   const filteredTasks = (tasks || []).filter((task) => {
@@ -216,11 +225,11 @@ export default function TasksTable() {
     })
   }
 
-  const resetFilter = () => {
-    setSearchTerm("");
-  setSelectedPriorities([])
-    setSelectedStatuses([])
-  }
+  // const resetFilter = () => {
+  //   setSearchTerm("");
+  // setSelectedPriorities([])
+  //   setSelectedStatuses([])
+  // }
 
   const isOverdue = (dueDate: string | undefined, status: string) => {
     if (!dueDate) return false;
@@ -232,12 +241,12 @@ export default function TasksTable() {
   // }
 
   // Multi-select status helpers
-  const statusOptions = statuses.filter((s) => s !== "All Status")
-  const toggleStatus = (status: string) => {
-    setSelectedStatuses((prev) =>
-      prev.includes(status) ? prev.filter((s) => s !== status) : [...prev, status]
-    )
-  }
+  // const statusOptions = statuses.filter((s) => s !== "All Status")
+  // const toggleStatus = (status: string) => {
+  //   setSelectedStatuses((prev) =>
+  //     prev.includes(status) ? prev.filter((s) => s !== status) : [...prev, status]
+  //   )
+  // }
 
   return (
     <div className="container mx-auto p-6 max-w-7xl">

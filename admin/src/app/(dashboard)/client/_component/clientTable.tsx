@@ -398,14 +398,20 @@ export default function ClientsTable() {
                             <Table>
                                 <TableHeader>
                                     <TableRow>
-                                        <TableHead className="text-xs sm:text-sm">Client</TableHead><TableHead className="text-xs sm:text-sm">Type</TableHead><TableHead className="text-xs sm:text-sm">Contact Info</TableHead><TableHead className="text-xs sm:text-sm">Communication</TableHead><TableHead className="text-xs sm:text-sm">Tasks</TableHead><TableHead className="text-xs sm:text-sm text-right">Actions</TableHead>
+                                        <TableHead className="text-xs sm:text-sm">Client</TableHead>
+                                        <TableHead className="text-xs sm:text-sm">Type</TableHead>
+                                        <TableHead className="text-xs sm:text-sm">Contact Info</TableHead>
+                                        <TableHead className="text-xs sm:text-sm">Communication</TableHead>
+                                        <TableHead className="text-xs sm:text-sm">Tasks</TableHead>
+                                        <TableHead className="text-xs sm:text-sm">Retainership</TableHead>
+                                        <TableHead className="text-xs sm:text-sm text-right">Actions</TableHead>
                                     </TableRow>
                                 </TableHeader>
 
                                 <TableBody>
                                     {currentClients.length === 0 ? (
                                         <TableRow>
-                                            <TableCell colSpan={6} className="text-center py-8 text-sm text-muted-foreground">
+                                            <TableCell colSpan={7} className="text-center py-8 text-sm text-muted-foreground">
                                                 No clients found matching your criteria.
                                             </TableCell>
                                         </TableRow>
@@ -462,6 +468,9 @@ export default function ClientsTable() {
                                                             <span className="text-xs text-muted-foreground">No tasks</span>
                                                         )}
                                                     </div>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Badge className="bg-gray-200 text-black">{client.retainershipCount ?? 0}</Badge>
                                                 </TableCell>
                                                 <TableCell className="text-right">
                                                     <DropdownMenu>

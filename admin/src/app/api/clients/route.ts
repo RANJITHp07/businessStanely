@@ -55,6 +55,7 @@ export async function GET() {
             status: true,
           },
         },
+        retainerships: true,
       },
     });
 
@@ -65,10 +66,13 @@ export async function GET() {
       for (const task of client.tasks) {
         statusCounts[task.status] = (statusCounts[task.status] || 0) + 1;
       }
+      // Count retainerships
+      const retainershipCount = client.retainerships ? client.retainerships.length : 0;
       return {
         ...client,
         name: client.organizationName || `${client.firstName || ''} ${client.lastName || ''}`.trim() || 'Unknown Name',
         statusCounts,
+        retainershipCount,
       };
     });
 

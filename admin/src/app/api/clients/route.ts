@@ -50,20 +50,29 @@ export async function GET() {
         createdAt: 'desc',
       },
       include: {
-        _count: {
-          select: { tasks: true }, // Include task count for each client
+        tasks: {
+          select: {
+            status: true,
+          },
         },
       },
     });
 
     // Add a `name` field prioritizing `organizationName` for organizations
-    const clientsWithName = clients.map(client => ({
-      ...client,
-      name: client.organizationName || `${client.firstName || ''} ${client.lastName || ''}`.trim() || 'Unknown Name',
-      taskCount: client._count.tasks, // Add task count to the response
-    }));
+    const clientsWithStatusCounts = clients.map(client => {
+      // Count tasks by status
+      const statusCounts = {};
+      for (const task of client.tasks) {
+        statusCounts[task.status] = (statusCounts[task.status] || 0) + 1;
+      }
+      return {
+        ...client,
+        name: client.organizationName || `${client.firstName || ''} ${client.lastName || ''}`.trim() || 'Unknown Name',
+        statusCounts,
+      };
+    });
 
-    return NextResponse.json(clientsWithName);
+    return NextResponse.json(clientsWithStatusCounts);
   } catch (error) {
     console.error("Error fetching clients:", error);
     return NextResponse.json({ error: "Failed to fetch clients" }, { status: 500 });

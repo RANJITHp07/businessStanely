@@ -55,6 +55,15 @@ const entityTypes = ["All Entity Types", "Corporation", "LLC", "Partnership", "S
 import { Client } from "@/types";
 import { useRouter } from "next/navigation"
 
+// Helper to get badge color for each status add more colors if you want 
+    const getStatusBadge = (status: string, count: number) => {
+        return (
+            <Badge key={status} className="bg-gray-200 text-black">
+                {status.charAt(0).toUpperCase() + status.slice(1)}: {count}
+            </Badge>
+        );
+    };
+
 export default function ClientsTable() {
     const [clients, setClients] = useState<Client[]>([]);
     const [searchTerm, setSearchTerm] = useState("")
@@ -444,7 +453,16 @@ export default function ClientsTable() {
                                                     </div>
                                                 </TableCell>
                                                 <TableCell>{getCommunicationBadge(client.preferredCommunication || "")}</TableCell>
-                                                <TableCell>{client.taskCount ?? 0}</TableCell>
+                                                <TableCell>
+                                                    {/* Task Status Badges */}
+                                                    <div className="flex flex-col gap-1">
+                                                        {client.statusCounts && Object.entries(client.statusCounts).length > 0 ? (
+                                                            Object.entries(client.statusCounts).map(([status, count]) => getStatusBadge(status, count))
+                                                        ) : (
+                                                            <span className="text-xs text-muted-foreground">No tasks</span>
+                                                        )}
+                                                    </div>
+                                                </TableCell>
                                                 <TableCell className="text-right">
                                                     <DropdownMenu>
                                                         <DropdownMenuTrigger asChild>

@@ -197,29 +197,32 @@ export interface Comment {
   };
 }
 
-export interface Legislation {
+export interface Client {
   id: string;
-  title: string;
-  description?: string;
-  assignedAgent?: {
-    id: string;
-    name: string;
-    email: string;
-  };
-  client?: {
-    id: string;
-    name: string;
-    email: string;
-    phoneNumber?: string;
-  };
-  retainership?: {
-    client?: {
-      name: string;
-      email: string;
-      organizationName?: string; // Added for API compatibility
-      clientType: string;
-      firstName: string | null;
-      lastName: string | null;
-    };
-  };
+  clientType: string;
+  email: string;
+  phoneNumber: string;
+  secondaryPhoneNumber?: string;
+  address?: string;
+  preferredCommunication?: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+  firstName?: string;
+  lastName?: string;
+  gender?: string;
+  dateOfBirth?: string;
+  idProofType?: string;
+  idProofNumber?: string;
+  organizationName?: string;
+  registrationNumber?: string;
+  entityType?: string;
+  incorporationDate?: string;
+  gstNumber?: string;
+  authorizedPersonName?: string;
+  designation?: string;
+  contactEmail?: string;
+  name?: string;
+  taskCount?: number;
+  statusCounts?: Record<string, number>;
 }

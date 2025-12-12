@@ -107,16 +107,16 @@ export default function TasksTable() {
   useEffect(() => {
     const fetchTasks = async () => {
       try {
-        // Get assignedToId and status from URL
+        // Get assignedToId, status, or statuses from URL
         const assignedToId = searchParams.get("assignedToId");
         const status = searchParams.get("status");
-        // Only fetch if both are present
-        if (!assignedToId || !status) {
-          setTasks([]);
-          setLoading(false);
-          return;
-        }
-        const url = `/api/tasks?assignedToId=${encodeURIComponent(assignedToId)}&status=${encodeURIComponent(status)}`;
+        const statuses = searchParams.get("statuses");
+        let url = "/api/tasks";
+        const params = [];
+        if (assignedToId) params.push(`assignedToId=${encodeURIComponent(assignedToId)}`);
+        if (status) params.push(`status=${encodeURIComponent(status)}`);
+        if (statuses) params.push(`statuses=${encodeURIComponent(statuses)}`);
+        if (params.length > 0) url += `?${params.join("&")}`;
         const response = await fetchWithAuth(url);
         if (response.ok) {
           const data = await response.json();

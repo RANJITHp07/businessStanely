@@ -78,7 +78,7 @@ export async function GET(req: NextRequest) {
   try {
     // Get the current admin user
     const currentAdmin = await getCurrentAdmin(req);
-
+    console.log("currentAdmin:",currentAdmin)
     if (!currentAdmin) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -88,7 +88,8 @@ export async function GET(req: NextRequest) {
     const clientId = searchParams.get("clientId");
     const categoryId = searchParams.get("categoryId");
     const status = searchParams.get("status");
-
+    console.log('status:',status);
+    
     // Build the where clause: if filtering by categoryId, allow any status; otherwise, only approved
     let whereClause: Prisma.TaskWhereInput;
     if (categoryId) {

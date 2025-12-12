@@ -376,7 +376,7 @@ function SectionTable({ label, tasks }: { label: string; tasks: Task[] }) {
                               <Tooltip>
                                 <TooltipTrigger asChild>
                                   <Link
-                                    href={`/task?statuses=${encodeURIComponent(
+                                    href={`/task?status=${encodeURIComponent(
                                       sectionLabelToStatus(label)
                                     )}`}
                                     className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-muted"
@@ -435,7 +435,7 @@ function SectionTable({ label, tasks }: { label: string; tasks: Task[] }) {
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Link
-                                href={`/task?statuses=${encodeURIComponent(
+                                href={`/task?status=${encodeURIComponent(
                                   sectionLabelToStatus(label)
                                 )}`}
                                 className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-muted"
@@ -521,7 +521,7 @@ function SectionTable({ label, tasks }: { label: string; tasks: Task[] }) {
 
       <div className="flex justify-end">
         <Link
-          href={`/task?statuses=${encodeURIComponent(
+          href={`/task?status=${encodeURIComponent(
             sectionLabelToStatus(label)
           )}`}
           className="bg-[#003459] cursor-pointer text-white text-[14px] py-[10px] mt-[10px] px-[10px] rounded-[5px] inline-block"

@@ -222,7 +222,7 @@ export default function TaskForm({ id }: TaskFormProps) {
   const filteredCategories = categories.filter((category) => {
     // Only show approved and pending categories, not rejected ones
     if (category.status === "rejected") return false;
-    
+
     return category.name.toLowerCase().includes(categorySearchQuery.toLowerCase());
   });
 
@@ -525,11 +525,11 @@ export default function TaskForm({ id }: TaskFormProps) {
       return;
     }
 
-      // Only require triggerDate if recurring is set
-      if (formData.recurring !== "0" && !formData.triggerDate) {
-        toast.error("Trigger Date is required for recurring tasks");
-        return;
-      }
+    // Only require triggerDate if recurring is set
+    if (formData.recurring !== "0" && !formData.triggerDate) {
+      toast.error("Trigger Date is required for recurring tasks");
+      return;
+    }
 
     setIsSubmitting(true);
 
@@ -682,13 +682,33 @@ export default function TaskForm({ id }: TaskFormProps) {
   // Add handler for recurring selection to show information
   const handleRecurringChange = (value: string) => {
     handleInputChange("recurring", value);
-    
+
     // Show information about next task creation if recurring is selected
     if (value !== "0" && dueDate) {
       const nextDueDate = new Date(dueDate);
       nextDueDate.setMonth(nextDueDate.getMonth() + parseInt(value));
       console.log(`Next recurring task will be due on: ${nextDueDate.toLocaleDateString()}`);
     }
+  };
+
+
+  const getMaxTriggerDate = () => {
+    if (!formData.recurring || formData.recurring === "0") return undefined;
+
+    const [type, value] = formData.recurring.split("-");
+    const interval = parseInt(value, 10);
+
+    const maxDate = new Date();
+
+    if (type === "week") {
+      maxDate.setDate(maxDate.getDate() + interval * 7);
+    }
+
+    if (type === "month") {
+      maxDate.setMonth(maxDate.getMonth() + interval);
+    }
+
+    return format(maxDate, "yyyy-MM-dd");
   };
 
   return (
@@ -1462,28 +1482,6 @@ export default function TaskForm({ id }: TaskFormProps) {
                 </div>
               </div>
 
-              {/* Trigger Date Field - Shown only when recurring is set */}
-              {formData.recurring && formData.recurring !== "0" && (
-                <div className="space-y-2">
-                  <Label htmlFor="triggerDate">Trigger Date</Label>
-                  <Input
-                    id="triggerDate"
-                    type="date"
-                    value={formData.triggerDate || format(new Date(), "yyyy-MM-dd")}
-                    min={format(new Date(), "yyyy-MM-dd")}
-                    onChange={(e) => {
-                      const newTriggerDate = e.target.value;
-                      handleInputChange("triggerDate", newTriggerDate);
-
-                      // Ensure Completion Date is not earlier than Trigger Date
-                      if (dueDate && new Date(newTriggerDate) > new Date(dueDate)) {
-                        setDueDate(new Date(newTriggerDate));
-                      }
-                    }}
-                  />
-                </div>
-              )}
-
               {/* Completion Date */}
               <div className="space-y-2">
                 <Label className="flex items-center gap-1">
@@ -1534,45 +1532,74 @@ export default function TaskForm({ id }: TaskFormProps) {
               </div>
 
               {/* Recurring Field */}
-              <div className="space-y-2">
-                <Label htmlFor="recurring">Recurring (Monthly)</Label>
-                <Select
-                  value={formData.recurring}
-                  onValueChange={handleRecurringChange}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select recurring interval (optional)" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="0">No Recurring</SelectItem>
-                    {Array.from({ length: 12 }, (_, i) => i + 1).map((month) => (
-                      <SelectItem key={month} value={month.toString()}>
-                        Every {month} {month === 1 ? "month" : "months"}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  Set how often this task should repeat (1-12 months, optional)
-                  {formData.recurring !== "0" && dueDate && (
-                    <span className="block mt-1 text-blue-600">
-                      {(() => {
-                        const nextDueDate = new Date(dueDate);
-                        nextDueDate.setMonth(nextDueDate.getMonth() + parseInt(formData.recurring));
-                        
-                        // Get selected category to find time period
-                        const selectedCategory = categories.find(cat => cat.id === formData.categoryId);
-                        const timePeriod = selectedCategory?.timePeriod || 7; // Default to 7 days if no category time period
-                        
-                        // Always calculate and show start date (due date - time period)
-                        const startDate = new Date(nextDueDate);
-                        startDate.setDate(startDate.getDate() - timePeriod);
-                        
-                        return `Next task period: ${startDate.toLocaleDateString('en-GB')} to ${nextDueDate.toLocaleDateString('en-GB')}`;
-                      })()}
-                    </span>
+              <div className="flex gap-3">
+                <div className="space-y-2 w-1/2">
+                  <Label htmlFor="recurring">Recurring (Monthly)</Label>
+                  <Select
+                    value={formData.recurring}
+                    onValueChange={handleRecurringChange}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select recurring interval (optional)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="0">No Recurring</SelectItem>
+                      <SelectItem value="week-1">Every 1 week</SelectItem>
+                      <SelectItem value="week-2">Every 2 weeks</SelectItem>
+                      <SelectItem value="week-3">Every 3 weeks</SelectItem>
+                      {Array.from({ length: 12 }, (_, i) => i + 1).map((month) => (
+                        <SelectItem key={month} value={month.toString()}>
+                          Every {month} {month === 1 ? "month" : "months"}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Set how often this task should repeat (1-12 months, optional)
+                    {formData.recurring !== "0" && dueDate && (
+                      <span className="block mt-1 text-blue-600">
+                        {(() => {
+                          const nextDueDate = new Date(dueDate);
+                          nextDueDate.setMonth(nextDueDate.getMonth() + parseInt(formData.recurring));
+
+                          // Get selected category to find time period
+                          const selectedCategory = categories.find(cat => cat.id === formData.categoryId);
+                          const timePeriod = selectedCategory?.timePeriod || 7; // Default to 7 days if no category time period
+
+                          // Always calculate and show start date (due date - time period)
+                          const startDate = new Date(nextDueDate);
+                          startDate.setDate(startDate.getDate() - timePeriod);
+
+                          return `Next task period: ${startDate.toLocaleDateString('en-GB')} to ${nextDueDate.toLocaleDateString('en-GB')}`;
+                        })()}
+                      </span>
+                    )}
+                  </p>
+                </div>
+                <div className="w-1/2">
+                  {/* Trigger Date Field - Shown only when recurring is set */}
+                  {formData.recurring && formData.recurring !== "0" && (
+                    <div className="space-y-2">
+                      <Label htmlFor="triggerDate">Trigger Date</Label>
+                      <Input
+                        id="triggerDate"
+                        type="date"
+                        value={formData.triggerDate || format(new Date(), "yyyy-MM-dd")}
+                        min={format(new Date(), "yyyy-MM-dd")}
+                        max={getMaxTriggerDate()}
+                        onChange={(e) => {
+                          const newTriggerDate = e.target.value;
+                          handleInputChange("triggerDate", newTriggerDate);
+
+                          // Ensure Completion Date is not earlier than Trigger Date
+                          if (dueDate && new Date(newTriggerDate) > new Date(dueDate)) {
+                            setDueDate(new Date(newTriggerDate));
+                          }
+                        }}
+                      />
+                    </div>
                   )}
-                </p>
+                </div>
               </div>
 
               {/* Assignment Preview */}

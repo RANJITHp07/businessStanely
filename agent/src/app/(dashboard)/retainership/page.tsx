@@ -18,7 +18,13 @@ import {
     MoreHorizontal,
     Plus,
     Search,
-    Trash2
+    Trash2,
+    User,
+    Building2,
+    Phone,
+    Mail,
+    Calendar,
+    AlertCircle
 } from "lucide-react"
 import {
     Table, TableBody, TableCell, TableHead, TableHeader, TableRow
@@ -69,7 +75,7 @@ interface DashboardRetainership {
     client?: {
         id: string;
         name: string;
-        email: string; 
+        email: string;
     };
     photo?: string;
     taskCount?: number;
@@ -165,14 +171,14 @@ export default function RetainershipTable() {
             if (activeTab === 'my-retainerships') {
                 try {
                     setLoading(true);
-                    const response = await fetchWithAuth(`/api/retainerships?assignedTo=me`);
+                    const response = await fetchWithAuth(`/api/tasks?retainershipTasks=true`);
 
                     if (!response.ok) {
                         throw new Error('Failed to fetch my retainerships');
                     }
 
                     const data = await response.json();
-                    setMyRetainerships(data || []);
+                    setMyRetainerships(data.tasks || []);
                 } catch (error) {
                     console.error("Error fetching my retainerships:", error);
                     setMyRetainerships([]);
@@ -300,6 +306,81 @@ export default function RetainershipTable() {
                 )}
             </>
         );
+    };
+
+    const getClientTypeBadge = (type: string) => {
+        const colors = {
+            individual: "bg-blue-100 text-blue-800 border-blue-200",
+            organization: "bg-purple-100 text-purple-800 border-purple-200",
+        }
+
+        const icons = {
+            individual: <User className="w-3 h-3 mr-1" />,
+            organization: <Building2 className="w-3 h-3 mr-1" />,
+        }
+
+        return (
+            <Badge className={`${colors[type as keyof typeof colors]} border`}>
+                {icons[type as keyof typeof icons]}
+                {type.charAt(0).toUpperCase() + type.slice(1)}
+            </Badge>
+        )
+    }
+
+    const getCommunicationBadge = (communication: string) => {
+        const colors = {
+            email: "bg-green-100 text-green-800",
+            phone: "bg-blue-100 text-blue-800",
+            sms: "bg-yellow-100 text-yellow-800",
+            mail: "bg-gray-100 text-gray-800",
+            "in-person": "bg-orange-100 text-orange-800",
+        }
+
+        return (
+            <Badge className={colors[communication as keyof typeof colors] || "bg-gray-100 text-gray-800"}>
+                {communication.charAt(0).toUpperCase() + communication.slice(1).replace("-", " ")}
+            </Badge>
+        )
+    }
+
+    const getClientDisplayName = (client: any) => {
+        return client.clientType === "individual" ? `${client.firstName} ${client.lastName}` : client.organizationName
+    }
+
+
+    const getPriorityBadge = (priority: string) => {
+        const colors = {
+            low: "bg-green-100 text-green-800 border-green-200",
+            medium: "bg-yellow-100 text-yellow-800 border-yellow-200",
+            high: "bg-red-100 text-red-800 border-red-200",
+        };
+
+        const icons = {
+            low: <AlertCircle className="w-3 h-3 mr-1" />,
+            medium: <AlertCircle className="w-3 h-3 mr-1" />,
+            high: <AlertCircle className="w-3 h-3 mr-1" />,
+        };
+
+        return (
+            <Badge className={`${colors[priority as keyof typeof colors]} border`}>
+                {icons[priority as keyof typeof icons]}
+                {priority.charAt(0).toUpperCase() + priority.slice(1)}
+            </Badge>
+        );
+    };
+
+    const formatDate = (dateString: string | undefined) => {
+        if (!dateString) return "N/A";
+        return new Date(dateString).toLocaleDateString("en-US", {
+            month: "short",
+            day: "numeric",
+            year: "numeric",
+        });
+    };
+
+    const isOverdue = (dueDate: string | undefined, status: string) => {
+        if (!dueDate) return false;
+        return new Date(dueDate) < new Date() && status !== "Completed";
     };
 
     return (
@@ -474,24 +555,24 @@ export default function RetainershipTable() {
                                                             </TableCell>
                                                             <TableCell>
                                                                 <div className="max-w-xs">
-                                                                  <p className="text-sm truncate" title={retainership.description}>
-  {retainership.description.length > 30 
-    ? retainership.description.slice(0, 35) + '...'
-    : retainership.description
-  }
-</p>
+                                                                    <p className="text-sm truncate" title={retainership.description}>
+                                                                        {retainership.description.length > 30
+                                                                            ? retainership.description.slice(0, 35) + '...'
+                                                                            : retainership.description
+                                                                        }
+                                                                    </p>
                                                                 </div>
                                                             </TableCell>
                                                             <TableCell>
                                                                 <div className="text-sm">
-<p>
-  {retainership.client?.name 
-    ? retainership.client.name.length > 30 
-      ? retainership.client.name.slice(0, 30) + '...'
-      : retainership.client.name
-    : "N/A"
-  }
-</p>                                                                    <p className="text-muted-foreground text-xs">{retainership.client?.email || "N/A"}</p>
+                                                                    <p>
+                                                                        {retainership.client?.name
+                                                                            ? retainership.client.name.length > 30
+                                                                                ? retainership.client.name.slice(0, 30) + '...'
+                                                                                : retainership.client.name
+                                                                            : "N/A"
+                                                                        }
+                                                                    </p>                                                                    <p className="text-muted-foreground text-xs">{retainership.client?.email || "N/A"}</p>
                                                                 </div>
                                                             </TableCell>
                                                             <TableCell>
@@ -838,23 +919,109 @@ export default function RetainershipTable() {
                                     <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                                 </div>
                             ) : myRetainerships.length === 0 ? (
-                                <p className="text-center text-muted-foreground">No retainerships assigned to you.</p>
+                                <p className="text-center text-muted-foreground">No retainership task assigned to you.</p>
                             ) : (
                                 <div className="rounded-md border">
                                     <Table>
                                         <TableHeader>
                                             <TableRow>
-                                                <TableHead>Retainership</TableHead>
-                                                <TableHead>Description</TableHead>
+                                                <TableHead>Task</TableHead>
                                                 <TableHead>Client</TableHead>
+                                                <TableHead>Assigned To</TableHead>
+                                                <TableHead>Priority</TableHead>
+                                                <TableHead>Due Date</TableHead>
+                                                <TableHead>Progress</TableHead>
                                             </TableRow>
                                         </TableHeader>
                                         <TableBody>
-                                            {myRetainerships.map((retainership) => (
-                                                <TableRow key={retainership.id}>
-                                                    <TableCell>{retainership.name}</TableCell>
-                                                    <TableCell>{retainership.description}</TableCell>
-                                                    <TableCell>{retainership.client?.name || "N/A"}</TableCell>
+                                            {myRetainerships.map((task: any) => (
+                                                <TableRow key={task.id}>
+                                                    <TableCell className="max-w-36 truncate overflow-hidden whitespace-nowrap">
+                                                        <div className="space-y-1">
+                                                            <div className="font-medium">
+                                                                {task.title}
+                                                            </div>
+                                                            {/* Show approved category only */}
+                                                            {task.category &&
+                                                                task.category.status === "approved" && (
+                                                                    <div className="text-xs mt-1">
+                                                                        <span className="inline-block px-2 py-1 rounded bg-blue-100 text-blue-800 border border-blue-200">
+                                                                            {task.category.name}
+                                                                        </span>
+                                                                    </div>
+                                                                )}
+                                                        </div>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <div className="space-y-1">
+                                                            <div className="font-medium">
+                                                                {task.client
+                                                                    ? task.client.name || "N/A"
+                                                                    : "N/A"}
+                                                            </div>
+                                                            <div className="text-sm text-muted-foreground">
+                                                                {task.client?.email}
+                                                            </div>
+                                                        </div>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <div className="flex items-center space-x-2">
+                                                            <Avatar className="h-8 w-8">
+                                                                <AvatarFallback className="text-xs">
+                                                                    {task.assignedTo?.name
+                                                                        .toUpperCase()
+                                                                        .split(" ")
+                                                                        .map((n) => n[0])
+                                                                        .join("")}
+                                                                </AvatarFallback>
+                                                            </Avatar>
+                                                            <div>
+                                                                <div className="font-medium text-sm">
+                                                                    {task.assignedTo?.name}
+                                                                </div>
+                                                                <div className="text-xs text-muted-foreground">
+                                                                    {task.assignedTo?.agentType}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        {getPriorityBadge(task.priority)}
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <div className="flex items-center gap-1">
+                                                            <Calendar className="h-4 w-4 text-muted-foreground" />
+                                                            <span
+                                                                className={
+                                                                    isOverdue(task.dueDate, task.status)
+                                                                        ? "text-red-600 font-medium"
+                                                                        : ""
+                                                                }
+                                                            >
+                                                                {task.dueDate
+                                                                    ? formatDate(task.dueDate)
+                                                                    : "N/A"}
+                                                            </span>
+                                                        </div>
+                                                        {task.dueDate &&
+                                                            isOverdue(task.dueDate, task.status) && (
+                                                                <Badge
+                                                                    variant="destructive"
+                                                                    className="text-xs mt-1"
+                                                                >
+                                                                    Overdue
+                                                                </Badge>
+                                                            )}
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <div className="space-y-2">
+                                                            <div className="flex items-center justify-between">
+                                                                <span className="text-sm font-medium">
+                                                                    {task.status}
+                                                                </span>
+                                                            </div>
+                                                        </div>
+                                                    </TableCell>
                                                 </TableRow>
                                             ))}
                                         </TableBody>
@@ -882,15 +1049,60 @@ export default function RetainershipTable() {
                                     <Table>
                                         <TableHeader>
                                             <TableRow>
-                                                <TableHead>Client</TableHead>
-                                                <TableHead>Email</TableHead>
+                                                <TableHead className="text-xs sm:text-sm">Client</TableHead>
+                                                <TableHead className="text-xs sm:text-sm">Type</TableHead>
+                                                <TableHead className="text-xs sm:text-sm">Contact Info</TableHead>
                                             </TableRow>
                                         </TableHeader>
                                         <TableBody>
-                                            {myClients.map((client) => (
+                                            {myClients.map((client: any) => (
                                                 <TableRow key={client.id}>
-                                                    <TableCell>{client.name}</TableCell>
-                                                    <TableCell>{client?.email || "N/A"}</TableCell>
+                                                    <TableCell>
+                                                        <div className="flex items-center space-x-3">
+                                                            <Avatar className="h-10 w-10 flex-shrink-0">
+                                                                <AvatarFallback>
+                                                                    {client.clientType === "individual"
+                                                                        ? `${client.firstName?.[0] ?? ''}${client.lastName?.[0] ?? ''}`
+                                                                        : client.organizationName
+                                                                            ?.toUpperCase()
+                                                                            ?.split(" ")
+                                                                            .map((n) => n[0])
+                                                                            .join("")
+                                                                            .slice(0, 2)}
+                                                                </AvatarFallback>
+                                                            </Avatar>
+                                                            <div className="min-w-0">
+                                                                <div className="font-medium text-sm truncate">
+                                                                    {getClientDisplayName(client)
+                                                                        ? getClientDisplayName(client)!.length > 35
+                                                                            ? getClientDisplayName(client)!.slice(0, 35) + '...'
+                                                                            : getClientDisplayName(client)
+                                                                        : 'N/A'
+                                                                    }
+                                                                </div>                                                          <div className="text-xs text-muted-foreground truncate">
+                                                                    {client.clientType === "organization" && client.authorizedPersonName && (
+                                                                        <>Contact: {client.authorizedPersonName.charAt(0).toUpperCase() + client?.authorizedPersonName?.slice(1)}</>
+                                                                    )}
+                                                                    {client.clientType === "individual" && client.gender && (
+                                                                        <>{client.gender.charAt(0).toUpperCase() + client.gender.slice(1)}</>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </TableCell>
+                                                    <TableCell className="text-xs">{getClientTypeBadge(client.clientType)}</TableCell>
+                                                    <TableCell>
+                                                        <div className="space-y-0.5">
+                                                            <div className="flex items-center gap-1 text-xs">
+                                                                <Mail className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                                                                <span className="truncate text-xs">{client.email}</span>
+                                                            </div>
+                                                            <div className="flex items-center gap-1 text-xs">
+                                                                <Phone className="h-3 w-3 text-muted-foreground flex-shrink-0" />
+                                                                <span className="truncate text-xs">{client.phoneNumber}</span>
+                                                            </div>
+                                                        </div>
+                                                    </TableCell>
                                                 </TableRow>
                                             ))}
                                         </TableBody>

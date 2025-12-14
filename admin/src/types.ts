@@ -89,6 +89,7 @@ export interface Task {
     status: string;
     createdAt: string;
     updatedAt: string;
+    triggerDate?: Date | null;
   }; // Added legislation object to include detailed information
 }
 

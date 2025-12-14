@@ -27,8 +27,9 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const recurringValue = recurring && recurring !== "0" ? parseInt(recurring) : null;
-    
+    const recurringValue =
+      recurring && recurring !== "0" ? parseInt(recurring) : null;
+
     const newTask = await prisma.task.create({
       data: {
         title,
@@ -54,8 +55,14 @@ export async function POST(req: NextRequest) {
     // Initialize recurring fields if this is a recurring task
     if (recurringValue && dueDate) {
       try {
-        const { initializeRecurringTask } = await import("@/lib/singleTaskRecurring");
-        await initializeRecurringTask(newTask.id, recurringValue, new Date(dueDate));
+        const { initializeRecurringTask } = await import(
+          "@/lib/singleTaskRecurring"
+        );
+        await initializeRecurringTask(
+          newTask.id,
+          recurringValue,
+          new Date(dueDate)
+        );
       } catch (error) {
         console.error("Error initializing recurring task:", error);
       }
@@ -78,7 +85,7 @@ export async function GET(req: NextRequest) {
   try {
     // Get the current admin user
     const currentAdmin = await getCurrentAdmin(req);
-    console.log("currentAdmin:",currentAdmin)
+    console.log("currentAdmin:", currentAdmin);
     if (!currentAdmin) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -88,14 +95,13 @@ export async function GET(req: NextRequest) {
     const clientId = searchParams.get("clientId");
     const categoryId = searchParams.get("categoryId");
     const status = searchParams.get("status");
-    console.log('status:',status);
-    
+
     // Build the where clause: if filtering by categoryId, allow any status; otherwise, only approved
     let whereClause: Prisma.TaskWhereInput;
     if (categoryId) {
       whereClause = { categoryId };
     } else {
-      whereClause = { AND: [ { category: { status: "approved" } } ] };
+      whereClause = { AND: [{ category: { status: "approved" } }] };
     }
     if (assignedToId) {
       whereClause.assignedToId = assignedToId;

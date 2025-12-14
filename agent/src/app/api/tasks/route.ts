@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentAgent } from "@/lib/auth";
 
-import { Prisma } from '@prisma/client';
+import { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 
 interface TaskWithAdditionalFields {
@@ -15,25 +15,22 @@ export async function GET(req: NextRequest) {
     const agent = await getCurrentAgent(req);
 
     if (!agent) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     // Get URL search params for filtering
     const { searchParams } = new URL(req.url);
 
-  const status = searchParams.get("status");
-  const priority = searchParams.get("priority");
-  const categoryId = searchParams.get("categoryId");
-  
+    const status = searchParams.get("status");
+    const priority = searchParams.get("priority");
+    const categoryId = searchParams.get("categoryId");
 
     // If categoryId is present, return all tasks for that category (regardless of assignment)
     // If assignedToId is present, return all tasks for that agent
     // Otherwise, only show tasks Ownership to this agent
     let where: Prisma.TaskWhereInput;
     const assignedToId = searchParams.get("assignedToId");
+    const retainershipTasks = searchParams.get("retainershipTasks");
     if (categoryId) {
       where = { categoryId };
     } else if (assignedToId) {
@@ -41,24 +38,30 @@ export async function GET(req: NextRequest) {
         assignedToId,
         AND: [
           {
-            OR: [
-              { category: null },
-              { category: { status: 'approved' } }
-            ]
-          }
-        ]
+            OR: [{ category: null }, { category: { status: "approved" } }],
+          },
+        ],
+      };
+    } else if (retainershipTasks === "true") {
+      where = {
+        assignedToId: agent.id,
+        legislationId: {
+          not: null,
+        },
+        AND: [
+          {
+            OR: [{ category: null }, { category: { status: "approved" } }],
+          },
+        ],
       };
     } else {
       where = {
         assignedToId: agent.id,
         AND: [
           {
-            OR: [
-              { category: null },
-              { category: { status: 'approved' } }
-            ]
-          }
-        ]
+            OR: [{ category: null }, { category: { status: "approved" } }],
+          },
+        ],
       };
     }
 
@@ -116,25 +119,29 @@ export async function GET(req: NextRequest) {
       recurring: task.recurring,
       createdAt: task.createdAt,
       updatedAt: task.updatedAt,
-      client: task.client ? {
-        id: task.client.id,
-        name: task.client.clientType === "individual" 
-          ? `${task.client.firstName} ${task.client.lastName}`.trim()
-          : task.client.organizationName,
-        type: task.client.clientType,
-        email: task.client.email,
-      } : null,
-      category: task.category, 
+      client: task.client
+        ? {
+            id: task.client.id,
+            name:
+              task.client.clientType === "individual"
+                ? `${task.client.firstName} ${task.client.lastName}`.trim()
+                : task.client.organizationName,
+            type: task.client.clientType,
+            email: task.client.email,
+          }
+        : null,
+      category: task.category,
       createdBy: task.createdBy,
       assignedTo: task.assignedTo,
       commentsCount: task.comments.length,
       recentComments: task.comments,
+      followUpDuration: task.followUpDuration,
+      statusCheckDuration: task.statusCheckDuration,
     }));
 
     return NextResponse.json({
       tasks: formattedTasks,
     });
-
   } catch (error) {
     console.error("Error fetching tasks:", error);
     return NextResponse.json(
@@ -151,10 +158,7 @@ export async function POST(req: NextRequest) {
     const agent = await getCurrentAgent(req);
 
     if (!agent) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const body = await req.json();
@@ -174,10 +178,7 @@ export async function POST(req: NextRequest) {
 
     // Validate required fields
     if (!title) {
-      return NextResponse.json(
-        { error: "Title is required" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Title is required" }, { status: 400 });
     }
 
     if (recurring && recurring !== "0" && !triggerDate) {
@@ -187,7 +188,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const recurringValue = recurring && recurring !== "0" ? parseInt(recurring) : null;
+    const recurringValue =
+      recurring && recurring !== "0" ? parseInt(recurring) : null;
     const taskDueDate = dueDate ? new Date(dueDate) : null;
     const taskTriggerDate = triggerDate ? new Date(triggerDate) : null;
 
@@ -238,7 +240,9 @@ export async function POST(req: NextRequest) {
     // Initialize recurring fields if this is a recurring task
     if (recurringValue && taskDueDate) {
       try {
-        const { initializeRecurringTask } = await import("@/lib/singleTaskRecurring");
+        const { initializeRecurringTask } = await import(
+          "@/lib/singleTaskRecurring"
+        );
         await initializeRecurringTask(newTask.id, recurringValue, taskDueDate);
       } catch (error) {
         console.error("Error initializing recurring task:", error);
@@ -261,34 +265,43 @@ export async function POST(req: NextRequest) {
       recurring: newTask.recurring,
       createdAt: newTask.createdAt,
       updatedAt: newTask.updatedAt,
-      client: newTask.client ? {
-        id: newTask.client.id,
-        name: newTask.client.clientType === "individual" 
-          ? `${newTask.client.firstName} ${newTask.client.lastName}`.trim()
-          : newTask.client.organizationName,
-        type: newTask.client.clientType,
-        email: newTask.client.email,
-      } : null,
+      client: newTask.client
+        ? {
+            id: newTask.client.id,
+            name:
+              newTask.client.clientType === "individual"
+                ? `${newTask.client.firstName} ${newTask.client.lastName}`.trim()
+                : newTask.client.organizationName,
+            type: newTask.client.clientType,
+            email: newTask.client.email,
+          }
+        : null,
       category: null, // Will be fetched separately if needed
-      createdBy: newTask.createdBy ? {
-        id: newTask.createdBy.id,
-        name: newTask.createdBy.name,
-        email: newTask.createdBy.email,
-      } : null,
-      assignedTo: newTask.assignedTo ? {
-        id: newTask.assignedTo.id,
-        name: newTask.assignedTo.name,
-        email: newTask.assignedTo.email,
-      } : null,
+      createdBy: newTask.createdBy
+        ? {
+            id: newTask.createdBy.id,
+            name: newTask.createdBy.name,
+            email: newTask.createdBy.email,
+          }
+        : null,
+      assignedTo: newTask.assignedTo
+        ? {
+            id: newTask.assignedTo.id,
+            name: newTask.assignedTo.name,
+            email: newTask.assignedTo.email,
+          }
+        : null,
       commentsCount: 0,
       recentComments: [],
     };
 
-    return NextResponse.json({
-      message: "Task created successfully",
-      task: formattedTask,
-    }, { status: 201 });
-
+    return NextResponse.json(
+      {
+        message: "Task created successfully",
+        task: formattedTask,
+      },
+      { status: 201 }
+    );
   } catch (error) {
     console.error("Error creating task:", error);
     return NextResponse.json(

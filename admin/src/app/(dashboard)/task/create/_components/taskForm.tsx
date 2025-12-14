@@ -92,6 +92,7 @@ export default function TaskForm() {
     legislationId: "",
     legislationName: "",
     recurring: "0",
+    triggerDate: "",
   });
   const [clients, setClients] = useState<Client[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
@@ -291,6 +292,7 @@ export default function TaskForm() {
               legislationId: task.legislation?.id || "",
               legislationName: task.legislation?.title || "",
               recurring: task.recurring ? task.recurring.toString() : "0",
+              triggerDate: task?.triggerDate || "",
             });
             if (task.category) {
               setCategorySearchQuery(task.category.name);
@@ -307,7 +309,24 @@ export default function TaskForm() {
     }
   }, [id]);
 
-  console.log(formData)
+  const getMaxTriggerDate = () => {
+    if (!formData.recurring || formData.recurring === "0") return undefined;
+
+    const [type, value] = formData.recurring.split("-");
+    const interval = parseInt(value, 10);
+
+    const maxDate = new Date();
+
+    if (type === "week") {
+      maxDate.setDate(maxDate.getDate() + interval * 7);
+    }
+
+    if (type === "month") {
+      maxDate.setMonth(maxDate.getMonth() + interval);
+    }
+
+    return format(maxDate, "yyyy-MM-dd");
+  };
 
   // Auto-fill contact number and email when client is selected
   useEffect(() => {
@@ -616,6 +635,16 @@ export default function TaskForm() {
       const calculatedDueDate = new Date();
       calculatedDueDate.setDate(calculatedDueDate.getDate() + category.timePeriod);
       setDueDate(calculatedDueDate);
+    }
+  };
+
+  const handleRecurringChange = (value: string) => {
+    handleInputChange("recurring", value);
+
+    // Show information about next task creation if recurring is selected
+    if (value !== "0" && dueDate) {
+      const nextDueDate = new Date(dueDate);
+      nextDueDate.setMonth(nextDueDate.getMonth() + parseInt(value));
     }
   };
 
@@ -1429,40 +1458,74 @@ export default function TaskForm() {
               </div>
 
               {/* Recurring Field */}
-              <div className="space-y-2">
-                <Label htmlFor="recurring">Recurring (Monthly)</Label>
-                <Select
-                  value={formData.recurring}
-                  onValueChange={(value) => handleInputChange("recurring", value)}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select recurring interval (optional)" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="0">No Recurring</SelectItem>
-                    {Array.from({ length: 12 }, (_, i) => i + 1).map((month) => (
-                      <SelectItem key={month} value={month.toString()}>
-                        Every {month} {month === 1 ? "month" : "months"}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  Set how often this task should repeat (1-12 months, optional)
-                  {formData.recurring !== "0" && dueDate && (
-                    <span className="block mt-1 text-blue-600">
-                      {(() => {
-                        // Calculate date range using the recurring months
-                        const recurringMonths = parseInt(formData.recurring);
-                        const endDate = new Date(dueDate);
-                        endDate.setMonth(endDate.getMonth() + recurringMonths);
+              <div className="flex gap-3 ">
+                <div className="space-y-2 w-1/2">
+                  <Label htmlFor="recurring">Recurring (Monthly)</Label>
+                  <Select
+                    value={formData.recurring}
+                    onValueChange={handleRecurringChange}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select recurring interval (optional)" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="0">No Recurring</SelectItem>
+                      <SelectItem value="week-1">Every 1 week</SelectItem>
+                      <SelectItem value="week-2">Every 2 weeks</SelectItem>
+                      <SelectItem value="week-3">Every 3 weeks</SelectItem>
+                      {Array.from({ length: 12 }, (_, i) => i + 1).map((month) => (
+                        <SelectItem key={month} value={month.toString()}>
+                          Every {month} {month === 1 ? "month" : "months"}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">
+                    Set how often this task should repeat (1-12 months, optional)
+                    {formData.recurring !== "0" && dueDate && (
+                      <span className="block mt-1 text-blue-600">
+                        {(() => {
+                          const nextDueDate = new Date(dueDate);
+                          nextDueDate.setMonth(nextDueDate.getMonth() + parseInt(formData.recurring));
 
-                        // For display, show the period from due date to end date
-                        return `Period: ${dueDate.toLocaleDateString('en-GB')} to ${endDate.toLocaleDateString('en-GB')} (${recurringMonths} month${recurringMonths > 1 ? 's' : ''})`;
-                      })()}
-                    </span>
+                          // Get selected category to find time period
+                          const selectedCategory = categories.find(cat => cat.id === formData.categoryId);
+                          const timePeriod = selectedCategory?.timePeriod || 7; // Default to 7 days if no category time period
+
+                          // Always calculate and show start date (due date - time period)
+                          const startDate = new Date(nextDueDate);
+                          startDate.setDate(startDate.getDate() - timePeriod);
+
+                          return `Next task period: ${startDate.toLocaleDateString('en-GB')} to ${nextDueDate.toLocaleDateString('en-GB')}`;
+                        })()}
+                      </span>
+                    )}
+                  </p>
+                </div>
+                <div className="w-1/2">
+                  {/* Trigger Date Field - Shown only when recurring is set */}
+                  {formData.recurring && formData.recurring !== "0" && (
+                    <div className="space-y-2">
+                      <Label htmlFor="triggerDate">Trigger Date</Label>
+                      <Input
+                        id="triggerDate"
+                        type="date"
+                        value={formData.triggerDate || format(new Date(), "yyyy-MM-dd")}
+                        min={format(new Date(), "yyyy-MM-dd")}
+                        max={getMaxTriggerDate()}
+                        onChange={(e) => {
+                          const newTriggerDate = e.target.value;
+                          handleInputChange("triggerDate", newTriggerDate);
+
+                          // Ensure Completion Date is not earlier than Trigger Date
+                          if (dueDate && new Date(newTriggerDate) > new Date(dueDate)) {
+                            setDueDate(new Date(newTriggerDate));
+                          }
+                        }}
+                      />
+                    </div>
                   )}
-                </p>
+                </div>
               </div>
 
               {/* Assignment Preview */}

@@ -220,7 +220,7 @@ export default function TasksTable() {
     if (search) params.set("search", search);
     if (priorities.length > 0) params.set("priorities", priorities.join(","));
     if (statuses.length > 0) params.set("statuses", statuses.join(","));
-    
+
     const newUrl = params.toString() ? `?${params.toString()}` : window.location.pathname;
     window.history.replaceState({}, "", newUrl);
   };
@@ -231,7 +231,7 @@ export default function TasksTable() {
       const urlSearch = searchParams?.get("search");
       const urlPriorities = searchParams?.get("priorities");
       const urlStatuses = searchParams?.get("statuses");
-      
+
       if (urlSearch) setSearchTerm(urlSearch);
       if (urlPriorities) setSelectedPriorities(urlPriorities.split(","));
       if (urlStatuses) setSelectedStatuses(urlStatuses.split(","));
@@ -724,11 +724,10 @@ export default function TasksTable() {
                             <TableRow
                               key={task.id}
                               onClick={() => router.push(`/task/${task.id}`)}
-                              className={`cursor-pointer hover:bg-muted/50 ${
-                                isOverdue(task.dueDate, task.status) ? "bg-red-50" : 
+                              className={`cursor-pointer hover:bg-muted/50 ${isOverdue(task.dueDate, task.status) ? "bg-red-50" :
                                 task.followUpDuration && task.followUpDuration !== 'None' ? "bg-blue-50" :
-                                task.statusCheckDuration && task.statusCheckDuration !== 'None' ? "bg-green-50" : ""
-                              }`}
+                                  task.statusCheckDuration && task.statusCheckDuration !== 'None' ? "bg-green-50" : ""
+                                }`}
                             >
                               <TableCell className="max-w-36 truncate overflow-hidden whitespace-nowrap">
                                 <div className="space-y-1">

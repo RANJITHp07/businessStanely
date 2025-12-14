@@ -55,6 +55,15 @@ const entityTypes = ["All Entity Types", "Corporation", "LLC", "Partnership", "S
 import { Client } from "@/types";
 import { useRouter } from "next/navigation"
 
+// Helper to get badge color for each status add more colors if you want 
+    const getStatusBadge = (status: string, count: number) => {
+        return (
+            <Badge key={status} className="bg-gray-200 text-black">
+                {status.charAt(0).toUpperCase() + status.slice(1)}: {count}
+            </Badge>
+        );
+    };
+
 export default function ClientsTable() {
     const [clients, setClients] = useState<Client[]>([]);
     const [searchTerm, setSearchTerm] = useState("")
@@ -392,8 +401,9 @@ export default function ClientsTable() {
                                         <TableHead className="text-xs sm:text-sm">Client</TableHead>
                                         <TableHead className="text-xs sm:text-sm">Type</TableHead>
                                         <TableHead className="text-xs sm:text-sm">Contact Info</TableHead>
-                                        <TableHead className="text-xs sm:text-sm">Communication</TableHead> {/* Communication column */}
-                                        <TableHead className="text-xs sm:text-sm">Tasks</TableHead> {/* Tasks column */}
+                                        <TableHead className="text-xs sm:text-sm">Communication</TableHead>
+                                        <TableHead className="text-xs sm:text-sm">Tasks</TableHead>
+                                        <TableHead className="text-xs sm:text-sm">Retainership</TableHead>
                                         <TableHead className="text-xs sm:text-sm text-right">Actions</TableHead>
                                     </TableRow>
                                 </TableHeader>
@@ -401,7 +411,7 @@ export default function ClientsTable() {
                                 <TableBody>
                                     {currentClients.length === 0 ? (
                                         <TableRow>
-                                            <TableCell colSpan={6} className="text-center py-8 text-sm text-muted-foreground">
+                                            <TableCell colSpan={7} className="text-center py-8 text-sm text-muted-foreground">
                                                 No clients found matching your criteria.
                                             </TableCell>
                                         </TableRow>
@@ -449,7 +459,19 @@ export default function ClientsTable() {
                                                     </div>
                                                 </TableCell>
                                                 <TableCell>{getCommunicationBadge(client.preferredCommunication || "")}</TableCell>
-                                                <TableCell>{client.taskCount ?? 0}</TableCell>
+                                                <TableCell>
+                                                    {/* Task Status Badges */}
+                                                    <div className="flex flex-col gap-1">
+                                                        {client.statusCounts && Object.entries(client.statusCounts).length > 0 ? (
+                                                            Object.entries(client.statusCounts).map(([status, count]) => getStatusBadge(status, count))
+                                                        ) : (
+                                                            <span className="text-xs text-muted-foreground">No tasks</span>
+                                                        )}
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Badge className="bg-gray-200 text-black">{client.retainershipCount ?? 0}</Badge>
+                                                </TableCell>
                                                 <TableCell className="text-right">
                                                     <DropdownMenu>
                                                         <DropdownMenuTrigger asChild>
@@ -470,7 +492,7 @@ export default function ClientsTable() {
                                                             <DropdownMenuItem
                                                                 className="text-destructive"
                                                                 onClick={(e) => {
-                                                                    e.stopPropagation(); // Prevent row click event
+                                                                    e.stopPropagation();
                                                                     setClientToDelete(client);
                                                                 }}
                                                             >
@@ -492,10 +514,7 @@ export default function ClientsTable() {
                             <Table>
                                 <TableHeader>
                                     <TableRow>
-                                        <TableHead className="text-xs">Client</TableHead>
-                                        <TableHead className="text-xs">Type</TableHead>
-                                        <TableHead className="text-xs">Contact</TableHead>
-                                        <TableHead className="text-xs text-right">Actions</TableHead>
+                                        <TableHead className="text-xs">Client</TableHead><TableHead className="text-xs">Type</TableHead><TableHead className="text-xs">Contact</TableHead><TableHead className="text-xs text-right">Actions</TableHead>
                                     </TableRow>
                                 </TableHeader>
 

@@ -52,12 +52,18 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
 
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
   try {
+    // Unwrap params if it's a Promise (Next.js App Router)
+    const resolvedParams = typeof params.then === 'function' ? await params : params;
+    const id = resolvedParams.id;
+    if (!id) {
+      return NextResponse.json({ error: "Missing client id" }, { status: 400 });
+    }
     await prisma.client.delete({
-      where: { id: params.id },
+      where: { id },
     });
     return new NextResponse(null, { status: 204 });
   } catch (error) {
-    console.error(`Error deleting client ${params.id}:`, error);
+    console.error(`Error deleting client:`, error);
     return NextResponse.json({ error: "Failed to delete client" }, { status: 500 });
   }
 }

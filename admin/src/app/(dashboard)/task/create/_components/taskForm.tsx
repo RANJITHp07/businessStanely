@@ -51,7 +51,7 @@ import {
 import { format, isBefore, startOfDay } from "date-fns";
 import { cn } from "@/lib/utils";
 
-import { Client, Agent, Task, Legislation } from "@/types";
+import { Client, Agent, Task } from "@/types";
 
 interface Category {
   id: string;
@@ -125,7 +125,7 @@ export default function TaskForm() {
   // Added legislation-related state variables
   const [legislationSearchQuery, setLegislationSearchQuery] = useState("");
   const [showLegislationSuggestions, setShowLegislationSuggestions] = useState(false);
-  const [legislationList, setLegislationList] = useState<Legislation[]>([]);
+  const [legislationList, setLegislationList] = useState<any[]>([]);
   const [isLegislationModalOpen, setIsLegislationModalOpen] = useState(false);
   const [isCreatingLegislation, setIsCreatingLegislation] = useState(false);
   const [newLegislationData, setNewLegislationData] = useState({
@@ -206,7 +206,7 @@ export default function TaskForm() {
   const filteredCategories = categories.filter((category) => {
     // Only show approved and pending categories, not rejected ones
     if (category.status === "rejected") return false;
-    
+
     return category.name.toLowerCase().includes(categorySearchQuery.toLowerCase());
   });
 
@@ -280,7 +280,7 @@ export default function TaskForm() {
         try {
           const response = await fetch(`/api/tasks/${id}`);
           if (response.ok) {
-            const task: Task = await response.json();
+            const { task }: { task: Task } = await response.json();
             setFormData({
               title: task.title,
               clientId: task.client?.id || "",
@@ -306,6 +306,8 @@ export default function TaskForm() {
       fetchTask();
     }
   }, [id]);
+
+  console.log(formData)
 
   // Auto-fill contact number and email when client is selected
   useEffect(() => {
@@ -1454,7 +1456,7 @@ export default function TaskForm() {
                         const recurringMonths = parseInt(formData.recurring);
                         const endDate = new Date(dueDate);
                         endDate.setMonth(endDate.getMonth() + recurringMonths);
-                        
+
                         // For display, show the period from due date to end date
                         return `Period: ${dueDate.toLocaleDateString('en-GB')} to ${endDate.toLocaleDateString('en-GB')} (${recurringMonths} month${recurringMonths > 1 ? 's' : ''})`;
                       })()}

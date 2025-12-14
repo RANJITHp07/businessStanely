@@ -208,7 +208,7 @@ export default function AgentDetails() {
       try {
         setServiceRecordsLoading(true);
         const response = await fetchWithAuth(`/api/agents/${id}/service-records`);
-        
+
         if (response.ok) {
           const data = await response.json();
           setServiceRecords(data.serviceRecords || []);
@@ -450,29 +450,31 @@ export default function AgentDetails() {
         {/* Agent Summary Card */}
         <Card>
           <CardContent className="p-6">
-            <div className="flex items-start gap-6">
-              <Avatar className="h-20 w-20">
-                <AvatarImage src={agent.photo || ""} />
-                <AvatarFallback className="text-lg">
-                  {agent.name
-                    .split(" ")
-                    .map((n) => n[0])
-                    .join("")}
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex-1">
-                <div className="flex items-center gap-3 mb-2">
-                  <h2 className="text-2xl font-bold">{agent.name}</h2>
-                  {getAgentTypeBadge(agent.agentType)}
-                </div>
-                <div className="text-sm text-muted-foreground">
-                  <div className="flex items-center gap-2">
-                    <Mail className="h-4 w-4" />
-                    <span>{agent.email}</span>
+            <div className="flex flex-col md:flex-row items-start justify-between gap-6">
+              <div className="flex items-center gap-5">
+                <Avatar className="h-20 w-20">
+                  <AvatarImage src={agent.photo || ""} />
+                  <AvatarFallback className="text-lg">
+                    {agent.name
+                      .split(" ")
+                      .map((n) => n[0])
+                      .join("")}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1">
+                  <div className="flex items-center gap-3 mb-2">
+                    <h2 className="text-2xl font-bold">{agent.name}</h2>
+                    {getAgentTypeBadge(agent.agentType)}
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Phone className="h-4 w-4" />
-                    <span>{agent.phoneNumber}</span>
+                  <div className="text-sm text-muted-foreground">
+                    <div className="flex items-center gap-2">
+                      <Mail className="h-4 w-4" />
+                      <span>{agent.email}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Phone className="h-4 w-4" />
+                      <span>{agent.phoneNumber}</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -495,12 +497,12 @@ export default function AgentDetails() {
                     <div className="text-2xl font-bold text-green-600">
                       {agentTasks.length > 0
                         ? Math.round(
-                            (agentTasks.filter(
-                              (task) =>
-                                task.status === "Completed"
-                            ).length / agentTasks.length) *
-                              100
-                          )
+                          (agentTasks.filter(
+                            (task) =>
+                              task.status === "Completed"
+                          ).length / agentTasks.length) *
+                          100
+                        )
                         : 0}
                       %
                     </div>
@@ -655,12 +657,12 @@ export default function AgentDetails() {
                           (status === "Completed"
                             ? "text-green-600"
                             : status === "To Do"
-                            ? "text-orange-600"
-                            : status === "In Progress"
-                            ? "text-blue-600"
-                            : status === "Hold"
-                            ? "text-gray-500"
-                            : "text-gray-800")
+                              ? "text-orange-600"
+                              : status === "In Progress"
+                                ? "text-blue-600"
+                                : status === "Hold"
+                                  ? "text-gray-500"
+                                  : "text-gray-800")
                         }>
                           {agentTasks.filter((task) => task.status === status).length}
                         </span>
@@ -675,14 +677,14 @@ export default function AgentDetails() {
                       <span className="text-sm font-bold">
                         {agentTasks.length > 0
                           ? Math.round(
-                              (agentTasks.filter(
-                                (task) =>
-                                  task.status === "Completed" ||
-                                  task.status === "Done"
-                              ).length /
-                                agentTasks.length) *
-                                100
-                            )
+                            (agentTasks.filter(
+                              (task) =>
+                                task.status === "Completed" ||
+                                task.status === "Done"
+                            ).length /
+                              agentTasks.length) *
+                            100
+                          )
                           : 0}
                         %
                       </span>
@@ -691,13 +693,13 @@ export default function AgentDetails() {
                       value={
                         agentTasks.length > 0
                           ? Math.round(
-                              (agentTasks.filter(
-                                (task) =>
-                                  task.status === "Completed"
-                              ).length /
-                                agentTasks.length) *
-                                100
-                            )
+                            (agentTasks.filter(
+                              (task) =>
+                                task.status === "Completed"
+                            ).length /
+                              agentTasks.length) *
+                            100
+                          )
                           : 0
                       }
                       className="h-2"
@@ -734,19 +736,19 @@ export default function AgentDetails() {
             </Card>
           ) : (
             <div className="space-y-[40px]">
-              <SectionTable 
-                label="New Task" 
-                tasks={agentTasks.filter((t) => ["todo"].includes(statusKey(t.status))).slice(0, 3)} 
-                agentId={id}
-                          />
-              <SectionTable 
-                label="In Progress" 
-                tasks={agentTasks.filter((t) => ["inprogress"].includes(statusKey(t.status))).slice(0, 3)} 
+              <SectionTable
+                label="New Task"
+                tasks={agentTasks.filter((t) => ["todo"].includes(statusKey(t.status))).slice(0, 3)}
                 agentId={id}
               />
-              <SectionTable 
-                label="Completed" 
-                tasks={agentTasks.filter((t) => ["completed"].includes(statusKey(t.status))).slice(0, 3)} 
+              <SectionTable
+                label="In Progress"
+                tasks={agentTasks.filter((t) => ["inprogress"].includes(statusKey(t.status))).slice(0, 3)}
+                agentId={id}
+              />
+              <SectionTable
+                label="Completed"
+                tasks={agentTasks.filter((t) => ["completed"].includes(statusKey(t.status))).slice(0, 3)}
                 agentId={id}
               />
             </div>
@@ -911,7 +913,7 @@ export default function AgentDetails() {
                                 <TableRow key={idx}>
                                   <TableCell className="break-words whitespace-pre-line align-top" style={{ wordBreak: 'break-word', whiteSpace: 'pre-line', width: '33%', minWidth: 120, maxWidth: 240 }}>
                                     {activity.taskTitle ? (
-                                      <Link 
+                                      <Link
                                         href={`/task/${activity.taskId}?agentId=${id}`}
                                         className="text-blue-600 hover:underline break-words whitespace-pre-line block"
                                         style={{ wordBreak: 'break-word', whiteSpace: 'pre-line' }}
@@ -966,7 +968,7 @@ export default function AgentDetails() {
                         onChange={(e) => setNewNote(e.target.value)}
                       />
                     </div>
-                    <Button 
+                    <Button
                       onClick={handleAddNote}
                       disabled={!newNote.trim() || addingNote}
                       className="bg-[#003459] hover:bg-[#003459] text-white"

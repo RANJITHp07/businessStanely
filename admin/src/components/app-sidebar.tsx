@@ -59,7 +59,7 @@ const items = [
   //   url: "/task",
   //   icon: ClipboardCheck,
   // },
-   {
+  {
     title: "Task",
     url: "/my-task",
     icon: ClipboardCheck,
@@ -114,7 +114,7 @@ export function AppSidebar() {
 
   return (
     <>
-      <Sidebar>
+      <Sidebar className="hidden md:flex flex-shrink-0">
         <SidebarContent>
           <SidebarGroup>
             <SidebarGroupLabel className="mt-[10px] ">

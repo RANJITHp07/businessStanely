@@ -170,7 +170,7 @@ export default function ApproveRetainership({ params }: { params: Promise<{ id: 
             // Show success message and redirect
             toast.success("Retainership approved successfully")
             // Redirect to the retainership detail page to show the updated status
-            router.push(`/retainership/${resolvedParams.id}`)
+            router.push(`/retainership/${resolvedParams.id}/edit`)
         } catch (error) {
             console.error("Error approving retainership:", error)
             const errorMessage = error instanceof Error ? error.message : "Failed to approve retainership"

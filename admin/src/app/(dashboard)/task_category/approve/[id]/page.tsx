@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { toast } from "react-toastify"
-import { Loader2 } from "lucide-react"
+import { Loader2, TimerIcon } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -49,6 +49,7 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { Input } from "@/components/ui/input"
 
 export interface TaskCategory {
     id: string
@@ -69,6 +70,7 @@ export interface TaskCategory {
     rejectedAt?: string | null
     rejectionReason?: string | null
     photo?: string
+    timePeriod?: number
 }
 
 
@@ -128,6 +130,58 @@ export default function ApproveCategory({ params }: { params: Promise<{ id: stri
     const [rejecting, setRejecting] = useState(false)
     const [rejectionReason, setRejectionReason] = useState("")
     const [showRejectDialog, setShowRejectDialog] = useState(false)
+    const [title, setTitle] = useState("");
+    const [description, setDescription] = useState("")
+    const [timePeriod, setTimePeriod] = useState("")
+    const [isSubmitting, setIsSubmitting] = useState(false)
+
+    const handleSubmit = async () => {
+
+        if (!title?.trim()) {
+            toast.error("Title is required");
+            return;
+        }
+
+        if (!description?.trim()) {
+            toast.error("Description is required");
+            return;
+        }
+
+        try {
+            setIsSubmitting(true);
+
+            const payload = {
+                name: title.trim(),
+                description: description.trim(),
+                timePeriod: parseInt(timePeriod, 10),
+            };
+
+            const response = await fetch(
+                `/api/task-categories/${resolvedParams?.id}`,
+                {
+                    method: "PUT",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify(payload),
+                }
+            );
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || "Failed to update category");
+            }
+
+            toast.success("Category updated successfully!");
+        } catch (error) {
+            const errorMessage =
+                error instanceof Error ? error.message : "Failed to update category";
+            toast.error(errorMessage);
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
 
     useEffect(() => {
         const fetchData = async () => {
@@ -142,6 +196,9 @@ export default function ApproveCategory({ params }: { params: Promise<{ id: stri
 
                 const categoryData = await categoryResponse.json()
                 setCategory(categoryData)
+                setTitle(categoryData.name);
+                setDescription(categoryData.description);
+                setTimePeriod(categoryData.timePeriod ? String(categoryData.timePeriod) : "");
 
                 // Fetch tasks associated with this category
                 const tasksResponse = await fetch(`/api/tasks?categoryId=${categoryId}`)
@@ -340,7 +397,7 @@ export default function ApproveCategory({ params }: { params: Promise<{ id: stri
                                     </Avatar>
                                     <div className="flex-1">
                                         <div className="flex items-center gap-3 mb-2">
-                                            <h2 className="text-2xl font-semibold">{category.name}</h2>
+                                            <Input value={title} onChange={(e) => setTitle(e.target.value)} />
                                             <Badge
                                                 variant="secondary"
                                                 className={category.status === "approved"
@@ -351,7 +408,19 @@ export default function ApproveCategory({ params }: { params: Promise<{ id: stri
                                                 {category.status === "approved" ? "Approved" : "Pending Approval"}
                                             </Badge>
                                         </div>
-                                        <p className="text-muted-foreground mb-4">{category.description}</p>
+                                        <Input className="mb-1" value={timePeriod} onChange={(e) => setTimePeriod(e.target.value)} />
+                                        <Textarea className="mb-2" value={description} onChange={(e) => setDescription(e.target.value)} rows={3} />
+                                        <div className="flex justify-end mb-5">
+                                            <Button
+                                                className="cursor-pointer shadow-none hover:shadow-lg transition-shadow duration-300"
+                                                type="submit"
+                                                disabled={isSubmitting}
+                                                onClick={handleSubmit}
+                                            >
+                                                {isSubmitting ? "Updating..." : "Update Service Details"}
+                                            </Button>
+                                        </div>
+
                                         <div className="grid grid-cols-2 gap-4 text-sm">
                                             <div className="flex items-center gap-2">
                                                 <User className="h-4 w-4 text-muted-foreground" />
@@ -368,6 +437,10 @@ export default function ApproveCategory({ params }: { params: Promise<{ id: stri
                                             <div className="flex items-center gap-2">
                                                 <Tag className="h-4 w-4 text-muted-foreground" />
                                                 <span>Tasks: {tasks?.length || 0}</span>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <TimerIcon className="h-4 w-4 text-muted-foreground" />
+                                                <span>Time Periods: {category.timePeriod || 0} days</span>
                                             </div>
                                         </div>
                                     </div>
@@ -481,10 +554,10 @@ export default function ApproveCategory({ params }: { params: Promise<{ id: stri
                                                     <TableRow key={task.id}>
                                                         <TableCell className="max-w-[220px] align-middle">
                                                             <div className="space-y-1">
-                                                                <div className="font-medium truncate" style={{maxWidth: '200px'}} title={task.title}>{task.title}</div>
+                                                                <div className="font-medium truncate" style={{ maxWidth: '200px' }} title={task.title}>{task.title}</div>
                                                                 <div
                                                                     className="text-sm text-muted-foreground truncate"
-                                                                    style={{maxWidth: '200px'}}
+                                                                    style={{ maxWidth: '200px' }}
                                                                     title={task.description}
                                                                 >
                                                                     {task.description}
@@ -688,6 +761,6 @@ export default function ApproveCategory({ params }: { params: Promise<{ id: stri
                     </AlertDialogContent>
                 </AlertDialog>
             </div>
-        </div>
+        </div >
     )
 }

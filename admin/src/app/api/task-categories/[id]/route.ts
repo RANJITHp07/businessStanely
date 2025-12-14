@@ -156,15 +156,7 @@ export async function PUT(
       );
     }
 
-    // Only owner can edit categories
-    if (currentAdmin.adminType !== "owner") {
-      return NextResponse.json(
-        { error: "Only owners can edit services" },
-        { status: 403 }
-      );
-    }
-
-  const { id } = params;
+  const { id } = await params;
   const body = await req.json();
   const { name, description, color, timePeriod, notes, processFlow, agentCanEditDays } = body;
 

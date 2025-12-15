@@ -13,10 +13,7 @@ export async function DELETE(
   try {
     const agent = await getCurrentAgent(req);
     if (!agent) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     const { id: taskId } = await params;
     // Allow delete if agent is creator, assigned, or superior of assigned agent
@@ -25,10 +22,7 @@ export async function DELETE(
       select: { createdById: true, assignedToId: true },
     });
     if (!task) {
-      return NextResponse.json(
-        { error: "Task not found" },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "Task not found" }, { status: 404 });
     }
     let isAuthorized = false;
     if (task.createdById === agent.id || task.assignedToId === agent.id) {
@@ -69,10 +63,7 @@ export async function GET(
     const agent = await getCurrentAgent(req);
 
     if (!agent) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const { id: taskId } = await params;
@@ -174,11 +165,11 @@ export async function GET(
               name: true,
               email: true,
               photo: true,
-            }
-          }
-        }
+            },
+          },
+        },
       });
-      assignedAgentSubordinates = subLinks.map(link => {
+      assignedAgentSubordinates = subLinks.map((link) => {
         const { id, name, email, photo } = link.subordinate;
         return {
           id,
@@ -190,10 +181,7 @@ export async function GET(
     }
 
     if (!task) {
-      return NextResponse.json(
-        { error: "Task not found" },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "Task not found" }, { status: 404 });
     }
 
     return NextResponse.json({
@@ -203,7 +191,7 @@ export async function GET(
           ? { ...task.assignedTo, subordinates: assignedAgentSubordinates }
           : null,
         service: task.category ? [task.category] : [], // Map category to service field
-      }
+      },
     });
   } catch (error) {
     console.error("Error fetching task:", error);
@@ -222,10 +210,7 @@ export async function PUT(
     const agent = await getCurrentAgent(req);
 
     if (!agent) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const { id: taskId } = await params;
@@ -237,10 +222,7 @@ export async function PUT(
       select: { createdById: true, assignedToId: true },
     });
     if (!task) {
-      return NextResponse.json(
-        { error: "Task not found" },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "Task not found" }, { status: 404 });
     }
     let isAuthorized = false;
     if (task.createdById === agent.id || task.assignedToId === agent.id) {
@@ -262,15 +244,23 @@ export async function PUT(
       );
     }
 
-
-
     // Enforce mutual exclusivity for followUpDuration and statusCheckDuration
     let { followUpDuration, statusCheckDuration } = body;
-    if (followUpDuration && followUpDuration !== "None" && statusCheckDuration && statusCheckDuration !== "None") {
+    if (
+      followUpDuration &&
+      followUpDuration !== "None" &&
+      statusCheckDuration &&
+      statusCheckDuration !== "None"
+    ) {
       // If both are non-None, prioritize the one being changed (frontend always sends both)
       // If followUpDuration is being set, set statusCheckDuration to 'None'
       statusCheckDuration = "None";
-    } else if (statusCheckDuration && statusCheckDuration !== "None" && followUpDuration && followUpDuration !== "None") {
+    } else if (
+      statusCheckDuration &&
+      statusCheckDuration !== "None" &&
+      followUpDuration &&
+      followUpDuration !== "None"
+    ) {
       // If statusCheckDuration is being set, set followUpDuration to 'None'
       followUpDuration = "None";
     }
@@ -307,7 +297,14 @@ export async function PUT(
     // Handle recurring field conversion
     if (updateData.recurring) {
       const recurringValue = updateData.recurring as string;
-      updateData.recurring = recurringValue && recurringValue !== "0" ? parseInt(recurringValue) : null;
+      updateData.recurring =
+        recurringValue && recurringValue !== "0"
+          ? parseInt(recurringValue)
+          : null;
+    }
+
+    if (!updateData.triggerDate) {
+      delete updateData.triggerDate;
     }
     // Remove any frontend-only fields
     delete updateData.legislationName;
@@ -351,7 +348,8 @@ export async function PUT(
 
     // Fetch category separately if needed
     let category = null;
-    const updatedTaskWithFields = updatedTask as typeof updatedTask & TaskWithFields;
+    const updatedTaskWithFields = updatedTask as typeof updatedTask &
+      TaskWithFields;
     if (updatedTaskWithFields.categoryId) {
       category = await prisma.taskCategory.findUnique({
         where: { id: updatedTaskWithFields.categoryId },
@@ -388,8 +386,8 @@ export async function PUT(
     return NextResponse.json({
       task: {
         ...updatedTask,
-        category
-      }
+        category,
+      },
     });
   } catch (error) {
     console.error("Error updating task:", error);

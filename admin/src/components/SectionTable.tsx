@@ -11,7 +11,7 @@ import {
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Eye, Calendar } from "lucide-react";
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
-import { Progress } from "@/components/ui/progress";
+// import { Progress } from "@/components/ui/progress";
 import Link from "next/link";
 import { Task } from "@/types";
 
@@ -194,11 +194,11 @@ export function SectionTable({ label, tasks, agentId }: { label: string; tasks: 
                             <TableCell className="text-right align-top">
                               <Tooltip>
                                 <TooltipTrigger asChild>
-                                  <Link href={`/task?status=${encodeURIComponent(sectionLabelToStatus(label))}`} className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-muted" aria-label="View tasks with this status">
+                                  <Link href={`/task/${t.id}`} className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-muted" aria-label="View task details">
                                     <Eye className="h-5 w-5" />
                                   </Link>
                                 </TooltipTrigger>
-                                <TooltipContent sideOffset={6}>View tasks with this status</TooltipContent>
+                                <TooltipContent sideOffset={6}>View task details</TooltipContent>
                               </Tooltip>
                             </TableCell>
                           </TableRow>

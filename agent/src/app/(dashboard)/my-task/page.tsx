@@ -377,17 +377,15 @@ function SectionTable({ label, tasks }: { label: string; tasks: Task[] }) {
                               <Tooltip>
                                 <TooltipTrigger asChild>
                                   <Link
-                                    href={`/task?status=${encodeURIComponent(
-                                      sectionLabelToStatus(label)
-                                    )}`}
+                                    href={`/task/${t.id}`}
                                     className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-muted"
-                                    aria-label="View tasks with this status"
+                                    aria-label="View task details"
                                   >
                                     <Eye className="h-5 w-5" />
                                   </Link>
                                 </TooltipTrigger>
                                 <TooltipContent sideOffset={6}>
-                                  View tasks with this status
+                                  View task details
                                 </TooltipContent>
                               </Tooltip>
                             </TableCell>
@@ -436,17 +434,15 @@ function SectionTable({ label, tasks }: { label: string; tasks: Task[] }) {
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Link
-                                href={`/task?status=${encodeURIComponent(
-                                  sectionLabelToStatus(label)
-                                )}`}
+                                href={`/task/${t.id}`}
                                 className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-muted"
-                                aria-label="View tasks with this status"
+                                aria-label="View task details"
                               >
                                 <Eye className="h-4 w-4" />
                               </Link>
                             </TooltipTrigger>
                             <TooltipContent sideOffset={6}>
-                              View tasks with this status
+                              View task details
                             </TooltipContent>
                           </Tooltip>
                         </div>

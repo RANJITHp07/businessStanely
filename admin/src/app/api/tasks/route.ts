@@ -85,7 +85,6 @@ export async function GET(req: NextRequest) {
   try {
     // Get the current admin user
     const currentAdmin = await getCurrentAdmin(req);
-    console.log("currentAdmin:", currentAdmin);
     if (!currentAdmin) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -95,7 +94,11 @@ export async function GET(req: NextRequest) {
     const clientId = searchParams.get("clientId");
     const categoryId = searchParams.get("categoryId");
     const status = searchParams.get("status");
-
+    const statusesParam = searchParams.get("statuses");
+    let statusesArray: string[] | undefined = undefined;
+    if (statusesParam) {
+      statusesArray = statusesParam.split(",").map(s => s.trim()).filter(Boolean);
+    }
     // Build the where clause: if filtering by categoryId, allow any status; otherwise, only approved
     let whereClause: Prisma.TaskWhereInput;
     if (categoryId) {
@@ -109,7 +112,9 @@ export async function GET(req: NextRequest) {
     if (clientId) {
       whereClause.clientId = clientId;
     }
-    if (status) {
+    if (statusesArray && statusesArray.length > 0) {
+      whereClause.status = { in: statusesArray };
+    } else if (status) {
       whereClause.status = status;
     }
     const tasks = await prisma.task.findMany({

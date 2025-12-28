@@ -27,7 +27,7 @@ import { toast } from "react-toastify";
 import { Agent } from "@/types";
 import { useRouter } from "next/navigation";
 
-const agentTypes = [
+const executionAgentTypes = [
   "Owner",
   "Partner",
   "CEO",
@@ -38,6 +38,20 @@ const agentTypes = [
   "Junior Executive",
   "Trainee",
   "Intern",
+];
+const advisorAgentTypes = [
+  "Lead Maker",
+  "Client Advisor",
+  "Client Manager",
+];
+// Get agent types based on selected role
+const getAgentTypesForRole = (role: string) => {
+  if (role === "Advisor Agent") return advisorAgentTypes;
+  return executionAgentTypes;
+};
+const agentRoles = [
+  "Execution Agent",
+  "Advisor Agent",
 ];
 
 // Define agent hierarchy - each agent can manage agents below them in the hierarchy
@@ -158,11 +172,22 @@ export default function AgentForm({ agent }: AgentFormProps) {
   const [allAgents, setAllAgents] = useState<Agent[]>([]);
   const [allSubordinateIds, setAllSubordinateIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
-  const [formData, setFormData] = useState({
+  type AgentFormData = {
+    name: string;
+    email: string;
+    phoneNumber: string;
+    secondaryPhoneNumber: string;
+    agentRole: string;
+    agentType: string;
+    barAssociationId: string;
+    jurisdiction: string;
+  };
+  const [formData, setFormData] = useState<AgentFormData>({
     name: agent?.name || "",
     email: agent?.email || "",
     phoneNumber: agent?.phoneNumber || "",
     secondaryPhoneNumber: agent?.secondaryPhoneNumber || "",
+    agentRole: agent?.agentRole || "Execution Agent",
     agentType: agent?.agentType || "",
     barAssociationId: agent?.barAssociationId || "",
     jurisdiction: agent?.jurisdiction || "",
@@ -403,6 +428,24 @@ export default function AgentForm({ agent }: AgentFormProps) {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
+                <Label htmlFor="agent-role">Agent Role *</Label>
+                <Select
+                  value={formData.agentRole || "Execution Agent"}
+                  onValueChange={(value) => handleInputChange("agentRole", value)}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select agent role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {agentRoles.map((role) => (
+                      <SelectItem key={role} value={role}>
+                        {role}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
                 <Label htmlFor="name">Full Name *</Label>
                 <Input
                   id="name"
@@ -472,15 +515,14 @@ export default function AgentForm({ agent }: AgentFormProps) {
                 <Label htmlFor="agent-type">Agent Type *</Label>
                 <Select
                   value={formData.agentType}
-                  onValueChange={(value) =>
-                    handleInputChange("agentType", value)
-                  }
+                  onValueChange={(value) => handleInputChange("agentType", value)}
+                  disabled={!formData.agentRole}
                 >
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Select agent type" />
                   </SelectTrigger>
                   <SelectContent>
-                    {agentTypes.map((type) => (
+                    {getAgentTypesForRole(formData.agentRole).map((type) => (
                       <SelectItem key={type} value={type}>
                         {type}
                       </SelectItem>

@@ -21,9 +21,12 @@ export interface Agent {
   phoneNumber: string;
   secondaryPhoneNumber: string | null;
   agentType: string;
+  agentRole: 'Execution Agent' | 'Advisor Agent';
   barAssociationId: string;
   jurisdiction: string;
   specializations: string[];
+  // For Advisor Agent, agentType can be: 'Lead Maker', 'Client Advisor', 'Client Manager'
+  // For Execution Agent, agentType can be: 'CEO', 'Partner', 'Manager', etc.
   photo: string | null;
   superior: Agent | null;
   subordinates: Agent[];

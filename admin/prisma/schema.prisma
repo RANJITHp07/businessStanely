@@ -85,6 +85,7 @@ model Agent {
   phoneNumber          String
   secondaryPhoneNumber String?
   agentType            String
+  agentRole            String    @default("Execution Agent") // "Execution Agent" or "Advisor Agent"
   barAssociationId     String
   jurisdiction         String
   specializations      String[]
@@ -100,6 +101,8 @@ model Agent {
   isOtpVerified Boolean   @default(false)
 
   // Team Management (multiple superiors via join table)
+  // For Advisor Agent, agentType can be: "Lead Maker", "Client Advisor", "Client Manager"
+  // For Execution Agent, agentType can be: "CEO", "Partner", "Manager", etc. (existing types)
   superiorsLinks    AgentSuperior[] @relation("AgentSuperiors_superior")
   subordinatesLinks AgentSuperior[] @relation("AgentSuperiors_subordinate")
   createdTasks  Task[]    @relation("CreatedTasks")

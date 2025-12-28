@@ -8,7 +8,7 @@ import { sendAgentInviteEmail } from "@/lib/email";
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-  const { specializations, superiors, subordinates, photo, password: providedPassword, ...agentData } = body;
+  const { specializations, superiors, subordinates, photo, password: providedPassword, agentRole, agentType, ...agentData } = body;
 
     // Generate a random password if not provided
     const password = providedPassword || Math.random().toString(36).slice(-8);
@@ -41,8 +41,21 @@ export async function POST(req: NextRequest) {
     if ('subordinates' in agentData) {
       delete agentData.subordinates;
     }
+    // Validate agentRole and agentType
+    const finalAgentType = agentType;
+    if (agentRole === "Advisor Agent") {
+      // Only allow advisor agent types
+      const advisorTypes = ["Lead Maker", "Client Advisor", "Client Manager"];
+      if (!advisorTypes.includes(agentType)) {
+        return NextResponse.json({ error: "Invalid agent type for Advisor Agent." }, { status: 400 });
+      }
+    }
+    // For Execution Agent, keep previous logic (no restriction)
+
     const data: Prisma.AgentCreateInput = {
       ...agentData,
+      agentRole: agentRole || "Execution Agent",
+      agentType: finalAgentType,
       password: hashedPassword,
       photo: photoS3Key,
       status: "active",

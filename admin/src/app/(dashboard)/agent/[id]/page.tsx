@@ -751,6 +751,11 @@ export default function AgentDetails() {
                 tasks={agentTasks.filter((t) => ["completed"].includes(statusKey(t.status))).slice(0, 3)}
                 agentId={id}
               />
+              <SectionTable
+                label="Hold"
+                tasks={agentTasks.filter((t) => ["hold"].includes(statusKey(t.status))).slice(0, 3)}
+                agentId={id}
+              />
             </div>
           )}
         </TabsContent>

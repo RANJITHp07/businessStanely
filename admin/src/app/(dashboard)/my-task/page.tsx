@@ -53,6 +53,7 @@ function sectionLabelToStatus(label: string) {
   const l = label.toLowerCase();
   if (l.includes("progress")) return "In Progress";
   if (l.includes("completed")) return "Completed";
+  if (l.includes("hold")) return "Hold";
   // default for New Task / todo
   return "To Do";
 }
@@ -215,8 +216,7 @@ function SectionTable({ label, tasks }: { label: string; tasks: Task[] }) {
                       tasks.map((t) => {
                         const clientName = t.client
                           ? t.client.clientType === "individual"
-                            ? `${t.client.firstName ?? ""} ${
-                                t.client.lastName ?? ""
+                            ? `${t.client.firstName ?? ""} ${t.client.lastName ?? ""
                               }`.trim()
                             : t.client.organizationName ?? ""
                           : "-";
@@ -229,12 +229,13 @@ function SectionTable({ label, tasks }: { label: string; tasks: Task[] }) {
                         const priority = (t.priority || "").toLowerCase();
                         const isOverdue = t.dueDate
                           ? new Date(t.dueDate) < new Date() &&
-                            statusKey(t.status) !== "completed"
+                          statusKey(t.status) !== "completed"
                           : false;
                         const statusLabel = (() => {
                           const k = statusKey(t.status);
                           if (k === "completed") return "Completed";
                           if (k === "inprogress") return "In Progress";
+                          if (k === "hold") return "Hold";
                           return "To Do";
                         })();
 
@@ -344,11 +345,10 @@ function SectionTable({ label, tasks }: { label: string; tasks: Task[] }) {
                                 <div className="flex items-center gap-2">
                                   <Calendar className="h-4 w-4 text-muted-foreground" />
                                   <span
-                                    className={`${
-                                      isOverdue
-                                        ? "text-red-600 font-semibold"
-                                        : "text-foreground"
-                                    }`}
+                                    className={`${isOverdue
+                                      ? "text-red-600 font-semibold"
+                                      : "text-foreground"
+                                      }`}
                                   >
                                     {formatDate(t.dueDate)}
                                   </span>
@@ -408,8 +408,7 @@ function SectionTable({ label, tasks }: { label: string; tasks: Task[] }) {
                   tasks.map((t) => {
                     const clientName = t.client
                       ? t.client.clientType === "individual"
-                        ? `${t.client.firstName ?? ""} ${
-                            t.client.lastName ?? ""
+                        ? `${t.client.firstName ?? ""} ${t.client.lastName ?? ""
                           }`.trim()
                         : t.client.organizationName ?? ""
                       : "-";
@@ -581,6 +580,10 @@ export default function MyTasksPage() {
     ["completed"].includes(statusKey(t.status))
   );
 
+  const tasksHold = tasks.filter((t) =>
+    ["hold"].includes(statusKey(t.status))
+  );
+
   return (
     <section className="container mx-auto p-6 max-w-7xl space-y-8 overflow-x-hidden min-w-0">
       <div className="flex items-center justify-between">
@@ -647,6 +650,7 @@ export default function MyTasksPage() {
             tasks={tasksInProgress.slice(0, 3)}
           />
           <SectionTable label="Completed" tasks={tasksCompleted.slice(0, 3)} />
+          <SectionTable label="Hold" tasks={tasksHold.slice(0, 3)} />
         </div>
       )}
     </section>

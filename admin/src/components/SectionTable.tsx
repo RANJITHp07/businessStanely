@@ -20,6 +20,7 @@ function statusKey(s?: string) {
   if (["todo", "pending"].includes(k)) return "todo";
   if (["inprogress", "progress"].includes(k)) return "inprogress";
   if (["completed"].includes(k)) return "completed";
+  if (["hold"].includes(k)) return "hold";
   return k || "todo";
 }
 
@@ -27,6 +28,7 @@ function sectionLabelToStatus(label: string) {
   const l = label.toLowerCase();
   if (l.includes("progress")) return "In Progress";
   if (l.includes("completed")) return "Completed";
+  if (l.includes("hold")) return "Hold";
   return "To Do";
 }
 
@@ -46,6 +48,7 @@ export function SectionTable({ label, tasks, agentId }: { label: string; tasks: 
     const l = label.toLowerCase();
     if (l.includes("progress")) return "text-sky-600";
     if (l.includes("completed")) return "text-green-600";
+    if (l.includes("hold")) return "text-gray-600";
     return "text-blue-600";
   })();
 
@@ -112,6 +115,7 @@ export function SectionTable({ label, tasks, agentId }: { label: string; tasks: 
                           const k = statusKey(t.status);
                           if (k === "completed") return "Completed";
                           if (k === "inprogress") return "In Progress";
+                          if (k === "hold") return "Hold";
                           return "To Do";
                         })();
                         const priorityBadge = (p: string) => {

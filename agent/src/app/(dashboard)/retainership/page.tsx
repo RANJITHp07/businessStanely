@@ -911,7 +911,7 @@ export default function RetainershipTable() {
                 <TabsContent value="my-retainerships">
                     <Card>
                         <CardHeader>
-                            <CardTitle>My Retainerships</CardTitle>
+                            <CardTitle>My Task - Retainer</CardTitle>
                         </CardHeader>
                         <CardContent>
                             {loading ? (
@@ -1035,7 +1035,7 @@ export default function RetainershipTable() {
                 <TabsContent value="my-clients">
                     <Card>
                         <CardHeader>
-                            <CardTitle>My Clients</CardTitle>
+                            <CardTitle>My Clients - Retainership</CardTitle>
                         </CardHeader>
                         <CardContent>
                             {loading ? (

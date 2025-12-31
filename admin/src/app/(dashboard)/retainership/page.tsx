@@ -395,7 +395,7 @@ export default function RetainershipTable() {
                                 router.push(`/retainership/${retainership.id}`)
                               }
                             >
-                              <TableCell>
+                              <TableCell className="w-12">
                                 <div className="flex items-center space-x-3">
                                   <Avatar className="h-10 w-10">
                                     <AvatarImage
@@ -409,8 +409,8 @@ export default function RetainershipTable() {
                                         .join("")}
                                     </AvatarFallback>
                                   </Avatar>
-                                  <div>
-                                    <div className="font-medium">
+                                  <div className="max-w-xs">
+                                    <div className="font-medium truncate">
                                       {retainership.name
                                         .charAt(0)
                                         .toUpperCase() +
@@ -432,11 +432,11 @@ export default function RetainershipTable() {
                                     title={retainership.description || ""}
                                   >
                                     {(retainership.description?.length ?? 0) >
-                                    30
+                                      30
                                       ? `${retainership.description?.slice(
-                                          0,
-                                          30
-                                        )}...`
+                                        0,
+                                        30
+                                      )}...`
                                       : retainership.description || ""}
                                   </p>
                                 </div>
@@ -463,26 +463,26 @@ export default function RetainershipTable() {
                                     )}
                                 </div>
                               </TableCell>
-                  <TableCell>
-  <div className="text-sm">
-    {(() => {
-      const organizationName = retainership.client?.organizationName;
-      const fullName = organizationName || 
-                      `${retainership.client?.firstName || ""} ${retainership.client?.lastName || ""}`.trim() || 
-                      "N/A";
-      const displayName = fullName.length > 30 ? `${fullName.slice(0, 30)}...` : fullName;
-      
-      return (
-        <>
-          <p title={fullName}>{displayName}</p>
-          <p className="text-muted-foreground text-xs">
-            {retainership.client?.email || "N/A"}
-          </p>
-        </>
-      );
-    })()}
-  </div>
-</TableCell>
+                              <TableCell>
+                                <div className="text-sm max-w-xs truncate">
+                                  {(() => {
+                                    const organizationName = retainership.client?.organizationName;
+                                    const fullName = organizationName ||
+                                      `${retainership.client?.firstName || ""} ${retainership.client?.lastName || ""}`.trim() ||
+                                      "N/A";
+                                    const displayName = fullName.length > 30 ? `${fullName.slice(0, 30)}...` : fullName;
+
+                                    return (
+                                      <>
+                                        <p title={fullName}>{displayName}</p>
+                                        <p className="text-muted-foreground text-xs">
+                                          {retainership.client?.email || "N/A"}
+                                        </p>
+                                      </>
+                                    );
+                                  })()}
+                                </div>
+                              </TableCell>
                               <TableCell className="text-right">
                                 <DropdownMenu>
                                   <DropdownMenuTrigger asChild>
@@ -773,11 +773,9 @@ export default function RetainershipTable() {
                                 <div className="text-sm">
                                   <p>
                                     {retainership.client?.organizationName ||
-                                      `${
-                                        retainership.client?.firstName || ""
-                                      } ${
-                                        retainership.client?.lastName || ""
-                                      }`.trim() ||
+                                      `${retainership.client?.firstName || ""
+                                        } ${retainership.client?.lastName || ""
+                                        }`.trim() ||
                                       "N/A"}
                                   </p>
                                   <p className="text-muted-foreground text-xs">

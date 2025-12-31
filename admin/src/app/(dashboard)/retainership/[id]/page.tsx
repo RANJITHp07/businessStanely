@@ -35,6 +35,7 @@ import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { fetchWithAuth } from "@/lib/fetchWithAuth"
+import { useRouter } from "next/navigation"
 
 export default function RetainershipDetail({ params }: { params: Promise<{ id: string }> | { id: string } }) {
     // Helper to render the creator label (name + (Owner/Admin/Agent))
@@ -56,14 +57,16 @@ export default function RetainershipDetail({ params }: { params: Promise<{ id: s
         );
     };
 
+    const router = useRouter()
     const resolvedParams = params instanceof Promise ? use(params) : params;
+    const [isEdit, setIsEdit] = useState(false)
     const [retainership, setRetainership] = useState<Retainership | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [modalAgentSearch, setModalAgentSearch] = useState("");
     const [agents, setAgents] = useState<any[]>([]);
     const [showModalAgentDropdown, setShowModalAgentDropdown] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false)
-    const [modalFormData, setModalFormData] = useState({
+    const [modalFormData, setModalFormData] = useState<any>({
         title: "",
         description: "",
         assignedAgent: "",
@@ -143,61 +146,115 @@ export default function RetainershipDetail({ params }: { params: Promise<{ id: s
     const handleSubmit = async () => {
         try {
             setIsSubmitting(true)
-            const res = await fetch("/api/legislation", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                    title: modalFormData.title,
-                    retainershipId: resolvedParams.id,
-                    description: modalFormData.description,
-                    assignedAgentId: agents.find(agent => agent.name === modalFormData.assignedAgent)?.id,
-                }),
-            });
+            if (isEdit) {
+                const res = await fetch(`/api/legislation/${modalFormData.id}`, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        title: modalFormData.title,
+                        description: modalFormData.description,
+                        assignedAgentId: agents.find(agent => agent.name === modalFormData.assignedAgent)?.id,
+                    }),
+                });
 
-            if (!res.ok) {
-                const errorText = await res.text();
-                throw new Error(errorText || "Failed to create legislation");
-            }
+                if (!res.ok) {
+                    const errorText = await res.text();
+                    throw new Error(errorText || "Failed to create legislation");
+                }
 
-            const data = await res.json();
-            console.log(data)
+                const data = await res.json();
 
-            setRetainership((prev) => {
-                if (!prev) return prev;
+                setRetainership((prev) => {
+                    if (!prev) return prev;
 
-                const agent = agents.find(
-                    (a) => a.name === modalFormData.assignedAgent
-                );
-                return {
-                    ...prev,
-                    legislation: [
-                        {
-                            id: data?.id,
-                            title: modalFormData.title,
-                            description: modalFormData.description,
-                            assignedAgentId: agent?.id ?? "",
-                            assignedAgent: agent
+                    const agent = agents.find(a => a.name === modalFormData.assignedAgent);
+
+                    return {
+                        ...prev,
+                        legislation: prev.legislation.map((leg) =>
+                            leg.id === data.id
                                 ? {
-                                    id: agent.id,
-                                    name: agent.name,
-                                    email: agent.email,
+                                    ...leg,
+                                    title: modalFormData.title,
+                                    description: modalFormData.description,
+                                    assignedAgentId: agent?.id ?? "",
+                                    assignedAgent: agent
+                                        ? {
+                                            id: agent.id,
+                                            name: agent.name,
+                                            email: agent.email,
+                                        }
+                                        : undefined,
                                 }
-                                : undefined,
-                        },
-                        ...prev.legislation,
-                    ],
-                };
-            });
+                                : leg
+                        ),
+                    };
+                });
 
-            toast.success("Legislation added successfully");
 
+            } else {
+                const res = await fetch("/api/legislation", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        title: modalFormData.title,
+                        retainershipId: resolvedParams.id,
+                        description: modalFormData.description,
+                        assignedAgentId: agents.find(agent => agent.name === modalFormData.assignedAgent)?.id,
+                    }),
+                });
+
+                if (!res.ok) {
+                    const errorText = await res.text();
+                    throw new Error(errorText || "Failed to create legislation");
+                }
+
+                const data = await res.json();
+
+                setRetainership((prev) => {
+                    if (!prev) return prev;
+
+                    const agent = agents.find(
+                        (a) => a.name === modalFormData.assignedAgent
+                    );
+                    return {
+                        ...prev,
+                        legislation: [
+                            {
+                                id: data?.id,
+                                title: modalFormData.title,
+                                description: modalFormData.description,
+                                assignedAgentId: agent?.id ?? "",
+                                assignedAgent: agent
+                                    ? {
+                                        id: agent.id,
+                                        name: agent.name,
+                                        email: agent.email,
+                                    }
+                                    : undefined,
+                            },
+                            ...prev.legislation,
+                        ],
+                    };
+                });
+
+                toast.success("Legislation added successfully");
+            }
         } catch (error) {
             toast.error("Something went wrong");
         } finally {
             setIsSubmitting(false)
             setIsModalOpen(false)
+            setModalFormData({
+                title: "",
+                description: "",
+                assignedAgent: "",
+            })
+            setIsEdit(false)
         }
     };
 
@@ -370,14 +427,16 @@ export default function RetainershipDetail({ params }: { params: Promise<{ id: s
                                         </TableRow>
                                     ) : (
                                         retainership?.legislation?.map((legislation) => (
-                                            <TableRow key={legislation.id}>
+                                            <TableRow className="cursor-pointer" key={legislation.id} onClick={() => router.push(`/legislation/${legislation.id}`)}>
                                                 <TableCell>
                                                     <div title={legislation.title || ""}>
-                                                        {legislation.title
-                                                            ? (legislation.title.length > 40
-                                                                ? `${legislation.title.slice(0, 40)}...`
-                                                                : legislation.title)
-                                                            : "N/A"}
+                                                        {
+                                                            legislation.title
+                                                                ? (legislation.title.length > 40
+                                                                    ? `${legislation.title.slice(0, 40)}...`
+                                                                    : legislation.title)
+                                                                : "N/A"
+                                                        }
                                                     </div>
                                                 </TableCell>
                                                 <TableCell title={legislation.description || ""}>
@@ -398,20 +457,36 @@ export default function RetainershipDetail({ params }: { params: Promise<{ id: s
                                                         </DropdownMenuTrigger>
                                                         <DropdownMenuContent align="end">
                                                             <DropdownMenuLabel>Actions</DropdownMenuLabel>
+
                                                             <DropdownMenuItem asChild>
-                                                                <a href={`/legislation/${legislation.id}`}>
+                                                                <a href={`/legislation/${legislation.id}`} className="flex items-center">
                                                                     <Eye className="mr-2 h-4 w-4" />
                                                                     View Details
                                                                 </a>
                                                             </DropdownMenuItem>
+
                                                             <DropdownMenuItem asChild>
-                                                                <Pen className="mr-2 h-4 w-4" />
-                                                                Edit
+                                                                <button className="flex items-center w-full" onClick={() => {
+                                                                    setIsEdit(true)
+                                                                    setModalFormData({
+                                                                        id: legislation.id,
+                                                                        title: legislation.title,
+                                                                        description: legislation.description!,
+                                                                        assignedAgent: legislation.assignedAgent?.name || legislation.assignedAgent,
+                                                                    })
+                                                                    setModalAgentSearch(legislation.assignedAgent?.name || legislation?.assignedAgent! as any)
+                                                                    setIsModalOpen(true)
+                                                                }}>
+                                                                    <Pen className="mr-2 h-4 w-4" />
+                                                                    Edit
+                                                                </button>
                                                             </DropdownMenuItem>
+
                                                             {retainership.status !== "pending" && (
                                                                 <DropdownMenuItem asChild>
                                                                     <a
                                                                         href={`/task/create?legislationId=${legislation.id}&assignedAgent=${legislation.assignedAgentId}&client=${retainership.client?.id}`}
+                                                                        className="flex items-center"
                                                                     >
                                                                         <PlusCircle className="mr-2 h-4 w-4" />
                                                                         Create Task
@@ -419,6 +494,7 @@ export default function RetainershipDetail({ params }: { params: Promise<{ id: s
                                                                 </DropdownMenuItem>
                                                             )}
                                                         </DropdownMenuContent>
+
                                                     </DropdownMenu>
                                                 </TableCell>
                                             </TableRow>
@@ -428,8 +504,8 @@ export default function RetainershipDetail({ params }: { params: Promise<{ id: s
                             </Table>
                         </div>
                     </CardContent>
-                </Card>
-            </div>
+                </Card >
+            </div >
             <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
                 <DialogContent className="sm:max-w-[500px]">
                     <DialogHeader>
@@ -499,11 +575,13 @@ export default function RetainershipDetail({ params }: { params: Promise<{ id: s
                             Cancel
                         </Button>
                         <Button disabled={isSubmitting} type="button" onClick={handleSubmit}>
-                            {isSubmitting ? "Adding.." : "Add Legislation"}
+                            {isSubmitting
+                                ? (isEdit ? "Updating.." : "Adding..")
+                                : (isEdit ? "Edit Legislation" : "Add Legislation")}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
-        </div>
+        </div >
     );
 }

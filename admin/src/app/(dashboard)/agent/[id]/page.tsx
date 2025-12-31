@@ -119,7 +119,7 @@ export default function AgentDetails() {
   const [teamMembers, setTeamMembers] = useState<Agent[]>([]);
   const [loading, setLoading] = useState(true);
   const [tasksLoading, setTasksLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<string>(searchParams.get("tab") || "details");
+  const [activeTab, setActiveTab] = useState<string>(searchParams.get("tab") || "tasks");
 
   // Keep activeTab in sync with the tab query param
   useEffect(() => {

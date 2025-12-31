@@ -85,6 +85,7 @@ export default function ClientForm({ client }: ClientFormProps) {
         gstNumber: client?.gstNumber || "",
     })
 
+    const [isSubmitting, setIsSubmitting] = useState(false)
     const [dateOfBirth, setDateOfBirth] = useState<Date | undefined>(client?.dateOfBirth ? new Date(client.dateOfBirth) : undefined)
     const [incorporationDate, setIncorporationDate] = useState<Date | undefined>(client?.incorporationDate ? new Date(client.incorporationDate) : undefined)
     const router = useRouter()
@@ -92,13 +93,13 @@ export default function ClientForm({ client }: ClientFormProps) {
     const handleInputChange = (field: string, value: string) => {
         setFormData((prev) => ({ ...prev, [field]: value }))
     }
-
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         const url = client ? `/api/clients/${client.id}` : "/api/clients";
         const method = client ? "PUT" : "POST";
 
         try {
+            setIsSubmitting(true)
             const response = await fetch(url, {
                 method: method,
                 headers: {
@@ -113,7 +114,7 @@ export default function ClientForm({ client }: ClientFormProps) {
 
             if (response.ok) {
                 toast.success(`Client ${client ? 'updated' : 'created'} successfully!`)
-                router.push("/client")
+                // router.push("/client")
 
             } else {
                 const errorData = await response.json();
@@ -122,6 +123,8 @@ export default function ClientForm({ client }: ClientFormProps) {
         } catch (error) {
             console.error("Error submitting form:", error);
             alert("An unexpected error occurred. Please try again.");
+        } finally {
+            setIsSubmitting(false)
         }
     }
 
@@ -549,12 +552,12 @@ export default function ClientForm({ client }: ClientFormProps) {
                                     Reset Form
                                 </Button>
                                 :
-                                <Button className="bg-[#f42b03] hover:bg-[#f42b03] shadow-none hover:shadow-lg transition-shadow duration-300 text-white hover:text-white cursor-pointer" type="button" variant="outline" onClick={() => router.push("/client")}>
+                                <Button disabled={isSubmitting} className="bg-[#f42b03] hover:bg-[#f42b03] shadow-none hover:shadow-lg transition-shadow duration-300 text-white hover:text-white cursor-pointer" type="button" variant="outline" onClick={() => router.push("/client")}>
                                     Cancel
                                 </Button>
                         }
-                        <Button type="submit" className="cursor-pointer shadow-none hover:shadow-lg transition-shadow duration-300" >
-                            {client ? "Update Client" : "Create Client"}
+                        <Button disabled={isSubmitting} type="submit" className="cursor-pointer shadow-none hover:shadow-lg transition-shadow duration-300" >
+                            {isSubmitting ? "Processing..." : client ? "Update Client" : "Create Client"}
                         </Button>
                     </div>
                 )}

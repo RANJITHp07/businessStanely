@@ -56,13 +56,13 @@ import { Client } from "@/types";
 import { useRouter } from "next/navigation"
 
 // Helper to get badge color for each status add more colors if you want 
-    const getStatusBadge = (status: string, count: number) => {
-        return (
-            <Badge key={status} className="bg-gray-200 text-black">
-                {status.charAt(0).toUpperCase() + status.slice(1)}: {count}
-            </Badge>
-        );
-    };
+const getStatusBadge = (status: string, count: number) => {
+    return (
+        <Badge key={status} className="bg-gray-200 text-black">
+            {status.charAt(0).toUpperCase() + status.slice(1)}: {count}
+        </Badge>
+    );
+};
 
 export default function ClientsTable() {
     const [clients, setClients] = useState<Client[]>([]);
@@ -132,7 +132,11 @@ export default function ClientsTable() {
             selectedCommunication === "All Communication" ||
             (client.preferredCommunication && client.preferredCommunication.toLowerCase() === selectedCommunication.toLowerCase())
 
-        return matchesSearch && matchesType && matchesCommunication
+        const matchesEntity =
+            selectedEntityType === "All Entity Types" ||
+            (client.entityType && client.entityType.toLowerCase() === selectedEntityType.toLowerCase())
+
+        return matchesSearch && matchesType && matchesCommunication && matchesEntity
     })
 
     // Apply sorting to filtered clients
@@ -470,7 +474,7 @@ export default function ClientsTable() {
                                                     </div>
                                                 </TableCell>
                                                 <TableCell>
-                                                    <Badge className="bg-gray-200 text-black">{client.retainershipCount ?? 0}</Badge>
+                                                    <Badge className="bg-gray-200 text-black">{client?.retainershipCount ?? 0}</Badge>
                                                 </TableCell>
                                                 <TableCell className="text-right">
                                                     <DropdownMenu>

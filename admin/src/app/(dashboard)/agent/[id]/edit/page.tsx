@@ -38,7 +38,7 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
   }, [id]);
 
   if (loading) {
-   return (
+    return (
       <div className="container mx-auto p-6 max-w-7xl">
         {/* Header Skeleton */}
         <div className="mb-8">
@@ -47,7 +47,7 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
               <Skeleton className="h-8 w-40 mb-2" />
               <Skeleton className="h-5 w-80" />
             </div>
-           
+
           </div>
           <Card>
             <CardContent className="p-6 h-[300px]">
@@ -63,7 +63,7 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
             </CardContent>
           </Card>
 
-<div className="mt-[30px]">   <Card >
+          <div className="mt-[30px]">   <Card >
             <CardContent className="p-6  h-[400px]">
               <div className="space-y-4">
                 <Skeleton className="h-6 w-1/2 mb-2" />
@@ -91,9 +91,9 @@ export default function EditAgentPage({ params }: { params: Promise<{ id: string
             </CardContent>
           </Card></div>
 
-       
+
         </div>
-      
+
 
       </div>
     );

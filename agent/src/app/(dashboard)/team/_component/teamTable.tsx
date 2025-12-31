@@ -80,7 +80,7 @@ export default function TeamsTable() {
   useEffect(() => {
     const fetchTeams = async () => {
       try {
-  const response = await fetchWithAuth("/api/team-members");
+        const response = await fetchWithAuth("/api/team-members");
         if (response.ok) {
           const data = await response.json();
           setTeams(data);
@@ -302,7 +302,7 @@ export default function TeamsTable() {
                         return (
                           <TableRow
                             key={team.id}
-                            onClick={() => router.push(`/team/${team.id}`)}
+                            onClick={() => router.push(`/team/${team.id}?tab=tasks`)}
                             className="cursor-pointer hover:bg-muted/50"
                           >
                             <TableCell>
@@ -408,7 +408,7 @@ export default function TeamsTable() {
                         return (
                           <TableRow
                             key={team.id}
-                            onClick={() => router.push(`/team/${team.id}`)}
+                            onClick={() => router.push(`/team/${team.id}?tab=tasks`)}
                             className="cursor-pointer hover:bg-muted/50"
                           >
                             <TableCell>
@@ -580,7 +580,7 @@ export default function TeamsTable() {
           </>
         )}
       </Card>
-  {/* Removed AlertDialog for delete confirmation */}
+      {/* Removed AlertDialog for delete confirmation */}
     </div>
   );
 }

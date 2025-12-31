@@ -215,12 +215,15 @@ export default function TasksTable() {
   };
 
   // Update URL when filters change
-  const updateUrlFilters = (priorities: string[], statuses: string[], search: string) => {
+  const updateUrlFilters = (priorities: string[], statuses: string[], search: string, followUpDurations: string[], statusCheckDuration: string[]) => {
     const params = new URLSearchParams();
+    const assignedToId = searchParams.get("assignedToId");
+    if (assignedToId) params.set("assignedToId", assignedToId);
     if (search) params.set("search", search);
     if (priorities.length > 0) params.set("priorities", priorities.join(","));
     if (statuses.length > 0) params.set("statuses", statuses.join(","));
-
+    if (followUpDurations.length > 0) params.set("followUpDurations", followUpDurations.join(","));
+    if (statusCheckDuration.length > 0) params.set("statusCheckDuration", statusCheckDuration.join(","));
     const newUrl = params.toString() ? `?${params.toString()}` : window.location.pathname;
     window.history.replaceState({}, "", newUrl);
   };
@@ -356,7 +359,7 @@ export default function TasksTable() {
                           value={searchTerm}
                           onChange={(e) => {
                             setSearchTerm(e.target.value);
-                            updateUrlFilters(selectedPriorities, selectedStatuses, e.target.value);
+                            updateUrlFilters(selectedPriorities, selectedStatuses, e.target.value, selectedFollowUpDurations, selectedStatusCheckDurations);
                           }}
                           className="pl-10"
                         />
@@ -383,7 +386,7 @@ export default function TasksTable() {
                             onCheckedChange={(checked) => {
                               if (checked) {
                                 setSelectedPriorities([]);
-                                updateUrlFilters([], selectedStatuses, searchTerm);
+                                updateUrlFilters([], selectedStatuses, searchTerm, selectedFollowUpDurations, selectedStatusCheckDurations);
                               }
                             }}
                           >
@@ -401,7 +404,7 @@ export default function TasksTable() {
                                     ? selectedPriorities.filter((p) => p !== priority)
                                     : [...selectedPriorities, priority];
                                   setSelectedPriorities(newPriorities);
-                                  updateUrlFilters(newPriorities, selectedStatuses, searchTerm);
+                                  updateUrlFilters(newPriorities, selectedStatuses, searchTerm, selectedFollowUpDurations, selectedStatusCheckDurations);
                                 }}
                               >
                                 {priority}
@@ -422,7 +425,7 @@ export default function TasksTable() {
                                 onClick={() => {
                                   const newPriorities = selectedPriorities.filter((p) => p !== priority);
                                   setSelectedPriorities(newPriorities);
-                                  updateUrlFilters(newPriorities, selectedStatuses, searchTerm);
+                                  updateUrlFilters(newPriorities, selectedStatuses, searchTerm, selectedFollowUpDurations, selectedStatusCheckDurations);
                                 }}
                               >
                                 <X className="h-3 w-3" />
@@ -450,7 +453,7 @@ export default function TasksTable() {
                             onCheckedChange={(checked) => {
                               if (checked) {
                                 setSelectedStatuses([]);
-                                updateUrlFilters(selectedPriorities, [], searchTerm);
+                                updateUrlFilters(selectedPriorities, [], searchTerm, selectedFollowUpDurations, selectedStatusCheckDurations);
                               }
                             }}
                           >
@@ -466,7 +469,7 @@ export default function TasksTable() {
                                   ? selectedStatuses.filter((s) => s !== status)
                                   : [...selectedStatuses, status];
                                 setSelectedStatuses(newStatuses);
-                                updateUrlFilters(selectedPriorities, newStatuses, searchTerm);
+                                updateUrlFilters(selectedPriorities, newStatuses, searchTerm, selectedFollowUpDurations, selectedStatusCheckDurations);
                               }}
                             >
                               {status}
@@ -487,7 +490,7 @@ export default function TasksTable() {
                                 onClick={() => {
                                   const newStatuses = selectedStatuses.filter((s) => s !== status);
                                   setSelectedStatuses(newStatuses);
-                                  updateUrlFilters(selectedPriorities, newStatuses, searchTerm);
+                                  updateUrlFilters(selectedPriorities, newStatuses, searchTerm, selectedFollowUpDurations, selectedStatusCheckDurations);
                                 }}
                               >
                                 <X className="h-3 w-3" />
@@ -530,6 +533,8 @@ export default function TasksTable() {
                                   ? selectedFollowUpDurations.filter((d) => d !== duration)
                                   : [...selectedFollowUpDurations, duration];
                                 setSelectedFollowUpDurations(newDurations);
+                                updateUrlFilters(selectedPriorities, selectedStatuses, searchTerm, newDurations, selectedStatusCheckDurations);
+
                               }}
                             >
                               {duration}
@@ -550,6 +555,7 @@ export default function TasksTable() {
                                 onClick={() => {
                                   const newDurations = selectedFollowUpDurations.filter((d) => d !== duration);
                                   setSelectedFollowUpDurations(newDurations);
+                                  updateUrlFilters(selectedPriorities, selectedStatuses, searchTerm, newDurations, selectedStatusCheckDurations);
                                 }}
                               >
                                 <X className="h-3 w-3" />
@@ -592,6 +598,7 @@ export default function TasksTable() {
                                   ? selectedStatusCheckDurations.filter((d) => d !== duration)
                                   : [...selectedStatusCheckDurations, duration];
                                 setSelectedStatusCheckDurations(newDurations);
+                                updateUrlFilters(selectedPriorities, selectedStatuses, searchTerm, selectedFollowUpDurations, newDurations);
                               }}
                             >
                               {duration}
@@ -612,6 +619,7 @@ export default function TasksTable() {
                                 onClick={() => {
                                   const newDurations = selectedStatusCheckDurations.filter((d) => d !== duration);
                                   setSelectedStatusCheckDurations(newDurations);
+                                  updateUrlFilters(selectedPriorities, selectedStatuses, searchTerm, selectedFollowUpDurations, newDurations);
                                 }}
                               >
                                 <X className="h-3 w-3" />
@@ -632,7 +640,7 @@ export default function TasksTable() {
                         setSelectedStatuses([]);
                         setSelectedFollowUpDurations([]);
                         setSelectedStatusCheckDurations([]);
-                        updateUrlFilters([], [], "");
+                        updateUrlFilters([], [], "", [], []);
                       }}
                       className="cursor-pointer hover:text-white text-white bg-[#f42b03] hover:bg-[#f42b03] rounded-lg px-4 py-2 shadow-none hover:shadow-lg transition-shadow duration-300"
                       variant="outline"
@@ -947,7 +955,7 @@ export default function TasksTable() {
             </>
           )}
         </Card>
-      </div>
+      </div >
     </>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useState, useEffect } from "react";
-import { notFound, useParams } from "next/navigation";
+import { notFound, useParams, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -161,10 +161,9 @@ function SectionTable({ label, tasks, agentId }: SectionTableProps) {
                     ) : (
                       tasks.map((t) => {
                         const clientName = t.client
-                          ? t.client.name || 
-                            (t.client.clientType === "individual"
-                            ? `${t.client.firstName ?? ""} ${
-                                t.client.lastName ?? ""
+                          ? t.client.name ||
+                          (t.client.clientType === "individual"
+                            ? `${t.client.firstName ?? ""} ${t.client.lastName ?? ""
                               }`.trim()
                             : t.client.organizationName ?? "")
                           : "-";
@@ -174,7 +173,7 @@ function SectionTable({ label, tasks, agentId }: SectionTableProps) {
                         const priority = (t.priority || "").toLowerCase();
                         const isOverdue = t.dueDate
                           ? new Date(t.dueDate) < new Date() &&
-                            statusKey(t.status) !== "completed"
+                          statusKey(t.status) !== "completed"
                           : false;
                         const statusLabel = (() => {
                           const k = statusKey(t.status);
@@ -262,11 +261,10 @@ function SectionTable({ label, tasks, agentId }: SectionTableProps) {
                                 <div className="flex items-center gap-2">
                                   <Calendar className="h-4 w-4 text-muted-foreground" />
                                   <span
-                                    className={`${
-                                      isOverdue
-                                        ? "text-red-600 font-semibold"
-                                        : "text-foreground"
-                                    }`}
+                                    className={`${isOverdue
+                                      ? "text-red-600 font-semibold"
+                                      : "text-foreground"
+                                      }`}
                                   >
                                     {formatDateDMY(t.dueDate)}
                                   </span>
@@ -296,8 +294,8 @@ function SectionTable({ label, tasks, agentId }: SectionTableProps) {
                                     statusLabel === "Completed"
                                       ? 100
                                       : statusLabel === "In Progress"
-                                      ? 50
-                                      : 0
+                                        ? 50
+                                        : 0
                                   }
                                   className="h-1"
                                 />
@@ -349,10 +347,9 @@ function SectionTable({ label, tasks, agentId }: SectionTableProps) {
                 ) : (
                   tasks.map((t) => {
                     const clientName = t.client
-                      ? t.client.name || 
-                        (t.client.clientType === "individual"
-                        ? `${t.client.firstName ?? ""} ${
-                            t.client.lastName ?? ""
+                      ? t.client.name ||
+                      (t.client.clientType === "individual"
+                        ? `${t.client.firstName ?? ""} ${t.client.lastName ?? ""
                           }`.trim()
                         : t.client.organizationName ?? "")
                       : "-";
@@ -410,8 +407,8 @@ function SectionTable({ label, tasks, agentId }: SectionTableProps) {
                             {statusKey(t.status) === "completed"
                               ? "Completed"
                               : statusKey(t.status) === "inprogress"
-                              ? "In Progress"
-                              : "To Do"}
+                                ? "In Progress"
+                                : "To Do"}
                           </div>
                         </div>
                       </div>
@@ -440,15 +437,25 @@ function SectionTable({ label, tasks, agentId }: SectionTableProps) {
 
 export default function AgentDetails() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const id = params.id as string;
   const [agent, setAgent] = useState<Agent | null>(null);
   const [agentTasks, setAgentTasks] = useState<Task[]>([]);
   const [teamMembers, setTeamMembers] = useState<Agent[]>([]);
   const [loading, setLoading] = useState(true);
   const [tasksLoading, setTasksLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("details");
   const [activities, setActivities] = useState<AgentActivity[]>([]);
   const [activitiesLoading, setActivitiesLoading] = useState(true);
+
+  const [activeTab, setActiveTab] = useState<string>(searchParams.get("tab") || "details");
+
+  // Keep activeTab in sync with the tab query param
+  useEffect(() => {
+    const tabParam = searchParams.get("tab");
+    if (tabParam && tabParam !== activeTab) {
+      setActiveTab(tabParam);
+    }
+  }, [searchParams, activeTab]);
 
   useEffect(() => {
     if (!id) return;
@@ -466,7 +473,7 @@ export default function AgentDetails() {
           try {
             // Default status: To Do (can be changed as needed)
             const status = "To Do";
-            const tasksResponse = await fetch(`/api/tasks?assignedToId=${id}&status=${encodeURIComponent(status)}`);
+            const tasksResponse = await fetch(`/api/tasks?assignedToId=${id}`);
             if (tasksResponse.ok) {
               const tasksData = await tasksResponse.json();
               setAgentTasks(tasksData.tasks || []);
@@ -516,10 +523,9 @@ export default function AgentDetails() {
 
     return (
       <Badge
-        className={`${
-          colors[priority as keyof typeof colors] ||
+        className={`${colors[priority as keyof typeof colors] ||
           "bg-gray-100 text-gray-800 border-gray-200"
-        } border`}
+          } border`}
       >
         {priority.charAt(0).toUpperCase() + priority.slice(1)}
       </Badge>
@@ -547,10 +553,9 @@ export default function AgentDetails() {
 
     return (
       <Badge
-        className={`${
-          colors[status as keyof typeof colors] ||
+        className={`${colors[status as keyof typeof colors] ||
           "bg-gray-100 text-gray-800 border-gray-200"
-        } border`}
+          } border`}
       >
         {icons[status as keyof typeof icons] || (
           <Clock className="w-3 h-3 mr-1" />
@@ -590,73 +595,73 @@ export default function AgentDetails() {
 
   if (loading) {
     return (
-     <>
-      <div className="container mx-auto p-6 max-w-7xl">
-        {/* Header Skeleton */}
-        <div className="mb-8">
-          <div className="flex flex-col md:flex-row justify-between md:items-center mb-6 md:mb-4">
-            <div>
-              <Skeleton className="h-8 w-40 mb-2" />
-              <Skeleton className="h-5 w-80" />
-            </div>
-            <Skeleton className="h-10 w-32 mt-[20px] md:mt-0" />
-          </div>
-          <Card>
-            <CardContent className="p-6">
-              <div className="space-y-4">
-                <Skeleton className="h-6 w-1/2 mb-2" />
-                <Skeleton className="h-4 w-full mb-4" />
-                <div className="flex flex-col md:flex-row md:items-center gap-4 md:gap-6 p-0 md:p-4 bg-muted/30 rounded-lg">
-                  <Skeleton className="h-4 w-32" />
-                  <Skeleton className="h-4 w-32" />
-                  <Skeleton className="h-4 w-40 md:ml-auto" />
-                </div>
+      <>
+        <div className="container mx-auto p-6 max-w-7xl">
+          {/* Header Skeleton */}
+          <div className="mb-8">
+            <div className="flex flex-col md:flex-row justify-between md:items-center mb-6 md:mb-4">
+              <div>
+                <Skeleton className="h-8 w-40 mb-2" />
+                <Skeleton className="h-5 w-80" />
               </div>
-            </CardContent>
-          </Card>
-        </div>
-        {/* Tabs Skeleton */}
-        <Skeleton className="h-10 w-full mb-6" />
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 space-y-6">
+              <Skeleton className="h-10 w-32 mt-[20px] md:mt-0" />
+            </div>
             <Card>
-              <CardHeader>
-                <Skeleton className="h-6 w-40" />
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <Skeleton className="h-4 w-full mb-2" />
-                <Skeleton className="h-4 w-full mb-2" />
-                <Skeleton className="h-4 w-full mb-2" />
-                <Skeleton className="h-4 w-full" />
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <Skeleton className="h-6 w-40" />
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <Skeleton className="h-4 w-full mb-2" />
-                <Skeleton className="h-4 w-full mb-2" />
-                <Skeleton className="h-4 w-full" />
+              <CardContent className="p-6">
+                <div className="space-y-4">
+                  <Skeleton className="h-6 w-1/2 mb-2" />
+                  <Skeleton className="h-4 w-full mb-4" />
+                  <div className="flex flex-col md:flex-row md:items-center gap-4 md:gap-6 p-0 md:p-4 bg-muted/30 rounded-lg">
+                    <Skeleton className="h-4 w-32" />
+                    <Skeleton className="h-4 w-32" />
+                    <Skeleton className="h-4 w-40 md:ml-auto" />
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </div>
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <Skeleton className="h-6 w-40" />
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <Skeleton className="h-4 w-full mb-2" />
-                <Skeleton className="h-3 w-full" />
-              </CardContent>
-            </Card>
+          {/* Tabs Skeleton */}
+          <Skeleton className="h-10 w-full mb-6" />
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2 space-y-6">
+              <Card>
+                <CardHeader>
+                  <Skeleton className="h-6 w-40" />
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <Skeleton className="h-4 w-full mb-2" />
+                  <Skeleton className="h-4 w-full mb-2" />
+                  <Skeleton className="h-4 w-full mb-2" />
+                  <Skeleton className="h-4 w-full" />
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader>
+                  <Skeleton className="h-6 w-40" />
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <Skeleton className="h-4 w-full mb-2" />
+                  <Skeleton className="h-4 w-full mb-2" />
+                  <Skeleton className="h-4 w-full" />
+                </CardContent>
+              </Card>
+            </div>
+            <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <Skeleton className="h-6 w-40" />
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <Skeleton className="h-4 w-full mb-2" />
+                  <Skeleton className="h-3 w-full" />
+                </CardContent>
+              </Card>
 
+            </div>
           </div>
         </div>
-      </div>
-     
-     </>
+
+      </>
     );
   }
 
@@ -733,13 +738,14 @@ export default function AgentDetails() {
                     <div className="text-2xl font-bold text-green-600">
                       {agentTasks.length > 0
                         ? Math.round(
-                            (agentTasks.filter(
-                              (task) =>
-                                task.status === "Completed"
-                            ).length /
-                              agentTasks.length) *
-                              100
-                          )
+                          (agentTasks.filter(
+                            (task) =>
+                              task.status === "Completed" ||
+                              task.status === "Done"
+                          ).length /
+                            agentTasks.length) *
+                          100
+                        )
                         : 0}
                       %
                     </div>
@@ -757,7 +763,13 @@ export default function AgentDetails() {
       {/* Tabs */}
       <Tabs
         value={activeTab}
-        onValueChange={setActiveTab}
+        onValueChange={(value) => {
+          setActiveTab(value);
+          // Update URL to include the active tab
+          const url = new URL(window.location.href);
+          url.searchParams.set('tab', value);
+          window.history.replaceState({}, '', url.toString());
+        }}
         className="space-y-6"
       >
         <TabsList className="grid w-full grid-cols-4">
@@ -886,12 +898,12 @@ export default function AgentDetails() {
                           (status === "Completed"
                             ? "text-green-600"
                             : status === "To Do"
-                            ? "text-orange-600"
-                            : status === "In Progress"
-                            ? "text-blue-600"
-                            : status === "Hold"
-                            ? "text-gray-500"
-                            : "text-gray-800")
+                              ? "text-orange-600"
+                              : status === "In Progress"
+                                ? "text-blue-600"
+                                : status === "Hold"
+                                  ? "text-gray-500"
+                                  : "text-gray-800")
                         }>
                           {agentTasks.filter((task) => task.status === status).length}
                         </span>
@@ -906,14 +918,14 @@ export default function AgentDetails() {
                       <span className="text-sm font-bold">
                         {agentTasks.length > 0
                           ? Math.round(
-                              (agentTasks.filter(
-                                (task) =>
-                                  task.status === "Completed" ||
-                                  task.status === "Done"
-                              ).length /
-                                agentTasks.length) *
-                                100
-                            )
+                            (agentTasks.filter(
+                              (task) =>
+                                task.status === "Completed" ||
+                                task.status === "Done"
+                            ).length /
+                              agentTasks.length) *
+                            100
+                          )
                           : 0}
                         %
                       </span>
@@ -922,13 +934,13 @@ export default function AgentDetails() {
                       value={
                         agentTasks.length > 0
                           ? Math.round(
-                              (agentTasks.filter(
-                                (task) =>
-                                  task.status === "Completed"
-                              ).length /
-                                agentTasks.length) *
-                                100
-                            )
+                            (agentTasks.filter(
+                              (task) =>
+                                task.status === "Completed"
+                            ).length /
+                              agentTasks.length) *
+                            100
+                          )
                           : 0
                       }
                       className="h-2"
@@ -965,19 +977,19 @@ export default function AgentDetails() {
             </Card>
           ) : (
             <div className="space-y-[40px]">
-              <SectionTable 
-                label="New Task" 
-                tasks={agentTasks.filter((t) => ["todo"].includes(statusKey(t.status))).slice(0, 3)} 
+              <SectionTable
+                label="New Task"
+                tasks={agentTasks.filter((t) => ["todo"].includes(statusKey(t.status))).slice(0, 3)}
                 agentId={id}
               />
-              <SectionTable 
-                label="In Progress" 
-                tasks={agentTasks.filter((t) => ["inprogress"].includes(statusKey(t.status))).slice(0, 3)} 
+              <SectionTable
+                label="In Progress"
+                tasks={agentTasks.filter((t) => ["inprogress"].includes(statusKey(t.status))).slice(0, 3)}
                 agentId={id}
               />
-              <SectionTable 
-                label="Completed" 
-                tasks={agentTasks.filter((t) => ["completed"].includes(statusKey(t.status))).slice(0, 3)} 
+              <SectionTable
+                label="Completed"
+                tasks={agentTasks.filter((t) => ["completed"].includes(statusKey(t.status))).slice(0, 3)}
                 agentId={id}
               />
             </div>

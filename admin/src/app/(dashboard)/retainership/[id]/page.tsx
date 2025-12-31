@@ -11,18 +11,30 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuTrigger,
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    DialogFooter,
+} from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button";
-import { MoreHorizontal, Eye, PlusCircle } from "lucide-react";
+import { MoreHorizontal, Eye, PlusCircle, Pen } from "lucide-react";
 
 // Importing Retainership, Task, and UserInfo types from the types file
 import { Retainership } from "@/types";
 import { Calendar, Clock, FileText, Tag, User } from "lucide-react"
+import { Label } from "@/components/ui/label"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import { fetchWithAuth } from "@/lib/fetchWithAuth"
 
 export default function RetainershipDetail({ params }: { params: Promise<{ id: string }> | { id: string } }) {
     // Helper to render the creator label (name + (Owner/Admin/Agent))
@@ -46,7 +58,18 @@ export default function RetainershipDetail({ params }: { params: Promise<{ id: s
 
     const resolvedParams = params instanceof Promise ? use(params) : params;
     const [retainership, setRetainership] = useState<Retainership | null>(null);
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [modalAgentSearch, setModalAgentSearch] = useState("");
+    const [agents, setAgents] = useState<any[]>([]);
+    const [showModalAgentDropdown, setShowModalAgentDropdown] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false)
+    const [modalFormData, setModalFormData] = useState({
+        title: "",
+        description: "",
+        assignedAgent: "",
+    });
     const [loading, setLoading] = useState(true);
+
 
     useEffect(() => {
         const fetchData = async () => {
@@ -60,8 +83,8 @@ export default function RetainershipDetail({ params }: { params: Promise<{ id: s
 
                 const retainershipData = await retainershipResponse.json();
                 setRetainership({
-                  ...retainershipData,
-                  client: retainershipData.client || null
+                    ...retainershipData,
+                    client: retainershipData.client || null
                 });
 
                 const tasksResponse = await fetch(`/api/tasks?retainershipId=${retainershipId}`);
@@ -71,7 +94,6 @@ export default function RetainershipDetail({ params }: { params: Promise<{ id: s
                     console.error("Error fetching tasks:", await tasksResponse.text());
                 }
             } catch (error) {
-                console.error("Error fetching data:", error);
                 const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
                 toast.error(`Failed to load retainership: ${errorMessage}`);
                 setRetainership(null);
@@ -81,6 +103,103 @@ export default function RetainershipDetail({ params }: { params: Promise<{ id: s
         };
         fetchData();
     }, [resolvedParams.id]);
+
+    useEffect(() => {
+        const fetchClientsAndAgents = async () => {
+            try {
+                const [agentsResponse] = await Promise.all([
+                    fetchWithAuth('/api/agents'),
+                ]);
+
+                if (!agentsResponse.ok) {
+                    throw new Error('Failed to fetch data');
+                }
+
+                const agentsData: any = await agentsResponse.json();
+
+                setAgents(agentsData);
+            } catch (err) {
+                toast.error(err instanceof Error ? err.message : 'An error occurred');
+            }
+        };
+
+        fetchClientsAndAgents();
+    }, []);
+
+    const filteredModalAgents = modalAgentSearch
+        ? agents.filter(
+            (agent) =>
+                agent.name.toLowerCase().includes(modalAgentSearch.toLowerCase()) ||
+                agent.email.toLowerCase().includes(modalAgentSearch.toLowerCase())
+        )
+        : [];
+
+    const handleModalAgentSelect = (agent: any) => {
+        setModalFormData((prev) => ({ ...prev, assignedAgent: agent.name }));
+        setModalAgentSearch(agent.name);
+        setShowModalAgentDropdown(false);
+    };
+
+    const handleSubmit = async () => {
+        try {
+            setIsSubmitting(true)
+            const res = await fetch("/api/legislation", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    title: modalFormData.title,
+                    retainershipId: resolvedParams.id,
+                    description: modalFormData.description,
+                    assignedAgentId: agents.find(agent => agent.name === modalFormData.assignedAgent)?.id,
+                }),
+            });
+
+            if (!res.ok) {
+                const errorText = await res.text();
+                throw new Error(errorText || "Failed to create legislation");
+            }
+
+            const data = await res.json();
+            console.log(data)
+
+            setRetainership((prev) => {
+                if (!prev) return prev;
+
+                const agent = agents.find(
+                    (a) => a.name === modalFormData.assignedAgent
+                );
+                return {
+                    ...prev,
+                    legislation: [
+                        {
+                            id: data?.id,
+                            title: modalFormData.title,
+                            description: modalFormData.description,
+                            assignedAgentId: agent?.id ?? "",
+                            assignedAgent: agent
+                                ? {
+                                    id: agent.id,
+                                    name: agent.name,
+                                    email: agent.email,
+                                }
+                                : undefined,
+                        },
+                        ...prev.legislation,
+                    ],
+                };
+            });
+
+            toast.success("Legislation added successfully");
+
+        } catch (error) {
+            toast.error("Something went wrong");
+        } finally {
+            setIsSubmitting(false)
+            setIsModalOpen(false)
+        }
+    };
 
     if (loading) {
         return (
@@ -208,7 +327,7 @@ export default function RetainershipDetail({ params }: { params: Promise<{ id: s
                                                     Client: {
                                                         retainership.client
                                                             ? retainership.client.organizationName ||
-                                                              `${retainership.client.firstName || ""} ${retainership.client.lastName || ""}`.trim()
+                                                            `${retainership.client.firstName || ""} ${retainership.client.lastName || ""}`.trim()
                                                             : "Unknown"
                                                     }
                                                 </span>
@@ -228,6 +347,7 @@ export default function RetainershipDetail({ params }: { params: Promise<{ id: s
                                 <FileText className="h-5 w-5" />
                                 Retainership Legislation
                             </CardTitle>
+                            <Button onClick={() => setIsModalOpen(true)}>Add Legislation</Button>
                         </div>
                     </CardHeader>
                     <CardContent>
@@ -252,50 +372,54 @@ export default function RetainershipDetail({ params }: { params: Promise<{ id: s
                                         retainership?.legislation?.map((legislation) => (
                                             <TableRow key={legislation.id}>
                                                 <TableCell>
-  <div title={legislation.title || ""}>
-    {legislation.title 
-      ? (legislation.title.length > 40 
-          ? `${legislation.title.slice(0, 40)}...` 
-          : legislation.title)
-      : "N/A"}
-  </div>
-</TableCell>
-<TableCell title={legislation.description || ""}>
-  {legislation.description?.slice(0, 60)}
-  {(legislation.description?.length ?? 0) > 60 && '...'}
-</TableCell>                                                <TableCell>
-                                                  {typeof legislation.assignedAgent === "string"
-                                                    ? legislation.assignedAgent
-                                                    : legislation.assignedAgent?.name || "Unknown"}
+                                                    <div title={legislation.title || ""}>
+                                                        {legislation.title
+                                                            ? (legislation.title.length > 40
+                                                                ? `${legislation.title.slice(0, 40)}...`
+                                                                : legislation.title)
+                                                            : "N/A"}
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell title={legislation.description || ""}>
+                                                    {legislation.description?.slice(0, 60)}
+                                                    {(legislation.description?.length ?? 0) > 60 && '...'}
+                                                </TableCell>                                                <TableCell>
+                                                    {typeof legislation.assignedAgent === "string"
+                                                        ? legislation.assignedAgent
+                                                        : legislation.assignedAgent?.name || "Unknown"}
                                                 </TableCell>
                                                 <TableCell className="text-right">
-                                                  <DropdownMenu>
-                                                    <DropdownMenuTrigger asChild>
-                                                      <Button variant="ghost" className="h-8 w-8 p-0">
-                                                        <span className="sr-only">Open menu</span>
-                                                        <MoreHorizontal className="h-4 w-4" />
-                                                      </Button>
-                                                    </DropdownMenuTrigger>
-                                                    <DropdownMenuContent align="end">
-                                                      <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                                      <DropdownMenuItem asChild>
-                                                        <a href={`/legislation/${legislation.id}`}>
-                                                          <Eye className="mr-2 h-4 w-4" />
-                                                          View Details
-                                                        </a>
-                                                      </DropdownMenuItem>
-                                                      {retainership.status !== "pending" && (
-                                                        <DropdownMenuItem asChild>
-                                                          <a
-                                                            href={`/task/create?legislationId=${legislation.id}&assignedAgent=${legislation.assignedAgentId}&client=${retainership.client?.id}`}
-                                                          >
-                                                            <PlusCircle className="mr-2 h-4 w-4" />
-                                                            Create Task
-                                                          </a>
-                                                        </DropdownMenuItem>
-                                                      )}
-                                                    </DropdownMenuContent>
-                                                  </DropdownMenu>
+                                                    <DropdownMenu>
+                                                        <DropdownMenuTrigger asChild>
+                                                            <Button variant="ghost" className="h-8 w-8 p-0">
+                                                                <span className="sr-only">Open menu</span>
+                                                                <MoreHorizontal className="h-4 w-4" />
+                                                            </Button>
+                                                        </DropdownMenuTrigger>
+                                                        <DropdownMenuContent align="end">
+                                                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                                            <DropdownMenuItem asChild>
+                                                                <a href={`/legislation/${legislation.id}`}>
+                                                                    <Eye className="mr-2 h-4 w-4" />
+                                                                    View Details
+                                                                </a>
+                                                            </DropdownMenuItem>
+                                                            <DropdownMenuItem asChild>
+                                                                <Pen className="mr-2 h-4 w-4" />
+                                                                Edit
+                                                            </DropdownMenuItem>
+                                                            {retainership.status !== "pending" && (
+                                                                <DropdownMenuItem asChild>
+                                                                    <a
+                                                                        href={`/task/create?legislationId=${legislation.id}&assignedAgent=${legislation.assignedAgentId}&client=${retainership.client?.id}`}
+                                                                    >
+                                                                        <PlusCircle className="mr-2 h-4 w-4" />
+                                                                        Create Task
+                                                                    </a>
+                                                                </DropdownMenuItem>
+                                                            )}
+                                                        </DropdownMenuContent>
+                                                    </DropdownMenu>
                                                 </TableCell>
                                             </TableRow>
                                         ))
@@ -306,6 +430,80 @@ export default function RetainershipDetail({ params }: { params: Promise<{ id: s
                     </CardContent>
                 </Card>
             </div>
+            <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+                <DialogContent className="sm:max-w-[500px]">
+                    <DialogHeader>
+                        <DialogTitle>{"Add New Legislation"}</DialogTitle>
+                        <DialogDescription>
+                            {
+                                "Fill in the details for the new legislation item."}
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="modal-title">Legislation Title *</Label>
+                            <Input
+                                id="modal-title"
+                                value={modalFormData.title}
+                                onChange={(e) => setModalFormData((prev) => ({ ...prev, title: e.target.value }))}
+                                placeholder="Enter legislation title"
+                            />
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label htmlFor="modal-description">Description</Label>
+                            <Textarea
+                                id="modal-description"
+                                value={modalFormData.description}
+                                onChange={(e) => setModalFormData((prev) => ({ ...prev, description: e.target.value }))}
+                                placeholder="Describe the legislation requirements"
+                                rows={3}
+                            />
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label htmlFor="modal-agent">Assigned Agent</Label>
+                            <div className="relative">
+                                <Input
+                                    id="modal-agent"
+                                    value={modalAgentSearch}
+                                    onChange={(e) => {
+                                        setModalAgentSearch(e.target.value);
+                                        setModalFormData((prev) => ({ ...prev, assignedAgent: e.target.value }));
+                                        setShowModalAgentDropdown(true);
+                                    }}
+                                    onFocus={() => setShowModalAgentDropdown(true)}
+                                    placeholder="Type agent name or select from list..."
+                                />
+                                {showModalAgentDropdown && modalAgentSearch && filteredModalAgents.length > 0 && (
+                                    <div className="absolute z-10 w-full mt-1 bg-background border border-border rounded-md shadow-lg max-h-60 overflow-auto">
+                                        {filteredModalAgents.map((agent) => (
+                                            <div
+                                                key={agent.id}
+                                                className="px-4 py-3 hover:bg-muted cursor-pointer border-b border-border last:border-b-0"
+                                                onClick={() => handleModalAgentSelect(agent)}
+                                            >
+                                                <div className="font-medium">{agent.name}</div>
+                                                <div className="text-sm text-muted-foreground">{agent.email}</div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    <DialogFooter>
+                        <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>
+                            Cancel
+                        </Button>
+                        <Button disabled={isSubmitting} type="button" onClick={handleSubmit}>
+                            {isSubmitting ? "Adding.." : "Add Legislation"}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

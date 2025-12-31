@@ -168,6 +168,7 @@ export default function AgentForm({ agent }: AgentFormProps) {
     jurisdiction: agent?.jurisdiction || "",
   });
   const [agentSearch, setAgentSearch] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const router = useRouter();
 
   // Fetch all agents from API and collect all subordinate IDs
@@ -311,6 +312,7 @@ export default function AgentForm({ agent }: AgentFormProps) {
     const method = agent ? "PUT" : "POST";
 
     try {
+      setIsSubmitting(true)
       const response = await fetch(url, {
         method: method,
         headers: {
@@ -332,8 +334,9 @@ export default function AgentForm({ agent }: AgentFormProps) {
         toast.error(`${errorData.error}`);
       }
     } catch (error) {
-      console.error("Error submitting form:", error);
       alert("An unexpected error occurred. Please try again.");
+    } finally {
+      setIsSubmitting(false)
     }
   };
 
@@ -789,14 +792,16 @@ export default function AgentForm({ agent }: AgentFormProps) {
             className="bg-[#f42b03] hover:bg-[#f42b03] shadow-none hover:shadow-lg transition-shadow duration-300 text-white hover:text-white cursor-pointer"
             type="button"
             variant="outline"
+            disabled={isSubmitting}
           >
             Cancel
           </Button>
           <Button
             className=" cursor-pointer shadow-none hover:shadow-lg transition-shadow duration-300"
             type="submit"
+            disabled={isSubmitting}
           >
-            {agent ? "Update Agent" : "Create Agent"}
+            {isSubmitting ? "Proccessing..." : (agent ? "Update Agent" : "Create Agent")}
           </Button>
         </div>
       </form>

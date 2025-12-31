@@ -133,6 +133,8 @@ export default function ApproveCategory({ params }: { params: Promise<{ id: stri
     const [title, setTitle] = useState("");
     const [description, setDescription] = useState("")
     const [timePeriod, setTimePeriod] = useState("")
+    const [processFlow, setProccessFlow] = useState("");
+    const [notes, setNotes] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false)
 
     const handleSubmit = async () => {
@@ -154,6 +156,8 @@ export default function ApproveCategory({ params }: { params: Promise<{ id: stri
                 name: title.trim(),
                 description: description.trim(),
                 timePeriod: parseInt(timePeriod, 10),
+                processFlow: processFlow.trim(),
+                notes: notes.trim()
             };
 
             const response = await fetch(
@@ -195,10 +199,13 @@ export default function ApproveCategory({ params }: { params: Promise<{ id: stri
                 }
 
                 const categoryData = await categoryResponse.json()
+
                 setCategory(categoryData)
                 setTitle(categoryData.name);
                 setDescription(categoryData.description);
                 setTimePeriod(categoryData.timePeriod ? String(categoryData.timePeriod) : "");
+                setProccessFlow(categoryData.processFlow)
+                setNotes(categoryData.notes)
 
                 // Fetch tasks associated with this category
                 const tasksResponse = await fetch(`/api/tasks?categoryId=${categoryId}`)
@@ -409,6 +416,8 @@ export default function ApproveCategory({ params }: { params: Promise<{ id: stri
                                             </Badge>
                                         </div>
                                         <Input className="mb-1" value={timePeriod} onChange={(e) => setTimePeriod(e.target.value)} />
+                                        <Input className="mb-1" placeholder="Process Flow" value={processFlow} onChange={(e) => setProccessFlow(e.target.value)} />
+                                        <Input className="mb-1" placeholder="Notes" value={notes} onChange={(e) => setNotes(e.target.value)} />
                                         <Textarea className="mb-2" value={description} onChange={(e) => setDescription(e.target.value)} rows={3} />
                                         <div className="flex justify-end mb-5">
                                             <Button

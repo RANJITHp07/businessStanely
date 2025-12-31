@@ -33,6 +33,7 @@ export default function RootLayout({
           theme="light"
           pauseOnHover={false}
           pauseOnFocusLoss={false}
+          limit={3}
         />
       </body>
     </html>

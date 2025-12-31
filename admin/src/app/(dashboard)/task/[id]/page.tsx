@@ -36,6 +36,7 @@ import Image from "next/image";
 import { Input } from "@/components/ui/input";
 
 export default function TaskDetails() {
+  const [isReassiging, setIsReassigning] = useState(false)
   const [taskData, setTaskData] = useState<Task | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -62,7 +63,7 @@ export default function TaskDetails() {
       agent.agentType.toLowerCase().includes(agentSearchQuery.toLowerCase())
     );
   });
-// Load user data on mount
+  // Load user data on mount
   useEffect(() => {
     const loadUserData = () => {
       // Check for both "user" and "agent" keys to support both admin and agent logins
@@ -413,6 +414,7 @@ export default function TaskDetails() {
     if (!id) return;
 
     try {
+      setIsReassigning(true)
       const response = await fetch(`/api/tasks/${id}`, {
         method: "PUT",
         headers: {
@@ -440,7 +442,8 @@ export default function TaskDetails() {
         console.error("Failed to reassign task");
       }
     } catch (error) {
-      console.error("Error reassigning task:", error);
+    } finally {
+      setIsReassigning(false)
     }
   };
 
@@ -575,7 +578,7 @@ export default function TaskDetails() {
                     </h2>
                     {getStatusBadge(taskData.status)}
                   </div>
-                  <p className=" text-[16px] md:[18px] text-muted-foreground mb-4">
+                  <p className=" text-[16px] md:[18px] text-muted-foreground mb-2">
                     {taskData.description}
                   </p>
                 </div>
@@ -601,96 +604,7 @@ export default function TaskDetails() {
                     Ownership to {taskData.assignedTo?.name || "Unassigned"}
                   </span>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="assigned-agent">Assign Task To *</Label>
-                  <div className="flex gap-2">
-                    <div className="relative flex-1">
-                      <Input
-                        id="assigned-agent"
-                        type="text"
-                        placeholder="Type to search agents..."
-                        value={agentSearchQuery}
-                        onChange={(e) => {
-                          setAgentSearchQuery(e.target.value);
-                          if (e.target.value.trim()) {
-                            setShowAgentSuggestions(true);
-                          } else {
-                            setShowAgentSuggestions(false);
-                          }
-                        }}
-                        onFocus={() => {
-                          if (agentSearchQuery.trim()) {
-                            setShowAgentSuggestions(true);
-                          }
-                        }}
-                        className="w-full"
-                        // disabled={isFromRetainership} // Disable if form is from retainership
-                      />
 
-                      {showAgentSuggestions &&
-                        agentSearchQuery.trim() &&
-                        filteredAgents.length > 0 && (
-                          <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto">
-                            {filteredAgents.map((agent) => (
-                              <div
-                                key={agent.id}
-                                className="flex items-center gap-2 p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
-                                onClick={() => {
-                                  const agentName =
-                                    agent.name.charAt(0).toUpperCase() +
-                                    agent.name.slice(1);
-                                  setAgentSearchQuery(agentName);
-                                  setSelectedAgentId(agent.id);
-                                  setShowAgentSuggestions(false);
-                                }}
-                              >
-                                <Avatar className="h-6 w-6">
-                                  <AvatarFallback className="text-xs">
-                                    {agent.name
-                                      .toUpperCase()
-                                      .split(" ")
-                                      .filter((n) => n.length > 0)
-                                      .map((n) => n[0])
-                                      .join("")}
-                                  </AvatarFallback>
-                                </Avatar>
-                                <div>
-                                  <span className="font-medium">
-                                    {agent.name.charAt(0).toUpperCase() +
-                                      agent.name.slice(1)}
-                                  </span>
-                                  <span className="text-sm text-muted-foreground ml-2">
-                                    ({agent.agentType})
-                                  </span>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        )}
-
-                      {showAgentSuggestions &&
-                        agentSearchQuery.trim() &&
-                        filteredAgents.length === 0 && (
-                          <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg p-3">
-                            <span className="text-gray-500">No agents found</span>
-                          </div>
-                        )}
-                    </div>
-                    <Button
-                      type="button"
-                      onClick={() => {
-                        if (selectedAgentId) {
-                          handleReassign(selectedAgentId);
-                        }
-                      }}
-                      // disabled={!selectedAgentId || isFromRetainership}
-                      disabled={!selectedAgentId}
-                      className="px-4"
-                    >
-                      Reassign
-                    </Button>
-                  </div>
-                </div>
                 <div className="flex items-center gap-2 text-sm">
                   <CheckCircle className="h-4 w-4 text-gray-500" />
                   <span className="text-gray-600">
@@ -735,6 +649,97 @@ export default function TaskDetails() {
                 </div>
                 <div className="text-xs text-muted-foreground md:ml-auto">
                   Last updated: {formatDateTime(taskData.updatedAt, true)}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="assigned-agent">Assign Task To *</Label>
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <Input
+                      id="assigned-agent"
+                      type="text"
+                      placeholder="Type to search agents..."
+                      value={agentSearchQuery}
+                      onChange={(e) => {
+                        setAgentSearchQuery(e.target.value);
+                        if (e.target.value.trim()) {
+                          setShowAgentSuggestions(true);
+                        } else {
+                          setShowAgentSuggestions(false);
+                        }
+                      }}
+                      onFocus={() => {
+                        if (agentSearchQuery.trim()) {
+                          setShowAgentSuggestions(true);
+                        }
+                      }}
+                      className="w-full"
+                    // disabled={isFromRetainership} // Disable if form is from retainership
+                    />
+
+                    {showAgentSuggestions &&
+                      agentSearchQuery.trim() &&
+                      filteredAgents.length > 0 && (
+                        <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto">
+                          {filteredAgents.map((agent) => (
+                            <div
+                              key={agent.id}
+                              className="flex items-center gap-2 p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
+                              onClick={() => {
+                                const agentName =
+                                  agent.name.charAt(0).toUpperCase() +
+                                  agent.name.slice(1);
+                                setAgentSearchQuery(agentName);
+                                setSelectedAgentId(agent.id);
+                                setShowAgentSuggestions(false);
+                              }}
+                            >
+                              <Avatar className="h-6 w-6">
+                                <AvatarFallback className="text-xs">
+                                  {agent.name
+                                    .toUpperCase()
+                                    .split(" ")
+                                    .filter((n) => n.length > 0)
+                                    .map((n) => n[0])
+                                    .join("")}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div>
+                                <span className="font-medium">
+                                  {agent.name.charAt(0).toUpperCase() +
+                                    agent.name.slice(1)}
+                                </span>
+                                <span className="text-sm text-muted-foreground ml-2">
+                                  ({agent.agentType})
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                    {showAgentSuggestions &&
+                      agentSearchQuery.trim() &&
+                      filteredAgents.length === 0 && (
+                        <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg p-3">
+                          <span className="text-gray-500">No agents found</span>
+                        </div>
+                      )}
+                  </div>
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      if (selectedAgentId) {
+                        handleReassign(selectedAgentId);
+                      }
+                    }}
+                    // disabled={!selectedAgentId || isFromRetainership}
+                    disabled={!selectedAgentId || isReassiging}
+                    className="px-4"
+                  >
+                    {isReassiging ? "Reassigning" : "Reassign"}
+                  </Button>
                 </div>
               </div>
             </div>

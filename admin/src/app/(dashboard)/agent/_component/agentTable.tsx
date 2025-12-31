@@ -96,7 +96,7 @@ export default function AgentsTable() {
   useEffect(() => {
     const fetchAgents = async () => {
       try {
-  const response = await fetchWithAuth("/api/agents");
+        const response = await fetchWithAuth("/api/agents");
         if (response.ok) {
           const data = await response.json();
           setAgents(data);
@@ -240,7 +240,7 @@ export default function AgentsTable() {
                   <div className="h-5 w-full md:w-1/2 bg-gray-200 rounded-xl mb-3"></div>
                   <div className="h-5 w-full md:w-1/2 bg-gray-200 rounded-xl mb-3"></div>
                 </div></>
-            ) : (<>       
+            ) : (<>
               {/* Search */}
               <div className="flex flex-col items-start gap-2 md:gap-4">
                 <div className="w-full">
@@ -355,7 +355,7 @@ export default function AgentsTable() {
                       return (
                         <TableRow
                           key={agent.id}
-                          onClick={() => router.push(`/agent/${agent.id}`)}
+                          onClick={() => router.push(`/agent/${agent.id}?tab=tasks`)}
                           className="cursor-pointer hover:bg-muted/50"
                         >
                           <TableCell>
@@ -467,7 +467,7 @@ export default function AgentsTable() {
                       return (
                         <TableRow
                           key={agent.id}
-                          onClick={() => router.push(`/agent/${agent.id}`)}
+                          onClick={() => router.push(`/agent/${agent.id}?tab=tasks`)}
                           className="cursor-pointer hover:bg-muted/50"
                         >
                           <TableCell>

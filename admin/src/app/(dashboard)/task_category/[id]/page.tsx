@@ -39,7 +39,9 @@ import {
     Clock,
     Tag,
     FileText,
+    Router,
 } from "lucide-react"
+import { useRouter } from "next/navigation"
 
 export interface TaskCategory {
     id: string
@@ -126,6 +128,7 @@ export default function CategoryDetail({ params }: { params: Promise<{ id: strin
         );
     };
     // Unwrap params using React.use() to future-proof the code
+    const router = useRouter()
     const resolvedParams = params instanceof Promise ? use(params) : params
     const [category, setCategory] = useState<TaskCategory | null>(null)
     const [tasks, setTasks] = useState<Task[]>([])
@@ -138,7 +141,7 @@ export default function CategoryDetail({ params }: { params: Promise<{ id: strin
     // We only need the loading state for this view page
     // Other states were needed for approve page but not here
 
-       const handleDelete = useCallback(async () => {
+    const handleDelete = useCallback(async () => {
         if (!taskToDelete) return;
         try {
             const response = await fetch(`/api/tasks/${taskToDelete.id}`, { method: 'DELETE' });
@@ -375,10 +378,14 @@ export default function CategoryDetail({ params }: { params: Promise<{ id: strin
                 <Card>
                     <CardHeader>
                         <div className="flex items-center justify-between">
-                            <CardTitle className="flex items-center gap-2">
-                                <FileText className="h-5 w-5" />
-                                Service Tasks ({tasks.length})
-                            </CardTitle>
+                            <div className="flex justify-between items-center">
+                                <CardTitle className="flex items-center gap-2">
+                                    <FileText className="h-5 w-5" />
+                                    Service Tasks ({tasks.length})
+                                </CardTitle>
+
+                            </div>
+                            <Button onClick={() => router.push(`/task/create?serviceId=${resolvedParams.id}`)}>Add Task</Button>
                             {/* <div className="flex items-center gap-2">
                                 <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
                                 <Select value={sortBy} onValueChange={setSortBy}>
@@ -443,10 +450,10 @@ export default function CategoryDetail({ params }: { params: Promise<{ id: strin
                                                     <TableRow key={task.id}>
                                                         <TableCell className="max-w-[220px] align-middle">
                                                             <div className="space-y-1">
-                                                                <div className="font-medium truncate" style={{maxWidth: '200px'}} title={task.title}>{task.title}</div>
+                                                                <div className="font-medium truncate" style={{ maxWidth: '200px' }} title={task.title}>{task.title}</div>
                                                                 <div
                                                                     className="text-sm text-muted-foreground truncate"
-                                                                    style={{maxWidth: '200px'}}
+                                                                    style={{ maxWidth: '200px' }}
                                                                     title={task.description}
                                                                 >
                                                                     {task.description}

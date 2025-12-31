@@ -79,12 +79,15 @@ export default function TasksTable() {
   const searchParams = useSearchParams();
 
   // Update URL when filters change
-  const updateUrlFilters = (priorities: string[], statuses: string[], followUpDurations: string[], search: string) => {
+  const updateUrlFilters = (priorities: string[], statuses: string[], followUpDurations: string[], search: string, statusCheckDuration: string[]) => {
     const params = new URLSearchParams();
+    const assignedToId = searchParams.get("assignedToId");
+    if (assignedToId) params.set("assignedToId", assignedToId);
     if (search) params.set("search", search);
     if (priorities.length > 0) params.set("priorities", priorities.join(","));
     if (statuses.length > 0) params.set("statuses", statuses.join(","));
     if (followUpDurations.length > 0) params.set("followUpDurations", followUpDurations.join(","));
+    if (statusCheckDuration.length > 0) params.set("statusCheckDuration", statusCheckDuration.join(","));
     const newUrl = params.toString() ? `?${params.toString()}` : window.location.pathname;
     window.history.replaceState({}, "", newUrl);
   };
@@ -97,11 +100,13 @@ export default function TasksTable() {
       const urlStatuses = searchParams?.get("statuses");
       const urlStatus = searchParams?.get("status");
       const urlFollowUpDurations = searchParams?.get("followUpDurations");
+      const urlStatusCheckDurations = searchParams?.get("statusCheckDuration");
       if (urlSearch) setSearchTerm(urlSearch);
       if (urlPriorities) setSelectedPriorities(urlPriorities.split(","));
       if (urlStatuses) setSelectedStatuses(urlStatuses.split(","));
       else if (urlStatus) setSelectedStatuses([urlStatus]);
       if (urlFollowUpDurations) setSelectedFollowUpDurations(urlFollowUpDurations.split(","));
+      if (urlStatusCheckDurations) setSelectedStatusCheckDurations(urlStatusCheckDurations.split(","));
     } catch {
       // ignore
     }
@@ -304,16 +309,16 @@ export default function TasksTable() {
                     <Label htmlFor="search">Search Tasks</Label>
                     <div className="relative my-2">
                       <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          id="search"
-                          placeholder="Search by task name, client, agent, or description..."
-                          value={searchTerm}
-                          onChange={(e) => {
-                            setSearchTerm(e.target.value);
-                            updateUrlFilters(selectedPriorities, selectedStatuses, selectedFollowUpDurations, e.target.value);
-                          }}
-                          className="pl-10"
-                        />
+                      <Input
+                        id="search"
+                        placeholder="Search by task name, client, agent, or description..."
+                        value={searchTerm}
+                        onChange={(e) => {
+                          setSearchTerm(e.target.value);
+                          updateUrlFilters(selectedPriorities, selectedStatuses, selectedFollowUpDurations, e.target.value, selectedStatusCheckDurations);
+                        }}
+                        className="pl-10"
+                      />
                     </div>
                   </div>
                 </div>
@@ -354,7 +359,7 @@ export default function TasksTable() {
                                   ? selectedPriorities.filter((p) => p !== priority)
                                   : [...selectedPriorities, priority];
                                 setSelectedPriorities(newPriorities);
-                                updateUrlFilters(newPriorities, selectedStatuses, selectedFollowUpDurations, searchTerm);
+                                updateUrlFilters(newPriorities, selectedStatuses, selectedFollowUpDurations, searchTerm, selectedStatusCheckDurations);
                               }}
                             >
                               {priority}
@@ -375,6 +380,7 @@ export default function TasksTable() {
                               onClick={() => {
                                 const newPriorities = selectedPriorities.filter((p) => p !== priority);
                                 setSelectedPriorities(newPriorities);
+                                updateUrlFilters(newPriorities, selectedStatuses, selectedFollowUpDurations, searchTerm, selectedStatusCheckDurations);
                               }}
                             >
                               <X className="h-3 w-3" />
@@ -417,7 +423,7 @@ export default function TasksTable() {
                                 ? selectedStatuses.filter((s) => s !== status)
                                 : [...selectedStatuses, status];
                               setSelectedStatuses(newStatuses);
-                              updateUrlFilters(selectedPriorities, newStatuses, selectedFollowUpDurations, searchTerm);
+                              updateUrlFilters(selectedPriorities, newStatuses, selectedFollowUpDurations, searchTerm, selectedStatusCheckDurations);
                             }}
                           >
                             {status}
@@ -436,8 +442,17 @@ export default function TasksTable() {
                               aria-label={`Remove ${status}`}
                               className="ml-1 inline-flex h-4 w-4 items-center justify-center rounded hover:bg-muted/70"
                               onClick={() => {
-                                const newStatuses = selectedStatuses.filter((s) => s !== status);
+                                let newStatuses = selectedStatuses.filter((s) => s !== status);
+
                                 setSelectedStatuses(newStatuses);
+
+                                updateUrlFilters(
+                                  selectedPriorities,
+                                  newStatuses,
+                                  selectedFollowUpDurations,
+                                  searchTerm,
+                                  selectedStatusCheckDurations
+                                );
                               }}
                             >
                               <X className="h-3 w-3" />
@@ -480,7 +495,7 @@ export default function TasksTable() {
                                 ? selectedFollowUpDurations.filter((d) => d !== duration)
                                 : [...selectedFollowUpDurations, duration];
                               setSelectedFollowUpDurations(newDurations);
-                              updateUrlFilters(selectedPriorities, selectedStatuses, newDurations, searchTerm);
+                              updateUrlFilters(selectedPriorities, selectedStatuses, newDurations, searchTerm, selectedStatusCheckDurations);
                             }}
                           >
                             {duration}
@@ -501,6 +516,7 @@ export default function TasksTable() {
                               onClick={() => {
                                 const newDurations = selectedFollowUpDurations.filter((d) => d !== duration);
                                 setSelectedFollowUpDurations(newDurations);
+                                updateUrlFilters(selectedPriorities, selectedStatuses, newDurations, searchTerm, selectedStatusCheckDurations);
                               }}
                             >
                               <X className="h-3 w-3" />
@@ -543,6 +559,7 @@ export default function TasksTable() {
                                 ? selectedStatusCheckDurations.filter((d) => d !== duration)
                                 : [...selectedStatusCheckDurations, duration];
                               setSelectedStatusCheckDurations(newDurations);
+                              updateUrlFilters(selectedPriorities, selectedStatuses, selectedFollowUpDurations, searchTerm, newDurations);
                             }}
                           >
                             {duration}
@@ -563,6 +580,7 @@ export default function TasksTable() {
                               onClick={() => {
                                 const newDurations = selectedStatusCheckDurations.filter((d) => d !== duration);
                                 setSelectedStatusCheckDurations(newDurations);
+                                updateUrlFilters(selectedPriorities, selectedStatuses, selectedFollowUpDurations, searchTerm, newDurations);
                               }}
                             >
                               <X className="h-3 w-3" />
@@ -583,7 +601,7 @@ export default function TasksTable() {
                       setSelectedStatuses([]);
                       setSelectedFollowUpDurations([]);
                       setSelectedStatusCheckDurations([]);
-                       updateUrlFilters([], [], [], "");
+                      updateUrlFilters([], [], [], "", []);
                     }}
                     className="cursor-pointer hover:text-white text-white bg-[#f42b03] hover:bg-[#f42b03] rounded-lg px-4 py-2 shadow-none hover:shadow-lg transition-shadow duration-300"
                     variant="outline"
@@ -689,8 +707,8 @@ export default function TasksTable() {
                       currentTasks.map((task) => {
                         const clientName = task.client
                           ? (task.client.clientType === "individual"
-                              ? `${task.client.firstName} ${task.client.lastName}`
-                              : (task.client.organizationName ?? "N/A"))
+                            ? `${task.client.firstName} ${task.client.lastName}`
+                            : (task.client.organizationName ?? "N/A"))
                           : "N/A";
                         const clientEmail = task.client?.email ?? "";
                         const ownerName = task.assignedTo?.name ?? "";
@@ -699,11 +717,10 @@ export default function TasksTable() {
                           <TableRow
                             key={task.id}
                             onClick={() => router.push(`/task/${task.id}`)}
-                            className={`cursor-pointer hover:bg-muted/50 ${
-                              isOverdue(task.dueDate, task.status) ? "bg-red-50" : 
+                            className={`cursor-pointer hover:bg-muted/50 ${isOverdue(task.dueDate, task.status) ? "bg-red-50" :
                               task.followUpDuration && task.followUpDuration !== 'None' ? "bg-blue-50" :
-                              task.statusCheckDuration && task.statusCheckDuration !== 'None' ? "bg-green-50" : ""
-                            }`}
+                                task.statusCheckDuration && task.statusCheckDuration !== 'None' ? "bg-green-50" : ""
+                              }`}
                           >
                             <TableCell className="overflow-hidden">
                               <div className="space-y-1">
@@ -900,6 +917,6 @@ export default function TasksTable() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+    </div >
   )
 }

@@ -23,6 +23,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarFooter,
+  useSidebar,
 } from "@/components/ui/sidebar";
 
 import {
@@ -88,6 +89,7 @@ const items = [
 
 export function AppSidebar() {
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
+  const { setOpenMobile, isMobile } = useSidebar();
 
   const handleLogout = async () => {
     try {
@@ -125,7 +127,15 @@ export function AppSidebar() {
                 {items.map((item) => (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton asChild>
-                      <Link href={item.url}>
+                      <Link
+                        href={item.url}
+                        onClick={() => {
+                          console.log(isMobile)
+                          if (isMobile) {
+                            console.log("jii")
+                            setOpenMobile(false);
+                          }
+                        }}>
                         <item.icon />
                         <span className="text-[16px]">{item.title}</span>
                       </Link>

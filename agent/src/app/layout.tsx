@@ -29,10 +29,11 @@ export default function RootLayout({
           newestOnTop
           closeOnClick
           rtl={false}
-          pauseOnFocusLoss
           draggable
-          pauseOnHover
           theme="light"
+          pauseOnHover={false}
+          pauseOnFocusLoss={false}
+          limit={3}
         />
       </body>
     </html>

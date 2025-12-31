@@ -4,20 +4,18 @@ import prisma from "@/lib/prisma";
 
 export async function GET(
   req: NextRequest,
-  context: { params: { id: string } }
+  { params }: { params: { id: string } }
 ) {
   try {
-    const { params } = context;
-    const id = params?.id;
+    // const { params } = context;
+    // const id = params?.id;
+    const { id } = await params;
 
     // Get the current admin user
     const currentAdmin = await getCurrentAdmin(req);
-    
+
     if (!currentAdmin) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     if (!id) {
@@ -38,7 +36,7 @@ export async function GET(
             email: true,
             adminType: true,
             photo: true,
-          }
+          },
         },
         createdByAgent: {
           select: {
@@ -46,7 +44,7 @@ export async function GET(
             name: true,
             email: true,
             photo: true,
-          }
+          },
         },
         approvedBy: {
           select: {
@@ -54,7 +52,7 @@ export async function GET(
             username: true,
             email: true,
             photo: true,
-          }
+          },
         },
         rejectedBy: {
           select: {
@@ -62,18 +60,18 @@ export async function GET(
             username: true,
             email: true,
             photo: true,
-          }
+          },
         },
-      }
+      },
     });
-    
+
     if (!category) {
       return NextResponse.json(
         { error: "Category not found" },
         { status: 404 }
       );
     }
-    
+
     // Count tasks associated with this category
     const taskCount = await prisma.task.count({ where: { categoryId: id } });
 
@@ -148,24 +146,26 @@ export async function PUT(
   try {
     // Get the current admin user
     const currentAdmin = await getCurrentAdmin(req);
-    
+
     if (!currentAdmin) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-  const { id } = await params;
-  const body = await req.json();
-  const { name, description, color, timePeriod, notes, processFlow, agentCanEditDays } = body;
+    const { id } = await params;
+    const body = await req.json();
+    const {
+      name,
+      description,
+      color,
+      timePeriod,
+      notes,
+      processFlow,
+      agentCanEditDays,
+    } = body;
 
     // Validate required fields
     if (!name) {
-      return NextResponse.json(
-        { error: "Name is required" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Name is required" }, { status: 400 });
     }
 
     // Check if category exists
@@ -189,7 +189,12 @@ export async function PUT(
         notes: notes || "",
         processFlow: processFlow || "",
         color: color || "blue",
-        timePeriod: typeof timePeriod === 'number' ? timePeriod : (timePeriod ? parseInt(timePeriod, 10) : null),
+        timePeriod:
+          typeof timePeriod === "number"
+            ? timePeriod
+            : timePeriod
+            ? parseInt(timePeriod, 10)
+            : null,
         agentCanEditDays: agentCanEditDays ?? false,
       },
       include: {
@@ -197,23 +202,23 @@ export async function PUT(
           select: {
             id: true,
             username: true,
-          }
+          },
         },
         approvedBy: {
           select: {
             id: true,
             username: true,
-          }
-        }
-      }
+          },
+        },
+      },
     });
 
     return NextResponse.json(updatedCategory);
   } catch (error) {
     console.error("Error updating task category:", error);
-    
+
     // Check for unique constraint violations
-    if (error instanceof Error && 'code' in error && error.code === 'P2002') {
+    if (error instanceof Error && "code" in error && error.code === "P2002") {
       return NextResponse.json(
         { error: "A category with this name already exists" },
         { status: 409 }
@@ -234,12 +239,9 @@ export async function DELETE(
   try {
     // Get the current admin user
     const currentAdmin = await getCurrentAdmin(req);
-    
+
     if (!currentAdmin) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     // Only owner can delete categories
@@ -272,9 +274,9 @@ export async function DELETE(
     return NextResponse.json({ message: "Category deleted successfully" });
   } catch (error) {
     console.error("Error deleting task category:", error);
-    
+
     // Check for foreign key constraint violations
-    if (error instanceof Error && 'code' in error && error.code === 'P2003') {
+    if (error instanceof Error && "code" in error && error.code === "P2003") {
       return NextResponse.json(
         { error: "Cannot delete category because it is being used by tasks" },
         { status: 409 }

@@ -1,24 +1,35 @@
 import { NextRequest, NextResponse } from "next/server";
-import prisma from '@/lib/prisma';
+import prisma from "@/lib/prisma";
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(
+  req: NextRequest,
+  { params }: { params: { id: string } }
+) {
   try {
     const { id } = await params;
     const client = await prisma.client.findUnique({
       where: { id },
     });
+
     if (!client) {
       return NextResponse.json({ error: "Client not found" }, { status: 404 });
     }
     return NextResponse.json(client);
   } catch (error) {
     console.error(`Error fetching client ${params.id}:`, error);
-    return NextResponse.json({ error: "Failed to fetch client" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to fetch client" },
+      { status: 500 }
+    );
   }
 }
 
-export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(
+  req: NextRequest,
+  { params }: { params: { id: string } }
+) {
   try {
+    const { id } = await params;
     const body = await req.json();
     const { email, ...clientData } = body;
 
@@ -27,7 +38,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
       where: { email },
     });
 
-    if (existingClient && existingClient.id !== params.id) {
+    if (existingClient && existingClient.id !== id) {
       return NextResponse.json(
         { error: "Client with this email already exists." },
         { status: 400 }
@@ -36,7 +47,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
 
     // Proceed to update
     const updatedClient = await prisma.client.update({
-      where: { id: params.id },
+      where: { id: id },
       data: {
         ...clientData,
         email, // Include email if it's part of the update
@@ -46,14 +57,21 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     return NextResponse.json(updatedClient);
   } catch (error) {
     console.error(`Error updating client ${params.id}:`, error);
-    return NextResponse.json({ error: "Failed to update client" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to update client" },
+      { status: 500 }
+    );
   }
 }
 
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: { id: string } }
+) {
   try {
     // Unwrap params if it's a Promise (Next.js App Router)
-    const resolvedParams = typeof params.then === 'function' ? await params : params;
+    const resolvedParams =
+      typeof params.then === "function" ? await params : params;
     const id = resolvedParams.id;
     if (!id) {
       return NextResponse.json({ error: "Missing client id" }, { status: 400 });
@@ -64,6 +82,9 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
     return new NextResponse(null, { status: 204 });
   } catch (error) {
     console.error(`Error deleting client:`, error);
-    return NextResponse.json({ error: "Failed to delete client" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to delete client" },
+      { status: 500 }
+    );
   }
 }

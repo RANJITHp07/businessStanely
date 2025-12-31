@@ -63,7 +63,7 @@ export function SectionTable({ label, tasks, agentId }: { label: string; tasks: 
               <div className={`md:hidden flex items-center justify-center px-4 py-4 rounded-lg shadow-sm border border-gray-100 font-semibold ${labelColor} text-2xl tracking-widest`}>
                 {label}
               </div>
-              <div className="rounded-md overflow-hidden hidden md:block bg-white shadow-sm">
+              <div className="rounded-md overflow-hidden p-1 md:p-0 block bg-white shadow-sm">
                 <Table className="w-full table-fixed text-sm [&_th]:py-3 [&_th]:h-12 [&_td]:py-3">
                   <colgroup>
                     <col className="w-[180px]" />

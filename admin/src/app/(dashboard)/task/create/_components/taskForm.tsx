@@ -585,6 +585,7 @@ export default function TaskForm() {
   useEffect(() => {
     const query = new URLSearchParams(window.location.search);
     const legislationId = query.get("legislationId");
+    const serviceId = query.get("serviceId");
     const assignedAgent = query.get("assignedAgent");
     const client = query.get("client");
 
@@ -622,6 +623,17 @@ export default function TaskForm() {
           setLegislationSearchQuery(selectedLegislation.title); // Update the search query to show the selected legislation's name
         }
       }
+    } else if (serviceId) {
+      (async () => {
+        const res = await fetch(`/api/task-categories/${serviceId}`)
+        if (!res.ok) {
+          throw new Error(`Failed to fetch task categories: ${res.status}`);
+        }
+
+        const data = await res.json();
+        setCategorySearchQuery(data.name)
+        setFormData((prev) => ({ ...prev, categoryId: data.id }))
+      })()
     }
   }, [agents, clients, legislationList]);
 
@@ -673,6 +685,206 @@ export default function TaskForm() {
               <CardDescription>Enter the basic task details</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
+              <div className="md:flex items-center gap-2">
+                <div className="space-y-2 relative w-full">
+                  <Label htmlFor="taskCategory">Service *</Label>
+                  <div className="relative">
+                    <Input
+                      id="taskCategory"
+                      type="text"
+                      placeholder="Type to search services..."
+                      value={categorySearchQuery}
+                      onChange={(e) => {
+                        setCategorySearchQuery(e.target.value);
+                        if (e.target.value.trim()) {
+                          setShowCategorySuggestions(true);
+                        } else {
+                          setShowCategorySuggestions(false);
+                        }
+                      }}
+                      onFocus={() => {
+                        if (categorySearchQuery.trim()) {
+                          setShowCategorySuggestions(true);
+                        }
+                      }}
+                      className="w-full"
+                      required
+                    />
+
+                    {/* Category Suggestions Dropdown - Only show when searching */}
+                    {showCategorySuggestions &&
+                      categorySearchQuery.trim() &&
+                      filteredCategories.length > 0 && (
+                        <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto">
+                          {filteredCategories.map((category) => (
+                            <div
+                              key={category.id}
+                              className="flex items-center justify-between p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
+                              onClick={() => handleCategorySelection(category)}
+                            >
+                              <div className="flex items-center gap-2">
+                                <div>
+                                  <span className="font-medium">{category.name}</span>
+                                  {category.description && (
+                                    <div className="text-xs text-gray-500 mt-1">
+                                      {category.description}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                              <Badge
+                                className={`text-xs ${category.status === "approved"
+                                  ? "bg-green-100 text-green-800"
+                                  : "bg-yellow-100 text-yellow-800"
+                                  }`}
+                              >
+                                {category.status}
+                              </Badge>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                    {/* No results message - Only when searching */}
+                    {showCategorySuggestions &&
+                      categorySearchQuery &&
+                      filteredCategories.length === 0 && (
+                        <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg p-3">
+                          <span className="text-gray-500">No categories found</span>
+                        </div>
+                      )}
+                  </div>
+                </div>
+                <div>
+                  <div className="w-full mt-5">
+                    {/* Top-right Add Button */}
+                    <div className="flex justify-end ">
+                      <Dialog
+                        open={isCategoryModalOpen}
+                        onOpenChange={setIsCategoryModalOpen}
+                      >
+                        <DialogTrigger asChild>
+                          <Button
+                            type="button"
+                            onClick={handleAddCategoryClick}
+                            className="h-10"
+                          >
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add Service
+                          </Button>
+                        </DialogTrigger>
+
+                        <DialogContent className="sm:max-w-[400px] w-full">
+                          <DialogHeader>
+                            <DialogTitle>Add New Category</DialogTitle>
+                            <DialogDescription>
+                              Create a new service for better organization
+                            </DialogDescription>
+                          </DialogHeader>
+
+                          {/* Form Fields */}
+                          <div className="space-y-4 py-4">
+                            <div className="space-y-2">
+                              <Label htmlFor="category-name">Service Name *</Label>
+                              <Input
+                                id="category-name"
+                                placeholder="Enter category name (e.g., Legal Research, Contract Review)"
+                                className="w-full"
+                                value={newCategoryData.name}
+                                onChange={(e) =>
+                                  handleNewCategoryInputChange("name", e.target.value)
+                                }
+                                required
+                              />
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label htmlFor="category-description">Description</Label>
+                              <Textarea
+                                id="category-description"
+                                placeholder="Brief description of this category (optional)"
+                                className="w-full"
+                                value={newCategoryData.description}
+                                onChange={(e) =>
+                                  handleNewCategoryInputChange("description", e.target.value)
+                                }
+                                rows={4}
+                              />
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label htmlFor="category-timePeriod">Time Period (in days)</Label>
+                              <Input
+                                id="category-timePeriod"
+                                type="number"
+                                placeholder="Enter time period in days"
+                                className="w-full"
+                                value={newCategoryData.timePeriod || ""}
+                                onChange={(e) =>
+                                  handleNewCategoryInputChange("timePeriod", e.target.value)
+                                }
+                              />
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="category-notes">Notes</Label>
+                            <Textarea
+                              id="category-notes"
+                              placeholder="Enter notes (optional)"
+                              className="w-full"
+                              value={newCategoryData.notes}
+                              onChange={(e) =>
+                                handleNewCategoryInputChange("notes", e.target.value)
+                              }
+                              rows={2}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="category-processFlow">Process Flow</Label>
+                            <Textarea
+                              id="category-processFlow"
+                              placeholder="Enter process flow (optional)"
+                              className="w-full"
+                              value={newCategoryData.processFlow}
+                              onChange={(e) =>
+                                handleNewCategoryInputChange("processFlow", e.target.value)
+                              }
+                              rows={2}
+                            />
+                          </div>
+
+                          {/* Modal Actions */}
+                          <div className="flex justify-end gap-3 pt-4 border-t">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={() => setIsCategoryModalOpen(false)}
+                              disabled={isCreatingCategory}
+                            >
+                              Cancel
+                            </Button>
+
+                            <Button
+                              type="button"
+                              onClick={handleCreateCategory}
+                              disabled={!newCategoryData.name.trim() || isCreatingCategory}
+                            >
+                              {isCreatingCategory ? (
+                                <>
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  Creating...
+                                </>
+                              ) : (
+                                "Create Service"
+                              )}
+                            </Button>
+                          </div>
+                        </DialogContent>
+                      </Dialog>
+                    </div>
+                  </div>
+                </div>
+              </div>
               <div className="space-y-2">
                 <Label htmlFor="task-name">Task Name *</Label>
                 <Input
@@ -684,205 +896,6 @@ export default function TaskForm() {
                 />
               </div>
 
-              <div>
-                <div className="w-full">
-                  {/* Top-right Add Button */}
-                  <div className="flex justify-end mb-4">
-                    <Dialog
-                      open={isCategoryModalOpen}
-                      onOpenChange={setIsCategoryModalOpen}
-                    >
-                      <DialogTrigger asChild>
-                        <Button
-                          type="button"
-                          onClick={handleAddCategoryClick}
-                          className="h-10"
-                        >
-                          <Plus className="h-4 w-4 mr-2" />
-                          Add Service
-                        </Button>
-                      </DialogTrigger>
-
-                      <DialogContent className="sm:max-w-[400px] w-full">
-                        <DialogHeader>
-                          <DialogTitle>Add New Category</DialogTitle>
-                          <DialogDescription>
-                            Create a new service for better organization
-                          </DialogDescription>
-                        </DialogHeader>
-
-                        {/* Form Fields */}
-                        <div className="space-y-4 py-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="category-name">Service Name *</Label>
-                            <Input
-                              id="category-name"
-                              placeholder="Enter category name (e.g., Legal Research, Contract Review)"
-                              className="w-full"
-                              value={newCategoryData.name}
-                              onChange={(e) =>
-                                handleNewCategoryInputChange("name", e.target.value)
-                              }
-                              required
-                            />
-                          </div>
-
-                          <div className="space-y-2">
-                            <Label htmlFor="category-description">Description</Label>
-                            <Textarea
-                              id="category-description"
-                              placeholder="Brief description of this category (optional)"
-                              className="w-full"
-                              value={newCategoryData.description}
-                              onChange={(e) =>
-                                handleNewCategoryInputChange("description", e.target.value)
-                              }
-                              rows={4}
-                            />
-                          </div>
-
-                          <div className="space-y-2">
-                            <Label htmlFor="category-timePeriod">Time Period (in days)</Label>
-                            <Input
-                              id="category-timePeriod"
-                              type="number"
-                              placeholder="Enter time period in days"
-                              className="w-full"
-                              value={newCategoryData.timePeriod || ""}
-                              onChange={(e) =>
-                                handleNewCategoryInputChange("timePeriod", e.target.value)
-                              }
-                            />
-                          </div>
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="category-notes">Notes</Label>
-                          <Textarea
-                            id="category-notes"
-                            placeholder="Enter notes (optional)"
-                            className="w-full"
-                            value={newCategoryData.notes}
-                            onChange={(e) =>
-                              handleNewCategoryInputChange("notes", e.target.value)
-                            }
-                            rows={2}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="category-processFlow">Process Flow</Label>
-                          <Textarea
-                            id="category-processFlow"
-                            placeholder="Enter process flow (optional)"
-                            className="w-full"
-                            value={newCategoryData.processFlow}
-                            onChange={(e) =>
-                              handleNewCategoryInputChange("processFlow", e.target.value)
-                            }
-                            rows={2}
-                          />
-                        </div>
-
-                        {/* Modal Actions */}
-                        <div className="flex justify-end gap-3 pt-4 border-t">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => setIsCategoryModalOpen(false)}
-                            disabled={isCreatingCategory}
-                          >
-                            Cancel
-                          </Button>
-
-                          <Button
-                            type="button"
-                            onClick={handleCreateCategory}
-                            disabled={!newCategoryData.name.trim() || isCreatingCategory}
-                          >
-                            {isCreatingCategory ? (
-                              <>
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                Creating...
-                              </>
-                            ) : (
-                              "Create Service"
-                            )}
-                          </Button>
-                        </div>
-                      </DialogContent>
-                    </Dialog>
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-2 relative">
-                <Label htmlFor="taskCategory">Service *</Label>
-                <div className="relative">
-                  <Input
-                    id="taskCategory"
-                    type="text"
-                    placeholder="Type to search services..."
-                    value={categorySearchQuery}
-                    onChange={(e) => {
-                      setCategorySearchQuery(e.target.value);
-                      if (e.target.value.trim()) {
-                        setShowCategorySuggestions(true);
-                      } else {
-                        setShowCategorySuggestions(false);
-                      }
-                    }}
-                    onFocus={() => {
-                      if (categorySearchQuery.trim()) {
-                        setShowCategorySuggestions(true);
-                      }
-                    }}
-                    className="w-full"
-                    required
-                  />
-
-                  {/* Category Suggestions Dropdown - Only show when searching */}
-                  {showCategorySuggestions &&
-                    categorySearchQuery.trim() &&
-                    filteredCategories.length > 0 && (
-                      <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto">
-                        {filteredCategories.map((category) => (
-                          <div
-                            key={category.id}
-                            className="flex items-center justify-between p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
-                            onClick={() => handleCategorySelection(category)}
-                          >
-                            <div className="flex items-center gap-2">
-                              <div>
-                                <span className="font-medium">{category.name}</span>
-                                {category.description && (
-                                  <div className="text-xs text-gray-500 mt-1">
-                                    {category.description}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                            <Badge
-                              className={`text-xs ${category.status === "approved"
-                                ? "bg-green-100 text-green-800"
-                                : "bg-yellow-100 text-yellow-800"
-                                }`}
-                            >
-                              {category.status}
-                            </Badge>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-
-                  {/* No results message - Only when searching */}
-                  {showCategorySuggestions &&
-                    categorySearchQuery &&
-                    filteredCategories.length === 0 && (
-                      <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg p-3">
-                        <span className="text-gray-500">No categories found</span>
-                      </div>
-                    )}
-                </div>
-              </div>
 
               <div className="space-y-2">
                 <Label htmlFor="description">Task Description *</Label>
@@ -1733,6 +1746,6 @@ export default function TaskForm() {
           </div>
         </fieldset>
       </form>
-    </div>
+    </div >
   );
 }

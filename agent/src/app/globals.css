@@ -153,3 +153,21 @@
     --chart-5: oklch(0.645 0.246 16.439);
   }
 }
+
+.Toastify__toast-container {
+  z-index: 9999 !important;
+}
+
+body {
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.Toastify__toast-container--top-right {
+  top: 1rem;
+  right: 1rem;
+}
+
+.Toastify__toast {
+  animation-duration: 0.3s;
+}

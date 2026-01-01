@@ -34,6 +34,8 @@ export default function RootLayout({
           pauseOnHover={false}
           pauseOnFocusLoss={false}
           limit={3}
+          containerId="main-toast-container"
+          stacked={false}
         />
       </body>
     </html>

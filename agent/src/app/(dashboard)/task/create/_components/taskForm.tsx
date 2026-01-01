@@ -704,9 +704,9 @@ export default function TaskForm({ id }: TaskFormProps) {
       maxDate.setDate(maxDate.getDate() + interval * 7);
     }
 
-    if (type === "month") {
-      maxDate.setMonth(maxDate.getMonth() + interval);
-    }
+    // if (type === "month") {
+    //   maxDate.setMonth(maxDate.getMonth() + interval);
+    // }
 
     return format(maxDate, "yyyy-MM-dd");
   };
@@ -1586,7 +1586,7 @@ export default function TaskForm({ id }: TaskFormProps) {
                         type="date"
                         value={formData.triggerDate || format(new Date(), "yyyy-MM-dd")}
                         min={format(new Date(), "yyyy-MM-dd")}
-                        max={getMaxTriggerDate()}
+                        // max={getMaxTriggerDate()}
                         onChange={(e) => {
                           const newTriggerDate = e.target.value;
                           handleInputChange("triggerDate", newTriggerDate);

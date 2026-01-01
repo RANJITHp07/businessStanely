@@ -17,22 +17,43 @@ export async function updateRecurringTaskSchedule(taskId: string) {
     return null; // Not a recurring task or no due date
   }
 
+  let recurringType: 'day' | 'week' | 'month' = 'month';
+  let recurringValue: number = typeof task.recurring === 'number' ? task.recurring : 1;
+  if (typeof task.recurring === 'string' && (task.recurring as string).includes('-')) {
+    const [type, value] = (task.recurring as string).split('-');
+    recurringType = type as 'day' | 'week' | 'month';
+    recurringValue = parseInt(value, 10);
+  }
+
   const now = new Date();
   const taskDueDate = new Date(task.dueDate);
-  
+
   // Check if the current period has passed
   if (now > taskDueDate) {
     // Calculate how many periods have passed
-    const monthsDiff = (now.getFullYear() - taskDueDate.getFullYear()) * 12 + 
-                      (now.getMonth() - taskDueDate.getMonth());
-    
-    const periodsPassed = Math.floor(monthsDiff / task.recurring);
-    
+    let periodsPassed = 0;
+    if (recurringType === 'day') {
+      const daysDiff = Math.floor((now.getTime() - taskDueDate.getTime()) / (1000 * 60 * 60 * 24));
+      periodsPassed = Math.floor(daysDiff / recurringValue);
+    } else if (recurringType === 'week') {
+      const weeksDiff = Math.floor((now.getTime() - taskDueDate.getTime()) / (1000 * 60 * 60 * 24 * 7));
+      periodsPassed = Math.floor(weeksDiff / recurringValue);
+    } else if (recurringType === 'month') {
+      const monthsDiff = (now.getFullYear() - taskDueDate.getFullYear()) * 12 + (now.getMonth() - taskDueDate.getMonth());
+      periodsPassed = Math.floor(monthsDiff / recurringValue);
+    }
+
     if (periodsPassed > 0) {
       // Calculate new due date by adding the required periods
       const newDueDate = new Date(taskDueDate);
-      newDueDate.setMonth(newDueDate.getMonth() + (periodsPassed + 1) * task.recurring);
-      
+      if (recurringType === 'day') {
+        newDueDate.setDate(newDueDate.getDate() + (periodsPassed + 1) * recurringValue);
+      } else if (recurringType === 'week') {
+        newDueDate.setDate(newDueDate.getDate() + (periodsPassed + 1) * recurringValue * 7);
+      } else if (recurringType === 'month') {
+        newDueDate.setMonth(newDueDate.getMonth() + (periodsPassed + 1) * recurringValue);
+      }
+
       // Update task with new due date and reset status
       const updatedTask = await prisma.task.update({
         where: { id: taskId },

@@ -70,7 +70,7 @@ export interface Task {
   followUpDuration?: string; // e.g., '24hr', '48hr', '1w', 'None'
   statusCheckDuration?: string; // e.g., '24hr', '48hr', '1w', 'None'
   completed?: boolean;
-  recurring?: number | null; // Recurring in months (1-12), null means not recurring
+  recurring?: number | string | null; // Recurring in months (1-12), or string for new format
   createdAt: string;
   updatedAt: string;
   client?: Client;
@@ -93,7 +93,8 @@ export interface Task {
     createdAt: string;
     updatedAt: string;
     triggerDate?: Date | null;
-  }; // Added legislation object to include detailed information
+  };
+  triggerDate?: string; // <-- Add this line for direct access
 }
 
 export interface TaskCategory {

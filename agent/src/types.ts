@@ -1,3 +1,18 @@
+export interface Prospect {
+  id: string;
+  name: string;
+  phoneNumber: string;
+  address?: string;
+  email: string;
+  leadSource?: string;
+  description?: string;
+  notes?: string;
+  status: string; // e.g. 'prospect', 'opportunity', etc.
+  assignedTo?: string;
+  reminderDate?: string;
+  createdAt: string;
+  updatedAt: string;
+}
 export interface TaskCategory {
   id: string;
   name: string;

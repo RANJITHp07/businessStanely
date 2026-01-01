@@ -126,7 +126,16 @@ export default function TaskForm() {
   // Added legislation-related state variables
   const [legislationSearchQuery, setLegislationSearchQuery] = useState("");
   const [showLegislationSuggestions, setShowLegislationSuggestions] = useState(false);
-  const [legislationList, setLegislationList] = useState<any[]>([]);
+  interface Legislation {
+    id: string;
+    title: string;
+    description?: string;
+    status: string;
+    createdAt: string;
+    updatedAt: string;
+    triggerDate?: Date | null;
+  }
+  const [legislationList, setLegislationList] = useState<Legislation[]>([]);
   const [isLegislationModalOpen, setIsLegislationModalOpen] = useState(false);
   const [isCreatingLegislation, setIsCreatingLegislation] = useState(false);
   const [newLegislationData, setNewLegislationData] = useState({
@@ -309,24 +318,7 @@ export default function TaskForm() {
     }
   }, [id]);
 
-  const getMaxTriggerDate = () => {
-    if (!formData.recurring || formData.recurring === "0") return undefined;
-
-    const [type, value] = formData.recurring.split("-");
-    const interval = parseInt(value, 10);
-
-    const maxDate = new Date();
-
-    if (type === "week") {
-      maxDate.setDate(maxDate.getDate() + interval * 7);
-    }
-
-    if (type === "month") {
-      maxDate.setMonth(maxDate.getMonth() + interval);
-    }
-
-    return format(maxDate, "yyyy-MM-dd");
-  };
+  // Removed unused getMaxTriggerDate function
 
   // Auto-fill contact number and email when client is selected
   useEffect(() => {
@@ -1460,7 +1452,7 @@ export default function TaskForm() {
               {/* Recurring Field */}
               <div className="flex gap-3 ">
                 <div className="space-y-2 w-1/2">
-                  <Label htmlFor="recurring">Recurring (Monthly)</Label>
+                  <Label htmlFor="recurring">Recurring</Label>
                   <Select
                     value={formData.recurring}
                     onValueChange={handleRecurringChange}
@@ -1470,32 +1462,40 @@ export default function TaskForm() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="0">No Recurring</SelectItem>
+                      <SelectItem value="day-1">Every 1 day</SelectItem>
+                      <SelectItem value="day-2">Every 2 days</SelectItem>
+                      <SelectItem value="day-3">Every 3 days</SelectItem>
                       <SelectItem value="week-1">Every 1 week</SelectItem>
                       <SelectItem value="week-2">Every 2 weeks</SelectItem>
                       <SelectItem value="week-3">Every 3 weeks</SelectItem>
                       {Array.from({ length: 12 }, (_, i) => i + 1).map((month) => (
-                        <SelectItem key={month} value={month.toString()}>
+                        <SelectItem key={month} value={`month-${month}`}>
                           Every {month} {month === 1 ? "month" : "months"}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                   <p className="text-xs text-muted-foreground">
-                    Set how often this task should repeat (1-12 months, optional)
+                    Set how often this task should repeat (daily, weekly, monthly, optional)
                     {formData.recurring !== "0" && dueDate && (
                       <span className="block mt-1 text-blue-600">
                         {(() => {
+                          const [type, value] = formData.recurring.split("-");
+                          const interval = parseInt(value, 10);
                           const nextDueDate = new Date(dueDate);
-                          nextDueDate.setMonth(nextDueDate.getMonth() + parseInt(formData.recurring));
-
+                          if (type === "day") {
+                            nextDueDate.setDate(nextDueDate.getDate() + interval);
+                          } else if (type === "week") {
+                            nextDueDate.setDate(nextDueDate.getDate() + interval * 7);
+                          } else if (type === "month") {
+                            nextDueDate.setMonth(nextDueDate.getMonth() + interval);
+                          }
                           // Get selected category to find time period
                           const selectedCategory = categories.find(cat => cat.id === formData.categoryId);
                           const timePeriod = selectedCategory?.timePeriod || 7; // Default to 7 days if no category time period
-
                           // Always calculate and show start date (due date - time period)
                           const startDate = new Date(nextDueDate);
                           startDate.setDate(startDate.getDate() - timePeriod);
-
                           return `Next task period: ${startDate.toLocaleDateString('en-GB')} to ${nextDueDate.toLocaleDateString('en-GB')}`;
                         })()}
                       </span>
@@ -1512,12 +1512,10 @@ export default function TaskForm() {
                         type="date"
                         value={formData.triggerDate || format(new Date(), "yyyy-MM-dd")}
                         min={format(new Date(), "yyyy-MM-dd")}
-                        max={getMaxTriggerDate()}
                         onChange={(e) => {
                           const newTriggerDate = e.target.value;
                           handleInputChange("triggerDate", newTriggerDate);
-
-                          // Ensure Completion Date is not earlier than Trigger Date
+                          // Allow trigger date after due date, but optionally update due date if needed
                           if (dueDate && new Date(newTriggerDate) > new Date(dueDate)) {
                             setDueDate(new Date(newTriggerDate));
                           }

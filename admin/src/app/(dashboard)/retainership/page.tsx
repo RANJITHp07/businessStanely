@@ -409,7 +409,7 @@ export default function RetainershipTable() {
                                         .join("")}
                                     </AvatarFallback>
                                   </Avatar>
-                                  <div className="max-w-xs">
+                                  <div className="w-60">
                                     <div className="font-medium truncate">
                                       {retainership.name
                                         .charAt(0)
@@ -720,8 +720,8 @@ export default function RetainershipTable() {
                                         .join("")}
                                     </AvatarFallback>
                                   </Avatar>
-                                  <div>
-                                    <div className="font-medium">
+                                  <div className="w-60">
+                                    <div className="font-medium truncate">
                                       {retainership.name
                                         .charAt(0)
                                         .toUpperCase() +

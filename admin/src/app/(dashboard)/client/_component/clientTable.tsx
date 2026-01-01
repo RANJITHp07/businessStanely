@@ -423,7 +423,7 @@ export default function ClientsTable() {
                                         currentClients.map((client) => (
                                             <TableRow className="cursor-pointer hover:bg-muted/50" key={client.id} onClick={() => handleRowClick(client)}>
                                                 <TableCell>
-                                                    <div className="flex items-center space-x-3">
+                                                    <div className="flex items-center space-x-3 ">
                                                         <Avatar className="h-10 w-10 flex-shrink-0">
                                                             <AvatarFallback>
                                                                 {client.clientType === "individual"
@@ -436,7 +436,7 @@ export default function ClientsTable() {
                                                                         .slice(0, 2)}
                                                             </AvatarFallback>
                                                         </Avatar>
-                                                        <div className="min-w-0">
+                                                        <div className="w-60">
                                                             <div className="font-medium text-sm truncate">{getClientDisplayName(client)}</div>
                                                             <div className="text-xs text-muted-foreground truncate">
                                                                 {client.clientType === "organization" && client.authorizedPersonName && (

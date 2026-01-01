@@ -5,7 +5,6 @@ import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import '@/lib/cronInit'; // Initialize cron scheduler
 
-
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
@@ -20,7 +19,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${inter.className} h-screen flex overflow-hidden`}>
+      <body className={`${inter.className} h-screen flex`}>
         {children}
         <ToastContainer
           position="top-right"
@@ -34,6 +33,8 @@ export default function RootLayout({
           pauseOnHover={false}
           pauseOnFocusLoss={false}
           limit={3}
+          containerId="main-toast-container"
+          stacked={false}
         />
       </body>
     </html>

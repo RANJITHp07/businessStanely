@@ -427,8 +427,8 @@ export default function RetainershipDetail({ params }: { params: Promise<{ id: s
                                         </TableRow>
                                     ) : (
                                         retainership?.legislation?.map((legislation) => (
-                                            <TableRow className="cursor-pointer" key={legislation.id} onClick={() => router.push(`/legislation/${legislation.id}`)}>
-                                                <TableCell>
+                                            <TableRow className="cursor-pointer" key={legislation.id} >
+                                                <TableCell onClick={() => router.push(`/legislation/${legislation.id}`)}>
                                                     <div title={legislation.title || ""}>
                                                         {
                                                             legislation.title
@@ -439,10 +439,11 @@ export default function RetainershipDetail({ params }: { params: Promise<{ id: s
                                                         }
                                                     </div>
                                                 </TableCell>
-                                                <TableCell title={legislation.description || ""}>
+                                                <TableCell title={legislation.description || ""} onClick={() => router.push(`/legislation/${legislation.id}`)}>
                                                     {legislation.description?.slice(0, 60)}
                                                     {(legislation.description?.length ?? 0) > 60 && '...'}
-                                                </TableCell>                                                <TableCell>
+                                                </TableCell>
+                                                <TableCell onClick={() => router.push(`/legislation/${legislation.id}`)}>
                                                     {typeof legislation.assignedAgent === "string"
                                                         ? legislation.assignedAgent
                                                         : legislation.assignedAgent?.name || "Unknown"}

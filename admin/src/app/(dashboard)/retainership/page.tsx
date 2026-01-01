@@ -464,7 +464,7 @@ export default function RetainershipTable() {
                                 </div>
                               </TableCell>
                               <TableCell>
-                                <div className="text-sm max-w-xs truncate">
+                                <div className="text-sm w-60 truncate">
                                   {(() => {
                                     const organizationName = retainership.client?.organizationName;
                                     const fullName = organizationName ||

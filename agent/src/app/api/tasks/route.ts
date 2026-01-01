@@ -45,9 +45,19 @@ export async function GET(req: NextRequest) {
     } else if (retainershipTasks === "true") {
       where = {
         assignedToId: agent.id,
-        legislationId: {
-          not: null,
-        },
+        OR: [
+          {
+            retainershipId: {
+              not: null,
+            },
+          },
+          {
+            legislationId: {
+              not: null,
+            },
+          },
+        ],
+
         AND: [
           {
             OR: [{ category: null }, { category: { status: "approved" } }],
@@ -77,6 +87,7 @@ export async function GET(req: NextRequest) {
     const tasks = await prisma.task.findMany({
       where,
       include: {
+        legislation: true,
         client: {
           select: {
             id: true,
@@ -137,6 +148,7 @@ export async function GET(req: NextRequest) {
       recentComments: task.comments,
       followUpDuration: task.followUpDuration,
       statusCheckDuration: task.statusCheckDuration,
+      legislation: task?.legislation,
     }));
 
     return NextResponse.json({

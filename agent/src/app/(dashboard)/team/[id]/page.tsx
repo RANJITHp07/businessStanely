@@ -79,6 +79,7 @@ function statusKey(s?: string) {
   if (["todo", "pending"].includes(k)) return "todo";
   if (["inprogress", "progress"].includes(k)) return "inprogress";
   if (["completed"].includes(k)) return "completed";
+  if (["hold"].includes(k)) return "hold";
   return k || "todo";
 }
 
@@ -86,6 +87,7 @@ function sectionLabelToStatus(label: string) {
   const l = label.toLowerCase();
   if (l.includes("progress")) return "In Progress";
   if (l.includes("completed")) return "Completed";
+  if (l.includes("hold")) return "Hold";
   return "To Do";
 }
 
@@ -100,6 +102,7 @@ function SectionTable({ label, tasks, agentId }: SectionTableProps) {
     const l = label.toLowerCase();
     if (l.includes("progress")) return "text-sky-600";
     if (l.includes("completed")) return "text-green-600";
+    if (l.includes("hold")) return "text-gray-600";
     return "text-blue-600";
   })();
 
@@ -179,6 +182,7 @@ function SectionTable({ label, tasks, agentId }: SectionTableProps) {
                           const k = statusKey(t.status);
                           if (k === "completed") return "Completed";
                           if (k === "inprogress") return "In Progress";
+                          if (k === "hold") return "Hold";
                           return "To Do";
                         })();
 
@@ -990,6 +994,11 @@ export default function AgentDetails() {
               <SectionTable
                 label="Completed"
                 tasks={agentTasks.filter((t) => ["completed"].includes(statusKey(t.status))).slice(0, 3)}
+                agentId={id}
+              />
+              <SectionTable
+                label="Hold"
+                tasks={agentTasks.filter((t) => ["hold"].includes(statusKey(t.status))).slice(0, 3)}
                 agentId={id}
               />
             </div>

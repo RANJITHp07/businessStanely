@@ -248,7 +248,7 @@ export default function TaskDetails() {
             if (errorData && errorData.error) {
               errorMsg = errorData.error;
             }
-          } catch {}
+          } catch { }
           setError(errorMsg);
           return;
         }
@@ -963,6 +963,7 @@ export default function TaskDetails() {
                             In Progress
                           </SelectItem>
                           <SelectItem value="Hold">Hold</SelectItem>
+                          <SelectItem value="Abandoned">Abandoned</SelectItem>
                           <SelectItem value="Completed">Completed</SelectItem>
                         </SelectContent>
                       </Select>
@@ -1097,8 +1098,8 @@ export default function TaskDetails() {
                         Recurring
                       </Label>
                       <p className="font-medium">
-                        {task.recurring 
-                          ? `Every ${task.recurring} ${task.recurring === 1 ? "month" : "months"}` 
+                        {task.recurring
+                          ? `Every ${task.recurring} ${task.recurring === 1 ? "month" : "months"}`
                           : "Not recurring"}
                       </p>
                     </div>
@@ -1189,7 +1190,7 @@ export default function TaskDetails() {
                         <p className="text-sm text-muted-foreground">{service.description || "No description available"}</p>
                       </div>
                     ))
-                   ) : (
+                  ) : (
                     <p className="text-sm text-muted-foreground">No associated services available.</p>
                   )}
                 </CardContent>

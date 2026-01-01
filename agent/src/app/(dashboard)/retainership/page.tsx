@@ -58,6 +58,7 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { useRouter } from "next/navigation"
+import { SectionTable, statusKey } from "../my-task/page"
 
 
 // Updated the `DashboardRetainership` interface to include client details
@@ -168,53 +169,48 @@ export default function RetainershipTable() {
     // Fetch retainerships and clients assigned to the agent
     useEffect(() => {
         const fetchMyRetainerships = async () => {
-            if (activeTab === 'my-retainerships') {
-                try {
-                    setLoading(true);
-                    const response = await fetchWithAuth(`/api/tasks?retainershipTasks=true`);
 
-                    if (!response.ok) {
-                        throw new Error('Failed to fetch my retainerships');
-                    }
+            try {
+                setLoading(true);
+                const response = await fetchWithAuth(`/api/tasks?retainershipTasks=true`);
 
-                    const data = await response.json();
-                    setMyRetainerships(data.tasks || []);
-                } catch (error) {
-                    console.error("Error fetching my retainerships:", error);
-                    setMyRetainerships([]);
-                } finally {
-                    setLoading(false);
+                if (!response.ok) {
+                    throw new Error('Failed to fetch my retainerships');
                 }
+
+                const data = await response.json();
+                setMyRetainerships(data.tasks || []);
+            } catch (error) {
+                console.error("Error fetching my retainerships:", error);
+                setMyRetainerships([]);
+            } finally {
+                setLoading(false);
             }
         };
 
         const fetchMyClients = async () => {
-            if (activeTab === 'my-clients') {
-                try {
-                    setLoading(true);
-                    const response = await fetchWithAuth(`/api/clients?assignedTo=me`);
+            try {
+                setLoading(true);
+                const response = await fetchWithAuth(`/api/clients?assignedToId=me`);
 
-                    if (!response.ok) {
-                        throw new Error('Failed to fetch my clients');
-                    }
-
-                    const data = await response.json();
-                    setMyClients(data || []);
-                } catch (error) {
-                    console.error("Error fetching my clients:", error);
-                    setMyClients([]);
-                } finally {
-                    setLoading(false);
+                if (!response.ok) {
+                    throw new Error('Failed to fetch my clients');
                 }
+
+                const data = await response.json();
+                setMyClients(data || []);
+            } catch (error) {
+                console.error("Error fetching my clients:", error);
+                setMyClients([]);
+            } finally {
+                setLoading(false);
             }
         };
 
-        if (activeTab === 'my-retainerships') {
-            fetchMyRetainerships();
-        } else if (activeTab === 'my-clients') {
-            fetchMyClients();
-        }
-    }, [activeTab]);
+        fetchMyRetainerships();
+        fetchMyClients();
+
+    }, []);
 
     // Updated filtering logic to normalize status field for case-insensitive comparison
     const filteredRetainerships = (retainerships || []).filter((retainership) => {
@@ -347,6 +343,7 @@ export default function RetainershipTable() {
         return client.clientType === "individual" ? `${client.firstName} ${client.lastName}` : client.organizationName
     }
 
+    console.log(myRetainerships)
 
     const getPriorityBadge = (priority: string) => {
         const colors = {
@@ -465,11 +462,11 @@ export default function RetainershipTable() {
                     </TabsTrigger>
                     <TabsTrigger value="my-retainerships" className="flex items-center gap-2">
                         <CheckCircle className="h-4 w-4" />
-                        My Retainerships ({myRetainerships.length})
+                        My Task Retainer ({myRetainerships.length})
                     </TabsTrigger>
                     <TabsTrigger value="my-clients" className="flex items-center gap-2">
                         <CheckCircle className="h-4 w-4" />
-                        My Clients ({myClients.length})
+                        My Clients - Retainership ({myClients.length})
                     </TabsTrigger>
                 </TabsList>
 
@@ -909,127 +906,40 @@ export default function RetainershipTable() {
                 </TabsContent>
 
                 <TabsContent value="my-retainerships">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>My Task - Retainer</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            {loading ? (
-                                <div className="flex justify-center items-center py-8">
-                                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                                </div>
-                            ) : myRetainerships.length === 0 ? (
-                                <p className="text-center text-muted-foreground">No retainership task assigned to you.</p>
-                            ) : (
-                                <div className="rounded-md border">
-                                    <Table>
-                                        <TableHeader>
-                                            <TableRow>
-                                                <TableHead>Task</TableHead>
-                                                <TableHead>Client</TableHead>
-                                                <TableHead>Assigned To</TableHead>
-                                                <TableHead>Priority</TableHead>
-                                                <TableHead>Due Date</TableHead>
-                                                <TableHead>Progress</TableHead>
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                            {myRetainerships.map((task: any) => (
-                                                <TableRow key={task.id}>
-                                                    <TableCell className="max-w-36 truncate overflow-hidden whitespace-nowrap">
-                                                        <div className="space-y-1">
-                                                            <div className="font-medium">
-                                                                {task.title}
-                                                            </div>
-                                                            {/* Show approved category only */}
-                                                            {task.category &&
-                                                                task.category.status === "approved" && (
-                                                                    <div className="text-xs mt-1">
-                                                                        <span className="inline-block px-2 py-1 rounded bg-blue-100 text-blue-800 border border-blue-200">
-                                                                            {task.category.name}
-                                                                        </span>
-                                                                    </div>
-                                                                )}
-                                                        </div>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <div className="space-y-1">
-                                                            <div className="font-medium">
-                                                                {task.client
-                                                                    ? task.client.name || "N/A"
-                                                                    : "N/A"}
-                                                            </div>
-                                                            <div className="text-sm text-muted-foreground">
-                                                                {task.client?.email}
-                                                            </div>
-                                                        </div>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <div className="flex items-center space-x-2">
-                                                            <Avatar className="h-8 w-8">
-                                                                <AvatarFallback className="text-xs">
-                                                                    {task.assignedTo?.name
-                                                                        .toUpperCase()
-                                                                        .split(" ")
-                                                                        .map((n) => n[0])
-                                                                        .join("")}
-                                                                </AvatarFallback>
-                                                            </Avatar>
-                                                            <div>
-                                                                <div className="font-medium text-sm">
-                                                                    {task.assignedTo?.name}
-                                                                </div>
-                                                                <div className="text-xs text-muted-foreground">
-                                                                    {task.assignedTo?.agentType}
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        {getPriorityBadge(task.priority)}
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <div className="flex items-center gap-1">
-                                                            <Calendar className="h-4 w-4 text-muted-foreground" />
-                                                            <span
-                                                                className={
-                                                                    isOverdue(task.dueDate, task.status)
-                                                                        ? "text-red-600 font-medium"
-                                                                        : ""
-                                                                }
-                                                            >
-                                                                {task.dueDate
-                                                                    ? formatDate(task.dueDate)
-                                                                    : "N/A"}
-                                                            </span>
-                                                        </div>
-                                                        {task.dueDate &&
-                                                            isOverdue(task.dueDate, task.status) && (
-                                                                <Badge
-                                                                    variant="destructive"
-                                                                    className="text-xs mt-1"
-                                                                >
-                                                                    Overdue
-                                                                </Badge>
-                                                            )}
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <div className="space-y-2">
-                                                            <div className="flex items-center justify-between">
-                                                                <span className="text-sm font-medium">
-                                                                    {task.status}
-                                                                </span>
-                                                            </div>
-                                                        </div>
-                                                    </TableCell>
-                                                </TableRow>
-                                            ))}
-                                        </TableBody>
-                                    </Table>
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
+
+                    {loading ? (
+                        <div className="flex justify-center items-center py-8">
+                            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                        </div>
+                    ) : myRetainerships.length === 0 ? (
+                        <p className="text-center text-muted-foreground">No retainership task assigned to you.</p>
+                    ) : (
+                        <div className="">
+
+                            <div className="space-y-3">
+                                <SectionTable
+                                    label="New Task"
+                                    tasks={myRetainerships.filter((t) => ["todo"].includes(statusKey(t.status))).slice(0, 3)}
+                                    retainershipTasks={true}
+                                />
+                                <SectionTable
+                                    label="In Progress"
+                                    tasks={myRetainerships.filter((t) => ["inprogress"].includes(statusKey(t.status))).slice(0, 3)}
+                                    retainershipTasks={true}
+                                />
+                                <SectionTable
+                                    label="Completed"
+                                    tasks={myRetainerships.filter((t) => ["completed"].includes(statusKey(t.status))).slice(0, 3)}
+                                    retainershipTasks={true}
+                                />
+                                <SectionTable
+                                    label="Hold"
+                                    tasks={myRetainerships.filter((t) => ["hold"].includes(statusKey(t.status))).slice(0, 3)}
+                                    retainershipTasks={true}
+                                />
+                            </div>
+                        </div>
+                    )}
                 </TabsContent>
 
                 <TabsContent value="my-clients">
@@ -1112,7 +1022,7 @@ export default function RetainershipTable() {
                         </CardContent>
                     </Card>
                 </TabsContent>
-            </Tabs>
+            </Tabs >
 
             <AlertDialog open={!!retainershipToDelete} onOpenChange={() => setRetainershipToDelete(null)}>
                 <AlertDialogContent>
@@ -1129,6 +1039,6 @@ export default function RetainershipTable() {
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
-        </div>
+        </div >
     )
 }

@@ -42,7 +42,7 @@ function formatDate(dateString?: string) {
   });
 }
 
-function statusKey(s?: string) {
+export function statusKey(s?: string) {
   const k = (s || "").toLowerCase().replace(/\s+/g, "");
   if (["todo", "pending"].includes(k)) return "todo";
   if (["inprogress", "progress"].includes(k)) return "inprogress";
@@ -147,11 +147,12 @@ function StatCard({
   );
 }
 
-function SectionTable({ label, tasks }: { label: string; tasks: Task[] }) {
+export function SectionTable({ label, tasks, retainershipTasks }: { label: string; tasks: Task[], retainershipTasks?: boolean }) {
   const labelColor = (() => {
     const l = label.toLowerCase();
     if (l.includes("progress")) return "text-sky-600";
     if (l.includes("completed")) return "text-green-600";
+    if (l.includes("hold")) return "text-gray-600";
     return "text-blue-600"; // New Task
   })();
 
@@ -216,8 +217,7 @@ function SectionTable({ label, tasks }: { label: string; tasks: Task[] }) {
                       tasks.map((t) => {
                         const clientName = t.client
                           ? t.client.clientType === "individual"
-                            ? `${t.client.firstName ?? ""} ${
-                                t.client.lastName ?? ""
+                            ? `${t.client.firstName ?? ""} ${t.client.lastName ?? ""
                               }`.trim()
                             : t.client.organizationName ?? ""
                           : "-";
@@ -230,12 +230,13 @@ function SectionTable({ label, tasks }: { label: string; tasks: Task[] }) {
                         const priority = (t.priority || "").toLowerCase();
                         const isOverdue = t.dueDate
                           ? new Date(t.dueDate) < new Date() &&
-                            statusKey(t.status) !== "completed"
+                          statusKey(t.status) !== "completed"
                           : false;
                         const statusLabel = (() => {
                           const k = statusKey(t.status);
                           if (k === "completed") return "Completed";
                           if (k === "inprogress") return "In Progress";
+                          if (k === "hold") return "Hold";
                           return "To Do";
                         })();
 
@@ -345,11 +346,10 @@ function SectionTable({ label, tasks }: { label: string; tasks: Task[] }) {
                                 <div className="flex items-center gap-2">
                                   <Calendar className="h-4 w-4 text-muted-foreground" />
                                   <span
-                                    className={`${
-                                      isOverdue
-                                        ? "text-red-600 font-semibold"
-                                        : "text-foreground"
-                                    }`}
+                                    className={`${isOverdue
+                                      ? "text-red-600 font-semibold"
+                                      : "text-foreground"
+                                      }`}
                                   >
                                     {formatDate(t.dueDate)}
                                   </span>
@@ -407,8 +407,7 @@ function SectionTable({ label, tasks }: { label: string; tasks: Task[] }) {
                   tasks.map((t) => {
                     const clientName = t.client
                       ? t.client.clientType === "individual"
-                        ? `${t.client.firstName ?? ""} ${
-                            t.client.lastName ?? ""
+                        ? `${t.client.firstName ?? ""} ${t.client.lastName ?? ""
                           }`.trim()
                         : t.client.organizationName ?? ""
                       : "-";
@@ -520,7 +519,7 @@ function SectionTable({ label, tasks }: { label: string; tasks: Task[] }) {
         <Link
           href={`/task?status=${encodeURIComponent(
             sectionLabelToStatus(label)
-          )}`}
+          )}${retainershipTasks ? `&retainershipTasks=${encodeURIComponent(true)}` : ""}`}
           className="bg-[#003459] cursor-pointer text-white text-[14px] py-[10px] mt-[10px] px-[10px] rounded-[5px] inline-block"
         >
           View more
@@ -585,6 +584,10 @@ export default function MyTasksPage() {
   );
   const tasksCompleted = tasks.filter((t) =>
     ["completed"].includes(statusKey(t.status))
+  );
+
+  const tasksHold = tasks.filter((t) =>
+    ["hold"].includes(statusKey(t.status))
   );
 
   return (
@@ -653,6 +656,7 @@ export default function MyTasksPage() {
             tasks={tasksInProgress.slice(0, 3)}
           />
           <SectionTable label="Completed" tasks={tasksCompleted.slice(0, 3)} />
+          <SectionTable label="Hold" tasks={tasksHold.slice(0, 3)} />
         </div>
       )}
     </section>

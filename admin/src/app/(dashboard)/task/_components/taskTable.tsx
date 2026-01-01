@@ -56,7 +56,7 @@ import { useEffect } from "react"
 import { useSearchParams } from "next/navigation"
 
 const priorities = ["All Priorities", "Low", "Medium", "High"]
-const statuses = ["All Status", "To Do", "In Progress", "Hold", "Completed"]
+const statuses = ["All Status", "To Do", "In Progress", "Hold", "Completed", "Abandoned"]
 const durations = ["24hr", "48hr", "1w"]
 
 export default function TasksTable() {

@@ -72,7 +72,7 @@ import { useSearchParams } from "next/navigation";
 import { X } from "lucide-react";
 
 const priorities = ["All Priorities", "Low", "Medium", "High"];
-const statuses = ["All Status", "To Do", "In Progress", "Hold", "Completed"];
+const statuses = ["All Status", "To Do", "In Progress", "Hold", "Completed", "Abandoned"];
 const durations = ["24hr", "48hr", "1w"];
 
 export default function TasksTable() {
@@ -102,6 +102,7 @@ export default function TasksTable() {
       return "In Progress";
     if (k.includes("completed")) return "Completed";
     if (k.includes("hold")) return "Hold";
+    if (k.includes("abandoned")) return "Abandoned";
     // Fallback: title-case the provided value
     return q
       .split(/[-_\s]/)
@@ -131,9 +132,11 @@ export default function TasksTable() {
         // Get assignedToId and status from searchParams if available
         const assignedToId = searchParams?.get('assignedToId');
         const status = searchParams?.get('status');
+        const retainershipTasks = searchParams?.get("retainershipTasks")
         let url = '/api/tasks';
         const params = [];
         if (assignedToId) params.push(`assignedToId=${assignedToId}`);
+        if (retainershipTasks) params.push(`retainershipTasks=${retainershipTasks}`);
         if (status) params.push(`status=${encodeURIComponent(status)}`);
         if (params.length) url += `?${params.join('&')}`;
         const response = await fetchWithAuth(url);
@@ -218,7 +221,9 @@ export default function TasksTable() {
   const updateUrlFilters = (priorities: string[], statuses: string[], search: string, followUpDurations: string[], statusCheckDuration: string[]) => {
     const params = new URLSearchParams();
     const assignedToId = searchParams.get("assignedToId");
+    const retainershipTasks = searchParams?.get("retainershipTasks")
     if (assignedToId) params.set("assignedToId", assignedToId);
+    if (retainershipTasks) params.set("retainershipTasks", retainershipTasks);
     if (search) params.set("search", search);
     if (priorities.length > 0) params.set("priorities", priorities.join(","));
     if (statuses.length > 0) params.set("statuses", statuses.join(","));

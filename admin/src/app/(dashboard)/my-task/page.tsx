@@ -147,7 +147,7 @@ function StatCard({
   );
 }
 
-function SectionTable({ label, tasks }: { label: string; tasks: Task[] }) {
+export function SectionTable({ label, tasks }: { label: string; tasks: Task[] }) {
   const labelColor = (() => {
     const l = label.toLowerCase();
     if (l.includes("progress")) return "text-sky-600";

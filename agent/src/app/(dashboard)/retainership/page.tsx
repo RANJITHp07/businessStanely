@@ -540,8 +540,8 @@ export default function RetainershipTable() {
                                                                                 .join("")}
                                                                         </AvatarFallback>
                                                                     </Avatar>
-                                                                    <div>
-                                                                        <div className="font-medium">
+                                                                    <div className="w-60">
+                                                                        <div className="font-medium truncate">
                                                                             {retainership.name.charAt(0).toUpperCase() + retainership.name.slice(1)}
                                                                         </div>
                                                                         <div className="text-sm text-muted-foreground">
@@ -561,7 +561,7 @@ export default function RetainershipTable() {
                                                                 </div>
                                                             </TableCell>
                                                             <TableCell>
-                                                                <div className="text-sm">
+                                                                <div className="text-sm w-60 truncate">
                                                                     <p>
                                                                         {retainership.client?.name
                                                                             ? retainership.client.name.length > 30
@@ -767,8 +767,8 @@ export default function RetainershipTable() {
                                                                                 .join("")}
                                                                         </AvatarFallback>
                                                                     </Avatar>
-                                                                    <div>
-                                                                        <div className="font-medium">
+                                                                    <div className="w-60">
+                                                                        <div className="font-medium truncate">
                                                                             {retainership.name.charAt(0).toUpperCase() + retainership.name.slice(1)}
                                                                         </div>
                                                                         <div className="text-sm text-muted-foreground">
@@ -785,7 +785,7 @@ export default function RetainershipTable() {
                                                                 </div>
                                                             </TableCell>
                                                             <TableCell>
-                                                                <div className="text-sm">
+                                                                <div className="text-sm w-60 truncate">
                                                                     <p>{retainership.client?.name || "N/A"}</p>
                                                                     <p className="text-muted-foreground text-xs">{retainership.client?.email || "N/A"}</p>
                                                                 </div>

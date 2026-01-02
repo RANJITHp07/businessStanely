@@ -483,7 +483,7 @@ export default function TaskForm() {
         toast.success(
           `Task ${isEditMode ? "updated" : "created"} successfully!`
         );
-        router.push("/task");
+        router.back();
       } else {
         const errorData = await response.json();
         toast.error(errorData.error);

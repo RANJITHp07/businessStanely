@@ -1,7 +1,10 @@
-import prisma from '@/lib/prisma';
+import prisma from "@/lib/prisma";
 
 // Calculate next due date based on recurring months
-export function calculateNextDueDate(currentDate: Date, recurringMonths: number): Date {
+export function calculateNextDueDate(
+  currentDate: Date,
+  recurringMonths: number
+): Date {
   const nextDate = new Date(currentDate);
   nextDate.setMonth(nextDate.getMonth() + recurringMonths);
   return nextDate;
@@ -11,47 +14,72 @@ export function calculateNextDueDate(currentDate: Date, recurringMonths: number)
 export async function updateRecurringTaskSchedule(taskId: string) {
   const task = await prisma.task.findUnique({
     where: { id: taskId },
+    include: { category: true },
   });
 
-  if (!task || !task.recurring || !task.dueDate) {
-    return null; // Not a recurring task or no due date
+  if (
+    !task ||
+    !task.recurring ||
+    !task.recurringType ||
+    !task.triggerDate ||
+    !task.category?.timePeriod
+  ) {
+    return null;
   }
 
   const now = new Date();
-  const taskDueDate = new Date(task.dueDate);
-  
-  // Check if the current period has passed
-  if (now > taskDueDate) {
-    // Calculate how many periods have passed
-    const monthsDiff = (now.getFullYear() - taskDueDate.getFullYear()) * 12 + 
-                      (now.getMonth() - taskDueDate.getMonth());
-    
-    const periodsPassed = Math.floor(monthsDiff / task.recurring);
-    
-    if (periodsPassed > 0) {
-      // Calculate new due date by adding the required periods
-      const newDueDate = new Date(taskDueDate);
-      newDueDate.setMonth(newDueDate.getMonth() + (periodsPassed + 1) * task.recurring);
-      
-      // Update task with new due date and reset status
-      const updatedTask = await prisma.task.update({
-        where: { id: taskId },
-        data: {
-          dueDate: newDueDate,
-          nextDueDate: newDueDate as Date,
-          currentPeriodStart: now as Date,
-          completed: false, // Reset for new period
-          progress: 0, // Reset progress
-          status: 'To Do', // Reset status
-        },
-      });
+  const triggerDate = new Date(task.triggerDate);
 
-      console.log(`🔄 Auto-updated recurring task. New due date: ${newDueDate.toISOString()}`);
-      return updatedTask;
-    }
+  // Only update if today is the trigger date
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const startOfTomorrow = new Date(startOfToday);
+  startOfTomorrow.setDate(startOfTomorrow.getDate() + 1);
+
+  if (triggerDate < startOfToday || triggerDate >= startOfTomorrow) {
+    // Not trigger date yet
+    return null;
   }
 
-  return task; // No update needed
+  // Step 1: dueDate = triggerDate + taskCategoryTime
+  const dueDate = new Date(triggerDate);
+  dueDate.setDate(dueDate.getDate() + task.category?.timePeriod);
+
+  // Step 2: nextDueDate = triggerDate + recurring interval
+  const nextTriggerDate = new Date(triggerDate);
+  switch (task.recurringType) {
+    case "DAY":
+      nextTriggerDate.setDate(nextTriggerDate.getDate() + task.recurring);
+      break;
+    case "WEEK":
+      nextTriggerDate.setDate(nextTriggerDate.getDate() + task.recurring * 7);
+      break;
+    case "MONTH":
+      nextTriggerDate.setMonth(nextTriggerDate.getMonth() + task.recurring);
+      break;
+    default:
+      return null;
+  }
+
+  // Step 3: Update the task
+  const updatedTask = await prisma.task.update({
+    where: { id: taskId },
+    data: {
+      dueDate,
+      nextDueDate: nextTriggerDate,
+      triggerDate: nextTriggerDate,
+      currentPeriodStart: triggerDate,
+      completed: false,
+      progress: 0,
+      status: "To Do",
+    },
+  });
+
+  console.log(
+    `🔄 Recurring task triggered → triggerDate: ${triggerDate.toISOString()}, dueDate: ${dueDate.toISOString()}, nextDueDate: ${nextTriggerDate.toISOString()}`
+  );
+
+  return updatedTask;
 }
 
 // Update due dates for tasks in "Hold" status
@@ -95,11 +123,22 @@ export async function updateHoldTasks() {
 
 // Check and update overdue recurring tasks
 export async function updateAllRecurringTasks() {
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+
+  const startOfTomorrow = new Date(startOfToday);
+  startOfTomorrow.setDate(startOfTomorrow.getDate() + 1);
+
   // Find all active recurring tasks
   const recurringTasks = await prisma.task.findMany({
     where: {
       recurring: { not: null },
+      recurringType: { not: null },
       dueDate: { not: null },
+      triggerDate: {
+        gte: startOfToday,
+        lt: startOfTomorrow,
+      },
     },
   });
 
@@ -109,7 +148,7 @@ export async function updateAllRecurringTasks() {
     try {
       // Auto-update each recurring task based on calendar schedule
       const updatedTask = await updateRecurringTaskSchedule(task.id);
-      
+
       if (updatedTask && updatedTask.id !== task.id) {
         // Task was updated
         updatedTasks.push(updatedTask);
@@ -122,14 +161,20 @@ export async function updateAllRecurringTasks() {
   const holdTasks = await updateHoldTasks();
   updatedTasks.push(...holdTasks);
 
-  console.log(`📅 Auto-updated ${updatedTasks.length} tasks (recurring + hold).`);
+  console.log(
+    `📅 Auto-updated ${updatedTasks.length} tasks (recurring + hold).`
+  );
   return updatedTasks;
 }
 
 // Initialize recurring task fields when task is created with recurring
-export async function initializeRecurringTask(taskId: string, recurringMonths: number, dueDate: Date) {
+export async function initializeRecurringTask(
+  taskId: string,
+  recurringMonths: number,
+  dueDate: Date
+) {
   const currentPeriodStart = new Date();
-  
+
   const updatedTask = await prisma.task.update({
     where: { id: taskId },
     data: {
@@ -138,7 +183,9 @@ export async function initializeRecurringTask(taskId: string, recurringMonths: n
     },
   });
 
-  console.log(`🔄 Initialized recurring task. First due: ${dueDate.toISOString()}`);
+  console.log(
+    `🔄 Initialized recurring task. First due: ${dueDate.toISOString()}`
+  );
   return updatedTask;
 }
 
@@ -162,16 +209,22 @@ export function getRecurringTaskStatus(task: {
   }
 
   const now = new Date();
-  const completionHistory = Array.isArray(task.completionHistory) ? task.completionHistory : [];
+  const completionHistory = Array.isArray(task.completionHistory)
+    ? task.completionHistory
+    : [];
   const nextDue = task.nextDueDate ? new Date(task.nextDueDate) : null;
   const isOverdue = nextDue ? now > nextDue && !task.completed : false;
 
   return {
     isRecurring: true,
-    currentPeriod: task.currentPeriodStart ? new Date(task.currentPeriodStart) : null,
+    currentPeriod: task.currentPeriodStart
+      ? new Date(task.currentPeriodStart)
+      : null,
     nextDue,
     completionCount: completionHistory.length,
     isOverdue,
-    lastCompleted: task.lastCompletedDate ? new Date(task.lastCompletedDate) : null,
+    lastCompleted: task.lastCompletedDate
+      ? new Date(task.lastCompletedDate)
+      : null,
   };
 }

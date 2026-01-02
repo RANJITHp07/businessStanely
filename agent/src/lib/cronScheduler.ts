@@ -1,4 +1,4 @@
-import * as cron from 'node-cron';
+import * as cron from "node-cron";
 
 class CronScheduler {
   private static instance: CronScheduler;
@@ -15,36 +15,56 @@ class CronScheduler {
 
   // Start the recurring tasks scheduler
   public startRecurringTasksScheduler() {
-    const taskName = 'recurring-tasks';
-    
+    const taskName = "recurring-tasks";
+
     // Stop existing task if any
     this.stopTask(taskName);
-    
+
     // Schedule to run daily at 9:00 AM UTC
-    const task = cron.schedule('0 9 * * *', async () => {
-      console.log('🔄 Running recurring tasks and hold tasks cron job at:', new Date().toISOString());
+    const task = cron.schedule(
+      "0 9 * * *",
+      async () => {
+        console.log(
+          "🔄 Running recurring tasks and hold tasks cron job at:",
+          new Date().toISOString()
+        );
 
-      try {
-        const { updateAllRecurringTasks } = await import('./singleTaskRecurring');
-        const updatedTasks = await updateAllRecurringTasks();
-        console.log(`✅ Cron job completed. Auto-updated ${updatedTasks.length} tasks.`);
+        try {
+          const { updateAllRecurringTasks } = await import(
+            "./singleTaskRecurring"
+          );
+          const updatedTasks = await updateAllRecurringTasks();
+          console.log(
+            `✅ Cron job completed. Auto-updated ${updatedTasks.length} tasks.`
+          );
 
-        if (updatedTasks.length > 0) {
-          console.log('📝 Updated tasks:');
-          updatedTasks.forEach(task => {
-            console.log(`  - ${task.title} (New due date: ${task.dueDate?.toISOString()?.split('T')[0]})`);
-          });
+          if (updatedTasks.length > 0) {
+            console.log("📝 Updated tasks:");
+            updatedTasks.forEach((task) => {
+              console.log(
+                `  - ${task.title} (New due date: ${
+                  task.dueDate?.toISOString()?.split("T")[0]
+                })`
+              );
+            });
+          }
+        } catch (error) {
+          console.error(
+            "❌ Error in recurring tasks and hold tasks cron job:",
+            error
+          );
         }
-      } catch (error) {
-        console.error('❌ Error in recurring tasks and hold tasks cron job:', error);
+      },
+      {
+        timezone: "UTC",
       }
-    }, {
-      timezone: 'UTC'
-    });
+    );
 
     this.scheduledTasks.set(taskName, task);
-    
-    console.log(`🚀 Recurring tasks and hold tasks cron scheduler started (daily at 9:00 AM UTC)`);
+
+    console.log(
+      `🚀 Recurring tasks and hold tasks cron scheduler started (daily at 9:00 AM UTC)`
+    );
     return task;
   }
 
@@ -65,28 +85,30 @@ class CronScheduler {
       console.log(`🛑 Stopped cron task: ${taskName}`);
     }
     this.scheduledTasks.clear();
-    console.log('🛑 All cron tasks stopped');
+    console.log("🛑 All cron tasks stopped");
   }
 
   // Get status of all tasks
   public getTasksStatus() {
     return Array.from(this.scheduledTasks.entries()).map(([name]) => ({
       name,
-      scheduled: true // Task exists in map means it's scheduled
+      scheduled: true, // Task exists in map means it's scheduled
     }));
   }
 
   // Run the recurring tasks job manually (for testing)
   public async runRecurringTasksManually() {
-    console.log('🧪 Running recurring tasks manually...');
-    
+    console.log("🧪 Running recurring tasks manually...");
+
     try {
-      const { updateAllRecurringTasks } = await import('./singleTaskRecurring');
+      const { updateAllRecurringTasks } = await import("./singleTaskRecurring");
       const updatedTasks = await updateAllRecurringTasks();
-      console.log(`✅ Manual run completed. Auto-updated ${updatedTasks.length} recurring tasks.`);
+      console.log(
+        `✅ Manual run completed. Auto-updated ${updatedTasks.length} recurring tasks.`
+      );
       return updatedTasks;
     } catch (error) {
-      console.error('❌ Error in manual recurring tasks run:', error);
+      console.error("❌ Error in manual recurring tasks run:", error);
       throw error;
     }
   }

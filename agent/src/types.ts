@@ -109,6 +109,7 @@ export interface Task {
     updatedAt: string;
   }; // Added legislation object to include detailed information
   triggerDate?: string; // Added triggerDate property to Task interface
+  recurringType?: string;
 }
 
 export interface Comment {

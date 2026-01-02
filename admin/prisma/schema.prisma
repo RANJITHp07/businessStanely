@@ -143,6 +143,9 @@ model Task {
   statusCheckDuration  String? // e.g., "24hr", "48hr", "1w", "None"
   completed        Boolean   @default(false)
   recurring        Int?      // Recurring in months (1-12), null means not recurring
+  recurringType  String?  // 'DAY' | 'WEEK' | 'MONTH'
+
+  triggerDate      DateTime?
 
   // New recurring tracking fields
   lastCompletedDate    DateTime? // When the current period was completed

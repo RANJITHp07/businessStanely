@@ -186,6 +186,7 @@ export async function POST(req: NextRequest) {
       legislationId,
       recurring,
       triggerDate, // Added triggerDate to destructured fields
+      recurringType,
     } = body;
 
     // Validate required fields
@@ -220,6 +221,7 @@ export async function POST(req: NextRequest) {
         categoryId: categoryId || null,
         legislationId: legislationId || null, // Save legislationId
         recurring: recurringValue, // Save recurring field
+        recurringType
       },
       include: {
         client: {

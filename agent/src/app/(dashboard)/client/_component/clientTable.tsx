@@ -414,14 +414,14 @@ export default function ClientsTable() {
                                                             </AvatarFallback>
                                                         </Avatar>
                                                         <div className="min-w-0">
-<div className="font-medium text-sm truncate">
-  {getClientDisplayName(client)
-    ? getClientDisplayName(client)!.length > 35 
-      ? getClientDisplayName(client)!.slice(0, 35) + '...'
-      : getClientDisplayName(client)
-    : 'N/A'
-  }
-</div>                                                          <div className="text-xs text-muted-foreground truncate">
+                                                            <div className="font-medium text-sm w-60 truncate">
+                                                                {getClientDisplayName(client)
+                                                                    ? getClientDisplayName(client)!.length > 35
+                                                                        ? getClientDisplayName(client)!.slice(0, 35) + '...'
+                                                                        : getClientDisplayName(client)
+                                                                    : 'N/A'
+                                                                }
+                                                            </div>                                                          <div className="text-xs text-muted-foreground truncate">
                                                                 {client.clientType === "organization" && client.authorizedPersonName && (
                                                                     <>Contact: {client.authorizedPersonName.charAt(0).toUpperCase() + client?.authorizedPersonName?.slice(1)}</>
                                                                 )}

@@ -8,10 +8,7 @@ export async function GET(req: NextRequest) {
     // Get the current agent user
     const currentAgent = await getCurrentAgent(req);
     if (!currentAgent) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     // Parse query parameters
@@ -21,9 +18,12 @@ export async function GET(req: NextRequest) {
 
     // Build where clause for the query
     const where: { status?: string | { not: string } } = {};
-    
+
     // If status parameter is provided, filter by specific status
-    if (statusParam && ["approved", "pending", "rejected"].includes(statusParam)) {
+    if (
+      statusParam &&
+      ["approved", "pending", "rejected"].includes(statusParam)
+    ) {
       where.status = statusParam;
     } else if (includeAll) {
       // Show all categories including rejected (for admin purposes)
@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
       // Default: exclude rejected categories for task creation/selection
       where.status = { not: "rejected" };
     }
-    
+
     // Get categories from the database with proper relations
     // Get categories from the database with proper relations
     const categories = await prisma.taskCategory.findMany({
@@ -44,81 +44,81 @@ export async function GET(req: NextRequest) {
             username: true,
             email: true,
             adminType: true,
-          }
+          },
         },
         createdByAgent: {
           select: {
             id: true,
             name: true,
-            email: true
-          }
+            email: true,
+          },
         },
         approvedBy: {
           select: {
             id: true,
-            username: true
-          }
-        }
+            username: true,
+          },
+        },
       },
       orderBy: {
-        createdAt: 'desc'
-      }
+        createdAt: "desc",
+      },
     });
 
     // Get task counts for each category (this will be implemented later)
     // For now, we'll return 0 for task counts
-    
+
     // Transform data for frontend
-    const transformedCategories = await Promise.all(categories.map(async (category) => {
-      // Count tasks that belong to this category
-      const taskCount = await prisma.task.count({
-        where: {
-          categoryId: category.id
+    const transformedCategories = await Promise.all(
+      categories.map(async (category) => {
+        // Count tasks that belong to this category
+        const taskCount = await prisma.task.count({
+          where: {
+            categoryId: category.id,
+          },
+        });
+        // Determine creator name and type
+        let creatorName = null;
+        let creatorType = null;
+        let creatorRole = null;
+        if (category.createdByUser) {
+          creatorName = category.createdByUser.username;
+          creatorType = "user";
+          creatorRole = category.createdByUser.adminType; // "owner" or "admin"
+        } else if (category.createdByAgent) {
+          creatorName = category.createdByAgent.name;
+          creatorType = "agent";
+          creatorRole = null;
         }
-      });
-      // Determine creator name and type
-      let creatorName = null;
-      let creatorType = null;
-      let creatorRole = null;
-      if (category.createdByUser) {
-        creatorName = category.createdByUser.username;
-        creatorType = "user";
-        creatorRole = category.createdByUser.adminType; // "owner" or "admin"
-      } else if (category.createdByAgent) {
-        creatorName = category.createdByAgent.name;
-        creatorType = "agent";
-        creatorRole = null;
-      }
-      return {
-        id: category.id,
-        name: category.name,
-        description: category.description || "",
-        color: category.color,
-        status: category.status,
-        createdAt: category.createdAt.toISOString(),
-        updatedAt: category.updatedAt.toISOString(),
-        createdBy: creatorName,
-        createdByType: creatorType,
-        createdByRole: creatorRole,
-        createdById: category.createdByUserId || category.createdByAgentId,
-        approvedById: category.approvedById || null,
-        approvedBy: category.approvedBy?.username || null,
-        approvedAt: category.approvedAt?.toISOString() || null,
-        taskCount: taskCount,
-        isOwner: false,
-        timePeriod: category.timePeriod,
-        agentCanEditDays: category.agentCanEditDays ?? false,
-      };
-    }));
+        return {
+          id: category.id,
+          name: category.name,
+          description: category.description || "",
+          color: category.color,
+          status: category.status,
+          createdAt: category.createdAt.toISOString(),
+          updatedAt: category.updatedAt.toISOString(),
+          createdBy: creatorName,
+          createdByType: creatorType,
+          createdByRole: creatorRole,
+          createdById: category.createdByUserId || category.createdByAgentId,
+          approvedById: category.approvedById || null,
+          approvedBy: category.approvedBy?.username || null,
+          approvedAt: category.approvedAt?.toISOString() || null,
+          taskCount: taskCount,
+          isOwner: false,
+          timePeriod: category.timePeriod,
+          agentCanEditDays: category.agentCanEditDays ?? false,
+        };
+      })
+    );
 
     return NextResponse.json(transformedCategories);
   } catch (error) {
     console.error("Error fetching task categories:", error);
-    const errorMessage = error instanceof Error ? error.message : "Internal server error";
-    return NextResponse.json(
-      { error: errorMessage },
-      { status: 500 }
-    );
+    const errorMessage =
+      error instanceof Error ? error.message : "Internal server error";
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }
 
@@ -128,25 +128,19 @@ export async function POST(req: NextRequest) {
     // Get the current agent user
     const currentAgent = await getCurrentAgent(req);
     if (!currentAgent) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     // Parse request body
     const body = await req.json();
-  const { name, description, color, timePeriod, notes, processFlow } = body; // Include notes, processFlow
+    const { name, description, color, timePeriod, notes, processFlow } = body; // Include notes, processFlow
 
     // Convert timePeriod to an integer
     const parsedTimePeriod = timePeriod ? parseInt(timePeriod, 10) : null;
 
     // Validate required fields
     if (!name) {
-      return NextResponse.json(
-        { error: "Name is required" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Name is required" }, { status: 400 });
     }
 
     // All agent-created categories are pending and not approved
@@ -168,25 +162,32 @@ export async function POST(req: NextRequest) {
           select: {
             id: true,
             name: true,
-          }
+          },
         },
         approvedBy: {
           select: {
             id: true,
             username: true,
-          }
-        }
-      }
+          },
+        },
+      },
     });
-
 
     // Send notification email to all admins/owners
     try {
       const { sendAdminOwnerNotification } = await import("@/lib/email");
       await sendAdminOwnerNotification({
         subject: `New Service Created: ${newCategory.name}`,
-        html: `<p>A new service has been created by agent <b>${currentAgent.name}</b>.<br><br><b>Service Name:</b> ${newCategory.name}<br><b>Description:</b> ${newCategory.description || "-"}</p>`,
-        text: `A new service has been created by agent ${currentAgent.name}.\nService Name: ${newCategory.name}\nDescription: ${newCategory.description || "-"}`
+        html: `<p>A new service has been created by agent <b>${
+          currentAgent.name
+        }</b>.<br><br><b>Service Name:</b> ${
+          newCategory.name
+        }<br><b>Description:</b> ${newCategory.description || "-"}</p>`,
+        text: `A new service has been created by agent ${
+          currentAgent.name
+        }.\nService Name: ${newCategory.name}\nDescription: ${
+          newCategory.description || "-"
+        }`,
       });
     } catch (e) {
       console.error("Failed to send admin/owner notification email:", e);
@@ -207,25 +208,23 @@ export async function POST(req: NextRequest) {
       approvedBy: newCategory.approvedBy?.username || null,
       approvedAt: newCategory.approvedAt?.toISOString() || null,
       taskCount: 0,
-      timePeriod: newCategory.timePeriod // Include timePeriod in the response
+      timePeriod: newCategory.timePeriod, // Include timePeriod in the response
     };
 
     return NextResponse.json(transformedCategory, { status: 201 });
   } catch (error) {
     console.error("Error creating task category:", error);
-    
+
     // Check for unique constraint violations - Prisma error
-    if (error instanceof Error && 'code' in error && error.code === 'P2002') {
+    if (error instanceof Error && "code" in error && error.code === "P2002") {
       return NextResponse.json(
         { error: "A category with this name already exists" },
         { status: 409 }
       );
     }
-    
-    const errorMessage = error instanceof Error ? error.message : "Internal server error";
-    return NextResponse.json(
-      { error: errorMessage },
-      { status: 500 }
-    );
+
+    const errorMessage =
+      error instanceof Error ? error.message : "Internal server error";
+    return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
 }

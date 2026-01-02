@@ -40,6 +40,7 @@ import {
     Tag,
     FileText,
 } from "lucide-react"
+import { useRouter } from "next/navigation";
 
 export interface TaskCategory {
     id: string
@@ -110,6 +111,7 @@ interface UserInfo {
 
 export default function CategoryDetail({ params }: { params: Promise<{ id: string }> | { id: string } }) {
     // Unwrap params using React.use() to future-proof the code
+    const router = useRouter()
     const resolvedParams = params instanceof Promise ? use(params) : params
     const [category, setCategory] = useState<TaskCategory | null>(null)
     const [tasks, setTasks] = useState<Task[]>([])
@@ -347,6 +349,8 @@ export default function CategoryDetail({ params }: { params: Promise<{ id: strin
                                 <FileText className="h-5 w-5" />
                                 Service Tasks ({tasks.length})
                             </CardTitle>
+                            <Button onClick={() => router.push(`/task/create?serviceId=${resolvedParams.id}`)}>Add Task</Button>
+
                             {/* <div className="flex items-center gap-2">
                                 <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
                                 <Select value={sortBy} onValueChange={setSortBy}>

@@ -98,6 +98,8 @@ export default function TaskForm({ id }: TaskFormProps) {
     legislationName: "",
     recurring: "0",
     triggerDate: "", // Added triggerDate to formData
+    recurringType: "",
+    status: ""
   });
   const [clients, setClients] = useState<Client[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
@@ -270,10 +272,11 @@ export default function TaskForm({ id }: TaskFormProps) {
   useEffect(() => {
     const query = new URLSearchParams(window.location.search);
     const legislationId = query.get("legislationId");
+    const serviceId = query.get("serviceId");
     const assignedAgent = query.get("assignedAgent");
     const client = query.get("client");
 
-    if (legislationId || assignedAgent || client) {
+    if (legislationId || assignedAgent || client || serviceId) {
       setFormData((prev) => ({
         ...prev,
         legislationId: legislationId || prev.legislationId,
@@ -306,6 +309,18 @@ export default function TaskForm({ id }: TaskFormProps) {
         if (selectedLegislation) {
           setLegislationSearchQuery(selectedLegislation.title); // Update the search query to show the selected legislation's name
         }
+      }
+      if (serviceId) {
+        (async () => {
+          const res = await fetch(`/api/task-categories/${serviceId}`)
+          if (!res.ok) {
+            throw new Error(`Failed to fetch task categories: ${res.status}`);
+          }
+
+          const data = await res.json();
+          setCategorySearchQuery(data.name)
+          setFormData((prev) => ({ ...prev, categoryId: data.id }))
+        })()
       }
     }
   }, [agents, clients, legislationList]);
@@ -358,8 +373,10 @@ export default function TaskForm({ id }: TaskFormProps) {
               categoryId: task.category?.id || "",
               legislationId: task.legislationId || "",
               legislationName: task.legislation?.title || "",
-              recurring: task.recurring ? task.recurring.toString() : "0",
+              recurring: task.recurring?.toString() || "0",
+              recurringType: task.recurringType || "",
               triggerDate: task.triggerDate || "", // Ensure triggerDate is included
+              status: formData?.status
             });
             if (task.category) {
               setCategorySearchQuery(task.category.name);
@@ -541,8 +558,9 @@ export default function TaskForm({ id }: TaskFormProps) {
         },
         body: JSON.stringify({
           ...formData,
+          recurring: formData.recurring.split("-")[1],
           dueDate,
-          status: "To Do",
+          status: formData.status || "To Do",
           createdById: !isEditMode ? agents[0].id : undefined,
         }),
       });
@@ -551,7 +569,7 @@ export default function TaskForm({ id }: TaskFormProps) {
         toast.success(
           `Task ${isEditMode ? "updated" : "created"} successfully!`
         );
-        router.push("/task");
+        router.back();
       } else {
         const errorData = await response.json();
         toast.error(errorData.error);
@@ -681,7 +699,8 @@ export default function TaskForm({ id }: TaskFormProps) {
 
   // Add handler for recurring selection to show information
   const handleRecurringChange = (value: string) => {
-    handleInputChange("recurring", value);
+    handleInputChange("recurring", value.split("-")[1]);
+    handleInputChange("recurringType", value.split("-")[0].toLocaleUpperCase());
 
     // Show information about next task creation if recurring is selected
     if (value !== "0" && dueDate) {
@@ -689,26 +708,6 @@ export default function TaskForm({ id }: TaskFormProps) {
       nextDueDate.setMonth(nextDueDate.getMonth() + parseInt(value));
       console.log(`Next recurring task will be due on: ${nextDueDate.toLocaleDateString()}`);
     }
-  };
-
-
-  const getMaxTriggerDate = () => {
-    if (!formData.recurring || formData.recurring === "0") return undefined;
-
-    const [type, value] = formData.recurring.split("-");
-    const interval = parseInt(value, 10);
-
-    const maxDate = new Date();
-
-    if (type === "week") {
-      maxDate.setDate(maxDate.getDate() + interval * 7);
-    }
-
-    // if (type === "month") {
-    //   maxDate.setMonth(maxDate.getMonth() + interval);
-    // }
-
-    return format(maxDate, "yyyy-MM-dd");
   };
 
   return (
@@ -1510,13 +1509,13 @@ export default function TaskForm({ id }: TaskFormProps) {
                       mode="single"
                       selected={dueDate}
                       onSelect={(date) => {
-                        if (date && new Date(date) >= new Date(formData.triggerDate || new Date())) {
-                          setDueDate(date);
-                        }
+                        setDueDate(date);
+                        handleInputChange("triggerDate", null);
                       }}
                       fromDate={new Date(formData.triggerDate || new Date())}
                       initialFocus
                       disabled={Boolean(isDueDateDisabled)}
+                    // disabled={{ before: new Date() }}
                     />
                   </PopoverContent>
                 </Popover>
@@ -1534,9 +1533,9 @@ export default function TaskForm({ id }: TaskFormProps) {
               {/* Recurring Field */}
               <div className="flex gap-3">
                 <div className="space-y-2 w-1/2">
-                  <Label htmlFor="recurring">Recurring (Monthly)</Label>
+                  <Label htmlFor="recurring">Recurring </Label>
                   <Select
-                    value={formData.recurring}
+                    value={formData.recurring ? (formData.recurring == "0" ? "0" : `${formData.recurringType.toLocaleLowerCase()}-${formData.recurring}`) : ""}
                     onValueChange={handleRecurringChange}
                   >
                     <SelectTrigger className="w-full">
@@ -1544,11 +1543,18 @@ export default function TaskForm({ id }: TaskFormProps) {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="0">No Recurring</SelectItem>
-                      <SelectItem value="week-1">Every 1 week</SelectItem>
-                      <SelectItem value="week-2">Every 2 weeks</SelectItem>
-                      <SelectItem value="week-3">Every 3 weeks</SelectItem>
+                      {Array.from({ length: 6 }, (_, i) => i + 1).map((day) => (
+                        <SelectItem key={`day-${day}`} value={`day-${day}`}>
+                          Every {day} {day === 1 ? "day" : "days"}
+                        </SelectItem>
+                      ))}
+                      {Array.from({ length: 3 }, (_, i) => i + 1).map((week) => (
+                        <SelectItem key={`week-${week}`} value={`week-${week}`}>
+                          Every {week} {week === 1 ? "week" : "weeks"}
+                        </SelectItem>
+                      ))}
                       {Array.from({ length: 12 }, (_, i) => i + 1).map((month) => (
-                        <SelectItem key={month} value={month.toString()}>
+                        <SelectItem key={month} value={`month-${month}`}>
                           Every {month} {month === 1 ? "month" : "months"}
                         </SelectItem>
                       ))}
@@ -1556,21 +1562,27 @@ export default function TaskForm({ id }: TaskFormProps) {
                   </Select>
                   <p className="text-xs text-muted-foreground">
                     Set how often this task should repeat (1-12 months, optional)
-                    {formData.recurring !== "0" && dueDate && (
+                    {formData.recurring !== "0" && formData.categoryId && dueDate && (
                       <span className="block mt-1 text-blue-600">
                         {(() => {
-                          const nextDueDate = new Date(dueDate);
-                          nextDueDate.setMonth(nextDueDate.getMonth() + parseInt(formData.recurring));
+                          if (!formData.triggerDate) return "";
+
+                          const startDate = new Date(formData.triggerDate);
 
                           // Get selected category to find time period
-                          const selectedCategory = categories.find(cat => cat.id === formData.categoryId);
-                          const timePeriod = selectedCategory?.timePeriod || 7; // Default to 7 days if no category time period
+                          const selectedCategory = categories.find(
+                            cat => cat.id === formData.categoryId
+                          );
 
-                          // Always calculate and show start date (due date - time period)
-                          const startDate = new Date(nextDueDate);
-                          startDate.setDate(startDate.getDate() - timePeriod);
+                          const timePeriod = selectedCategory?.timePeriod || 7; // default 7 days
 
-                          return `Next task period: ${startDate.toLocaleDateString('en-GB')} to ${nextDueDate.toLocaleDateString('en-GB')}`;
+                          // End date = triggerDate + timePeriod
+                          const endDate = new Date(startDate);
+                          endDate.setDate(endDate.getDate() + timePeriod);
+
+                          return `Next task period:${startDate.toLocaleDateString(
+                            "en-GB"
+                          )} to ${endDate.toLocaleDateString("en-GB")}`;
                         })()}
                       </span>
                     )}
@@ -1580,24 +1592,64 @@ export default function TaskForm({ id }: TaskFormProps) {
                   {/* Trigger Date Field - Shown only when recurring is set */}
                   {formData.recurring && formData.recurring !== "0" && (
                     <div className="space-y-2">
-                      <Label htmlFor="triggerDate">Trigger Date</Label>
-                      <Input
-                        id="triggerDate"
-                        type="date"
-                        value={formData.triggerDate || format(new Date(), "yyyy-MM-dd")}
-                        min={format(new Date(), "yyyy-MM-dd")}
-                        // max={getMaxTriggerDate()}
-                        onChange={(e) => {
-                          const newTriggerDate = e.target.value;
-                          handleInputChange("triggerDate", newTriggerDate);
+                      <Label className="flex items-center gap-1">
+                        Trigger Date
+                        <span className="text-red-500">*</span>
+                      </Label>
 
-                          // Ensure Completion Date is not earlier than Trigger Date
-                          if (dueDate && new Date(newTriggerDate) > new Date(dueDate)) {
-                            setDueDate(new Date(newTriggerDate));
-                          }
-                        }}
-                      />
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            className={cn(
+                              "w-full justify-start text-left font-normal",
+                              !formData.triggerDate &&
+                              "text-muted-foreground "
+                            )}
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {formData.triggerDate
+                              ? format(new Date(formData.triggerDate), "PPP")
+                              : "Select trigger date"}
+                          </Button>
+                        </PopoverTrigger>
+
+                        <PopoverContent className="w-auto p-0">
+                          <Calendar
+                            mode="single"
+                            selected={
+                              formData.triggerDate
+                                ? new Date(formData.triggerDate)
+                                : undefined
+                            }
+                            fromDate={new Date()} // cannot select past dates
+                            onSelect={(date) => {
+                              if (!date) return;
+
+                              const formattedDate = format(date, "yyyy-MM-dd");
+                              handleInputChange("triggerDate", formattedDate);
+                            }}
+                            initialFocus
+                            disabled={
+                              dueDate
+                                ? {
+                                  before: new Date(
+                                    dueDate.getFullYear(),
+                                    dueDate.getMonth(),
+                                    dueDate.getDate() + 1
+                                  ),
+                                }
+                                : undefined
+                            }
+                          />
+                        </PopoverContent>
+                      </Popover>
+
+                      <p className="text-xs text-muted-foreground">
+                        Choose the date when this task should be triggered (required)
+                      </p>
                     </div>
+
                   )}
                 </div>
               </div>
@@ -1640,68 +1692,70 @@ export default function TaskForm({ id }: TaskFormProps) {
           </Card>
 
           {/* Legislation Information */}
-          {isFromRetainership && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <FileText className="h-5 w-5" />
-                  Legislation Information
-                </CardTitle>
-                <CardDescription>
-                  Optionally, select legislation for this task
-                </CardDescription>
-              </CardHeader>
+          {
+            isFromRetainership && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <FileText className="h-5 w-5" />
+                    Legislation Information
+                  </CardTitle>
+                  <CardDescription>
+                    Optionally, select legislation for this task
+                  </CardDescription>
+                </CardHeader>
 
-              <CardContent className="space-y-6">
-                <div className="space-y-2">
-                  <Label htmlFor="legislation">Legislation *</Label>
-                  <div className="relative">
-                    <Input
-                      id="legislation"
-                      placeholder="Search or select legislation"
-                      value={legislationSearchQuery}
-                      onChange={(e) => handleInputChange("legislationId", e.target.value)}
-                      disabled={isFromRetainership} // Disable field if accessed from retainership
-                      required
-                    />
+                <CardContent className="space-y-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="legislation">Legislation *</Label>
+                    <div className="relative">
+                      <Input
+                        id="legislation"
+                        placeholder="Search or select legislation"
+                        value={legislationSearchQuery}
+                        onChange={(e) => handleInputChange("legislationId", e.target.value)}
+                        disabled={isFromRetainership} // Disable field if accessed from retainership
+                        required
+                      />
 
-                    {showLegislationSuggestions && legislationSearchQuery.trim() && filteredLegislations.length > 0 && (
-                      <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto">
-                        {filteredLegislations.map((legislation) => (
-                          <div
-                            key={legislation.id}
-                            className="flex items-center justify-between p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
-                            onClick={() => {
-                              setFormData((prev) => ({ ...prev, legislationId: legislation.id }));
-                              setLegislationSearchQuery(legislation.title);
-                              setShowLegislationSuggestions(false);
-                            }}
-                          >
-                            <div className="flex items-center gap-2">
-                              <div>
-                                <span className="font-medium">{legislation.title}</span>
-                                {legislation.description && (
-                                  <div className="text-xs text-gray-500 mt-1">
-                                    {legislation.description}
-                                  </div>
-                                )}
+                      {showLegislationSuggestions && legislationSearchQuery.trim() && filteredLegislations.length > 0 && (
+                        <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto">
+                          {filteredLegislations.map((legislation) => (
+                            <div
+                              key={legislation.id}
+                              className="flex items-center justify-between p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
+                              onClick={() => {
+                                setFormData((prev) => ({ ...prev, legislationId: legislation.id }));
+                                setLegislationSearchQuery(legislation.title);
+                                setShowLegislationSuggestions(false);
+                              }}
+                            >
+                              <div className="flex items-center gap-2">
+                                <div>
+                                  <span className="font-medium">{legislation.title}</span>
+                                  {legislation.description && (
+                                    <div className="text-xs text-gray-500 mt-1">
+                                      {legislation.description}
+                                    </div>
+                                  )}
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                          ))}
+                        </div>
+                      )}
 
-                    {showLegislationSuggestions && legislationSearchQuery && filteredLegislations.length === 0 && (
-                      <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg p-3">
-                        <span className="text-gray-500">No legislations found</span>
-                      </div>
-                    )}
+                      {showLegislationSuggestions && legislationSearchQuery && filteredLegislations.length === 0 && (
+                        <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg p-3">
+                          <span className="text-gray-500">No legislations found</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
+                </CardContent>
+              </Card>
+            )
+          }
 
           {/* Submit Buttons */}
           <div className="flex justify-end gap-4">
@@ -1731,8 +1785,8 @@ export default function TaskForm({ id }: TaskFormProps) {
               )}
             </Button>
           </div>
-        </fieldset>
-      </form>
-    </div>
+        </fieldset >
+      </form >
+    </div >
   );
 }

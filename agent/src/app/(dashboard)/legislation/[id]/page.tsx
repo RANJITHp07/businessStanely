@@ -21,11 +21,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 import { Legislation, Task } from "@/types";
 import { FileText } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 export default function LegislationDetail({ params }: { params: Promise<{ id: string }> | { id: string } }) {
   const resolvedParams = params instanceof Promise ? use(params) : params;
 
-  const [legislation, setLegislation] = useState<Legislation | null>(null);
+  const [legislation, setLegislation] = useState<any | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
@@ -147,6 +148,7 @@ export default function LegislationDetail({ params }: { params: Promise<{ id: st
               <FileText className="h-5 w-5" />
               Legislation Tasks
             </CardTitle>
+            <Button onClick={() => router.push(`/task/create?legislationId=${resolvedParams.id}&assignedAgent=${legislation.assignedAgent.id}&client=${legislation.retainership.client?.id}`)}>Add Task</Button>
           </div>
         </CardHeader>
         <CardContent>
@@ -213,6 +215,6 @@ export default function LegislationDetail({ params }: { params: Promise<{ id: st
           </div>
         </CardContent>
       </Card>
-    </div>
+    </div >
   );
 }

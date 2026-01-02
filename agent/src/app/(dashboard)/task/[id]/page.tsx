@@ -80,6 +80,7 @@ interface Task {
     name: string;
     email: string;
   };
+  currentPeriodStart?: string;
   client: {
     id: string;
     clientType: string;
@@ -1226,6 +1227,15 @@ export default function TaskDetails() {
                       <div className="text-sm font-medium">Created</div>
                       <div className="text-sm text-muted-foreground">
                         {formatDateTime(task.createdAt)}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <div className="text-sm font-medium">Start Date</div>
+                      <div className="text-sm text-muted-foreground">
+                        {formatDateTime(task?.currentPeriodStart || task.createdAt)}
                       </div>
                     </div>
                   </div>

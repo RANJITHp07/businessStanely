@@ -376,7 +376,7 @@ export default function TaskForm({ id }: TaskFormProps) {
               recurring: task.recurring?.toString() || "0",
               recurringType: task.recurringType || "",
               triggerDate: task.triggerDate || "", // Ensure triggerDate is included
-              status: formData?.status
+              status: task?.status
             });
             if (task.category) {
               setCategorySearchQuery(task.category.name);
@@ -550,6 +550,7 @@ export default function TaskForm({ id }: TaskFormProps) {
 
     setIsSubmitting(true);
 
+    console.log(formData)
     try {
       const response = await fetch(url, {
         method,

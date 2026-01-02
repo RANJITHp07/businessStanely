@@ -296,7 +296,7 @@ export default function TaskForm() {
               recurring: task.recurring?.toString() || "0",
               recurringType: task.recurringType || "",
               triggerDate: task.triggerDate || "", // Ensure triggerDate is included
-              status: formData?.status
+              status: task?.status
             });
             if (task.category) {
               setCategorySearchQuery(task.category.name);

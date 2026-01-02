@@ -175,9 +175,9 @@ export default function LegislationDetail({ params }: { params: Promise<{ id: st
                       onClick={() => router.push(`/task/${task.id}`)}
                       className="cursor-pointer hover:bg-muted/50"
                     >
-                      <TableCell>{task.title}</TableCell>
-                      <TableCell>{task.description}</TableCell>
-                      <TableCell>{task.status}</TableCell>
+                      <TableCell className="max-w-xs  truncate">{task.title}</TableCell>
+                      <TableCell className="max-w-xs truncate">{task.description}</TableCell>
+                      <TableCell >{task.status}</TableCell>
                       {/* <TableCell className="text-right">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>

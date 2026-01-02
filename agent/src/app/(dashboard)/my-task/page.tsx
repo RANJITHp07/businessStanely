@@ -54,6 +54,7 @@ function sectionLabelToStatus(label: string) {
   const l = label.toLowerCase();
   if (l.includes("progress")) return "In Progress";
   if (l.includes("completed")) return "Completed";
+  if (l.includes("hold")) return "Hold";
   // default for New Task / todo
   return "To Do";
 }
@@ -215,12 +216,7 @@ export function SectionTable({ label, tasks, retainershipTasks }: { label: strin
                       </TableRow>
                     ) : (
                       tasks.map((t) => {
-                        const clientName = t.client
-                          ? t.client.clientType === "individual"
-                            ? `${t.client.firstName ?? ""} ${t.client.lastName ?? ""
-                              }`.trim()
-                            : t.client.organizationName ?? ""
-                          : "-";
+                        const clientName = t.client?.name || ""
                         const ownerName = t.assignedTo?.name ?? "-";
                         const shortId = `T-${t.id.slice(0, 6).toUpperCase()}`;
                         // build richer cells: category badge, client email, assigned role, priority badge, due date with overdue

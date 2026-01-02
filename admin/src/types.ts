@@ -81,6 +81,8 @@ export interface Task {
     status: string;
   };
   comments?: Comment[];
+  triggerDate?: string;
+  recurringType?: string;
   legislationId?: string; // Added to link tasks to legislations
   legislation?: {
     id: string;
@@ -89,7 +91,6 @@ export interface Task {
     status: string;
     createdAt: string;
     updatedAt: string;
-    triggerDate?: Date | null;
   }; // Added legislation object to include detailed information
 }
 

@@ -18,6 +18,8 @@ export async function POST(req: NextRequest) {
       categoryId,
       legislationId,
       recurring,
+      recurringType,
+      triggerDate,
     } = body;
 
     if (!title || !createdById) {
@@ -29,6 +31,8 @@ export async function POST(req: NextRequest) {
 
     const recurringValue =
       recurring && recurring !== "0" ? parseInt(recurring) : null;
+    const taskDueDate = dueDate ? new Date(dueDate) : null;
+    const taskTriggerDate = triggerDate ? new Date(triggerDate) : null;
 
     const newTask = await prisma.task.create({
       data: {
@@ -36,13 +40,15 @@ export async function POST(req: NextRequest) {
         description,
         status,
         priority,
-        dueDate,
+        dueDate: taskDueDate,
+        triggerDate: taskTriggerDate,
         clientId,
         createdById,
         assignedToId,
         categoryId: categoryId || undefined,
         legislationId: legislationId || null, // Save legislationId
         recurring: recurringValue, // Save recurring field
+        recurringType,
       },
       include: {
         client: true,
@@ -97,7 +103,10 @@ export async function GET(req: NextRequest) {
     const statusesParam = searchParams.get("statuses");
     let statusesArray: string[] | undefined = undefined;
     if (statusesParam) {
-      statusesArray = statusesParam.split(",").map(s => s.trim()).filter(Boolean);
+      statusesArray = statusesParam
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
     }
     // Build the where clause: if filtering by categoryId, allow any status; otherwise, only approved
     let whereClause: Prisma.TaskWhereInput;

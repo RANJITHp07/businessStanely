@@ -70,6 +70,14 @@ export default function ClientsTable() {
 
     const router = useRouter()
 
+    const getStatusBadge = (status: string, count: number) => {
+        return (
+            <Badge key={status} className="bg-gray-200 text-black">
+                {status.charAt(0).toUpperCase() + status.slice(1)}: {count}
+            </Badge>
+        );
+    };
+
     useEffect(() => {
         const fetchClients = async () => {
             try {

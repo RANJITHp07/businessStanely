@@ -1510,7 +1510,7 @@ export default function TaskForm({ id }: TaskFormProps) {
                       selected={dueDate}
                       onSelect={(date) => {
                         setDueDate(date);
-                        handleInputChange("triggerDate", null);
+                        handleInputChange("triggerDate", "");
                       }}
                       fromDate={new Date(formData.triggerDate || new Date())}
                       initialFocus

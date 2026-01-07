@@ -625,7 +625,7 @@ export default function TaskForm() {
   }, [agents, clients, legislationList]);
 
   const handleCategorySelection = (category: Category) => {
-    setFormData((prev) => ({ ...prev, categoryId: category.id, timePeriod: category.timePeriod }));
+    setFormData((prev) => ({ ...prev, categoryId: category.id }));
     setCategorySearchQuery(category.name);
     setShowCategorySuggestions(false);
 
@@ -1559,7 +1559,7 @@ export default function TaskForm() {
                               if (!date) return;
 
                               const formattedDate = format(date, "yyyy-MM-dd");
-                              handleInputChange("triggerDate", formattedDate);
+                              handleInputChange("triggerDate", date);
                             }}
                             initialFocus
                             disabled={

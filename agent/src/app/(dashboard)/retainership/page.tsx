@@ -90,7 +90,7 @@ export default function RetainershipTable() {
     const [itemsPerPage, setItemsPerPage] = useState(20)
     const [retainershipToDelete, setRetainershipToDelete] = useState<DashboardRetainership | null>(null)
     const [loading, setLoading] = useState(true)
-    const [activeTab, setActiveTab] = useState("approved")
+    const [activeTab, setActiveTab] = useState("my-retainerships")
     const [currentUserRole, setCurrentUserRole] = useState<string>("")
 
     const [myRetainerships, setMyRetainerships] = useState<DashboardRetainership[]>([]);
@@ -252,7 +252,7 @@ export default function RetainershipTable() {
         if (!retainershipToDelete) return
         try {
             // Call API to delete retainership
-            const response = await fetchWithAuth(`/api/task-retainerships/${retainershipToDelete.id}`, {
+            const response = await fetchWithAuth(`/api/retainerships/${retainershipToDelete.id}`, {
                 method: 'DELETE',
             })
 

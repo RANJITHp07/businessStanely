@@ -195,7 +195,7 @@ export default function RetainershipTable() {
     try {
       // Call API to delete retainership
       const response = await fetchWithAuth(
-        `/api/task-retainerships/${retainershipToDelete.id}`,
+        `/api/retainerships/${retainershipToDelete.id}`,
         {
           method: "DELETE",
         }

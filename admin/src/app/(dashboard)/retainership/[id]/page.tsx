@@ -482,6 +482,22 @@ export default function RetainershipDetail({ params }: { params: Promise<{ id: s
                                                                     Edit
                                                                 </button>
                                                             </DropdownMenuItem>
+                                                            <DropdownMenuItem asChild>
+                                                                <button className="flex items-center w-full" onClick={() => {
+                                                                    setIsEdit(true)
+                                                                    setModalFormData({
+                                                                        id: legislation.id,
+                                                                        title: legislation.title,
+                                                                        description: legislation.description!,
+                                                                        assignedAgent: legislation.assignedAgent?.name || legislation.assignedAgent,
+                                                                    })
+                                                                    setModalAgentSearch(legislation.assignedAgent?.name || legislation?.assignedAgent! as any)
+                                                                    setIsModalOpen(true)
+                                                                }}>
+                                                                    <Pen className="mr-2 h-4 w-4" />
+                                                                    Delete
+                                                                </button>
+                                                            </DropdownMenuItem>
 
                                                             {retainership.status !== "pending" && (
                                                                 <DropdownMenuItem asChild>

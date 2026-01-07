@@ -284,7 +284,7 @@ export default function TaskForm({ id }: TaskFormProps) {
         clientId: client || prev.clientId,
       }));
 
-      setIsFromRetainership(true); // Mark the form as coming from retainership
+      // setIsFromRetainership(true); // Mark the form as coming from retainership
 
       if (assignedAgent) {
         const selectedAgent = agents.find((agent) => agent.id === assignedAgent);
@@ -686,7 +686,7 @@ export default function TaskForm({ id }: TaskFormProps) {
   }, [agents]);
 
   const handleCategorySelection = (category: Category) => {
-    setFormData((prev) => ({ ...prev, categoryId: category.id, timePeriod: category.timePeriod }));
+    setFormData((prev) => ({ ...prev, categoryId: category.id }));
     setCategorySearchQuery(category.name);
     setShowCategorySuggestions(false);
     setSelectedCategory(category);
@@ -1295,7 +1295,10 @@ export default function TaskForm({ id }: TaskFormProps) {
                       id="contact-number"
                       placeholder="Contact number will auto-fill"
                       value={selectedClient?.phoneNumber || ""}
-                      onChange={(e) => handleInputChange("phoneNumber", e.target.value)}
+                      onChange={(e) => handleNewClientInputChange(
+                        "phoneNumber",
+                        e.target.value
+                      )}
                       className="pl-10"
                       required
                     />
@@ -1628,7 +1631,7 @@ export default function TaskForm({ id }: TaskFormProps) {
                               if (!date) return;
 
                               const formattedDate = format(date, "yyyy-MM-dd");
-                              handleInputChange("triggerDate", formattedDate);
+                              handleInputChange("triggerDate", date);
                             }}
                             initialFocus
                             disabled={

@@ -1,5 +1,6 @@
 "use client"
 import { useState, useEffect } from "react"
+import { useAgentContext } from "@/lib/agent-context"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -47,6 +48,7 @@ interface Opportunity {
 const statuses = ["Proposal Issued", "Closed as Won", "Closed as Loss"]
 
 export default function OpportunitiesTable() {
+    const agent = useAgentContext();
     const router = useRouter()
     const searchParams = useSearchParams()
     const [opportunities, setOpportunities] = useState<Opportunity[]>([])
@@ -59,102 +61,48 @@ export default function OpportunitiesTable() {
     useEffect(() => {
         const statusParam = searchParams?.get("status")
         if (statusParam) {
-            setSelectedStatuses([statusParam])
+            // Normalize status to match backend data
+            const normalized =
+                statusParam.toLowerCase() === "proposal issued".toLowerCase() ? "Proposal Issued" :
+                statusParam.toLowerCase() === "closed as won".toLowerCase() ? "Closed as Won" :
+                statusParam.toLowerCase() === "closed as loss".toLowerCase() ? "Closed as Loss" : statusParam;
+            setSelectedStatuses([normalized]);
         }
     }, [searchParams])
 
-    useEffect(() => {
-        // Mock API call - replace with actual API
-        setTimeout(() => {
-            const mockOpportunities: Opportunity[] = [
-                {
-                    id: "1a2b3c",
-                    name: "Acme Corp",
-                    phoneNumber: "+1 234-567-8900",
-                    description: "Enterprise software license for 100 users",
-                    amount: 50000,
-                    nextFollowUp: "2025-01-20",
-                    status: "Proposal Issued",
-                },
-                {
-                    id: "4d5e6f",
-                    name: "Tech Solutions Inc",
-                    phoneNumber: "+1 234-567-8901",
-                    description: "Cloud migration and consulting services",
-                    amount: 125000,
-                    nextFollowUp: "2025-01-15",
-                    status: "Closed as Won",
-                },
-                {
-                    id: "7g8h9i",
-                    name: "Global Enterprises",
-                    phoneNumber: "+1 234-567-8902",
-                    description: "Annual support contract renewal",
-                    amount: 35000,
-                    nextFollowUp: "2025-01-18",
-                    status: "Closed as Loss",
-                },
-                {
-                    id: "0j1k2l",
-                    name: "StartUp Innovations",
-                    phoneNumber: "+1 234-567-8903",
-                    description: "Custom app development project",
-                    amount: 75000,
-                    nextFollowUp: "2025-01-22",
-                    status: "Proposal Issued",
-                },
-                {
-                    id: "3m4n5o",
-                    name: "Retail Chain Co",
-                    phoneNumber: "+1 234-567-8904",
-                    description: "POS system integration",
-                    amount: 90000,
-                    nextFollowUp: "2025-01-12",
-                    status: "Closed as Won",
-                },
-                {
-                    id: "6p7q8r",
-                    name: "Manufacturing Ltd",
-                    phoneNumber: "+1 234-567-8905",
-                    description: "ERP system implementation",
-                    amount: 200000,
-                    nextFollowUp: "2025-02-01",
-                    status: "Proposal Issued",
-                },
-                {
-                    id: "9s0t1u",
-                    name: "Healthcare Group",
-                    phoneNumber: "+1 234-567-8906",
-                    description: "HIPAA compliant data management solution",
-                    amount: 150000,
-                    nextFollowUp: "2025-01-28",
-                    status: "Closed as Loss",
-                },
-                {
-                    id: "2v3w4x",
-                    name: "Financial Services Co",
-                    phoneNumber: "+1 234-567-8907",
-                    description: "Cybersecurity audit and implementation",
-                    amount: 180000,
-                    nextFollowUp: "2025-01-25",
-                    status: "Closed as Won",
-                },
-            ]
-            setOpportunities(mockOpportunities)
-            setLoading(false)
-        }, 500)
-    }, [])
 
-    const filteredOpportunities = opportunities.filter((opportunity) => {
+    useEffect(() => {
+        setLoading(true);
+        fetch('/api/opportunities')
+            .then(res => res.json())
+            .then(data => {
+                setOpportunities(data.opportunities || []);
+                setLoading(false);
+            })
+            .catch(() => {
+                setOpportunities([]);
+                setLoading(false);
+            });
+    }, []);
+
+    // Client-side role-based filtering
+    const filteredOpportunities = opportunities.filter((opportunity: any) => {
+        if (!agent) return false;
+        // If the API already filters, this is a safeguard for extra safety
+        if (agent.agentType === "Lead Maker") {
+            if (opportunity.prospect?.createdByAgentId !== agent.id) return false;
+        } else if (agent.agentType === "Client Advisor" || agent.agentType === "Client Manager") {
+            if (opportunity.prospect?.assignedAgentId !== agent.id) return false;
+        }
         const matchesSearch =
             opportunity.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
             opportunity.phoneNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            opportunity.description.toLowerCase().includes(searchTerm.toLowerCase())
+            opportunity.description.toLowerCase().includes(searchTerm.toLowerCase());
 
-        const matchesStatus = selectedStatuses.length === 0 || selectedStatuses.includes(opportunity.status)
+        const matchesStatus = selectedStatuses.length === 0 || selectedStatuses.includes(opportunity.status);
 
-        return matchesSearch && matchesStatus
-    })
+        return matchesSearch && matchesStatus;
+    });
 
     const totalPages = Math.ceil(filteredOpportunities.length / itemsPerPage)
     const startIndex = (currentPage - 1) * itemsPerPage

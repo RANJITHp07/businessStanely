@@ -1,3 +1,40 @@
+model Prospect {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  name          String
+  email         String?
+  phone         String?
+  phoneNumber   String?
+  description   String?
+  amount        Float?
+  status        String   @default("New") // e.g., New, Contacted, Qualified, Lost, Converted
+  notes         String?
+  nextFollowUp  DateTime?
+  assignedAgentId String? @db.ObjectId
+  assignedAgent   Agent?  @relation("AgentAssignedProspects", fields: [assignedAgentId], references: [id])
+  createdByAgentId String? @db.ObjectId
+  createdByAgent   Agent?  @relation("AgentCreatedProspects", fields: [createdByAgentId], references: [id])
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  opportunities Opportunity[] @relation("ProspectOpportunities")
+  archived      Boolean  @default(false) // If true, this prospect is archived (e.g., converted to opportunity)
+  leadSource    String? // Source of the lead (e.g., Referral, Website, etc.)
+  comments      Comment[] // Comments/interactions for this prospect
+}
+
+model Opportunity {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  name          String
+  phoneNumber   String?
+  description   String?
+  amount        Float?
+  nextFollowUp  DateTime?
+  status        String   @default("Proposal Issued") // "Proposal Issued", "Closed as Won", "Closed as Loss"
+  prospectId    String   @db.ObjectId
+  prospect      Prospect @relation("ProspectOpportunities", fields: [prospectId], references: [id])
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  comments      Comment[] // Comments/interactions for this opportunity
+}
 datasource db {
   provider = "mongodb"
   url      = env("DATABASE_URL")
@@ -85,6 +122,9 @@ model Agent {
   phoneNumber          String
   secondaryPhoneNumber String?
   agentType            String
+  agentRole            String    @default("Execution Agent") // "Execution Agent" or "Advisor Agent"
+  // For Advisor Agent, agentType can be: "Lead Maker", "Client Advisor", "Client Manager"
+  // For Execution Agent, agentType can be: "CEO", "Partner", "Manager", etc. (existing types)
   barAssociationId     String
   jurisdiction         String
   specializations      String[]
@@ -115,6 +155,11 @@ model Agent {
 
   // Legislation relations
   legislations Legislation[] @relation("AgentLegislations")
+
+  // Prospects assigned to this agent
+  assignedProspects Prospect[] @relation("AgentAssignedProspects")
+  // Prospects created by this agent
+  createdProspects Prospect[] @relation("AgentCreatedProspects")
 
   // Service Records relation
   serviceRecords ServiceRecord[] @relation("AgentServiceRecords")
@@ -247,8 +292,12 @@ model Comment {
   attachmentSize Int?
   attachmentType String?
 
-  taskId String @db.ObjectId
-  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  taskId String? @db.ObjectId
+  task   Task?   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  prospectId   String? @db.ObjectId
+  prospect     Prospect? @relation(fields: [prospectId], references: [id])
+  opportunityId String? @db.ObjectId
+  opportunity   Opportunity? @relation(fields: [opportunityId], references: [id])
 
   // Author can be either a User or an Agent
   authorId   String @db.ObjectId

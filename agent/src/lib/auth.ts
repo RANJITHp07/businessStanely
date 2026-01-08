@@ -8,13 +8,21 @@ export interface AgentJWTPayload {
   name: string;
   email: string;
   agentType: string;
+  agentRole: 'Execution Agent' | 'Advisor Agent';
   sessionToken?: string;
 }
 
 export async function getCurrentAgent(req: NextRequest) {
   try {
-    // Get token from cookie
-    const token = req.cookies.get("agent-auth-token")?.value;
+    // Try to get token from Authorization header first
+    let token = null;
+    const authHeader = req.headers.get("authorization");
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      token = authHeader.replace("Bearer ", "");
+    } else {
+      // Fallback to cookie
+      token = req.cookies.get("agent-auth-token")?.value;
+    }
     if (!token) {
       return null;
     }
@@ -35,6 +43,7 @@ export async function getCurrentAgent(req: NextRequest) {
         name: true,
         email: true,
         agentType: true,
+        agentRole: true,
         status: true,
         phoneNumber: true,
         jurisdiction: true,

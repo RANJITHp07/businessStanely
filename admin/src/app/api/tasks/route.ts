@@ -94,11 +94,10 @@ export async function GET(req: NextRequest) {
     const clientId = searchParams.get("clientId");
     const categoryId = searchParams.get("categoryId");
     const status = searchParams.get("status");
+    // Parse statuses as a comma-separated list
     const statusesParam = searchParams.get("statuses");
-    let statusesArray: string[] | undefined = undefined;
-    if (statusesParam) {
-      statusesArray = statusesParam.split(",").map(s => s.trim()).filter(Boolean);
-    }
+    const statusesArray = statusesParam ? statusesParam.split(",").map(s => s.trim()).filter(Boolean) : undefined;
+
     // Build the where clause: if filtering by categoryId, allow any status; otherwise, only approved
     let whereClause: Prisma.TaskWhereInput;
     if (categoryId) {

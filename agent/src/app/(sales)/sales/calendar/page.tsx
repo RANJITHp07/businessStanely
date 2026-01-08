@@ -25,87 +25,20 @@ import {
     DialogTrigger,
 } from "@/components/ui/dialog"
 
-// Mock followup data
-const followups = [
-    {
-        id: 1,
-        date: "2025-06-15",
-        time: "10:00 AM",
-        client: "Acme Corporation",
-        phone: "+1 (555) 123-4567",
-        type: "Demo Call",
-        description:
-            "Product demonstration for enterprise package. Discuss features, pricing, and implementation timeline.",
-        status: "upcoming",
-        priority: "high",
-    },
-    {
-        id: 2,
-        date: "2025-06-15",
-        time: "2:00 PM",
-        client: "TechStart Solutions",
-        phone: "+1 (555) 234-5678",
-        type: "Contract Discussion",
-        description: "Review contract terms and negotiate pricing. Address concerns about service level agreements.",
-        status: "upcoming",
-        priority: "medium",
-    },
-    {
-        id: 3,
-        date: "2025-06-14",
-        time: "11:00 AM",
-        client: "Global Industries",
-        phone: "+1 (555) 345-6789",
-        type: "Follow-up Call",
-        description: "Follow up on proposal sent last week. Discuss budget allocation and decision timeline.",
-        status: "missed",
-        priority: "high",
-    },
-    {
-        id: 4,
-        date: "2025-06-16",
-        time: "9:00 AM",
-        client: "Digital Ventures",
-        phone: "+1 (555) 456-7890",
-        type: "Proposal Review",
-        description: "Walk through custom proposal and answer technical questions from the IT team.",
-        status: "upcoming",
-        priority: "high",
-    },
-    {
-        id: 5,
-        date: "2025-06-16",
-        time: "3:30 PM",
-        client: "Smart Systems Inc",
-        phone: "+1 (555) 567-8901",
-        type: "Pricing Discussion",
-        description: "Negotiate volume pricing for annual contract. Discuss payment terms and delivery schedule.",
-        status: "upcoming",
-        priority: "low",
-    },
-    {
-        id: 6,
-        date: "2025-06-13",
-        time: "4:00 PM",
-        client: "Innovation Labs",
-        phone: "+1 (555) 678-9012",
-        type: "Check-in Call",
-        description: "Regular check-in with existing client. Discuss satisfaction and potential upsell opportunities.",
-        status: "missed",
-        priority: "medium",
-    },
-    {
-        id: 7,
-        date: "2025-06-17",
-        time: "1:00 PM",
-        client: "Enterprise Corp",
-        phone: "+1 (555) 789-0123",
-        type: "Quarterly Review",
-        description: "Quarterly business review meeting. Present performance metrics and discuss expansion plans.",
-        status: "upcoming",
-        priority: "high",
-    },
-]
+
+import { useEffect } from "react"
+
+type Followup = {
+  id: string
+  date: string
+  time?: string
+  client?: string
+  phone?: string
+  type?: string
+  description?: string
+  status?: string
+  priority?: string
+}
 
 const daysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
 const months = [
@@ -123,12 +56,50 @@ const months = [
     "December",
 ]
 
+
 export default function CalendarPage() {
-    const router = useRouter()
-    const [currentDate, setCurrentDate] = useState(new Date(2025, 5, 15)) // June 15, 2025
-    const [selectedDate, setSelectedDate] = useState<Date | null>(new Date(2025, 5, 15))
+    const [currentDate, setCurrentDate] = useState(new Date())
+    const [selectedDate, setSelectedDate] = useState<Date | null>(new Date())
     const [isFilterOpen, setIsFilterOpen] = useState(false)
-    const [selectedFollowup, setSelectedFollowup] = useState<(typeof followups)[0] | null>(null)
+    const [selectedFollowup, setSelectedFollowup] = useState<Followup | null>(null)
+    const [followups, setFollowups] = useState<Followup[]>([])
+
+    useEffect(() => {
+        async function fetchFollowups() {
+            const resProspects = await fetch("/api/prospects")
+            const dataProspects = await resProspects.json()
+            const prospectFollowups: Followup[] = (dataProspects.prospects || [])
+                .filter((p: { nextFollowUp?: string }) => p.nextFollowUp)
+                .map((p: { id: string, nextFollowUp: string, name: string, phoneNumber?: string, description?: string }) => ({
+                    id: p.id,
+                    date: typeof p.nextFollowUp === 'string' ? p.nextFollowUp.split("T")[0] : '',
+                    time: typeof p.nextFollowUp === 'string' && p.nextFollowUp.includes('T') ? p.nextFollowUp.split("T")[1]?.slice(0, 5) : '',
+                    client: p.name,
+                    phone: p.phoneNumber,
+                    type: "Prospect Follow-up",
+                    description: p.description,
+                    status: "upcoming",
+                    priority: "medium",
+                }))
+            const resTasks = await fetch("/api/tasks")
+            const dataTasks = await resTasks.json()
+            const taskFollowups: Followup[] = (dataTasks.tasks || [])
+                .filter((t: { dueDate?: string }) => t.dueDate)
+                .map((t: { id: string, dueDate: string, client?: { name?: string, phoneNumber?: string }, title?: string, description?: string, status?: string, priority?: string }) => ({
+                    id: t.id,
+                    date: typeof t.dueDate === 'string' ? t.dueDate.split("T")[0] : '',
+                    time: typeof t.dueDate === 'string' && t.dueDate.includes('T') ? t.dueDate.split("T")[1]?.slice(0, 5) : '',
+                    client: t.client?.name,
+                    phone: t.client?.phoneNumber,
+                    type: t.title,
+                    description: t.description,
+                    status: t.status,
+                    priority: t.priority,
+                }))
+            setFollowups([...prospectFollowups, ...taskFollowups])
+        }
+        fetchFollowups()
+    }, [])
 
     const getDaysInMonth = (date: Date) => {
         const year = date.getFullYear()
@@ -137,19 +108,9 @@ export default function CalendarPage() {
         const lastDay = new Date(year, month + 1, 0)
         const daysInMonth = lastDay.getDate()
         const startingDayOfWeek = firstDay.getDay()
-
-        const days = []
-
-        // Add empty cells for days before the first day of the month
-        for (let i = 0; i < startingDayOfWeek; i++) {
-            days.push(null)
-        }
-
-        // Add all days of the month
-        for (let day = 1; day <= daysInMonth; day++) {
-            days.push(new Date(year, month, day))
-        }
-
+        const days = [] as (Date | null)[]
+        for (let i = 0; i < startingDayOfWeek; i++) days.push(null)
+        for (let day = 1; day <= daysInMonth; day++) days.push(new Date(year, month, day))
         return days
     }
 
@@ -158,35 +119,24 @@ export default function CalendarPage() {
         return followups.filter((f) => f.date === dateString)
     }
 
-    const previousMonth = () => {
-        setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1))
-    }
-
-    const nextMonth = () => {
-        setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1))
-    }
+    const previousMonth = () => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1))
+    const nextMonth = () => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1))
 
     const days = getDaysInMonth(currentDate)
     const missedFollowups = followups.filter((f) => f.status === "missed")
     const upcomingFollowups = followups.filter((f) => f.status === "upcoming")
     const selectedDateFollowups = selectedDate ? getFollowupsForDate(selectedDate) : []
 
-    const getPriorityColor = (priority: string) => {
+    const getPriorityColor = (priority: string | undefined) => {
         switch (priority) {
-            case "high":
-                return "bg-red-100 text-red-700 border-red-300"
-            case "medium":
-                return "bg-amber-100 text-amber-700 border-amber-300"
-            case "low":
-                return "bg-blue-100 text-blue-700 border-blue-300"
-            default:
-                return "bg-gray-100 text-gray-700 border-gray-300"
+            case "high": return "bg-red-100 text-red-700 border-red-300"
+            case "medium": return "bg-amber-100 text-amber-700 border-amber-300"
+            case "low": return "bg-blue-100 text-blue-700 border-blue-300"
+            default: return "bg-gray-100 text-gray-700 border-gray-300"
         }
     }
 
-    const getStatusBadge = (status: string) => {
-        return status === "missed" ? "bg-red-500 text-white" : "bg-green-500 text-white"
-    }
+    const getStatusBadge = (status: string | undefined) => status === "missed" ? "bg-red-500 text-white" : "bg-green-500 text-white"
 
     return (
         <div className="min-h-screen flex flex-col p-6 space-y-6 bg-gradient-to-br from-slate-50 to-blue-50">

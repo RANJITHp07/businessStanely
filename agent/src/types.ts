@@ -1,17 +1,28 @@
 export interface Prospect {
   id: string;
   name: string;
-  phoneNumber: string;
+  email?: string;
+  phone?: string;
+  phoneNumber?: string;
   address?: string;
-  email: string;
   leadSource?: string;
   description?: string;
+  nextFollowUp?: string;
+  lastFollowUp?: string;
+  status: string; // e.g., New, Contacted, Qualified, Lost, Converted
   notes?: string;
-  status: string; // e.g. 'prospect', 'opportunity', etc.
   assignedTo?: string;
-  reminderDate?: string;
+  createdByAgentId?: string;
+  createdByAgent?: {
+    id: string;
+    name: string;
+    email: string;
+  };
+  assignedAgentId?: string;
+  assignedAgent?: Agent;
   createdAt: string;
   updatedAt: string;
+  archived?: boolean;
 }
 export interface TaskCategory {
   id: string;
@@ -53,6 +64,7 @@ export interface Agent {
   phoneNumber: string;
   secondaryPhoneNumber: string | null;
   agentType: string;
+  agentRole: 'Execution Agent' | 'Advisor Agent';
   barAssociationId: string;
   jurisdiction: string;
   specializations: string[];

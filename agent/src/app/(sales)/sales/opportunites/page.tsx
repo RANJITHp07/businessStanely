@@ -239,14 +239,14 @@ function SectionTable({ label, opportunities }: { label: string; opportunities: 
                                                                 <Tooltip>
                                                                     <TooltipTrigger asChild>
                                                                         <Link
-                                                                            href={`/sales/opportunities/table?status=${encodeURIComponent(opp.status)}`}
+                                                                            href={`/sales/opportunites/${opp.id}`}
                                                                             className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-muted"
                                                                             aria-label="View opportunities with this status"
                                                                         >
                                                                             <Eye className="h-5 w-5" />
                                                                         </Link>
                                                                     </TooltipTrigger>
-                                                                    <TooltipContent sideOffset={6}>View opportunities with this status</TooltipContent>
+                                                                    <TooltipContent sideOffset={6}>View opportunity details</TooltipContent>
                                                                 </Tooltip>
                                                             </TooltipProvider>
                                                         </TableCell>
@@ -275,14 +275,14 @@ function SectionTable({ label, opportunities }: { label: string; opportunities: 
                                                         <Tooltip>
                                                             <TooltipTrigger asChild>
                                                                 <Link
-                                                                    href={`/sales/opportunities/table?status=${encodeURIComponent(opp.status)}`}
+                                                                    href={`/sales/opportunites/${opp.id}`}
                                                                     className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-muted"
                                                                     aria-label="View opportunities"
                                                                 >
                                                                     <Eye className="h-4 w-4" />
                                                                 </Link>
                                                             </TooltipTrigger>
-                                                            <TooltipContent sideOffset={6}>View opportunities with this status</TooltipContent>
+                                                            <TooltipContent sideOffset={6}>View opportunity details</TooltipContent>
                                                         </Tooltip>
                                                     </TooltipProvider>
                                                 </div>
@@ -335,60 +335,32 @@ export default function OpportunitiesPage() {
     const [opportunities, setOpportunities] = useState<Opportunity[]>([])
     const [loading, setLoading] = useState(true)
 
-    // Mock data - replace with actual API call
     useEffect(() => {
-        // Simulate API call
-        setTimeout(() => {
-            const mockOpportunities: Opportunity[] = [
-                {
-                    id: "1a2b3c",
-                    name: "Acme Corp",
-                    phoneNumber: "+1 234-567-8900",
-                    description: "Enterprise software license for 100 users",
-                    amount: 50000,
-                    nextFollowUp: "2025-01-20",
-                    status: "Proposal Issued",
-                },
-                {
-                    id: "4d5e6f",
-                    name: "Tech Solutions Inc",
-                    phoneNumber: "+1 234-567-8901",
-                    description: "Cloud migration and consulting services",
-                    amount: 125000,
-                    nextFollowUp: "2025-01-15",
-                    status: "Closed as Won",
-                },
-                {
-                    id: "7g8h9i",
-                    name: "Global Enterprises",
-                    phoneNumber: "+1 234-567-8902",
-                    description: "Annual support contract renewal",
-                    amount: 35000,
-                    nextFollowUp: "2025-01-18",
-                    status: "Closed as Loss",
-                },
-                {
-                    id: "0j1k2l",
-                    name: "StartUp Innovations",
-                    phoneNumber: "+1 234-567-8903",
-                    description: "Custom app development project",
-                    amount: 75000,
-                    nextFollowUp: "2025-01-22",
-                    status: "Proposal Issued",
-                },
-                {
-                    id: "3m4n5o",
-                    name: "Retail Chain Co",
-                    phoneNumber: "+1 234-567-8904",
-                    description: "POS system integration",
-                    amount: 90000,
-                    nextFollowUp: "2025-01-12",
-                    status: "Closed as Won",
-                },
-            ]
-            setOpportunities(mockOpportunities)
+        async function fetchOpportunities() {
+            setLoading(true)
+            try {
+                const res = await fetch("/api/opportunities", { method: "GET" })
+                if (!res.ok) throw new Error("Failed to fetch opportunities")
+                const data = await res.json()
+                // Ensure all frontend fields are present, fallback to empty string/zero if missing
+                const safeData = Array.isArray(data.opportunities)
+                    ? data.opportunities.map((opp: Opportunity) => ({
+                        id: opp.id || "",
+                        name: opp.name || "",
+                        phoneNumber: opp.phoneNumber || "",
+                        description: opp.description || "",
+                        amount: typeof opp.amount === "number" ? opp.amount : 0,
+                        nextFollowUp: opp.nextFollowUp || "",
+                        status: opp.status || "Proposal Issued",
+                    }))
+                    : []
+                setOpportunities(safeData)
+            } catch {
+                setOpportunities([])
+            }
             setLoading(false)
-        }, 500)
+        }
+        fetchOpportunities()
     }, [])
 
     const proposalOpportunities = opportunities.filter((o) => o.status === "Proposal Issued")

@@ -17,6 +17,7 @@ interface Prospect {
     description: string
     nextFollowUp?: string
     status: "New" | "In Progress"
+    archived?: boolean
 }
 
 function formatDate(dateString?: string) {
@@ -198,14 +199,14 @@ function SectionTable({ label, prospects }: { label: string; prospects: Prospect
                                                                 <Tooltip>
                                                                     <TooltipTrigger asChild>
                                                                         <Link
-                                                                            href={`/sales/prospects/table?status=${encodeURIComponent(p.status)}`}
+                                                                            href={`/sales/prospects/${p.id}`}
                                                                             className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-muted"
-                                                                            aria-label="View prospects with this status"
+                                                                            aria-label="View prospect details"
                                                                         >
                                                                             <Eye className="h-5 w-5" />
                                                                         </Link>
                                                                     </TooltipTrigger>
-                                                                    <TooltipContent sideOffset={6}>View prospects with this status</TooltipContent>
+                                                                    <TooltipContent sideOffset={6}>View prospect details</TooltipContent>
                                                                 </Tooltip>
                                                             </TooltipProvider>
                                                         </TableCell>
@@ -234,9 +235,9 @@ function SectionTable({ label, prospects }: { label: string; prospects: Prospect
                                                         <Tooltip>
                                                             <TooltipTrigger asChild>
                                                                 <Link
-                                                                    href={`/sales/prospects/table?status=${encodeURIComponent(p.status)}`}
+                                                                    href={`/sales/prospects/${p.id}`}
                                                                     className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-muted"
-                                                                    aria-label="View prospects"
+                                                                    aria-label="View prospect details"
                                                                 >
                                                                     <Eye className="h-4 w-4" />
                                                                 </Link>
@@ -286,39 +287,22 @@ export default function ProspectsPage() {
     const [prospects, setProspects] = useState<Prospect[]>([])
     const [loading, setLoading] = useState(true)
 
-    // Mock data - replace with actual API call
     useEffect(() => {
-        // Simulate API call
-        setTimeout(() => {
-            const mockProspects: Prospect[] = [
-                {
-                    id: "1a2b3c",
-                    name: "John Doe",
-                    phoneNumber: "+1 234-567-8900",
-                    description: "Interested in legal consultation for business setup",
-                    nextFollowUp: "2025-01-20",
-                    status: "New",
-                },
-                {
-                    id: "4d5e6f",
-                    name: "Jane Smith",
-                    phoneNumber: "+1 234-567-8901",
-                    description: "Needs assistance with contract review",
-                    nextFollowUp: "2025-01-22",
-                    status: "In Progress",
-                },
-                {
-                    id: "7g8h9i",
-                    name: "Bob Johnson",
-                    phoneNumber: "+1 234-567-8902",
-                    description: "Looking for trademark registration services",
-                    nextFollowUp: "2025-01-18",
-                    status: "New",
-                },
-            ]
-            setProspects(mockProspects)
-            setLoading(false)
-        }, 500)
+        setLoading(true)
+        fetch('/api/prospects')
+            .then(res => res.json())
+            .then(data => {
+                if (data.prospects) {
+                    setProspects(data.prospects.filter((p: Prospect) => !p.archived))
+                } else {
+                    setProspects([])
+                }
+                setLoading(false)
+            })
+            .catch(() => {
+                setProspects([])
+                setLoading(false)
+            })
     }, [])
 
     const newProspects = prospects.filter((p) => p.status === "New")

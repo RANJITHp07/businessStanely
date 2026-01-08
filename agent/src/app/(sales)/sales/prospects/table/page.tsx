@@ -1,5 +1,6 @@
 "use client"
 import { useState, useEffect } from "react"
+import { useAgentContext } from "@/lib/agent-context"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -32,20 +33,13 @@ import {
     DropdownMenuTrigger,
     DropdownMenuCheckboxItem,
 } from "@/components/ui/dropdown-menu"
-import Link from "next/link"
 
-interface Prospect {
-    id: string
-    name: string
-    phoneNumber: string
-    description: string
-    nextFollowUp?: string
-    status: "New" | "In Progress"
-}
+import type { Prospect } from "@/types"
 
 const statuses = ["New", "In Progress"]
 
 export default function ProspectsTable() {
+    const agent = useAgentContext();
     const router = useRouter()
     const searchParams = useSearchParams()
     const [prospects, setProspects] = useState<Prospect[]>([])
@@ -54,6 +48,25 @@ export default function ProspectsTable() {
     const [selectedStatuses, setSelectedStatuses] = useState<string[]>([])
     const [currentPage, setCurrentPage] = useState(1)
     const [itemsPerPage, setItemsPerPage] = useState(20)
+    const [deletingId, setDeletingId] = useState<string | null>(null);
+
+    // Delete handler
+    const handleDelete = async (id: string) => {
+        if (!window.confirm("Are you sure you want to delete this prospect?")) return;
+        setDeletingId(id);
+        try {
+            const res = await fetch(`/api/prospects/${id}`, { method: "DELETE" });
+            if (res.ok) {
+                setProspects((prev) => prev.filter((p) => p.id !== id));
+            } else {
+                alert("Failed to delete prospect.");
+            }
+        } catch {
+            alert("Failed to delete prospect.");
+        } finally {
+            setDeletingId(null);
+        }
+    };
 
     useEffect(() => {
         const statusParam = searchParams?.get("status")
@@ -63,57 +76,38 @@ export default function ProspectsTable() {
     }, [searchParams])
 
     useEffect(() => {
-        // Mock API call - replace with actual API
-        setTimeout(() => {
-            const mockProspects: Prospect[] = [
-                {
-                    id: "1a2b3c",
-                    name: "John Doe",
-                    phoneNumber: "+1 234-567-8900",
-                    description: "Interested in legal consultation for business setup",
-                    nextFollowUp: "2025-01-20",
-                    status: "New",
-                },
-                {
-                    id: "4d5e6f",
-                    name: "Jane Smith",
-                    phoneNumber: "+1 234-567-8901",
-                    description: "Needs assistance with contract review",
-                    nextFollowUp: "2025-01-22",
-                    status: "In Progress",
-                },
-                {
-                    id: "7g8h9i",
-                    name: "Bob Johnson",
-                    phoneNumber: "+1 234-567-8902",
-                    description: "Looking for trademark registration services",
-                    nextFollowUp: "2025-01-18",
-                    status: "New",
-                },
-                {
-                    id: "0j1k2l",
-                    name: "Alice Williams",
-                    phoneNumber: "+1 234-567-8903",
-                    description: "Requires immigration law assistance",
-                    nextFollowUp: "2025-01-25",
-                    status: "In Progress",
-                },
-            ]
-            setProspects(mockProspects)
-            setLoading(false)
-        }, 500)
-    }, [])
+        setLoading(true);
+        fetch('/api/prospects')
+            .then(res => res.json())
+            .then(data => {
+                if (data.prospects) {
+                    setProspects(data.prospects);
+                } else {
+                    setProspects([]);
+                }
+                setLoading(false);
+            })
+            .catch(() => {
+                setProspects([]);
+                setLoading(false);
+            });
+    }, []);
 
     const filteredProspects = prospects.filter((prospect) => {
+        if (!agent) return false;
+        // Lead Maker: only created prospects
+        if (agent.agentType === "Lead Maker") {
+            if (prospect.createdByAgentId !== agent.id) return false;
+        } else if (agent.agentType === "Client Advisor" || agent.agentType === "Client Manager") {
+            if (prospect.assignedAgentId !== agent.id) return false;
+        }
         const matchesSearch =
             prospect.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            prospect.phoneNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            prospect.description.toLowerCase().includes(searchTerm.toLowerCase())
-
-        const matchesStatus = selectedStatuses.length === 0 || selectedStatuses.includes(prospect.status)
-
-        return matchesSearch && matchesStatus
-    })
+            (prospect.phoneNumber ?? "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (prospect.description ?? "").toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesStatus = selectedStatuses.length === 0 || selectedStatuses.includes(prospect.status);
+        return matchesSearch && matchesStatus;
+    });
 
     const totalPages = Math.ceil(filteredProspects.length / itemsPerPage)
     const startIndex = (currentPage - 1) * itemsPerPage
@@ -318,18 +312,18 @@ export default function ProspectsTable() {
                                                             </DropdownMenuTrigger>
                                                             <DropdownMenuContent align="end">
                                                                 <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                                                <DropdownMenuItem onClick={() => router.push("/sales/prospects/1")}>
+                                                                <DropdownMenuItem onClick={() => router.push(`/sales/prospects/${prospect.id}`)}>
                                                                     <Eye className="mr-2 h-4 w-4" />
                                                                     View
                                                                 </DropdownMenuItem>
-                                                                <DropdownMenuItem>
+                                                                <DropdownMenuItem onClick={() => router.push(`/sales/prospects/${prospect.id}/edit`)}>
                                                                     <Edit className="mr-2 h-4 w-4" />
                                                                     Edit
                                                                 </DropdownMenuItem>
                                                                 <DropdownMenuSeparator />
-                                                                <DropdownMenuItem className="text-destructive">
+                                                                <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(prospect.id)} disabled={deletingId === prospect.id}>
                                                                     <Trash2 className="mr-2 h-4 w-4" />
-                                                                    Delete
+                                                                    {deletingId === prospect.id ? "Deleting..." : "Delete"}
                                                                 </DropdownMenuItem>
                                                             </DropdownMenuContent>
                                                         </DropdownMenu>

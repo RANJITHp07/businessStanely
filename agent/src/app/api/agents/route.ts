@@ -4,10 +4,6 @@ import prisma from '@/lib/prisma';
 export async function GET() {
   try {
     const agents = await prisma.agent.findMany({
-      include: {
-        superior: true,
-        subordinates: true,
-      },
       orderBy: {
         createdAt: "desc",
       },

@@ -1,7 +1,7 @@
 "use client"
 
-import type React from "react"
-import { useState } from "react"
+import React, { useState, useEffect } from "react"
+import { useAgentContext } from "@/lib/agent-context"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -12,18 +12,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar"
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { CalendarIcon, Check, ChevronLeft } from "lucide-react"
+import { CalendarIcon, Check} from "lucide-react"
 import { cn } from "@/lib/utils"
-import Link from "next/link"
-
-// Mock team members data - replace with actual data from your backend
-const teamMembers = [
-    { id: "1", name: "John Smith", email: "john@example.com" },
-    { id: "2", name: "Sarah Johnson", email: "sarah@example.com" },
-    { id: "3", name: "Michael Brown", email: "michael@example.com" },
-    { id: "4", name: "Emily Davis", email: "emily@example.com" },
-    { id: "5", name: "David Wilson", email: "david@example.com" },
-]
 
 // Lead source options
 const leadSources = [
@@ -38,9 +28,11 @@ const leadSources = [
 ]
 
 export default function NewProspectPage() {
+    const agent = useAgentContext();
     const router = useRouter()
     const [open, setOpen] = useState(false)
     const [assignedTo, setAssignedTo] = useState("")
+    const [assignTouched, setAssignTouched] = useState(false)
     const [reminderDate, setReminderDate] = useState<Date>()
     const [formData, setFormData] = useState({
         name: "",
@@ -49,25 +41,84 @@ export default function NewProspectPage() {
         email: "",
         leadSource: "",
         description: "",
+        amount: "",
     })
 
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault()
-        // Here you would typically send the data to your backend
-        console.log({
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setAssignTouched(true);
+        // For Client Advisor/Manager, assignedTo is required
+        if ((agent?.agentType === "Client Advisor" || agent?.agentType === "Client Manager") && !assignedTo) {
+            alert("Please assign this prospect to yourself or another agent.");
+            return;
+        }
+        const payload = {
             ...formData,
-            assignedTo,
-            reminderDate,
-        })
-        // Redirect back to prospects page
-        router.push("/prospects")
+            amount: formData.amount ? parseFloat(formData.amount) : undefined,
+            assignedAgentId: assignedTo || undefined,
+            nextFollowUp: reminderDate ? reminderDate.toISOString() : undefined,
+        };
+        try {
+            const res = await fetch('/api/prospects', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            });
+            if (!res.ok) throw new Error('Failed to create prospect');
+            router.push('/sales/prospects/table');
+        } catch (err) {
+            alert('Failed to create prospect');
+        }
     }
+            type TeamMember = {
+                id: string;
+                name: string;
+                email: string;
+            };
+            const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
+            // Fetch agent info and subordinates if needed
+            useEffect(() => {
+                async function fetchTeam() {
+                    // Get current agent info
+                    const agentRes = await fetch("/api/agents/me")
+                    if (!agentRes.ok) return setTeamMembers([])
+                    const agent = await agentRes.json()
+                    if (agent.agentRole === "Advisor Agent" && agent.agentType === "Client Manager") {
+                        // Fetch subordinates
+                        const subRes = await fetch("/api/agents/me/subordinates")
+                        if (subRes.ok) {
+                            const subs = await subRes.json()
+                            setTeamMembers(subs)
+                            return
+                        }
+                    }
+                    // Fallback: fetch all agents
+                    const allRes = await fetch("/api/agents")
+                    if (allRes.ok) {
+                        setTeamMembers(await allRes.json())
+                    } else {
+                        setTeamMembers([])
+                    }
+                }
+                fetchTeam()
+            }, [])
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         setFormData({
             ...formData,
             [e.target.name]: e.target.value,
         })
+    }
+
+    // Always show self as first option in teamMembersWithSelf, marked as (You), and remove duplicates
+    let teamMembersWithSelf = teamMembers;
+    if (agent && (agent.agentType === "Client Advisor" || agent.agentType === "Client Manager")) {
+        // Remove any existing entry for self
+        const filtered = teamMembers.filter(m => m.id !== agent.id);
+        teamMembersWithSelf = [
+            { id: agent.id, name: agent.name + " (You)", email: agent.email },
+            ...filtered
+        ];
     }
 
     return (
@@ -120,20 +171,38 @@ export default function NewProspectPage() {
                                 </div>
                             </div>
 
-                            {/* Email */}
-                            <div className="space-y-2">
-                                <Label htmlFor="email">
-                                    Email <span className="text-destructive">*</span>
-                                </Label>
-                                <Input
-                                    id="email"
-                                    name="email"
-                                    type="email"
-                                    placeholder="Enter email address"
-                                    value={formData.email}
-                                    onChange={handleInputChange}
-                                    required
-                                />
+
+                            {/* Email & Amount Row */}
+                            <div className="flex gap-2">
+                                {/* Email */}
+                                <div className="space-y-2 w-1/2">
+                                    <Label htmlFor="email">
+                                        Email <span className="text-destructive">*</span>
+                                    </Label>
+                                    <Input
+                                        id="email"
+                                        name="email"
+                                        type="email"
+                                        placeholder="Enter email address"
+                                        value={formData.email}
+                                        onChange={handleInputChange}
+                                        required
+                                    />
+                                </div>
+                                {/* Amount */}
+                                <div className="space-y-2 w-1/2">
+                                    <Label htmlFor="amount">Amount</Label>
+                                    <Input
+                                        id="amount"
+                                        name="amount"
+                                        type="number"
+                                        min="0"
+                                        step="0.01"
+                                        placeholder="Enter amount (optional)"
+                                        value={formData.amount}
+                                        onChange={handleInputChange}
+                                    />
+                                </div>
                             </div>
 
                             {/* Address */}
@@ -210,7 +279,12 @@ export default function NewProspectPage() {
 
                             {/* Assign */}
                             <div className="space-y-2">
-                                <Label htmlFor="assign">Assign To</Label>
+                                <Label htmlFor="assign">
+                                    Assign To
+                                    {(agent?.agentType === "Client Advisor" || agent?.agentType === "Client Manager") && (
+                                        <span className="text-destructive">*</span>
+                                    )}
+                                </Label>
                                 <Popover open={open} onOpenChange={setOpen}>
                                     <PopoverTrigger asChild>
                                         <Button
@@ -218,10 +292,10 @@ export default function NewProspectPage() {
                                             variant="outline"
                                             role="combobox"
                                             aria-expanded={open}
-                                            className="w-full justify-between font-normal bg-transparent"
+                                            className={cn("w-full justify-between font-normal bg-transparent", (assignTouched && (agent?.agentType === "Client Advisor" || agent?.agentType === "Client Manager") && !assignedTo) && "border-red-500")}
                                         >
                                             {assignedTo
-                                                ? teamMembers.find((member) => member.id === assignedTo)?.name
+                                                ? teamMembersWithSelf.find((member) => member.id === assignedTo)?.name
                                                 : "Select team member..."}
                                             <Check className={cn("ml-2 size-4 shrink-0 opacity-0", assignedTo && "opacity-100")} />
                                         </Button>
@@ -232,7 +306,7 @@ export default function NewProspectPage() {
                                             <CommandList>
                                                 <CommandEmpty>No team member found.</CommandEmpty>
                                                 <CommandGroup>
-                                                    {teamMembers.map((member) => (
+                                                    {teamMembersWithSelf.map((member) => (
                                                         <CommandItem
                                                             key={member.id}
                                                             value={member.name}

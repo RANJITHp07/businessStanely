@@ -1,8 +1,7 @@
 "use client"
 
-import type React from "react"
-import { useState, useEffect, use } from "react"
-import { useRouter } from "next/navigation"
+import { useParams } from "next/navigation"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -33,81 +32,66 @@ interface oppurtunities {
     id: string
     name: string
     phoneNumber: string
-    address?: string
-    email: string
-    leadSource: string
     description: string
+    amount?: number
     nextFollowUp?: string
-    lastFollowUp?: string
-    status: "Proposal issued" | "Closed as won" | "Closed as loss"
+    status: "Proposal Issued" | "Closed as Won" | "Closed as Loss"
     createdAt: string
     updatedAt: string
-    assignedTo?: string
-    createdBy?: string
+    prospect?: {
+        email?: string;
+        leadSource?: string;
+        createdByAgent?: { name?: string };
+        address?: string;
+        assignedAgent?: {
+            id?: string;
+            name?: string;
+            email?: string;
+        };
+    };
 }
 
-interface Interaction {
-    id: string
-    message: string
-    createdAt: string
-    createdBy: string
-    attachments?: { name: string; url: string }[]
-}
-
-export default function oppurtunitiesDetailPage({ params }: { params: Promise<{ id: string }> }) {
-    const resolvedParams = use(params)
-    const router = useRouter()
+export default function OppurtunitiesDetailPage() {
     const [oppurtunities, setoppurtunities] = useState<oppurtunities | null>(null)
-    const [interactions, setInteractions] = useState<Interaction[]>([])
+interface Comment {
+    id: string;
+    content: string;
+    createdAt: string;
+    agent?: { name?: string };
+    user?: { username?: string };
+    attachmentName?: string;
+    attachmentUrl?: string;
+}
+
+        const [comments, setComments] = useState<Comment[]>([])
     const [loading, setLoading] = useState(true)
     const [newComment, setNewComment] = useState("")
     const [attachments, setAttachments] = useState<File[]>([])
     const [submitting, setSubmitting] = useState(false)
     const [nextFollowUpDate, setNextFollowUpDate] = useState<Date | undefined>(undefined)
 
+    // Use useParams from next/navigation for dynamic route params in client components
+    const params = useParams();
+    const opportunityId = params.id;
+
     useEffect(() => {
-        setTimeout(() => {
-            const mockoppurtunities: oppurtunities = {
-                id: resolvedParams.id,
-                name: "John Doe",
-                phoneNumber: "+1 234-567-8900",
-                address: "123 Main Street, New York, NY 10001",
-                email: "john.doe@example.com",
-                leadSource: "Website",
-                description: "Interested in legal consultation for business setup",
-                nextFollowUp: "2025-01-20",
-                lastFollowUp: "2025-01-15",
-                status: "Proposal issued",
-                createdAt: "2025-01-15T10:00:00Z",
-                updatedAt: "2025-01-15T10:00:00Z",
-                assignedTo: "Sarah Johnson",
-                createdBy: "Michael Smith",
+        async function fetchData() {
+            setLoading(true);
+            try {
+                const res = await fetch(`/api/opportunities/${opportunityId}`);
+                const data = await res.json();
+                setoppurtunities(data.opportunity || null);
+                setComments(data.opportunity?.comments || []);
+                if (data.opportunity && data.opportunity.nextFollowUp) {
+                    setNextFollowUpDate(new Date(data.opportunity.nextFollowUp));
+                }
+            } catch {
+                // ignore
             }
-
-            const mockInteractions: Interaction[] = [
-                {
-                    id: "1",
-                    message: "Initial contact made via website form. Client is interested in business setup consultation.",
-                    createdAt: "2025-01-15T10:30:00Z",
-                    createdBy: "Sarah Johnson",
-                },
-                {
-                    id: "2",
-                    message: "Follow-up call scheduled for next week. Client requested information about pricing.",
-                    createdAt: "2025-01-15T14:00:00Z",
-                    createdBy: "Sarah Johnson",
-                    attachments: [{ name: "pricing-document.pdf", url: "#" }],
-                },
-            ]
-
-            setoppurtunities(mockoppurtunities)
-            setInteractions(mockInteractions)
-            if (mockoppurtunities.nextFollowUp) {
-                setNextFollowUpDate(new Date(mockoppurtunities.nextFollowUp))
-            }
-            setLoading(false)
-        }, 500)
-    }, [resolvedParams.id])
+            setLoading(false);
+        }
+        fetchData();
+    }, [opportunityId]);
 
     const handleNextFollowUpChange = (date: Date | undefined) => {
         setNextFollowUpDate(date)
@@ -117,7 +101,7 @@ export default function oppurtunitiesDetailPage({ params }: { params: Promise<{ 
         }
     }
 
-    const handleStatusChange = (newStatus: any) => {
+    const handleStatusChange = (newStatus: "Proposal Issued" | "Closed as Won" | "Closed as Loss") => {
         if (oppurtunities) {
             setoppurtunities({ ...oppurtunities, status: newStatus })
             console.log("Status updated to:", newStatus)
@@ -135,26 +119,28 @@ export default function oppurtunitiesDetailPage({ params }: { params: Promise<{ 
     }
 
     const handleSubmitComment = async () => {
-        if (!newComment.trim() && attachments.length === 0) return
-
-        setSubmitting(true)
-        setTimeout(() => {
-            const newInteraction: Interaction = {
-                id: Date.now().toString(),
-                message: newComment,
-                createdAt: new Date().toISOString(),
-                createdBy: "Current User",
-                attachments: attachments.map((file) => ({
-                    name: file.name,
-                    url: "#",
-                })),
+        if (!newComment.trim() && attachments.length === 0) return;
+        setSubmitting(true);
+        try {
+            // TODO: Replace with actual user context
+            const res = await fetch(`/api/opportunities/${opportunityId}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    content: newComment,
+                    // Attachments logic can be expanded here
+                }),
+            });
+            if (res.ok) {
+                const { comment } = await res.json();
+                setComments([comment, ...comments]);
+                setNewComment("");
+                setAttachments([]);
             }
-
-            setInteractions([...interactions, newInteraction])
-            setNewComment("")
-            setAttachments([])
-            setSubmitting(false)
-        }, 500)
+        } catch {
+            // Handle error
+        }
+        setSubmitting(false);
     }
 
     const formatDate = (dateString: string) => {
@@ -200,58 +186,73 @@ export default function oppurtunitiesDetailPage({ params }: { params: Promise<{ 
                 <Card>
                     <CardContent className="space-y-4">
                         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                            <div>
-                                <h1 className="text-3xl font-bold">{oppurtunities.name}</h1>
-                                <p className="text-muted-foreground mt-1">Oppurtunities Details</p>
-                            </div>
-                            <div className="gap-2 flex">
-                                <div>
-                                    <p className="text-sm text-muted-foreground mb-2">Next Follow Up</p>
-                                    <Popover>
-                                        <PopoverTrigger asChild>
-                                            <Button
-                                                variant="outline"
-                                                className={cn(
-                                                    "w-full justify-start text-left font-normal",
-                                                    !nextFollowUpDate && "text-muted-foreground",
-                                                )}
-                                            >
-                                                <CalendarIcon className="mr-2 h-4 w-4" />
-                                                {nextFollowUpDate ? (
-                                                    new Date(nextFollowUpDate).toLocaleDateString("en-US", {
-                                                        month: "short",
-                                                        day: "numeric",
-                                                        year: "numeric",
-                                                    })
-                                                ) : (
-                                                    <span>Pick a date</span>
-                                                )}
-                                            </Button>
-                                        </PopoverTrigger>
-                                        <PopoverContent className="w-auto p-0" align="start">
-                                            <CalendarComponent
-                                                mode="single"
-                                                selected={nextFollowUpDate}
-                                                onSelect={handleNextFollowUpChange}
-                                                initialFocus
-                                            />
-                                        </PopoverContent>
-                                    </Popover>
+                            {/* ...existing code... */}
+                        </div>
+                        <div>
+                            <p className="text-sm text-muted-foreground">Assigned To</p>
+                            <div className="flex items-center gap-2 mt-1">
+                                <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center">
+                                    <User className="h-3 w-3 text-primary" />
                                 </div>
-                                <div className="flex items-center gap-4">
-                                    <div className="flex flex-col gap-1">
-                                        <p className="text-sm text-muted-foreground mb-1">Status</p>
-                                        <Select value={oppurtunities.status} onValueChange={handleStatusChange}>
-                                            <SelectTrigger className="w-[180px]">
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="Proposal issued">Proposal issued</SelectItem>
-                                                <SelectItem value="Closed as won">Closed as won</SelectItem>
-                                                <SelectItem value="Closed as loss">Closed as loss</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
+                                <p className="font-medium">
+                                    {oppurtunities.prospect?.assignedAgent?.name
+                                        ? oppurtunities.prospect.assignedAgent.name
+                                        : "Unassigned"}
+                                </p>
+                            </div>
+                        </div>
+                        <Separator />
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardContent className="space-y-4">
+                        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                            <div>
+                                <p className="text-sm text-muted-foreground mb-2">Next Follow Up</p>
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <Button
+                                            variant="outline"
+                                            className={cn(
+                                                "w-full justify-start text-left font-normal",
+                                                !nextFollowUpDate && "text-muted-foreground",
+                                            )}
+                                        >
+                                            <CalendarIcon className="mr-2 h-4 w-4" />
+                                            {nextFollowUpDate ? (
+                                                new Date(nextFollowUpDate).toLocaleDateString("en-US", {
+                                                    month: "short",
+                                                    day: "numeric",
+                                                    year: "numeric",
+                                                })
+                                            ) : (
+                                                <span>Pick a date</span>
+                                            )}
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-0" align="start">
+                                        <CalendarComponent
+                                            mode="single"
+                                            selected={nextFollowUpDate}
+                                            onSelect={handleNextFollowUpChange}
+                                            initialFocus
+                                        />
+                                    </PopoverContent>
+                                </Popover>
+                            </div>
+                            <div className="flex items-center gap-4">
+                                <div className="flex flex-col gap-1">
+                                    <p className="text-sm text-muted-foreground mb-1">Status</p>
+                                    <Select value={oppurtunities.status} onValueChange={handleStatusChange}>
+                                        <SelectTrigger className="w-[180px]">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="Proposal Issued">Proposal Issued</SelectItem>
+                                            <SelectItem value="Closed as Won">Closed as Won</SelectItem>
+                                            <SelectItem value="Closed as Loss">Closed as Loss</SelectItem>
+                                        </SelectContent>
+                                    </Select>
                                 </div>
                             </div>
                         </div>
@@ -282,18 +283,18 @@ export default function oppurtunitiesDetailPage({ params }: { params: Promise<{ 
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <p className="text-sm text-muted-foreground">Email</p>
-                                        <p className="font-medium truncate">{oppurtunities.email}</p>
+                                        <p className="font-medium truncate">{oppurtunities.prospect?.email || '-'}</p>
                                     </div>
                                 </div>
                             </div>
-                            {oppurtunities.address && (
+                            {oppurtunities.prospect?.address && (
                                 <div className="flex items-start gap-3">
                                     <div className="p-2 rounded-lg bg-purple-100 text-purple-700">
                                         <MapPin className="h-5 w-5" />
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <p className="text-sm text-muted-foreground">Address</p>
-                                        <p className="font-medium">{oppurtunities.address}</p>
+                                        <p className="font-medium">{oppurtunities.prospect.address}</p>
                                     </div>
                                 </div>
                             )}
@@ -308,6 +309,14 @@ export default function oppurtunitiesDetailPage({ params }: { params: Promise<{ 
                             <p className="text-muted-foreground leading-relaxed">{oppurtunities.description}</p>
                         </CardContent>
                     </Card>
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Amount</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <p className="text-muted-foreground leading-relaxed">{oppurtunities.amount !== undefined ? `$${oppurtunities.amount}` : '—'}</p>
+                        </CardContent>
+                    </Card>
 
                     <Card>
                         <CardHeader>
@@ -319,38 +328,35 @@ export default function oppurtunitiesDetailPage({ params }: { params: Promise<{ 
                         </CardHeader>
                         <CardContent className="space-y-6">
                             <div className="space-y-4">
-                                {interactions.length === 0 ? (
+                                {comments.length === 0 ? (
                                     <p className="text-center text-muted-foreground py-8">No interactions yet</p>
                                 ) : (
-                                    interactions.map((interaction) => (
-                                        <div key={interaction.id} className="border rounded-lg p-4 space-y-3">
+                                    comments.map((comment) => (
+                                        <div key={comment.id} className="border rounded-lg p-4 space-y-3">
                                             <div className="flex items-start justify-between gap-4">
                                                 <div className="flex items-center gap-2">
                                                     <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
                                                         <User className="h-4 w-4 text-primary" />
                                                     </div>
                                                     <div>
-                                                        <p className="font-medium text-sm">{interaction.createdBy}</p>
+                                                        <p className="font-medium text-sm">{comment.agent?.name || comment.user?.username || "Unknown"}</p>
                                                         <p className="text-xs text-muted-foreground flex items-center gap-1">
                                                             <Clock className="h-3 w-3" />
-                                                            {formatDate(interaction.createdAt)}
+                                                            {formatDate(comment.createdAt)}
                                                         </p>
                                                     </div>
                                                 </div>
                                             </div>
-                                            <p className="text-sm leading-relaxed">{interaction.message}</p>
-                                            {interaction.attachments && interaction.attachments.length > 0 && (
+                                            <p className="text-sm leading-relaxed">{comment.content}</p>
+                                            {comment.attachmentUrl && (
                                                 <div className="flex flex-wrap gap-2 pt-2">
-                                                    {interaction.attachments.map((file, idx) => (
-                                                        <a
-                                                            key={idx}
-                                                            href={file.url}
-                                                            className="flex items-center gap-2 px-3 py-1.5 bg-muted rounded-md text-sm hover:bg-muted/80 transition-colors"
-                                                        >
-                                                            <Paperclip className="h-3 w-3" />
-                                                            {file.name}
-                                                        </a>
-                                                    ))}
+                                                    <a
+                                                        href={comment.attachmentUrl}
+                                                        className="flex items-center gap-2 px-3 py-1.5 bg-muted rounded-md text-sm hover:bg-muted/80 transition-colors"
+                                                    >
+                                                        <Paperclip className="h-3 w-3" />
+                                                        {comment.attachmentName}
+                                                    </a>
                                                 </div>
                                             )}
                                         </div>
@@ -428,7 +434,11 @@ export default function oppurtunitiesDetailPage({ params }: { params: Promise<{ 
                             <div>
                                 <p className="text-sm text-muted-foreground">Status</p>
                                 <Badge
-                                    className={`mt-1 ${oppurtunities.status === "New" ? "bg-green-100 text-green-800" : "bg-sky-100 text-sky-800"}`}
+                                    className={`mt-1 ${oppurtunities.status === "Proposal Issued"
+                                        ? "bg-amber-100 text-amber-800"
+                                        : oppurtunities.status === "Closed as Won"
+                                            ? "bg-green-100 text-green-800"
+                                            : "bg-red-100 text-red-800"}`}
                                 >
                                     {oppurtunities.status}
                                 </Badge>
@@ -436,7 +446,7 @@ export default function oppurtunitiesDetailPage({ params }: { params: Promise<{ 
                             <Separator />
                             <div>
                                 <p className="text-sm text-muted-foreground">Lead Source</p>
-                                <p className="font-medium mt-1">{oppurtunities.leadSource}</p>
+                                <p className="font-medium mt-1">{oppurtunities.prospect?.leadSource || '-'}</p>
                             </div>
                             <Separator />
                             <div>
@@ -445,10 +455,11 @@ export default function oppurtunitiesDetailPage({ params }: { params: Promise<{ 
                                     <div className="h-6 w-6 rounded-full bg-emerald-100 flex items-center justify-center">
                                         <User className="h-3 w-3 text-emerald-700" />
                                     </div>
-                                    <p className="font-medium">{oppurtunities.createdBy || "Unknown"}</p>
+                                    <p className="font-medium">{oppurtunities.prospect?.createdByAgent?.name || "Unknown"}</p>
                                 </div>
                             </div>
                             <Separator />
+                            {/*
                             <div>
                                 <p className="text-sm text-muted-foreground">Assigned To</p>
                                 <div className="flex items-center gap-2 mt-1">
@@ -459,6 +470,8 @@ export default function oppurtunitiesDetailPage({ params }: { params: Promise<{ 
                                 </div>
                             </div>
                             <Separator />
+                            */}
+                            {/*
                             <div>
                                 <p className="text-sm text-muted-foreground">Last Follow Up</p>
                                 <div className="flex items-center gap-2 mt-1">
@@ -475,6 +488,7 @@ export default function oppurtunitiesDetailPage({ params }: { params: Promise<{ 
                                 </div>
                             </div>
                             <Separator />
+                            */}
 
                             <div>
                                 <p className="text-sm text-muted-foreground">Created</p>

@@ -9,9 +9,11 @@ import {
   Boxes,
   ClipboardList,
   UserSearch,
-  FileText
+  FileText,
+  Calendar
 } from "lucide-react";
 import { useState } from "react";
+import { useAuth } from "@/hooks/useAuth";
 import Link from "next/link";
 
 import {
@@ -38,8 +40,36 @@ import {
 } from "@/components/ui/alert-dialog";
 import Image from "next/image";
 import Logo from "./../../public/Logo.jpg";
-// Menu items.
-const items = [
+const salesItems = [
+  {
+    title: "Sales Dashboard",
+    url: "/sales/dashboard",
+    icon: Home,
+  },
+  {
+    title: "Opportunities",
+    url: "/sales/opportunites",
+    icon: ClipboardList,
+  },
+  {
+    title: "Prospects",
+    url: "/sales/prospects",
+    icon: UserSearch,
+  },
+  {
+    title: "Calendar",
+    url: "/sales/calendar",
+    icon: Calendar,
+  },
+  {
+    title: "Settings",
+    url: "/setting",
+    icon: Settings,
+  },
+];
+
+
+const dashboardItems = [
   {
     title: "Dashboard",
     url: "/dashboard",
@@ -50,17 +80,11 @@ const items = [
     url: "/team",
     icon: UserRoundPen,
   },
-  // {
-  //   title: "Task",
-  //   url: "/task",
-  //   icon: ClipboardCheck,
-  // },
-    {
+  {
     title: "Task",
     url: "/my-task",
     icon: ClipboardCheck,
   },
-  
   {
     title: "Client",
     url: "/client",
@@ -81,7 +105,7 @@ const items = [
     url: "/service-records",
     icon: FileText,
   },
-    {
+  {
     title: "Retainership",
     url: "/retainership",
     icon: Boxes,
@@ -95,6 +119,30 @@ const items = [
 
 export function AppSidebar() {
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
+  // Use agent info from localStorage (set at login/root redirect)
+  let agentRole = null;
+  let agentType = null;
+  if (typeof window !== "undefined") {
+    try {
+      const agentLS = localStorage.getItem("agent");
+      if (agentLS) {
+        const agentObj = JSON.parse(agentLS);
+        agentRole = agentObj.agentRole;
+        agentType = agentObj.agentType;
+      }
+    } catch {}
+  }
+
+  let items = dashboardItems;
+  if (agentRole === "Advisor Agent") {
+    if (agentType === "Client Advisor" || agentType === "Client Manager") {
+      items = salesItems;
+    } else if ( agentType === "Lead Maker") {
+      items = salesItems.filter(item => item.title !== "Calendar");
+    } else {
+      items = salesItems;
+    }
+  }
 
   const handleLogout = async () => {
     try {

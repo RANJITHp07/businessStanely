@@ -8,6 +8,7 @@ interface Agent {
   name: string;
   email: string;
   agentType: string;
+  agentRole: 'Execution Agent' | 'Advisor Agent';
   phoneNumber: string;
   jurisdiction: string;
   specializations: string[];

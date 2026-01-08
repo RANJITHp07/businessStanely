@@ -31,35 +31,50 @@ import { Separator } from "@/components/ui/separator"
 import { cn } from "@/lib/utils"
 
 interface Prospect {
-    id: string
-    name: string
-    phoneNumber: string
-    address?: string
-    email: string
-    leadSource: string
-    description: string
-    nextFollowUp?: string
-    lastFollowUp?: string
-    status: "New" | "In Progress"
-    createdAt: string
-    updatedAt: string
-    assignedTo?: string
-    createdBy?: string
+    id: string;
+    name: string;
+    phoneNumber: string;
+    address?: string;
+    email: string;
+    leadSource: string;
+    description: string;
+    amount?: number | null;
+    nextFollowUp?: string;
+    lastFollowUp?: string;
+    status: "New" | "In Progress" | "Opportunity" | "Converted";
+    archived: boolean;
+    createdAt: string;
+    updatedAt: string;
+    assignedTo?: string;
+    assignedAgent?: {
+        id: string;
+        name: string;
+        email: string;
+    };
+    createdByAgentId?: string;
+    createdByAgent?: {
+        id: string;
+        name: string;
+        email: string;
+    };
 }
 
-interface Interaction {
-    id: string
-    message: string
-    createdAt: string
-    createdBy: string
-    attachments?: { name: string; url: string }[]
+
+interface Comment {
+    id: string;
+    content: string;
+    createdAt: string;
+    agent?: { name?: string };
+    user?: { username?: string };
+    attachmentName?: string;
+    attachmentUrl?: string;
 }
 
 export default function ProspectDetailPage({ params }: { params: Promise<{ id: string }> }) {
     const resolvedParams = use(params)
     const router = useRouter()
     const [prospect, setProspect] = useState<Prospect | null>(null)
-    const [interactions, setInteractions] = useState<Interaction[]>([])
+    const [comments, setComments] = useState<Comment[]>([])
     const [loading, setLoading] = useState(true)
     const [newComment, setNewComment] = useState("")
     const [attachments, setAttachments] = useState<File[]>([])
@@ -67,47 +82,18 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
     const [nextFollowUpDate, setNextFollowUpDate] = useState<Date | undefined>(undefined)
 
     useEffect(() => {
-        setTimeout(() => {
-            const mockProspect: Prospect = {
-                id: resolvedParams.id,
-                name: "John Doe",
-                phoneNumber: "+1 234-567-8900",
-                address: "123 Main Street, New York, NY 10001",
-                email: "john.doe@example.com",
-                leadSource: "Website",
-                description: "Interested in legal consultation for business setup",
-                nextFollowUp: "2025-01-20",
-                lastFollowUp: "2025-01-15",
-                status: "New",
-                createdAt: "2025-01-15T10:00:00Z",
-                updatedAt: "2025-01-15T10:00:00Z",
-                assignedTo: "Sarah Johnson",
-                createdBy: "Michael Smith",
-            }
-
-            const mockInteractions: Interaction[] = [
-                {
-                    id: "1",
-                    message: "Initial contact made via website form. Client is interested in business setup consultation.",
-                    createdAt: "2025-01-15T10:30:00Z",
-                    createdBy: "Sarah Johnson",
-                },
-                {
-                    id: "2",
-                    message: "Follow-up call scheduled for next week. Client requested information about pricing.",
-                    createdAt: "2025-01-15T14:00:00Z",
-                    createdBy: "Sarah Johnson",
-                    attachments: [{ name: "pricing-document.pdf", url: "#" }],
-                },
-            ]
-
-            setProspect(mockProspect)
-            setInteractions(mockInteractions)
-            if (mockProspect.nextFollowUp) {
-                setNextFollowUpDate(new Date(mockProspect.nextFollowUp))
-            }
-            setLoading(false)
-        }, 500)
+        setLoading(true)
+        fetch(`/api/prospects/${resolvedParams.id}`)
+            .then(res => res.json())
+            .then(data => {
+                setProspect(data.prospect || null)
+                setComments(data.prospect?.comments || [])
+                if (data.prospect && data.prospect.nextFollowUp) {
+                    setNextFollowUpDate(new Date(data.prospect.nextFollowUp))
+                }
+                setLoading(false)
+            })
+            .catch(() => setLoading(false))
     }, [resolvedParams.id])
 
     const handleNextFollowUpChange = (date: Date | undefined) => {
@@ -118,10 +104,45 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
         }
     }
 
-    const handleStatusChange = (newStatus: "New" | "In Progress") => {
-        if (prospect) {
-            setProspect({ ...prospect, status: newStatus })
-            console.log("Status updated to:", newStatus)
+    const handleStatusChange = async (newStatus: Prospect["status"]) => {
+        if (!prospect) return;
+        // If status is Opportunity, create and redirect immediately
+        if (newStatus === "Opportunity") {
+            try {
+                const res = await fetch(`/api/prospects/${prospect.id}`, {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ ...prospect, status: newStatus }),
+                });
+                if (!res.ok) {
+                    console.error("Failed to update status");
+                    return;
+                }
+                const data = await res.json();
+                if (data.opportunity && data.opportunity.id) {
+                    // Redirect to new opportunity and prevent rendering deleted prospect
+                    router.replace(`/sales/opportunites/${data.opportunity.id}`);
+                } else {
+                    router.replace(`/sales/opportunites/table`);
+                }
+            } catch (err) {
+                console.error("Error updating status:", err);
+            }
+            return;
+        }
+        // Otherwise, update prospect as usual
+        setProspect({ ...prospect, status: newStatus });
+        try {
+            const res = await fetch(`/api/prospects/${prospect.id}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ ...prospect, status: newStatus }),
+            });
+            if (!res.ok) {
+                console.error("Failed to update status");
+            }
+        } catch (err) {
+            console.error("Error updating status:", err);
         }
     }
 
@@ -135,27 +156,35 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
         setAttachments(attachments.filter((_, i) => i !== index))
     }
 
+    const isCommentDisabled = prospect?.archived || prospect?.status === "Converted" || prospect?.status === "Opportunity";
     const handleSubmitComment = async () => {
-        if (!newComment.trim() && attachments.length === 0) return
-
-        setSubmitting(true)
-        setTimeout(() => {
-            const newInteraction: Interaction = {
-                id: Date.now().toString(),
-                message: newComment,
-                createdAt: new Date().toISOString(),
-                createdBy: "Current User",
-                attachments: attachments.map((file) => ({
-                    name: file.name,
-                    url: "#",
-                })),
+        if (isCommentDisabled) return;
+        if (!newComment.trim() && attachments.length === 0) return;
+        setSubmitting(true);
+        try {
+            // TODO: Replace with actual user context
+            const authorId = "current-user-id";
+            const authorType = "AGENT";
+            const res = await fetch(`/api/prospects/${resolvedParams.id}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    content: newComment,
+                    authorId,
+                    authorType,
+                    // Attachments logic can be expanded here
+                }),
+            });
+            if (res.ok) {
+                const { comment } = await res.json();
+                setComments([comment, ...comments]);
+                setNewComment("");
+                setAttachments([]);
             }
-
-            setInteractions([...interactions, newInteraction])
-            setNewComment("")
-            setAttachments([])
-            setSubmitting(false)
-        }, 500)
+        } catch (err) {
+            // Handle error
+        }
+        setSubmitting(false);
     }
 
     const formatDate = (dateString: string) => {
@@ -309,6 +338,16 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
                             <p className="text-muted-foreground leading-relaxed">{prospect.description}</p>
                         </CardContent>
                     </Card>
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Amount</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <p className="text-muted-foreground leading-relaxed">
+                                {prospect.amount !== null && prospect.amount !== undefined ? `$${prospect.amount}` : '—'}
+                            </p>
+                        </CardContent>
+                    </Card>
 
                     <Card>
                         <CardHeader>
@@ -320,38 +359,35 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
                         </CardHeader>
                         <CardContent className="space-y-6">
                             <div className="space-y-4">
-                                {interactions.length === 0 ? (
+                                {comments.length === 0 ? (
                                     <p className="text-center text-muted-foreground py-8">No interactions yet</p>
                                 ) : (
-                                    interactions.map((interaction) => (
-                                        <div key={interaction.id} className="border rounded-lg p-4 space-y-3">
+                                    comments.map((comment) => (
+                                        <div key={comment.id} className="border rounded-lg p-4 space-y-3">
                                             <div className="flex items-start justify-between gap-4">
                                                 <div className="flex items-center gap-2">
                                                     <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
                                                         <User className="h-4 w-4 text-primary" />
                                                     </div>
                                                     <div>
-                                                        <p className="font-medium text-sm">{interaction.createdBy}</p>
+                                                        <p className="font-medium text-sm">{comment.agent?.name || comment.user?.username || "Unknown"}</p>
                                                         <p className="text-xs text-muted-foreground flex items-center gap-1">
                                                             <Clock className="h-3 w-3" />
-                                                            {formatDate(interaction.createdAt)}
+                                                            {formatDate(comment.createdAt)}
                                                         </p>
                                                     </div>
                                                 </div>
                                             </div>
-                                            <p className="text-sm leading-relaxed">{interaction.message}</p>
-                                            {interaction.attachments && interaction.attachments.length > 0 && (
+                                            <p className="text-sm leading-relaxed">{comment.content}</p>
+                                            {comment.attachmentUrl && (
                                                 <div className="flex flex-wrap gap-2 pt-2">
-                                                    {interaction.attachments.map((file, idx) => (
-                                                        <a
-                                                            key={idx}
-                                                            href={file.url}
-                                                            className="flex items-center gap-2 px-3 py-1.5 bg-muted rounded-md text-sm hover:bg-muted/80 transition-colors"
-                                                        >
-                                                            <Paperclip className="h-3 w-3" />
-                                                            {file.name}
-                                                        </a>
-                                                    ))}
+                                                    <a
+                                                        href={comment.attachmentUrl}
+                                                        className="flex items-center gap-2 px-3 py-1.5 bg-muted rounded-md text-sm hover:bg-muted/80 transition-colors"
+                                                    >
+                                                        <Paperclip className="h-3 w-3" />
+                                                        {comment.attachmentName}
+                                                    </a>
                                                 </div>
                                             )}
                                         </div>
@@ -389,7 +425,7 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
                                 )}
 
                                 <div className="flex items-center gap-2">
-                                    <Button onClick={handleSubmitComment} disabled={submitting} className="gap-2">
+                                    <Button onClick={handleSubmitComment} disabled={submitting || isCommentDisabled} className="gap-2">
                                         {submitting ? (
                                             <>
                                                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -403,12 +439,13 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
                                         )}
                                     </Button>
                                     <div>
-                                        <input type="file" id="file-upload" multiple className="hidden" onChange={handleFileSelect} />
+                                        <input type="file" id="file-upload" multiple className="hidden" onChange={handleFileSelect} disabled={isCommentDisabled} />
                                         <Button
                                             type="button"
                                             variant="outline"
-                                            onClick={() => document.getElementById("file-upload")?.click()}
+                                            onClick={() => !isCommentDisabled && document.getElementById("file-upload")?.click()}
                                             className="gap-2"
+                                            disabled={isCommentDisabled}
                                         >
                                             <Paperclip className="h-4 w-4" />
                                             Attach Files
@@ -446,7 +483,7 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
                                     <div className="h-6 w-6 rounded-full bg-emerald-100 flex items-center justify-center">
                                         <User className="h-3 w-3 text-emerald-700" />
                                     </div>
-                                    <p className="font-medium">{prospect.createdBy || "Unknown"}</p>
+                                    <p className="font-medium">{prospect.createdByAgent?.name || "Unknown"}</p>
                                 </div>
                             </div>
                             <Separator />
@@ -456,7 +493,11 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
                                     <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center">
                                         <User className="h-3 w-3 text-primary" />
                                     </div>
-                                    <p className="font-medium">{prospect.assignedTo || "Unassigned"}</p>
+                                    <p className="font-medium">
+                                        {prospect.assignedAgent?.name
+                                            ? prospect.assignedAgent.name
+                                            : prospect.assignedTo || "Unassigned"}
+                                    </p>
                                 </div>
                             </div>
                             <Separator />

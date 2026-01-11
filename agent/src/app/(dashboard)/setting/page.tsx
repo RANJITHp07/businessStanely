@@ -54,28 +54,28 @@ export default function AgentSettingsPage() {
 
   // Load agent data from localStorage on component mount
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    const agentDataString = localStorage.getItem("agent");
-
-    if (token && agentDataString) {
+    // Always fetch agent info from backend and update localStorage
+    async function fetchAndSyncAgent() {
       try {
-        const agentData = JSON.parse(agentDataString);
-        setAgent(agentData);
-        setName(agentData.name || "");
-        setEmail(agentData.email || "");
-        setPhoneNumber(agentData.phoneNumber || "");
-        setAgentType(agentData.agentType || "");
-        setBarAssociationId(agentData.barAssociationId || "");
-        setIsLoading(false);
+        const response = await fetchWithAuth("/api/auth/me");
+        if (response.ok) {
+          const data = await response.json();
+          setAgent(data.agent);
+          setName(data.agent.name || "");
+          setEmail(data.agent.email || "");
+          setPhoneNumber(data.agent.phoneNumber || "");
+          setAgentType(data.agent.agentType || "");
+          setBarAssociationId(data.agent.barAssociationId || "");
+          localStorage.setItem("agent", JSON.stringify(data.agent));
+          setIsLoading(false);
+        } else {
+          window.location.href = "/login";
+        }
       } catch {
-        console.error("Error parsing agent data");
-        // Redirect to login if data is corrupted
         window.location.href = "/login";
       }
-    } else {
-      // If no localStorage data, fetch from API
-      fetchAgentProfile();
     }
+    fetchAndSyncAgent();
   }, []);
 
   const fetchAgentProfile = async () => {
@@ -119,7 +119,7 @@ export default function AgentSettingsPage() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ name }),
+        body: JSON.stringify({ name, phoneNumber }),
       });
 
       const data = await response.json();
@@ -254,6 +254,16 @@ export default function AgentSettingsPage() {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Enter your full name"
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="phoneNumber">Phone Number</Label>
+              <Input
+                id="phoneNumber"
+                value={phoneNumber}
+                onChange={(e) => setPhoneNumber(e.target.value)}
+                placeholder="Enter your phone number"
                 required
               />
             </div>

@@ -19,6 +19,7 @@ export async function GET(req: NextRequest) {
         name: agent.name,
         email: agent.email,
         agentType: agent.agentType,
+        agentRole: agent.agentRole,
         phoneNumber: agent.phoneNumber,
         jurisdiction: agent.jurisdiction,
         specializations: agent.specializations,

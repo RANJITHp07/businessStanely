@@ -71,3 +71,39 @@ export async function POST(req: Request, context: { params: { id: string } }) {
     return new Response("Internal Server Error", { status: 500 });
   }
 }
+
+export async function DELETE(
+  req: Request,
+  context: { params: { id: string } }
+) {
+  const { params } = context;
+  const { id } = params;
+
+  try {
+    const deletedLegislation = await prisma.legislation.delete({
+      where: { id },
+      include: {
+        assignedAgent: true,
+        retainership: {
+          include: {
+            client: true,
+          },
+        },
+        tasks: true,
+      },
+    });
+
+    return new Response(JSON.stringify(deletedLegislation), {
+      headers: { "Content-Type": "application/json" },
+      status: 200,
+    });
+  } catch (error: any) {
+    // Record not found
+    if (error.code === "P2025") {
+      return new Response("Legislation not found", { status: 404 });
+    }
+
+    console.error("Error deleting legislation:", error);
+    return new Response("Internal Server Error", { status: 500 });
+  }
+}

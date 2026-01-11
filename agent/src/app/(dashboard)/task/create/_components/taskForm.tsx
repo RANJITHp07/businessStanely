@@ -284,7 +284,7 @@ export default function TaskForm({ id }: TaskFormProps) {
         clientId: client || prev.clientId,
       }));
 
-      // setIsFromRetainership(true); // Mark the form as coming from retainership
+      setIsFromRetainership(true); // Mark the form as coming from retainership
 
       if (assignedAgent) {
         const selectedAgent = agents.find((agent) => agent.id === assignedAgent);
@@ -1430,7 +1430,7 @@ export default function TaskForm({ id }: TaskFormProps) {
                         }
                       }}
                       className="w-full"
-                      disabled={isFromRetainership} // Disable if form is from retainership
+                    // disabled={isFromRetainership} // Disable if form is from retainership
                     />
 
                     {showAgentSuggestions &&

@@ -26,7 +26,7 @@ import {
     DialogFooter,
 } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button";
-import { MoreHorizontal, Eye, PlusCircle, Pen } from "lucide-react";
+import { MoreHorizontal, Eye, PlusCircle, Pen, Trash } from "lucide-react";
 
 // Importing Retainership, Task, and UserInfo types from the types file
 import { Retainership } from "@/types";
@@ -141,6 +141,31 @@ export default function RetainershipDetail({ params }: { params: Promise<{ id: s
         setModalFormData((prev) => ({ ...prev, assignedAgent: agent.name }));
         setModalAgentSearch(agent.name);
         setShowModalAgentDropdown(false);
+    };
+
+    const handleDelete = async (id: string) => {
+        try {
+            const res = await fetch(`/api/legislation/${id}`, {
+                method: "DELETE",
+            });
+
+            if (!res.ok) {
+                throw new Error("Failed to delete legislation");
+            }
+
+            setRetainership((prev) => {
+                if (!prev) return prev;
+
+                return {
+                    ...prev,
+                    legislation: prev.legislation.filter(
+                        (leg) => leg.id !== id
+                    ),
+                };
+            });
+        } catch (error) {
+            console.error("Error deleting legislation:", error);
+        }
     };
 
     const handleSubmit = async () => {
@@ -483,18 +508,8 @@ export default function RetainershipDetail({ params }: { params: Promise<{ id: s
                                                                 </button>
                                                             </DropdownMenuItem>
                                                             <DropdownMenuItem asChild>
-                                                                <button className="flex items-center w-full" onClick={() => {
-                                                                    setIsEdit(true)
-                                                                    setModalFormData({
-                                                                        id: legislation.id,
-                                                                        title: legislation.title,
-                                                                        description: legislation.description!,
-                                                                        assignedAgent: legislation.assignedAgent?.name || legislation.assignedAgent,
-                                                                    })
-                                                                    setModalAgentSearch(legislation.assignedAgent?.name || legislation?.assignedAgent! as any)
-                                                                    setIsModalOpen(true)
-                                                                }}>
-                                                                    <Pen className="mr-2 h-4 w-4" />
+                                                                <button className="flex items-center w-full" onClick={() => handleDelete(legislation.id)}>
+                                                                    <Trash className="mr-2 h-4 w-4" />
                                                                     Delete
                                                                 </button>
                                                             </DropdownMenuItem>

@@ -2,7 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Users, UserPlus, Calendar, TrendingUp, ArrowRight, Activity, BarChart3 } from "lucide-react"
+import { Users, UserPlus, Calendar, TrendingUp, ArrowRight, Activity, BarChart3, Loader2, Eye } from "lucide-react"
 import {
     PieChart,
     Pie,
@@ -15,339 +15,77 @@ import {
     YAxis,
     CartesianGrid,
 } from "recharts"
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from "@/components/ui/dialog"
+import { useEffect, useState } from "react"
+import { Button } from "@/components/ui/button"
+import { Label } from "@/components/ui/label"
+import { Input } from "@/components/ui/input"
+import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip"
+import Link from "next/link"
 
-// Mock data
-const statsData = {
-    total: 248,
-    "Proposal issued": 89,
-    "Closed as won": 64,
-    "Closed as loss": 20,
-}
-
-const dateWiseData = {
-    toBeContacted: 45,
-    contacted: 78,
-    missedOut: 23,
-}
-
-const leadSourceData = [
-    { name: "Website", value: 92, color: "#3b82f6" },
-    { name: "Referral", value: 68, color: "#10b981" },
-    { name: "Phone Call", value: 51, color: "#f59e0b" },
-    { name: "Campaign", value: 37, color: "#8b5cf6" },
-]
-
-const statusCategoryData = [
-    { status: "Proposal issued", count: 89, color: "#10b981" },
-    { status: "Closed as won", count: 64, color: "#3b82f6" },
-    { status: "Closed as loss", count: 20, color: "#f87171" },
-    { status: "Contacted", count: 58, color: "#0ea5e9" },
-    { status: "Missed", count: 37, color: "#ef4444" },
-    { status: "Follow Up", count: 20, color: "#f87171" },
-]
-
-const prospectsData = {
-    new: [
-        {
-            id: 1,
-            name: "Sarah Johnson",
-            email: "sarah.johnson@email.com",
-            phone: "(555) 123-4567",
-            company: "Tech Solutions Inc",
-            source: "Website",
-            advisor: "John Smith",
-            advisorRole: "Senior Advisor",
-            nextFollowUp: "2024-01-20",
-            status: "New",
-            priority: "High",
-        },
-        {
-            id: 2,
-            name: "Michael Chen",
-            email: "m.chen@company.com",
-            phone: "(555) 234-5678",
-            company: "Digital Ventures",
-            source: "Referral",
-            advisor: "Emily Davis",
-            advisorRole: "Sales Rep",
-            nextFollowUp: "2024-01-21",
-            status: "New",
-            priority: "Medium",
-        },
-        {
-            id: 3,
-            name: "Emma Williams",
-            email: "emma.w@business.com",
-            phone: "(555) 345-6789",
-            company: "Global Enterprises",
-            source: "Phone Call",
-            advisor: "Robert Brown",
-            advisorRole: "Lead Advisor",
-            nextFollowUp: "2024-01-22",
-            status: "New",
-            priority: "High",
-        },
-        {
-            id: 4,
-            name: "James Wilson",
-            email: "j.wilson@startup.io",
-            phone: "(555) 456-7890",
-            company: "Innovation Labs",
-            source: "Campaign",
-            advisor: "Sarah Miller",
-            advisorRole: "Account Manager",
-            nextFollowUp: "2024-01-23",
-            status: "New",
-            priority: "Low",
-        },
-    ],
-    inProgress: [
-        {
-            id: 6,
-            name: "David Brown",
-            email: "david.b@corporate.com",
-            phone: "(555) 678-9012",
-            company: "Enterprise Corp",
-            source: "Website",
-            advisor: "John Smith",
-            advisorRole: "Senior Advisor",
-            nextFollowUp: "2024-01-19",
-            status: "In Progress",
-            priority: "High",
-        },
-        {
-            id: 7,
-            name: "Sophia Taylor",
-            email: "sophia.t@firm.com",
-            phone: "(555) 789-0123",
-            company: "Consulting Firm",
-            source: "Referral",
-            advisor: "Emily Davis",
-            advisorRole: "Sales Rep",
-            nextFollowUp: "2024-01-20",
-            status: "In Progress",
-            priority: "Medium",
-        },
-        {
-            id: 8,
-            name: "Daniel Wilson",
-            email: "d.wilson@business.net",
-            phone: "(555) 890-1234",
-            company: "Business Solutions",
-            source: "Phone Call",
-            advisor: "Robert Brown",
-            advisorRole: "Lead Advisor",
-            nextFollowUp: "2024-01-21",
-            status: "In Progress",
-            priority: "Medium",
-        },
-    ],
-}
-
-const segregationData = {
-    toBeContacted: [
-        {
-            id: 101,
-            name: "Alex Rodriguez",
-            email: "alex.r@techcorp.com",
-            phone: "(555) 111-2222",
-            company: "TechCorp Solutions",
-            source: "Website",
-            advisor: "John Smith",
-            advisorRole: "Senior Advisor",
-            nextFollowUp: "2024-01-18",
-            status: "To Be Contacted",
-            priority: "High",
-            scheduledDate: "2024-01-18",
-        },
-        {
-            id: 102,
-            name: "Jessica Parker",
-            email: "j.parker@innovate.io",
-            phone: "(555) 222-3333",
-            company: "Innovate Labs",
-            source: "Referral",
-            advisor: "Emily Davis",
-            advisorRole: "Sales Rep",
-            nextFollowUp: "2024-01-19",
-            status: "To Be Contacted",
-            priority: "Medium",
-            scheduledDate: "2024-01-19",
-        },
-        {
-            id: 103,
-            name: "Robert Martinez",
-            email: "r.martinez@global.com",
-            phone: "(555) 333-4444",
-            company: "Global Industries",
-            source: "Campaign",
-            advisor: "Sarah Miller",
-            advisorRole: "Account Manager",
-            nextFollowUp: "2024-01-20",
-            status: "To Be Contacted",
-            priority: "High",
-            scheduledDate: "2024-01-20",
-        },
-    ],
-    contacted: [
-        {
-            id: 201,
-            name: "Lisa Anderson",
-            email: "l.anderson@business.net",
-            phone: "(555) 444-5555",
-            company: "Business Dynamics",
-            source: "Website",
-            advisor: "Robert Brown",
-            advisorRole: "Lead Advisor",
-            lastContactDate: "2024-01-16",
-            status: "Contacted",
-            priority: "Medium",
-            contactedDate: "2024-01-16",
-        },
-        {
-            id: 202,
-            name: "Tom Harris",
-            email: "t.harris@startupco.io",
-            phone: "(555) 555-6666",
-            company: "StartupCo",
-            source: "Phone Call",
-            advisor: "Emily Davis",
-            advisorRole: "Sales Rep",
-            lastContactDate: "2024-01-15",
-            status: "Contacted",
-            priority: "High",
-            contactedDate: "2024-01-15",
-        },
-        {
-            id: 203,
-            name: "Maria Garcia",
-            email: "m.garcia@enterprises.com",
-            phone: "(555) 666-7777",
-            company: "Garcia Enterprises",
-            source: "Referral",
-            advisor: "John Smith",
-            advisorRole: "Senior Advisor",
-            lastContactDate: "2024-01-17",
-            status: "Contacted",
-            priority: "Low",
-            contactedDate: "2024-01-17",
-        },
-    ],
-    missedOut: [
-        {
-            id: 301,
-            name: "Kevin Thompson",
-            email: "k.thompson@ventures.com",
-            phone: "(555) 777-8888",
-            company: "Thompson Ventures",
-            source: "Website",
-            advisor: "Sarah Miller",
-            advisorRole: "Account Manager",
-            missedDate: "2024-01-14",
-            status: "Missed",
-            priority: "High",
-            scheduledDate: "2024-01-14",
-        },
-        {
-            id: 302,
-            name: "Amanda White",
-            email: "a.white@solutions.io",
-            phone: "(555) 888-9999",
-            company: "White Solutions",
-            source: "Campaign",
-            advisor: "Robert Brown",
-            advisorRole: "Lead Advisor",
-            missedDate: "2024-01-13",
-            status: "Missed",
-            priority: "Medium",
-            scheduledDate: "2024-01-13",
-        },
-    ],
-}
-
-const statusColors = {
-    New: "bg-emerald-50 text-emerald-700 border-emerald-200",
-    "In Progress": "bg-blue-50 text-blue-700 border-blue-200",
-    Contacted: "bg-sky-50 text-sky-700 border-sky-200",
-    Missed: "bg-rose-50 text-rose-700 border-rose-200",
-}
 
 function getStatusBadge(status: string) {
     const s = status.toLowerCase()
-    if (s === "new")
+    if (s === "closed as won")
         return (
             <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200">
-                New
+                Closed as Won
             </Badge>
         )
-    if (s === "in progress")
+    if (s === "proposal issued")
         return (
             <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                In Progress
+                Proposal Issued
             </Badge>
         )
-    if (s === "contacted")
-        return (
-            <Badge variant="outline" className="bg-sky-50 text-sky-700 border-sky-200">
-                Contacted
-            </Badge>
-        )
-    if (s === "missed" || s === "missed out")
+    if (s === "closed as loss")
         return (
             <Badge variant="outline" className="bg-rose-50 text-rose-700 border-rose-200">
-                Missed
-            </Badge>
-        )
-    if (s === "to be contacted")
-        return (
-            <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
-                To Be Contacted
+                Closed as Loss
             </Badge>
         )
     return <Badge variant="outline">{status}</Badge>
 }
 
-function getPriorityBadge(priority: string) {
-    const p = priority.toLowerCase()
-    if (p === "high")
-        return (
-            <span className="inline-flex items-center gap-1 bg-rose-50 text-rose-700 px-3 py-1 rounded-md text-xs font-medium border border-rose-200">
-                High
-            </span>
-        )
-    if (p === "medium")
-        return (
-            <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-700 px-3 py-1 rounded-md text-xs font-medium border border-amber-200">
-                Medium
-            </span>
-        )
-    return (
-        <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 px-3 py-1 rounded-md text-xs font-medium border border-emerald-200">
-            Low
-        </span>
-    )
+
+const formatDate = (dateString: string | undefined) => {
+    if (!dateString) return "N/A"
+    return new Date(dateString).toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+    })
 }
 
 function ProspectTable({ label, prospects, statusFilter }: { label: string; prospects: any[]; statusFilter: string }) {
+
     const labelColor = (() => {
         const l = label.toLowerCase()
-        if (l.includes("progress")) return "text-purple-600"
-        if (l.includes("new")) return "text-emerald-600"
-        return "text-slate-700"
+        if (l.includes("proposal issued")) return "text-purple-600"
+        if (l.includes("closed as won")) return "text-emerald-600"
+        return "text-red-700"
     })()
 
     const bgClass = (() => {
         const l = label.toLowerCase()
-        if (l.includes("progress")) return "bg-purple-50"
-        if (l.includes("new")) return "bg-emerald-50"
-        return "bg-slate-50"
+        if (l.includes("proposal issued")) return "bg-purple-50"
+        if (l.includes("closed as won")) return "bg-emerald-50"
+        return "bg-red-50"
     })()
 
     const borderClass = (() => {
         const l = label.toLowerCase()
-        if (l.includes("progress")) return "border-purple-100"
-        if (l.includes("new")) return "border-emerald-100"
-        return "border-slate-200"
+        if (l.includes("proposal issued")) return "border-purple-100"
+        if (l.includes("closed as won")) return "border-emerald-100"
+        return "border-red-200"
     })()
 
     return (
@@ -375,107 +113,129 @@ function ProspectTable({ label, prospects, statusFilter }: { label: string; pros
                 </div>
 
                 <CardContent className="p-0">
-                    {/* Desktop table view */}
-                    <div className="hidden md:block overflow-x-auto">
-                        <table className="w-full">
-                            <thead className=" border-b border-slate-200 text-white py-2 bg-[#003459]">
-                                <tr>
-                                    <th className="text-left py-3 px-4 text-xs font-semibold  uppercase tracking-wide">
-                                        Name
-                                    </th>
-                                    <th className="text-left py-3 px-4 text-xs font-semibold  uppercase tracking-wide">
-                                        Company
-                                    </th>
-                                    <th className="text-left py-3 px-4 text-xs font-semibold  uppercase tracking-wide">
-                                        Status
-                                    </th>
-                                    <th className="text-left py-3 px-4 text-xs font-semibold  uppercase tracking-wide">
-                                        Assigned To
-                                    </th>
-                                    <th className="text-left py-3 px-4 text-xs font-semibold  uppercase tracking-wide">
-                                        Priority
-                                    </th>
-                                    <th className="text-left py-3 px-4 text-xs font-semibold  uppercase tracking-wide">
-                                        Follow Up
-                                    </th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100">
+                    {prospects.length === 0 ? (
+                        <div className="py-8 text-center text-slate-500 text-sm font-medium">
+                            No prospect found
+                        </div>
+                    ) : (
+                        <>
+                            {/* Desktop table view */}
+                            <div className="hidden md:block overflow-x-auto">
+                                <table className="w-full">
+                                    <thead className=" border-b border-slate-200 text-white py-2 bg-[#003459]">
+                                        <tr>
+                                            <th className="text-left py-3 px-4 text-xs font-semibold  uppercase tracking-wide">
+                                                Name
+                                            </th>
+                                            <th className="text-left py-3 px-4 text-xs font-semibold  uppercase tracking-wide">
+                                                Phone Number
+                                            </th>
+                                            <th className="text-left py-3 px-4 text-xs font-semibold  uppercase tracking-wide">
+                                                Status
+                                            </th>
+                                            <th className="text-left py-3 px-4 text-xs font-semibold  uppercase tracking-wide">
+                                                Assigned To
+                                            </th>
+                                            <th className="text-left py-3 px-4 text-xs font-semibold  uppercase tracking-wide">
+                                                Follow Up
+                                            </th>
+                                            <th className="text-left py-3 px-4 text-xs font-semibold  uppercase tracking-wide">
+                                                View
+                                            </th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {prospects.map((prospect) => (
+                                            <tr key={prospect.id} className="hover:bg-slate-50/50 transition-colors">
+                                                <td className="py-3 px-4">
+                                                    <div>
+                                                        <p className="text-sm font-medium text-slate-800">{prospect.name}</p>
+                                                        <p className="text-xs text-slate-500">{prospect.email}</p>
+                                                    </div>
+                                                </td>
+                                                <td className="py-3 px-4">
+                                                    <p className="text-sm text-slate-700">{prospect?.phoneNumber}</p>
+                                                </td>
+                                                <td className="py-3 px-4">{getStatusBadge(prospect.status)}</td>
+                                                <td className="py-3 px-4">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="h-7 w-7 rounded-full bg-gradient-to-br from-blue-100 to-purple-100 flex items-center justify-center text-xs font-semibold text-slate-700">
+                                                            {prospect?.prospect?.assignedAgent?.name
+                                                                .split(" ")
+                                                                .map((n: string) => n[0])
+                                                                .join("")}
+                                                        </div>
+                                                        <span className="text-sm text-slate-700">{prospect?.prospect?.assignedAgent?.name}</span>
+                                                    </div>
+                                                </td>
+                                                <td className="py-3 px-4">
+                                                    <p className="text-sm ">{formatDate(prospect.nextFollowUp)}</p>
+                                                </td>
+                                                <td className="text-center py-3 px-4 flex justify-center items-center">
+                                                    <TooltipProvider>
+                                                        <Tooltip>
+                                                            <TooltipTrigger asChild>
+                                                                <Link
+                                                                    href={`/sales/prospects/${prospect.id}`}
+                                                                    className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-muted"
+                                                                    aria-label="View prospect details"
+                                                                >
+                                                                    <Eye className="h-4 w-4" />
+                                                                </Link>
+                                                            </TooltipTrigger>
+                                                            <TooltipContent sideOffset={6}>View prospects with this status</TooltipContent>
+                                                        </Tooltip>
+                                                    </TooltipProvider>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            {/* Mobile card view */}
+                            <div className="md:hidden divide-y divide-slate-100">
                                 {prospects.map((prospect) => (
-                                    <tr key={prospect.id} className="hover:bg-slate-50/50 transition-colors">
-                                        <td className="py-3 px-4">
+                                    <div key={prospect.id} className="p-4 hover:bg-slate-50/50 transition-colors">
+                                        <div className="flex items-start justify-between mb-3">
                                             <div>
-                                                <p className="text-sm font-medium text-slate-800">{prospect.name}</p>
+                                                <p className="font-medium text-sm text-slate-800 mb-1">{prospect.name}</p>
                                                 <p className="text-xs text-slate-500">{prospect.email}</p>
                                             </div>
-                                        </td>
-                                        <td className="py-3 px-4">
-                                            <p className="text-sm text-slate-700">{prospect.company}</p>
-                                        </td>
-                                        <td className="py-3 px-4">{getStatusBadge(prospect.status)}</td>
-                                        <td className="py-3 px-4">
-                                            <div className="flex items-center gap-2">
-                                                <div className="h-7 w-7 rounded-full bg-gradient-to-br from-blue-100 to-purple-100 flex items-center justify-center text-xs font-semibold text-slate-700">
-                                                    {prospect.advisor
-                                                        .split(" ")
-                                                        .map((n: string) => n[0])
-                                                        .join("")}
-                                                </div>
-                                                <span className="text-sm text-slate-700">{prospect.advisor}</span>
+                                            {getStatusBadge(prospect.status)}
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-3 text-xs">
+                                            <div>
+                                                <p className="text-slate-500 mb-1">Company</p>
+                                                <p className="text-slate-700 font-medium">{prospect.company}</p>
                                             </div>
-                                        </td>
-                                        <td className="py-3 px-4">{getPriorityBadge(prospect.priority)}</td>
-                                        <td className="py-3 px-4">
-                                            <p className="text-sm ">{prospect.nextFollowUp}</p>
-                                        </td>
-                                    </tr>
+                                            <div>
+                                                <p className="text-slate-500 mb-1">Advisor</p>
+                                                <p className="text-slate-700 font-medium">{prospect?.assignedAgent?.name}</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-slate-500 mb-1">Follow Up</p>
+                                                <p className="text-slate-700 font-medium">{formatDate(prospect.nextFollowUp)}</p>
+                                            </div>
+                                        </div>
+                                    </div>
                                 ))}
-                            </tbody>
-                        </table>
-                    </div>
-
-                    {/* Mobile card view */}
-                    <div className="md:hidden divide-y divide-slate-100">
-                        {prospects.map((prospect) => (
-                            <div key={prospect.id} className="p-4 hover:bg-slate-50/50 transition-colors">
-                                <div className="flex items-start justify-between mb-3">
-                                    <div>
-                                        <p className="font-medium text-sm text-slate-800 mb-1">{prospect.name}</p>
-                                        <p className="text-xs text-slate-500">{prospect.email}</p>
-                                    </div>
-                                    {getStatusBadge(prospect.status)}
-                                </div>
-                                <div className="grid grid-cols-2 gap-3 text-xs">
-                                    <div>
-                                        <p className="text-slate-500 mb-1">Company</p>
-                                        <p className="text-slate-700 font-medium">{prospect.company}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-slate-500 mb-1">Priority</p>
-                                        {getPriorityBadge(prospect.priority)}
-                                    </div>
-                                    <div>
-                                        <p className="text-slate-500 mb-1">Advisor</p>
-                                        <p className="text-slate-700 font-medium">{prospect.advisor}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-slate-500 mb-1">Follow Up</p>
-                                        <p className="text-slate-700 font-medium">{prospect.nextFollowUp}</p>
-                                    </div>
-                                </div>
                             </div>
-                        ))}
-                    </div>
+                        </>
+                    )}
 
-                    <div className="border-t border-slate-100 p-4 bg-slate-50/30">
-                        <a
-                            href={`/dashboard/prospects/table`}
-                            className="flex items-center justify-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors"
-                        >
-                            View All {label}
-                            <ArrowRight className="h-4 w-4" />
-                        </a>
-                    </div>
+                    {prospects.length > 0 && (
+                        <div className="border-t border-slate-100 p-4 bg-slate-50/30">
+                            <a
+                                href={`/dashboard/opportunities/table?status=${statusFilter}`}
+                                className="flex items-center justify-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors"
+                            >
+                                View All {label}
+                                <ArrowRight className="h-4 w-4" />
+                            </a>
+                        </div>
+                    )}
+
                 </CardContent>
             </Card>
         </div>
@@ -495,15 +255,14 @@ function SegregationTable({
 }) {
     const labelColor = (() => {
         const l = label.toLowerCase()
-        if (l.includes("contacted") && !l.includes("missed")) return "text-sky-600"
-        if (l.includes("be contacted")) return "text-amber-600"
+        if (l.includes("follow up") && !l.includes("missed")) return "text-sky-600"
         if (l.includes("missed")) return "text-rose-600"
         return "text-blue-600"
     })()
 
     const bgClass = (() => {
         const l = label.toLowerCase()
-        if (l.includes("contacted") && !l.includes("missed")) return "bg-sky-50"
+        if (l.includes("follow up") && !l.includes("missed")) return "bg-sky-50"
         if (l.includes("be contacted")) return "bg-amber-50"
         if (l.includes("missed")) return "bg-rose-50"
         return "bg-blue-50"
@@ -511,7 +270,7 @@ function SegregationTable({
 
     const borderClass = (() => {
         const l = label.toLowerCase()
-        if (l.includes("contacted") && !l.includes("missed")) return "border-sky-100"
+        if (l.includes("follow up") && !l.includes("missed")) return "border-sky-100"
         if (l.includes("be contacted")) return "border-amber-100"
         if (l.includes("missed")) return "border-rose-100"
         return "border-blue-100"
@@ -542,143 +301,288 @@ function SegregationTable({
                 </div>
 
                 <CardContent className="p-0">
-                    {/* Desktop table view */}
-                    <div className="hidden md:block overflow-x-auto">
-                        <table className="w-full">
-                            <thead className="text-white border-b py-2 border-slate-200 bg-[#003459]">
-                                <tr>
-                                    <th className="text-left py-3 px-4 text-xs font-semibold  uppercase tracking-wide">
-                                        Name
-                                    </th>
-                                    <th className="text-left py-3 px-4 text-xs font-semibold  uppercase tracking-wide">
-                                        Company
-                                    </th>
-                                    <th className="text-left py-3 px-4 text-xs font-semibold  uppercase tracking-wide">
-                                        Status
-                                    </th>
-                                    <th className="text-left py-3 px-4 text-xs font-semibold  uppercase tracking-wide">
-                                        Assigned To
-                                    </th>
-                                    <th className="text-left py-3 px-4 text-xs font-semibold  uppercase tracking-wide">
-                                        Source
-                                    </th>
-                                    <th className="text-left py-3 px-4 text-xs font-semibold  uppercase tracking-wide">
-                                        {dateLabel}
-                                    </th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100">
+                    {leads.length === 0 ? (
+                        <div className="p-4 text-center text-slate-500 font-medium">
+                            No prospect found
+                        </div>
+                    ) : (
+                        <>
+                            {/* Desktop table view */}
+                            <div className="hidden md:block overflow-x-auto">
+                                <table className="w-full">
+                                    <thead className="text-white border-b py-2 border-slate-200 bg-[#003459]">
+                                        <tr>
+                                            <th className="text-left py-3 px-4 text-xs font-semibold uppercase tracking-wide">
+                                                Name
+                                            </th>
+                                            <th className="text-left py-3 px-4 text-xs font-semibold uppercase tracking-wide">
+                                                Phone Number
+                                            </th>
+                                            <th className="text-left py-3 px-4 text-xs font-semibold uppercase tracking-wide">
+                                                Status
+                                            </th>
+                                            <th className="text-left py-3 px-4 text-xs font-semibold uppercase tracking-wide">
+                                                Assigned To
+                                            </th>
+                                            <th className="text-left py-3 px-4 text-xs font-semibold uppercase tracking-wide">
+                                                {dateLabel}
+                                            </th>
+                                            <th className="text-left py-3 px-4 text-xs font-semibold uppercase tracking-wide">
+                                                View
+                                            </th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100">
+                                        {leads.map((lead) => (
+                                            <tr
+                                                key={lead.id}
+                                                className="hover:bg-slate-50/50 transition-colors"
+                                            >
+                                                <td className="py-3 px-4">
+                                                    <div>
+                                                        <p className="text-sm font-medium text-slate-800">
+                                                            {lead.name}
+                                                        </p>
+                                                        <p className="text-xs text-slate-500">
+                                                            {lead.email}
+                                                        </p>
+                                                    </div>
+                                                </td>
+                                                <td className="py-3 px-4">
+                                                    <p className="text-sm text-slate-700">
+                                                        {lead.phoneNumber}
+                                                    </p>
+                                                </td>
+                                                <td className="py-3 px-4">{getStatusBadge(lead.status)}</td>
+                                                <td className="py-3 px-4">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="h-7 w-7 rounded-full bg-gradient-to-br from-blue-100 to-purple-100 flex items-center justify-center text-xs font-semibold text-slate-700">
+                                                            {lead?.prospect?.assignedAgent?.name
+                                                                .split(" ")
+                                                                .map((n: string) => n[0])
+                                                                .join("")}
+                                                        </div>
+                                                        <span className="text-sm text-slate-700">
+                                                            {lead?.prospect?.assignedAgent?.name}
+                                                        </span>
+                                                    </div>
+                                                </td>
+                                                <td className="py-3 px-4">
+                                                    <p className="text-sm ">
+                                                        {formatDate(
+                                                            lead.scheduledDate ||
+                                                            lead.contactedDate ||
+                                                            lead.missedDate ||
+                                                            lead.nextFollowUp
+                                                        )}
+                                                    </p>
+                                                </td>
+                                                <td className="text-center py-3 px-4 flex justify-center items-center">
+                                                    <TooltipProvider>
+                                                        <Tooltip>
+                                                            <TooltipTrigger asChild>
+                                                                <Link
+                                                                    href={`/sales/prospects/${lead.id}`}
+                                                                    className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-muted"
+                                                                    aria-label="View prospect details"
+                                                                >
+                                                                    <Eye className="h-4 w-4" />
+                                                                </Link>
+                                                            </TooltipTrigger>
+                                                            <TooltipContent sideOffset={6}>View prospects with this status</TooltipContent>
+                                                        </Tooltip>
+                                                    </TooltipProvider>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            {/* Mobile card view */}
+                            <div className="md:hidden divide-y divide-slate-100">
                                 {leads.map((lead) => (
-                                    <tr key={lead.id} className="hover:bg-slate-50/50 transition-colors">
-                                        <td className="py-3 px-4">
+                                    <div
+                                        key={lead.id}
+                                        className="p-4 hover:bg-slate-50/50 transition-colors"
+                                    >
+                                        <div className="flex items-start justify-between mb-3">
                                             <div>
-                                                <p className="text-sm font-medium text-slate-800">{lead.name}</p>
+                                                <p className="font-medium text-sm text-slate-800 mb-1">
+                                                    {lead.name}
+                                                </p>
                                                 <p className="text-xs text-slate-500">{lead.email}</p>
                                             </div>
-                                        </td>
-                                        <td className="py-3 px-4">
-                                            <p className="text-sm text-slate-700">{lead.company}</p>
-                                        </td>
-                                        <td className="py-3 px-4">{getStatusBadge(lead.status)}</td>
-                                        <td className="py-3 px-4">
-                                            <div className="flex items-center gap-2">
-                                                <div className="h-7 w-7 rounded-full bg-gradient-to-br from-blue-100 to-purple-100 flex items-center justify-center text-xs font-semibold text-slate-700">
-                                                    {lead.advisor
-                                                        .split(" ")
-                                                        .map((n: string) => n[0])
-                                                        .join("")}
-                                                </div>
-                                                <span className="text-sm text-slate-700">{lead.advisor}</span>
+                                            {getStatusBadge(lead.status)}
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-3 text-xs">
+                                            <div>
+                                                <p className="text-slate-500 mb-1">Company</p>
+                                                <p className="text-slate-700 font-medium">{lead.company}</p>
                                             </div>
-                                        </td>
-                                        <td className="py-3 px-4">
-                                            <span className="inline-flex items-center gap-1 bg-slate-100 text-slate-700 px-3 py-1 rounded-md text-xs font-medium">
-                                                {lead.source}
-                                            </span>
-                                        </td>
-                                        <td className="py-3 px-4">
-                                            <p className="text-sm ">
-                                                {lead.scheduledDate || lead.contactedDate || lead.missedDate || lead.nextFollowUp}
-                                            </p>
-                                        </td>
-                                    </tr>
+                                            <div>
+                                                <p className="text-slate-500 mb-1">Source</p>
+                                                <span className="inline-flex items-center gap-1 bg-slate-100 text-slate-700 px-2 py-0.5 rounded text-xs font-medium">
+                                                    {lead.source}
+                                                </span>
+                                            </div>
+                                            <div>
+                                                <p className="text-slate-500 mb-1">Advisor</p>
+                                                <p className="text-slate-700 font-medium">{lead.advisor}</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-slate-500 mb-1">{dateLabel}</p>
+                                                <p className="text-slate-700 font-medium">
+                                                    {lead.scheduledDate ||
+                                                        lead.contactedDate ||
+                                                        lead.missedDate ||
+                                                        lead.nextFollowUp}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
                                 ))}
-                            </tbody>
-                        </table>
-                    </div>
-
-                    {/* Mobile card view */}
-                    <div className="md:hidden divide-y divide-slate-100">
-                        {leads.map((lead) => (
-                            <div key={lead.id} className="p-4 hover:bg-slate-50/50 transition-colors">
-                                <div className="flex items-start justify-between mb-3">
-                                    <div>
-                                        <p className="font-medium text-sm text-slate-800 mb-1">{lead.name}</p>
-                                        <p className="text-xs text-slate-500">{lead.email}</p>
-                                    </div>
-                                    {getStatusBadge(lead.status)}
-                                </div>
-                                <div className="grid grid-cols-2 gap-3 text-xs">
-                                    <div>
-                                        <p className="text-slate-500 mb-1">Company</p>
-                                        <p className="text-slate-700 font-medium">{lead.company}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-slate-500 mb-1">Source</p>
-                                        <span className="inline-flex items-center gap-1 bg-slate-100 text-slate-700 px-2 py-0.5 rounded text-xs font-medium">
-                                            {lead.source}
-                                        </span>
-                                    </div>
-                                    <div>
-                                        <p className="text-slate-500 mb-1">Advisor</p>
-                                        <p className="text-slate-700 font-medium">{lead.advisor}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-slate-500 mb-1">{dateLabel}</p>
-                                        <p className="text-slate-700 font-medium">
-                                            {lead.scheduledDate || lead.contactedDate || lead.missedDate || lead.nextFollowUp}
-                                        </p>
-                                    </div>
-                                </div>
                             </div>
-                        ))}
-                    </div>
 
-                    <div className="border-t border-slate-100 p-4 bg-slate-50/30">
-                        <a
-                            href={`/dashboard/prospects/table`}
-                            className="flex items-center justify-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors"
-                        >
-                            View All {label}
-                            <ArrowRight className="h-4 w-4" />
-                        </a>
-                    </div>
+                            {/* View All link only if leads exist */}
+                            {leads.length > 0 && (
+                                <div className="border-t border-slate-100 p-4 bg-slate-50/30">
+                                    <a
+                                        href={`/dashboard/opportunities/table?engagementStatus=${statusFilter}`}
+                                        className="flex items-center justify-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors"
+                                    >
+                                        View All {label}
+                                        <ArrowRight className="h-4 w-4" />
+                                    </a>
+                                </div>
+                            )}
+                        </>
+                    )}
                 </CardContent>
             </Card>
         </div>
     )
 }
 
+
 export default function ProspectDashboard() {
+    const [prospects, setProspects] = useState<any>([])
+    const [loading, setLoading] = useState(false)
+    const [leadSources, setLeadSources] = useState<any>([])
+    const [statusCategoryData, setStatusCategoryData] = useState<any>([])
+
+    useEffect(() => {
+        setLoading(true)
+
+        Promise.all([
+            fetch("/api/opportunities").then(res => res.json()),
+            fetch("/api/lead_source").then(res => res.json()),
+        ])
+            .then(([prospectsRes, leadSourceRes]) => {
+                const prospects = Array.isArray(prospectsRes?.opportunities)
+                    ? prospectsRes.opportunities.filter((p: any) => !p.archived)
+                    : []
+
+                setProspects(prospects)
+
+                /* ---------------- LEAD SOURCE DATA ---------------- */
+                const leadSourceColors = [
+                    "#3b82f6",
+                    "#10b981",
+                    "#f59e0b",
+                    "#8b5cf6",
+                    "#ef4444",
+                    "#06b6d4",
+                ]
+
+                const leadSourceChartData = Array.isArray(leadSourceRes)
+                    ? leadSourceRes.map((source: any, index: number) => ({
+                        name: source.name,
+                        value: prospects.filter(
+                            (p: any) => p.prospect.leadSourceId === source.id
+                        ).length,
+                        color: leadSourceColors[index % leadSourceColors.length],
+                    }))
+                    : []
+
+                setLeadSources(leadSourceChartData)
+
+
+                /* ---------------- STATUS CATEGORY DATA ---------------- */
+                const today = new Date()
+
+                const statusCounts = {
+                    "Follow Up": 0,
+                    Missed: 0,
+                }
+
+                prospects.forEach((p: any) => {
+                    const assignedAgentId = p.prospect.assignedAgentId
+                    console.log(p)
+                    const agentComments = Array.isArray(p.comments)
+                        ? p.comments
+                            .filter((c: any) => c.authorId === assignedAgentId)
+                            .sort(
+                                (a: any, b: any) =>
+                                    new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+                            )
+                        : []
+
+                    if (p.nextFollowUp) {
+                        const followUpDate = new Date(p.nextFollowUp)
+                        if (agentComments.length === 0) {
+                            statusCounts["Follow Up"]++
+                        } else {
+                            const lastCommentDate = new Date(agentComments[0].createdAt)
+                            if (followUpDate > lastCommentDate) statusCounts["Follow Up"]++
+                            else statusCounts.Missed++
+                        }
+                    }
+                })
+
+                const statusCategoryData = [
+                    { status: "Follow Up", count: statusCounts["Follow Up"], color: "#f87171" },
+                    { status: "Missed", count: statusCounts.Missed, color: "#ef4444" },
+                ]
+
+                setStatusCategoryData(statusCategoryData)
+            })
+            .catch((err) => {
+                setProspects([])
+                setLeadSources([])
+                setStatusCategoryData([])
+            })
+            .finally(() => {
+                setLoading(false)
+            })
+    }, [])
+
+
+    if (loading) {
+        return (< div className="flex justify-center items-center py-12" >
+            <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div >
+        )
+    }
     return (
         <div className="min-h-screen bg-slate-50 p-4 md:p-6 lg:p-8">
-            <div className="max-w-7xl mx-auto space-y-6">
+            <div className=" mx-auto space-y-6">
                 {/* Header */}
                 <div className="flex items-center justify-between mb-6">
                     <div>
                         <h1 className="text-3xl font-bold text-slate-800 mb-1">Opportunities Reports Dashboard</h1>
-                        <p className="">Track and manage your sales prospects</p>
+                        <p className="">Track and manage your sales opportunities</p>
                     </div>
                 </div>
 
                 {/* Stats Cards */}
-                <div className="grid gap-4 md:grid-cols-3">
+                <div className="grid gap-4 md:grid-cols-4">
                     {/* Total Prospects */}
                     <Card className="border border-blue-200 bg-blue-50/50 rounded-xl shadow-sm overflow-hidden">
                         <div className="h-1.5 bg-blue-300" />
                         <CardHeader className="pb-2">
                             <div className="flex items-center justify-between">
-                                <CardTitle className="text-sm font-medium text-slate-700">Total Oppurtunities</CardTitle>
+                                <CardTitle className="text-sm font-medium text-slate-700">Total Opportunities</CardTitle>
                                 <div className="h-10 w-10 rounded-xl bg-blue-100 flex items-center justify-center">
                                     <Users className="h-5 w-5 text-blue-600" />
                                 </div>
@@ -686,13 +590,7 @@ export default function ProspectDashboard() {
                         </CardHeader>
                         <CardContent>
                             <div className="space-y-2">
-                                <div className="text-3xl font-bold text-slate-800">{statsData.total}</div>
-                                <div className="flex items-center gap-2">
-                                    <Badge variant="outline" className="bg-blue-100 text-blue-700 border-blue-200 text-xs">
-                                        <TrendingUp className="h-3 w-3 mr-1" />
-                                        12% vs last month
-                                    </Badge>
-                                </div>
+                                <div className="text-3xl font-bold text-slate-800">{prospects.length}</div>
                                 <div className="w-full bg-blue-200 h-1.5 rounded-full overflow-hidden">
                                     <div className="bg-blue-500 h-full" style={{ width: "75%" }} />
                                 </div>
@@ -700,12 +598,30 @@ export default function ProspectDashboard() {
                         </CardContent>
                     </Card>
 
-                    {/* New Prospects */}
+                    <Card className="border border-purple-200 bg-purple-50/50 rounded-xl shadow-sm overflow-hidden">
+                        <div className="h-1.5 bg-purple-300" />
+                        <CardHeader className="pb-2">
+                            <div className="flex items-center justify-between">
+                                <CardTitle className="text-sm font-medium text-slate-700">Proposal Issued</CardTitle>
+                                <div className="h-10 w-10 rounded-xl bg-purple-100 flex items-center justify-center">
+                                    <UserPlus className="h-5 w-5 text-purple-600" />
+                                </div>
+                            </div>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="space-y-2">
+                                <div className="text-3xl font-bold text-slate-800">{prospects.filter((prospect: any) => prospect.status == "Proposal Issued")?.length}</div>
+                                <div className="w-full bg-purple-200 h-1.5 rounded-full overflow-hidden">
+                                    <div className="bg-purple-500 h-full" style={{ width: "60%" }} />
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
                     <Card className="border border-emerald-200 bg-emerald-50/50 rounded-xl shadow-sm overflow-hidden">
                         <div className="h-1.5 bg-emerald-300" />
                         <CardHeader className="pb-2">
                             <div className="flex items-center justify-between">
-                                <CardTitle className="text-sm font-medium text-slate-700">New Opportunities</CardTitle>
+                                <CardTitle className="text-sm font-medium text-slate-700">Closed As Won</CardTitle>
                                 <div className="h-10 w-10 rounded-xl bg-emerald-100 flex items-center justify-center">
                                     <UserPlus className="h-5 w-5 text-emerald-600" />
                                 </div>
@@ -713,13 +629,7 @@ export default function ProspectDashboard() {
                         </CardHeader>
                         <CardContent>
                             <div className="space-y-2">
-                                <div className="text-3xl font-bold text-slate-800">{statsData.new}</div>
-                                <div className="flex items-center gap-2">
-                                    <Badge variant="outline" className="bg-emerald-100 text-emerald-700 border-emerald-200 text-xs">
-                                        <TrendingUp className="h-3 w-3 mr-1" />
-                                        18% vs last month
-                                    </Badge>
-                                </div>
+                                <div className="text-3xl font-bold text-slate-800">{prospects.filter((prospect: any) => prospect.status == "Closed as Won")?.length}</div>
                                 <div className="w-full bg-emerald-200 h-1.5 rounded-full overflow-hidden">
                                     <div className="bg-emerald-500 h-full" style={{ width: "60%" }} />
                                 </div>
@@ -728,27 +638,21 @@ export default function ProspectDashboard() {
                     </Card>
 
                     {/* In Progress */}
-                    <Card className="border border-purple-200 bg-purple-50/50 rounded-xl shadow-sm overflow-hidden">
-                        <div className="h-1.5 bg-purple-300" />
+                    <Card className="border border-red-200 bg-red-50/50 rounded-xl shadow-sm overflow-hidden">
+                        <div className="h-1.5 bg-red-300" />
                         <CardHeader className="pb-2">
                             <div className="flex items-center justify-between">
-                                <CardTitle className="text-sm font-medium text-slate-700">In Progress</CardTitle>
-                                <div className="h-10 w-10 rounded-xl bg-purple-100 flex items-center justify-center">
-                                    <Activity className="h-5 w-5 text-purple-600" />
+                                <CardTitle className="text-sm font-medium text-red-700">Closed As Loss</CardTitle>
+                                <div className="h-10 w-10 rounded-xl bg-red-100 flex items-center justify-center">
+                                    <Activity className="h-5 w-5 text-red-600" />
                                 </div>
                             </div>
                         </CardHeader>
                         <CardContent>
                             <div className="space-y-2">
-                                <div className="text-3xl font-bold text-slate-800">{statsData.inProgress}</div>
-                                <div className="flex items-center gap-2">
-                                    <Badge variant="outline" className="bg-purple-100 text-purple-700 border-purple-200 text-xs">
-                                        <TrendingUp className="h-3 w-3 mr-1" />
-                                        8% vs last month
-                                    </Badge>
-                                </div>
-                                <div className="w-full bg-purple-200 h-1.5 rounded-full overflow-hidden">
-                                    <div className="bg-purple-500 h-full" style={{ width: "45%" }} />
+                                <div className="text-3xl font-bold text-slate-800">{prospects.filter((prospect: any) => prospect.status == "Closed as Loss")?.length}</div>
+                                <div className="w-full bg-red-200 h-1.5 rounded-full overflow-hidden">
+                                    <div className="bg-red-500 h-full" style={{ width: "45%" }} />
                                 </div>
                             </div>
                         </CardContent>
@@ -771,7 +675,7 @@ export default function ProspectDashboard() {
                             <ResponsiveContainer width="100%" height={250}>
                                 <PieChart>
                                     <Pie
-                                        data={leadSourceData}
+                                        data={leadSources}
                                         cx="50%"
                                         cy="50%"
                                         labelLine={false}
@@ -780,7 +684,7 @@ export default function ProspectDashboard() {
                                         fill="#8884d8"
                                         dataKey="value"
                                     >
-                                        {leadSourceData.map((entry, index) => (
+                                        {leadSources.map((entry, index) => (
                                             <Cell key={`cell-${index}`} fill={entry.color} />
                                         ))}
                                     </Pie>
@@ -788,7 +692,7 @@ export default function ProspectDashboard() {
                                 </PieChart>
                             </ResponsiveContainer>
                             <div className="grid grid-cols-2 gap-3 mt-4">
-                                {leadSourceData.map((source) => (
+                                {leadSources.map((source) => (
                                     <div key={source.name} className="flex items-center gap-2">
                                         <div className="w-3 h-3 rounded-sm" style={{ backgroundColor: source.color }} />
                                         <span className="text-sm ">
@@ -833,37 +737,22 @@ export default function ProspectDashboard() {
                         <h2 className="text-xl font-bold text-slate-800">Date-wise Lead Tracking</h2>
                     </div>
 
-                    <div className="grid gap-4 md:grid-cols-3">
+                    <div className="grid gap-4 md:grid-cols-2">
                         {/* Leads To Be Contacted */}
-                        <Card className="border border-amber-200 bg-amber-50/50 rounded-xl shadow-sm overflow-hidden hover:shadow-md transition-shadow">
-                            <div className="h-1.5 bg-amber-300" />
-                            <CardHeader className="pb-3">
-                                <div className="flex items-center justify-between">
-                                    <CardTitle className="text-sm font-semibold text-slate-700">Leads To Be Contacted</CardTitle>
-                                    <div className="h-10 w-10 rounded-xl bg-amber-100 flex items-center justify-center">
-                                        <Calendar className="h-5 w-5 text-amber-600" />
-                                    </div>
-                                </div>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="text-4xl font-bold text-amber-600 mb-2">{dateWiseData.toBeContacted}</div>
-                                <p className="text-sm ">Scheduled for follow-up</p>
-                            </CardContent>
-                        </Card>
 
                         {/* Leads Contacted */}
                         <Card className="border border-sky-200 bg-sky-50/50 rounded-xl shadow-sm overflow-hidden hover:shadow-md transition-shadow">
                             <div className="h-1.5 bg-sky-300" />
                             <CardHeader className="pb-3">
                                 <div className="flex items-center justify-between">
-                                    <CardTitle className="text-sm font-semibold text-slate-700">Leads Contacted</CardTitle>
+                                    <CardTitle className="text-sm font-semibold text-slate-700">Follow Up Required</CardTitle>
                                     <div className="h-10 w-10 rounded-xl bg-sky-100 flex items-center justify-center">
                                         <UserPlus className="h-5 w-5 text-sky-600" />
                                     </div>
                                 </div>
                             </CardHeader>
                             <CardContent>
-                                <div className="text-4xl font-bold text-sky-600 mb-2">{dateWiseData.contacted}</div>
+                                <div className="text-4xl font-bold text-sky-600 mb-2">{(statusCategoryData.find((status: any) => status.status == "Follow Up")?.count || 0)}</div>
                                 <p className="text-sm ">Successfully reached out</p>
                             </CardContent>
                         </Card>
@@ -880,7 +769,7 @@ export default function ProspectDashboard() {
                                 </div>
                             </CardHeader>
                             <CardContent>
-                                <div className="text-4xl font-bold text-rose-600 mb-2">{dateWiseData.missedOut}</div>
+                                <div className="text-4xl font-bold text-rose-600 mb-2">{statusCategoryData.find((status: any) => status.status == "Missed")?.count || 0}</div>
                                 <p className="text-sm ">Requires attention</p>
                             </CardContent>
                         </Card>
@@ -896,16 +785,16 @@ export default function ProspectDashboard() {
                         <h2 className="text-xl font-bold text-slate-800">Active Prospects</h2>
                     </div>
 
-                    <ProspectTable label="Proposal issued" prospects={prospectsData.new} statusFilter="new" />
+                    <ProspectTable label="Proposal Issued" prospects={prospects.filter((prospect) => prospect.status == "Proposal Issued").slice(0, 5)} statusFilter="New" />
                     <ProspectTable
-                        label="Closed as won"
-                        prospects={prospectsData.inProgress}
-                        statusFilter="in-progress"
+                        label="Closed as Won Prospects"
+                        prospects={prospects.filter((prospect) => prospect.status == "Closed as Won").slice(0, 5)}
+                        statusFilter="In Progress"
                     />
                     <ProspectTable
-                        label="Closed as loss"
-                        prospects={prospectsData.inProgress}
-                        statusFilter="in-progress"
+                        label="Closed as Loss Prospects"
+                        prospects={prospects.filter((prospect) => prospect.status == "Closed as Loss").slice(0, 5)}
+                        statusFilter="In Progress"
                     />
                 </div>
 
@@ -917,23 +806,56 @@ export default function ProspectDashboard() {
                         </div>
                         <h2 className="text-xl font-bold text-slate-800">Lead Segregation</h2>
                     </div>
+                    <SegregationTable
+                        label="Follow Up"
+                        leads={prospects
+                            .filter((prospect: any) => {
+                                if (prospect.status != "Proposal Issued") return false; // only consider Proposal Issued prospects`
+                                if (!prospect.nextFollowUp) return false; // no follow-up, skip
 
-                    <SegregationTable
-                        label="Leads To Be Contacted"
-                        leads={segregationData.toBeContacted}
-                        statusFilter="to-be-contacted"
-                        dateLabel="Scheduled Date"
-                    />
-                    <SegregationTable
-                        label="Leads Contacted"
-                        leads={segregationData.contacted}
-                        statusFilter="contacted"
+                                // get comments by assigned agent
+                                const agentComments = (prospect.comments || [])
+                                    .filter(c => c.authorId === prospect.prospect.assignedAgentId)
+                                    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+                                const lastCommentDate = agentComments[0] ? new Date(agentComments[0].createdAt) : null;
+                                const nextFollowUpDate = new Date(prospect.nextFollowUp);
+
+                                // if no comments yet, consider it a follow-up
+                                if (!lastCommentDate) return true;
+
+                                // check if follow-up is still upcoming
+                                return nextFollowUpDate > lastCommentDate;
+                            })
+                            .sort((a, b) => new Date(b.nextFollowUp).getTime() - new Date(a.nextFollowUp).getTime()) // latest first
+                            .slice(0, 5)}
+                        statusFilter="Follow Up"
                         dateLabel="Contacted Date"
                     />
                     <SegregationTable
                         label="Leads Missed Out"
-                        leads={segregationData.missedOut}
-                        statusFilter="missed"
+                        leads={prospects
+                            .filter((prospect: any) => {
+                                if (prospect.status != "Proposal Issued") return false;
+                                if (!prospect.nextFollowUp) return false; // no follow-up, skip
+
+                                // get comments by assigned agent
+                                const agentComments = (prospect.comments || [])
+                                    .filter(c => c.authorId === prospect.prospect.assignedAgentId)
+                                    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+                                const lastCommentDate = agentComments[0] ? new Date(agentComments[0].createdAt) : null;
+                                const nextFollowUpDate = new Date(prospect.nextFollowUp);
+
+                                // if no comments yet, consider it a follow-up
+                                if (!lastCommentDate) return false;
+
+                                // check if follow-up is still upcoming
+                                return nextFollowUpDate < lastCommentDate;
+                            })
+                            .sort((a, b) => new Date(b.nextFollowUp).getTime() - new Date(a.nextFollowUp).getTime()) // latest first
+                            .slice(0, 5)}
+                        statusFilter="Missed Out"
                         dateLabel="Missed Date"
                     />
                 </div>

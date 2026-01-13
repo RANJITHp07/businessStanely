@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { TrendingUp, TrendingDown, Users, DollarSign, AlertTriangle, CalendarIcon, Target, Clock } from "lucide-react"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, BarChart, Bar } from "recharts"
+import { useAgentContext } from "@/lib/agent-context"
 
 // Mock data for sales dashboard
 const dashboardData = {
@@ -86,6 +87,7 @@ const recentActivities = [
 
 export default function SalesDashboard() {
     const router = useRouter()
+    const agent = useAgentContext()
 
     const chartConfig = {
         revenue: {
@@ -107,14 +109,17 @@ export default function SalesDashboard() {
                         <h1 className="text-4xl font-bold text-balance text-slate-900">Sales Dashboard</h1>
                         <p className="text-slate-600 mt-2">Track your sales performance and manage your pipeline</p>
                     </div>
-                    <Button
-                        size="lg"
-                        onClick={() => router.push("/sales/calendar")}
-                        className="bg-blue-600 hover:bg-blue-700 gap-2 text-white"
-                    >
-                        <CalendarIcon className="h-5 w-5" />
-                        View Calendar
-                    </Button>
+                    {
+                        agent?.agentType != "Lead Maker" &&
+                        <Button
+                            size="lg"
+                            onClick={() => router.push("/sales/calendar")}
+                            className="bg-blue-600 hover:bg-blue-700 gap-2 text-white"
+                        >
+                            <CalendarIcon className="h-5 w-5" />
+                            View Calendar
+                        </Button>
+                    }
                 </div>
 
                 {/* Stats Cards */}

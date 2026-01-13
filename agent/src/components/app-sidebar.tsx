@@ -130,14 +130,14 @@ export function AppSidebar() {
         agentRole = agentObj.agentRole;
         agentType = agentObj.agentType;
       }
-    } catch {}
+    } catch { }
   }
 
   let items = dashboardItems;
   if (agentRole === "Advisor Agent") {
     if (agentType === "Client Advisor" || agentType === "Client Manager") {
       items = salesItems;
-    } else if ( agentType === "Lead Maker") {
+    } else if (agentType === "Lead Maker") {
       items = salesItems.filter(item => item.title !== "Calendar");
     } else {
       items = salesItems;

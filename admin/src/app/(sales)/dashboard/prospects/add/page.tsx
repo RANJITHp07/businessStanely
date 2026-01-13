@@ -2,7 +2,6 @@
 
 import type React from "react"
 import { useState, useEffect } from "react"
-import { useAgentContext } from "@/lib/agent-context"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -23,7 +22,6 @@ type LeadSource = {
 }
 
 export default function NewProspectPage() {
-    const agent = useAgentContext()
     const router = useRouter()
     const [open, setOpen] = useState(false)
     const [assignedTo, setAssignedTo] = useState("")
@@ -42,12 +40,11 @@ export default function NewProspectPage() {
     })
 
     const handleSubmit = async (e: React.FormEvent) => {
-        setLoading(true)
         e.preventDefault()
         setAssignTouched(true)
         // For Client Advisor/Manager, assignedTo is required
-        if ((agent?.agentType === "Client Advisor" || agent?.agentType === "Client Manager") && !assignedTo) {
-            toast.error("Please assign this prospect to yourself or another agent.")
+        if (!assignedTo) {
+            toast.error("Please assign this prospect to a agent.")
             return
         }
         const payload = {
@@ -58,6 +55,7 @@ export default function NewProspectPage() {
             leadSourceId: leadSources.find((source) => source.name == formData.leadSource)?.id
         }
         try {
+            setLoading(true)
             const res = await fetch("/api/prospects", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -65,7 +63,7 @@ export default function NewProspectPage() {
             })
             if (!res.ok) throw new Error("Failed to create prospect")
             toast.success("Successfully created prospect")
-            router.push("/sales/prospects/table")
+            router.back()
         } catch (err) {
             toast.error("Failed to create prospect")
         } finally {
@@ -82,31 +80,15 @@ export default function NewProspectPage() {
     // Fetch agent info and subordinates if needed
     useEffect(() => {
         async function fetchTeam() {
-            // Get current agent info
-            const agentRes = await fetch("/api/agents/me")
-            if (!agentRes.ok) return setTeamMembers([])
-            const agent = await agentRes.json()
-            if (agent.agentRole === "Advisor Agent" && agent.agentType === "Client Manager") {
-                // Fetch subordinates
-                const subRes = await fetch("/api/agents/me/subordinates")
-                if (subRes.ok) {
-                    const subs = await subRes.json()
-                    setTeamMembers(subs)
-                    return
-                }
-            }
-            // Fallback: fetch all agents
             const allRes = await fetch("/api/agents")
             if (allRes.ok) {
-                if (agent.agentRole === "Advisor Agent" && agent.agentType === "Lead Maker") {
-                    const allAgentsData = await allRes.json();
+                const allAgentsData = await allRes.json();
 
-                    const filteredAgents = Array.isArray(allAgentsData)
-                        ? allAgentsData.filter((agent) => agent.agentRole === "Advisor Agent")
-                        : [];
+                const filteredAgents = Array.isArray(allAgentsData)
+                    ? allAgentsData.filter((agent) => agent.agentRole === "Advisor Agent" && agent.agentType !== "Lead Maker")
+                    : [];
 
-                    setTeamMembers(filteredAgents);
-                }
+                setTeamMembers(filteredAgents);
             } else {
                 setTeamMembers([])
             }
@@ -123,11 +105,6 @@ export default function NewProspectPage() {
 
     // Always show self as first option in teamMembersWithSelf, marked as (You), and remove duplicates
     let teamMembersWithSelf = teamMembers
-    if (agent && (agent.agentType === "Client Advisor" || agent.agentType === "Client Manager")) {
-        // Remove any existing entry for self
-        const filtered = teamMembers.filter((m) => m.id !== agent.id)
-        teamMembersWithSelf = [{ id: agent.id, name: agent.name + " (You)", email: agent.email }, ...filtered]
-    }
 
     useEffect(() => {
         async function fetchLeadSources() {
@@ -309,102 +286,98 @@ export default function NewProspectPage() {
                         </CardContent>
                     </Card>
 
-                    {
-                        agent && !(agent.agentRole === "Advisor Agent" && agent.agentType === "Lead Maker") &&
-                        <Card>
-                            <CardHeader>
-                                <div className="flex items-center gap-2">
-                                    <Bell className="size-5 text-primary" />
-                                    <CardTitle>Follow-up & Assignment</CardTitle>
-                                </div>
-                                <CardDescription>Set reminders and assign to team members</CardDescription>
-                            </CardHeader>
-                            <CardContent className="space-y-4">
-                                {/* Reminder */}
-                                <div className="space-y-2">
-                                    <Label htmlFor="reminder">Set Reminder</Label>
-                                    <Popover>
-                                        <PopoverTrigger asChild>
-                                            <Button
-                                                id="reminder"
-                                                variant="outline"
-                                                className={cn(
-                                                    "w-full justify-start text-left font-normal",
-                                                    !reminderDate && "text-muted-foreground",
-                                                )}
-                                            >
-                                                <CalendarIcon className="mr-2 size-4" />
-                                                {reminderDate ? reminderDate.toLocaleDateString() : <span>Pick a reminder date</span>}
-                                            </Button>
-                                        </PopoverTrigger>
-                                        <PopoverContent className="w-auto p-0" align="start">
-                                            <Calendar mode="single" selected={reminderDate} onSelect={setReminderDate} initialFocus />
-                                        </PopoverContent>
-                                    </Popover>
-                                </div>
+                    <Card>
+                        <CardHeader>
+                            <div className="flex items-center gap-2">
+                                <Bell className="size-5 text-primary" />
+                                <CardTitle>Follow-up & Assignment</CardTitle>
+                            </div>
+                            <CardDescription>Set reminders and assign to team members</CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            {/* Reminder */}
+                            <div className="space-y-2">
+                                <Label htmlFor="reminder">Set Reminder</Label>
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <Button
+                                            id="reminder"
+                                            variant="outline"
+                                            className={cn(
+                                                "w-full justify-start text-left font-normal",
+                                                !reminderDate && "text-muted-foreground",
+                                            )}
+                                        >
+                                            <CalendarIcon className="mr-2 size-4" />
+                                            {reminderDate ? reminderDate.toLocaleDateString() : <span>Pick a reminder date</span>}
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-0" align="start">
+                                        <Calendar mode="single" selected={reminderDate} onSelect={setReminderDate} initialFocus />
+                                    </PopoverContent>
+                                </Popover>
+                            </div>
 
-                                {/* Assign */}
-                                <div className="space-y-2">
-                                    <Label htmlFor="assign">
-                                        Assign To
-                                        {(agent?.agentType === "Client Advisor" || agent?.agentType === "Client Manager") && (
-                                            <span className="text-destructive">*</span>
-                                        )}
-                                    </Label>
-                                    <Popover open={open} onOpenChange={setOpen}>
-                                        <PopoverTrigger asChild>
-                                            <Button
-                                                id="assign"
-                                                variant="outline"
-                                                role="combobox"
-                                                aria-expanded={open}
-                                                className={cn(
-                                                    "w-full justify-between font-normal bg-transparent",
-                                                    assignTouched &&
-                                                    (agent?.agentType === "Client Advisor" || agent?.agentType === "Client Manager") &&
-                                                    !assignedTo &&
-                                                    "border-red-500",
-                                                )}
-                                            >
-                                                {assignedTo
-                                                    ? teamMembersWithSelf.find((member) => member.id === assignedTo)?.name
-                                                    : "Select team member..."}
-                                                <Check className={cn("ml-2 size-4 shrink-0 opacity-0", assignedTo && "opacity-100")} />
-                                            </Button>
-                                        </PopoverTrigger>
-                                        <PopoverContent className="w-full p-0" align="start">
-                                            <Command>
-                                                <CommandInput placeholder="Search team members..." />
-                                                <CommandList>
-                                                    <CommandEmpty>No team member found.</CommandEmpty>
-                                                    <CommandGroup>
-                                                        {teamMembersWithSelf.map((member) => (
-                                                            <CommandItem
-                                                                key={member.id}
-                                                                value={member.name}
-                                                                onSelect={() => {
-                                                                    setAssignedTo(member.id === assignedTo ? "" : member.id)
-                                                                    setOpen(false)
-                                                                }}
-                                                            >
-                                                                <Check
-                                                                    className={cn("mr-2 size-4", assignedTo === member.id ? "opacity-100" : "opacity-0")}
-                                                                />
-                                                                <div className="flex flex-col">
-                                                                    <span className="font-medium">{member.name}</span>
-                                                                    <span className="text-xs text-muted-foreground">{member.email}</span>
-                                                                </div>
-                                                            </CommandItem>
-                                                        ))}
-                                                    </CommandGroup>
-                                                </CommandList>
-                                            </Command>
-                                        </PopoverContent>
-                                    </Popover>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    }
+                            {/* Assign */}
+                            <div className="space-y-2">
+                                <Label htmlFor="assign">
+                                    Assign To
+
+                                    <span className="text-destructive">*</span>
+
+                                </Label>
+                                <Popover open={open} onOpenChange={setOpen}>
+                                    <PopoverTrigger asChild>
+                                        <Button
+                                            id="assign"
+                                            variant="outline"
+                                            role="combobox"
+                                            aria-expanded={open}
+                                            className={cn(
+                                                "w-full justify-between font-normal bg-transparent",
+                                                assignTouched &&
+                                                !assignedTo &&
+                                                "border-red-500",
+                                            )}
+                                        >
+                                            {assignedTo
+                                                ? teamMembersWithSelf.find((member) => member.id === assignedTo)?.name
+                                                : "Select team member..."}
+                                            <Check className={cn("ml-2 size-4 shrink-0 opacity-0", assignedTo && "opacity-100")} />
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-full p-0" align="start">
+                                        <Command>
+                                            <CommandInput placeholder="Search team members..." />
+                                            <CommandList>
+                                                <CommandEmpty>No team member found.</CommandEmpty>
+                                                <CommandGroup>
+                                                    {teamMembersWithSelf.map((member) => (
+                                                        <CommandItem
+                                                            key={member.id}
+                                                            value={member.name}
+                                                            onSelect={() => {
+                                                                setAssignedTo(member.id === assignedTo ? "" : member.id)
+                                                                setOpen(false)
+                                                            }}
+                                                        >
+                                                            <Check
+                                                                className={cn("mr-2 size-4", assignedTo === member.id ? "opacity-100" : "opacity-0")}
+                                                            />
+                                                            <div className="flex flex-col">
+                                                                <span className="font-medium">{member.name}</span>
+                                                                <span className="text-xs text-muted-foreground">{member.email}</span>
+                                                            </div>
+                                                        </CommandItem>
+                                                    ))}
+                                                </CommandGroup>
+                                            </CommandList>
+                                        </Command>
+                                    </PopoverContent>
+                                </Popover>
+                            </div>
+                        </CardContent>
+                    </Card>
 
                     <div className="flex items-center justify-end gap-4">
                         <Button
@@ -412,7 +385,7 @@ export default function NewProspectPage() {
                             variant="outline"
                             disabled={loading}
                             className="bg-[#f42b03] hover:bg-[#f42b03] shadow-none hover:shadow-lg transition-shadow duration-300 text-white hover:text-white cursor-pointer"
-                            onClick={() => router.push("/sales/prospects")}
+                            onClick={() => router.back()}
                         >
                             Cancel
                         </Button>

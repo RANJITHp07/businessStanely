@@ -97,7 +97,33 @@ export interface Task {
   };
   triggerDate?: string; // <-- Add this line for direct access
 }
-
+export interface Prospect {
+  id: string;
+  name: string;
+  email?: string;
+  phone?: string;
+  phoneNumber?: string;
+  address?: string;
+  leadSource?: string;
+  description?: string;
+  nextFollowUp?: string;
+  lastFollowUp?: string;
+  status: string; // e.g., New, Contacted, Qualified, Lost, Converted
+  notes?: string;
+  assignedTo?: string;
+  createdByAgentId?: string;
+  createdByAgent?: {
+    id: string;
+    name: string;
+    email: string;
+  };
+  amount?: string;
+  assignedAgentId?: string;
+  assignedAgent?: Agent;
+  createdAt: string;
+  updatedAt: string;
+  archived?: boolean;
+}
 export interface TaskCategory {
   id: string;
   name: string;

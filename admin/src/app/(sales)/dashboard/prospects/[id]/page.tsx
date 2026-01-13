@@ -29,7 +29,6 @@ import {
 import Link from "next/link"
 import { Separator } from "@/components/ui/separator"
 import { cn } from "@/lib/utils"
-import { useAgentContext } from "@/lib/agent-context"
 
 interface Prospect {
     id: string;
@@ -74,7 +73,6 @@ interface Comment {
 export default function ProspectDetailPage({ params }: { params: Promise<{ id: string }> }) {
     const resolvedParams = use(params)
     const router = useRouter()
-    const agent = useAgentContext()
     const [prospect, setProspect] = useState<Prospect | null>(null)
     const [comments, setComments] = useState<Comment[]>([])
     const [loading, setLoading] = useState(true)
@@ -83,8 +81,6 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
     const [submitting, setSubmitting] = useState(false)
     const [nextFollowUpDate, setNextFollowUpDate] = useState<Date | undefined>(undefined)
 
-
-    console.log(agent)
     useEffect(() => {
         setLoading(true)
         fetch(`/api/prospects/${resolvedParams.id}`)
@@ -168,6 +164,7 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
     }
 
     const isCommentDisabled = prospect?.archived || prospect?.status === "Converted" || prospect?.status === "Opportunity";
+
     const handleSubmitComment = async () => {
         if (isCommentDisabled) return;
         if (!newComment.trim() && attachments.length === 0) return;
@@ -175,7 +172,7 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
         try {
             // TODO: Replace with actual user context
             const authorId = "current-user-id";
-            const authorType = "AGENT";
+            const authorType = "ADMIN";
             const res = await fetch(`/api/prospects/${resolvedParams.id}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -256,7 +253,7 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
                                                     "w-full justify-start text-left font-normal",
                                                     !nextFollowUpDate && "text-muted-foreground",
                                                 )}
-                                                disabled={Boolean(agent && agent.agentRole === "Advisor Agent" && agent.agentType === "Lead Maker")}
+                                                disabled={true}
                                             >
                                                 <CalendarIcon className="mr-2 h-4 w-4" />
                                                 {nextFollowUpDate ? (
@@ -289,7 +286,7 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
                                     <div className="flex flex-col gap-1">
                                         <p className="text-sm text-muted-foreground mb-1">Status</p>
                                         <Select
-                                            disabled={Boolean(agent && agent.agentRole === "Advisor Agent" && agent.agentType === "Lead Maker")}
+                                            disabled={true}
                                             value={prospect.status} onValueChange={handleStatusChange}>
                                             <SelectTrigger className="w-[180px]">
                                                 <SelectValue />

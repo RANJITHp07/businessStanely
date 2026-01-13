@@ -64,8 +64,8 @@ export default function OpportunitiesTable() {
             // Normalize status to match backend data
             const normalized =
                 statusParam.toLowerCase() === "proposal issued".toLowerCase() ? "Proposal Issued" :
-                statusParam.toLowerCase() === "closed as won".toLowerCase() ? "Closed as Won" :
-                statusParam.toLowerCase() === "closed as loss".toLowerCase() ? "Closed as Loss" : statusParam;
+                    statusParam.toLowerCase() === "closed as won".toLowerCase() ? "Closed as Won" :
+                        statusParam.toLowerCase() === "closed as loss".toLowerCase() ? "Closed as Loss" : statusParam;
             setSelectedStatuses([normalized]);
         }
     }, [searchParams])
@@ -132,10 +132,10 @@ export default function OpportunitiesTable() {
         setSelectedStatuses([])
     }
 
-    const totalAmount = filteredOpportunities.reduce((sum, opp) => sum + opp.amount, 0)
+    const totalAmount = filteredOpportunities.reduce((sum, opp) => sum + opp?.prospect?.amount, 0)
     const wonAmount = filteredOpportunities
         .filter((opp) => opp.status === "Closed as Won")
-        .reduce((sum, opp) => sum + opp.amount, 0)
+        .reduce((sum, opp) => sum + opp.prospect?.amount, 0)
 
     return (
         <div className="container mx-auto p-6 max-w-7xl">
@@ -303,11 +303,11 @@ export default function OpportunitiesTable() {
                                             </TableRow>
                                         ) : (
                                             currentOpportunities.map((opportunity) => (
-                                                <TableRow key={opportunity.id}>
-                                                    <TableCell className="font-medium">{opportunity.name}</TableCell>
-                                                    <TableCell>{opportunity.phoneNumber}</TableCell>
-                                                    <TableCell className="max-w-[300px] truncate">{opportunity.description}</TableCell>
-                                                    <TableCell className="font-semibold">{formatCurrency(opportunity.amount)}</TableCell>
+                                                <TableRow key={opportunity.id} className="cursor-pointer">
+                                                    <TableCell className="max-w-[150px] truncate" onClick={() => router.push(`/sales/opportunites/${opportunity.id}`)}>{opportunity?.prospect?.name}</TableCell>
+                                                    <TableCell onClick={() => router.push(`/sales/opportunites/${opportunity.id}`)}>{opportunity.phoneNumber}</TableCell>
+                                                    <TableCell className="max-w-[300px] truncate" onClick={() => router.push(`/sales/opportunites/${opportunity.id}`)}>{opportunity.description}</TableCell>
+                                                    <TableCell className="font-semibold" onClick={() => router.push(`/sales/opportunites/${opportunity.id}`)}>{formatCurrency(opportunity?.prospect.amount)}</TableCell>
                                                     <TableCell>
                                                         <div className="flex items-center gap-2">
                                                             <Calendar className="h-4 w-4 text-muted-foreground" />
@@ -336,11 +336,11 @@ export default function OpportunitiesTable() {
                                                             </DropdownMenuTrigger>
                                                             <DropdownMenuContent align="end">
                                                                 <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                                                <DropdownMenuItem onClick={() => router.push("/sales/opportunites/1")}>
-                                                                    <Eye className="mr-2 h-4 w-4" />
+                                                                <DropdownMenuItem onClick={() => router.push(`/sales/opportunites/${opportunity.id}`)}>
+                                                                    < Eye className="mr-2 h-4 w-4" />
                                                                     View
                                                                 </DropdownMenuItem>
-                                                                <DropdownMenuItem>
+                                                                <DropdownMenuItem onClick={() => router.push(`/sales/prospects/${opportunity.prospectId}/edit`)}>
                                                                     <Edit className="mr-2 h-4 w-4" />
                                                                     Edit
                                                                 </DropdownMenuItem>
@@ -407,6 +407,6 @@ export default function OpportunitiesTable() {
                     )}
                 </CardContent>
             </Card>
-        </div>
+        </div >
     )
 }

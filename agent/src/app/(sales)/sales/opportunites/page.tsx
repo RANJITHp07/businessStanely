@@ -20,9 +20,9 @@ interface Opportunity {
 }
 
 function formatDate(dateString?: string) {
-    if (!dateString) return "-"
+    if (!dateString) return "N/A"
     const d = new Date(dateString)
-    if (isNaN(d.getTime())) return "-"
+    if (isNaN(d.getTime())) return "N/A"
     return d.toLocaleDateString("en-GB", {
         day: "2-digit",
         month: "2-digit",
@@ -31,9 +31,9 @@ function formatDate(dateString?: string) {
 }
 
 function formatCurrency(amount: number) {
-    return new Intl.NumberFormat("en-US", {
+    return new Intl.NumberFormat("en-IN", {
         style: "currency",
-        currency: "USD",
+        currency: "INR",
         minimumFractionDigits: 0,
         maximumFractionDigits: 0,
     }).format(amount)
@@ -204,14 +204,18 @@ function SectionTable({ label, opportunities }: { label: string; opportunities: 
                                                             </div>
                                                         </TableCell>
 
-                                                        <TableCell className="truncate max-w-[140px] align-top">{opp.phoneNumber || "-"}</TableCell>
+                                                        <TableCell className="truncate max-w-[140px] align-top">{opp.phoneNumber || "N/A"}</TableCell>
 
                                                         <TableCell className="truncate max-w-[200px] align-top" title={opp.description}>
-                                                            {opp.description || "-"}
+                                                            {opp.description || "N/A"}
                                                         </TableCell>
 
                                                         <TableCell className="whitespace-nowrap align-top font-semibold">
-                                                            {formatCurrency(opp.amount)}
+                                                            {
+                                                                opp.amount !== null && opp.amount !== undefined
+                                                                    ? new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(opp.amount)
+                                                                    : "0"
+                                                            }
                                                         </TableCell>
 
                                                         <TableCell className="whitespace-nowrap align-top" title={opp.nextFollowUp || ""}>
@@ -290,11 +294,15 @@ function SectionTable({ label, opportunities }: { label: string; opportunities: 
                                                 <div className="mt-3 grid grid-cols-2 gap-2 text-sm text-muted-foreground">
                                                     <div>
                                                         <div className="font-medium text-foreground">Description</div>
-                                                        <div className="truncate">{opp.description || "-"}</div>
+                                                        <div className="truncate">{opp.description || "N/A"}</div>
                                                     </div>
                                                     <div>
                                                         <div className="font-medium text-foreground">Amount</div>
-                                                        <div className="font-semibold">{formatCurrency(opp.amount)}</div>
+                                                        <div className="font-semibold">{
+                                                            opp.amount !== null && opp.amount !== undefined
+                                                                ? new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(opp.amount)
+                                                                : "0"
+                                                        }</div>
                                                     </div>
                                                     <div>
                                                         <div className="font-medium text-foreground">Status</div>
@@ -322,7 +330,7 @@ function SectionTable({ label, opportunities }: { label: string; opportunities: 
             <div className="flex justify-end">
                 <Link
                     href={`/sales/opportunites/table?status=${encodeURIComponent(statusValue)}`}
-                    className="bg-[#003459] cursor-pointer text-white text-[14px] py-[10px] mt-[10px] px-[10px] rounded-[5px] inline-block"
+                    className="bg-[#002FFF] cursor-pointer text-white text-[14px] py-[10px] mt-[10px] px-[10px] rounded-[5px] inline-block"
                 >
                     View more
                 </Link>

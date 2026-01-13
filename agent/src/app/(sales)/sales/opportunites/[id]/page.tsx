@@ -27,6 +27,7 @@ import {
 import Link from "next/link"
 import { Separator } from "@/components/ui/separator"
 import { cn } from "@/lib/utils"
+import { useAgentContext } from "@/lib/agent-context"
 
 interface oppurtunities {
     id: string
@@ -39,6 +40,7 @@ interface oppurtunities {
     createdAt: string
     updatedAt: string
     prospect?: {
+        name: string;
         email?: string;
         leadSource?: string;
         createdByAgent?: { name?: string };
@@ -52,23 +54,25 @@ interface oppurtunities {
 }
 
 export default function OppurtunitiesDetailPage() {
+    const agent = useAgentContext()
     const [oppurtunities, setoppurtunities] = useState<oppurtunities | null>(null)
-interface Comment {
-    id: string;
-    content: string;
-    createdAt: string;
-    agent?: { name?: string };
-    user?: { username?: string };
-    attachmentName?: string;
-    attachmentUrl?: string;
-}
+    interface Comment {
+        id: string;
+        content: string;
+        createdAt: string;
+        agent?: { name?: string };
+        user?: { username?: string };
+        attachmentName?: string;
+        attachmentUrl?: string;
+    }
 
-        const [comments, setComments] = useState<Comment[]>([])
+    const [comments, setComments] = useState<Comment[]>([])
     const [loading, setLoading] = useState(true)
     const [newComment, setNewComment] = useState("")
     const [attachments, setAttachments] = useState<File[]>([])
     const [submitting, setSubmitting] = useState(false)
     const [nextFollowUpDate, setNextFollowUpDate] = useState<Date | undefined>(undefined)
+
 
     // Use useParams from next/navigation for dynamic route params in client components
     const params = useParams();
@@ -93,18 +97,34 @@ interface Comment {
         fetchData();
     }, [opportunityId]);
 
-    const handleNextFollowUpChange = (date: Date | undefined) => {
+    const handleNextFollowUpChange = async (date: Date | undefined) => {
         setNextFollowUpDate(date)
         if (oppurtunities && date) {
             setoppurtunities({ ...oppurtunities, nextFollowUp: date.toISOString().split("T")[0] })
-            console.log("Next follow-up updated to:", date.toISOString().split("T")[0])
+            const res = await fetch(`/api/opportunities/${oppurtunities.id}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ ...oppurtunities, nextFollowUp: date }),
+            });
+            if (!res.ok) {
+                console.error("Failed to update status");
+                return;
+            }
         }
     }
 
-    const handleStatusChange = (newStatus: "Proposal Issued" | "Closed as Won" | "Closed as Loss") => {
+    const handleStatusChange = async (newStatus: "Proposal Issued" | "Closed as Won" | "Closed as Loss") => {
         if (oppurtunities) {
             setoppurtunities({ ...oppurtunities, status: newStatus })
-            console.log("Status updated to:", newStatus)
+            const res = await fetch(`/api/opportunities/${oppurtunities.id}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ ...oppurtunities, status: newStatus }),
+            });
+            if (!res.ok) {
+                console.error("Failed to update status");
+                return;
+            }
         }
     }
 
@@ -186,73 +206,66 @@ interface Comment {
                 <Card>
                     <CardContent className="space-y-4">
                         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                            {/* ...existing code... */}
-                        </div>
-                        <div>
-                            <p className="text-sm text-muted-foreground">Assigned To</p>
-                            <div className="flex items-center gap-2 mt-1">
-                                <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center">
-                                    <User className="h-3 w-3 text-primary" />
-                                </div>
-                                <p className="font-medium">
-                                    {oppurtunities.prospect?.assignedAgent?.name
-                                        ? oppurtunities.prospect.assignedAgent.name
-                                        : "Unassigned"}
-                                </p>
-                            </div>
-                        </div>
-                        <Separator />
-                    </CardContent>
-                </Card>
-                <Card>
-                    <CardContent className="space-y-4">
-                        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                             <div>
-                                <p className="text-sm text-muted-foreground mb-2">Next Follow Up</p>
-                                <Popover>
-                                    <PopoverTrigger asChild>
-                                        <Button
-                                            variant="outline"
-                                            className={cn(
-                                                "w-full justify-start text-left font-normal",
-                                                !nextFollowUpDate && "text-muted-foreground",
-                                            )}
-                                        >
-                                            <CalendarIcon className="mr-2 h-4 w-4" />
-                                            {nextFollowUpDate ? (
-                                                new Date(nextFollowUpDate).toLocaleDateString("en-US", {
-                                                    month: "short",
-                                                    day: "numeric",
-                                                    year: "numeric",
-                                                })
-                                            ) : (
-                                                <span>Pick a date</span>
-                                            )}
-                                        </Button>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-auto p-0" align="start">
-                                        <CalendarComponent
-                                            mode="single"
-                                            selected={nextFollowUpDate}
-                                            onSelect={handleNextFollowUpChange}
-                                            initialFocus
-                                        />
-                                    </PopoverContent>
-                                </Popover>
+                                <h1 className="text-3xl font-bold">{oppurtunities?.prospect?.name}</h1>
+                                <p className="text-muted-foreground mt-1">{oppurtunities?.prospect?.email}</p>
                             </div>
-                            <div className="flex items-center gap-4">
-                                <div className="flex flex-col gap-1">
-                                    <p className="text-sm text-muted-foreground mb-1">Status</p>
-                                    <Select value={oppurtunities.status} onValueChange={handleStatusChange}>
-                                        <SelectTrigger className="w-[180px]">
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="Proposal Issued">Proposal Issued</SelectItem>
-                                            <SelectItem value="Closed as Won">Closed as Won</SelectItem>
-                                            <SelectItem value="Closed as Loss">Closed as Loss</SelectItem>
-                                        </SelectContent>
-                                    </Select>
+                            <div className="gap-2 flex">
+                                <div>
+                                    <p className="text-sm text-muted-foreground mb-2">Next Follow Up</p>
+                                    <Popover>
+                                        <PopoverTrigger asChild>
+                                            <Button
+                                                variant="outline"
+                                                className={cn(
+                                                    "w-full justify-start text-left font-normal",
+                                                    !nextFollowUpDate && "text-muted-foreground",
+                                                )}
+                                                disabled={Boolean(agent && agent.agentRole === "Advisor Agent" && agent.agentType === "Lead Maker")}
+                                            >
+                                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                                {nextFollowUpDate ? (
+                                                    new Date(nextFollowUpDate).toLocaleDateString("en-US", {
+                                                        month: "short",
+                                                        day: "numeric",
+                                                        year: "numeric",
+                                                    })
+                                                ) : (
+                                                    <span>Pick a date</span>
+                                                )}
+                                            </Button>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-auto p-0" align="start">
+                                            <CalendarComponent
+                                                mode="single"
+                                                selected={nextFollowUpDate}
+                                                onSelect={handleNextFollowUpChange}
+                                                initialFocus
+                                                disabled={(date: Date) => {
+                                                    const today = new Date();
+                                                    today.setHours(0, 0, 0, 0); // Reset to midnight for accurate comparison
+                                                    return date < today; // disable all dates before today
+                                                }}
+                                            />
+                                        </PopoverContent>
+                                    </Popover>
+                                </div>
+                                <div className="flex items-center gap-4">
+                                    <div className="flex flex-col gap-1">
+                                        <p className="text-sm text-muted-foreground mb-1">Status</p>
+                                        <Select
+                                            disabled={Boolean(agent && agent.agentRole === "Advisor Agent" && agent.agentType === "Lead Maker")}
+                                            value={oppurtunities.status} onValueChange={handleStatusChange}>
+                                            <SelectTrigger className="w-[180px]">
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="Proposal Issued">Proposal Issued</SelectItem>
+                                                <SelectItem value="Closed as Won">Closed as Won</SelectItem>
+                                                <SelectItem value="Closed as Loss">Closed as Loss</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -446,7 +459,7 @@ interface Comment {
                             <Separator />
                             <div>
                                 <p className="text-sm text-muted-foreground">Lead Source</p>
-                                <p className="font-medium mt-1">{oppurtunities.prospect?.leadSource || '-'}</p>
+                                <p className="font-medium mt-1">{oppurtunities.prospect?.leadSource?.name || 'N/A'}</p>
                             </div>
                             <Separator />
                             <div>
@@ -456,6 +469,20 @@ interface Comment {
                                         <User className="h-3 w-3 text-emerald-700" />
                                     </div>
                                     <p className="font-medium">{oppurtunities.prospect?.createdByAgent?.name || "Unknown"}</p>
+                                </div>
+                            </div>
+                            <Separator />
+                            <div>
+                                <p className="text-sm text-muted-foreground">Assigned To</p>
+                                <div className="flex items-center gap-2 mt-1">
+                                    <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center">
+                                        <User className="h-3 w-3 text-primary" />
+                                    </div>
+                                    <p className="font-medium">
+                                        {oppurtunities.prospect?.assignedAgent?.name
+                                            ? oppurtunities.prospect?.assignedAgent.name
+                                            : oppurtunities.prospect?.assignedTo || "Unassigned"}
+                                    </p>
                                 </div>
                             </div>
                             <Separator />

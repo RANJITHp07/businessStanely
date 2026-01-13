@@ -18,6 +18,7 @@ export interface Prospect {
     name: string;
     email: string;
   };
+  amount?: string;
   assignedAgentId?: string;
   assignedAgent?: Agent;
   createdAt: string;
@@ -64,7 +65,7 @@ export interface Agent {
   phoneNumber: string;
   secondaryPhoneNumber: string | null;
   agentType: string;
-  agentRole: 'Execution Agent' | 'Advisor Agent';
+  agentRole: "Execution Agent" | "Advisor Agent";
   barAssociationId: string;
   jurisdiction: string;
   specializations: string[];

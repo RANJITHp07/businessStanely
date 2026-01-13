@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getCurrentAgent } from "@/lib/auth";
+import { getCurrentAdmin } from "@/lib/auth";
 
 // GET: Get a single prospect by ID
 export async function GET(
@@ -48,7 +48,7 @@ export async function PUT(
   { params }: { params: { id: string } }
 ) {
   try {
-    const agent = await getCurrentAgent(req);
+    const agent = await getCurrentAdmin(req);
     if (!agent) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -151,7 +151,7 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   try {
-    const agent = await getCurrentAgent(req);
+    const agent = await getCurrentAdmin(req);
     if (!agent) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -205,7 +205,7 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    const agent = await getCurrentAgent(req);
+    const agent = await getCurrentAdmin(req);
     if (!agent) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }

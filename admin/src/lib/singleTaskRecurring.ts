@@ -12,67 +12,78 @@ export function calculateNextDueDate(
 
 // Auto-update recurring tasks based on calendar schedule (not completion)
 export async function updateRecurringTaskSchedule(taskId: string) {
-  const task = await prisma.task.findUnique({
+  const task: any = await prisma.task.findUnique({
     where: { id: taskId },
     include: { category: true },
   });
 
   if (!task || !task.recurring || !task.dueDate) {
-    return null; // Not a recurring task or no due date
+    return null;
   }
 
-  let recurringType: 'day' | 'week' | 'month' = 'month';
-  let recurringValue: number = typeof task.recurring === 'number' ? task.recurring : 1;
-  if (typeof task.recurring === 'string' && (task.recurring as string).includes('-')) {
-    const [type, value] = (task.recurring as string).split('-');
-    recurringType = type as 'day' | 'week' | 'month';
+  let recurringType: "day" | "week" | "month" = "month";
+  let recurringValue = typeof task.recurring === "number" ? task.recurring : 1;
+
+  if (typeof task.recurring === "string" && task.recurring.includes("-")) {
+    const [type, value] = task.recurring.split("-");
+    recurringType = type as "day" | "week" | "month";
     recurringValue = parseInt(value, 10);
   }
 
   const now = new Date();
   const taskDueDate = new Date(task.dueDate);
 
-  // Check if the current period has passed
-  if (now > taskDueDate) {
-    // Calculate how many periods have passed
-    let periodsPassed = 0;
-    if (recurringType === 'day') {
-      const daysDiff = Math.floor((now.getTime() - taskDueDate.getTime()) / (1000 * 60 * 60 * 24));
-      periodsPassed = Math.floor(daysDiff / recurringValue);
-    } else if (recurringType === 'week') {
-      const weeksDiff = Math.floor((now.getTime() - taskDueDate.getTime()) / (1000 * 60 * 60 * 24 * 7));
-      periodsPassed = Math.floor(weeksDiff / recurringValue);
-    } else if (recurringType === 'month') {
-      const monthsDiff = (now.getFullYear() - taskDueDate.getFullYear()) * 12 + (now.getMonth() - taskDueDate.getMonth());
-      periodsPassed = Math.floor(monthsDiff / recurringValue);
-    }
+  if (now <= taskDueDate) return null;
 
-    if (periodsPassed > 0) {
-      // Calculate new due date by adding the required periods
-      const newDueDate = new Date(taskDueDate);
-      if (recurringType === 'day') {
-        newDueDate.setDate(newDueDate.getDate() + (periodsPassed + 1) * recurringValue);
-      } else if (recurringType === 'week') {
-        newDueDate.setDate(newDueDate.getDate() + (periodsPassed + 1) * recurringValue * 7);
-      } else if (recurringType === 'month') {
-        newDueDate.setMonth(newDueDate.getMonth() + (periodsPassed + 1) * recurringValue);
-      }
+  let periodsPassed = 0;
 
-      // Update task with new due date and reset status
-      const updatedTask = await prisma.task.update({
-        where: { id: taskId },
-        data: {
-          dueDate: newDueDate,
-          nextDueDate: newDueDate as Date,
-          currentPeriodStart: now as Date,
-          completed: false, // Reset for new period
-          progress: 0, // Reset progress
-          status: 'To Do', // Reset status
-        },
-      });
+  if (recurringType === "day") {
+    const daysDiff =
+      (now.getTime() - taskDueDate.getTime()) / (1000 * 60 * 60 * 24);
+    periodsPassed = Math.floor(daysDiff / recurringValue);
+  } else if (recurringType === "week") {
+    const weeksDiff =
+      (now.getTime() - taskDueDate.getTime()) / (1000 * 60 * 60 * 24 * 7);
+    periodsPassed = Math.floor(weeksDiff / recurringValue);
+  } else {
+    const monthsDiff =
+      (now.getFullYear() - taskDueDate.getFullYear()) * 12 +
+      (now.getMonth() - taskDueDate.getMonth());
+    periodsPassed = Math.floor(monthsDiff / recurringValue);
+  }
+
+  if (periodsPassed <= 0) return null;
+
+  const newDueDate = new Date(taskDueDate);
+
+  if (recurringType === "day") {
+    newDueDate.setDate(
+      newDueDate.getDate() + (periodsPassed + 1) * recurringValue
+    );
+  } else if (recurringType === "week") {
+    newDueDate.setDate(
+      newDueDate.getDate() + (periodsPassed + 1) * recurringValue * 7
+    );
+  } else {
+    newDueDate.setMonth(
+      newDueDate.getMonth() + (periodsPassed + 1) * recurringValue
+    );
+  }
+
+  const updatedTask = await prisma.task.update({
+    where: { id: taskId },
+    data: {
+      dueDate: newDueDate,
+      nextDueDate: newDueDate,
+      currentPeriodStart: now,
+      completed: false,
+      progress: 0,
+      status: "To Do",
+    },
+  });
 
   console.log(
-    `🔄 Recurring task triggered → triggerDate: ${triggerDate.toISOString()}, dueDate: ${dueDate.toISOString()}, nextDueDate: ${nextTriggerDate.toISOString()}`
+    `🔄 Recurring task updated → newDueDate: ${newDueDate.toISOString()}`
   );
 
   return updatedTask;

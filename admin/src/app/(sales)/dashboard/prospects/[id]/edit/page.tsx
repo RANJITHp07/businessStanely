@@ -15,12 +15,10 @@ import { CalendarIcon, Check, Mail, Phone, MapPin, FileText, UserPlus, Bell, Ban
 import { cn } from "@/lib/utils"
 import type { Agent, Prospect } from "@/types"
 import { Skeleton } from "@/components/ui/skeleton"
-import { useAgentContext } from "@/lib/agent-context"
 import { toast } from "react-toastify"
 
 
 export default function EditProspectPage() {
-  const agent = useAgentContext()
   const router = useRouter()
   const params = useParams()
   const searchParams = useSearchParams()
@@ -48,14 +46,12 @@ export default function EditProspectPage() {
         setLeadSources(leadData);
 
         // 2️⃣ Fetch prospect, current agent, and all agents concurrently
-        const [prospectRes, agentRes, allAgentsRes] = await Promise.all([
+        const [prospectRes, allAgentsRes] = await Promise.all([
           fetch(`/api/prospects/${id}`),
-          fetch("/api/agents/me"),
           fetch("/api/agents"),
         ]);
 
         const prospectData = await prospectRes.json();
-        const agent = await agentRes.json();
         const allAgentsData = await allAgentsRes.json();
 
         // 3️⃣ Set prospect form data AFTER lead sources are available
@@ -78,22 +74,10 @@ export default function EditProspectPage() {
         // 4️⃣ Determine team members
         let teamMembersList: any[] = [];
 
-        if (agent.agentRole === "Advisor Agent" && agent.agentType === "Client Manager") {
-          const subRes = await fetch("/api/agents/me/subordinates");
-          if (subRes.ok) teamMembersList = await subRes.json();
-        }
-
-        if (teamMembersList.length === 0 && Array.isArray(allAgentsData)) {
-          if (agent.agentRole === "Advisor Agent" && agent.agentType === "Lead Maker") {
-            teamMembersList = allAgentsData.filter((a: any) => a.agentRole === "Advisor Agent");
-          } else {
-            teamMembersList = allAgentsData;
-          }
-        }
+        teamMembersList = allAgentsData.filter((a: any) => a.agentRole === "Advisor Agent");
 
         setTeamMembers(teamMembersList);
       } catch (err) {
-        console.error(err);
         setLeadSources([]);
         setTeamMembers([]);
       } finally {
@@ -333,91 +317,89 @@ export default function EditProspectPage() {
             </CardContent>
           </Card>
 
-          {
-            agent && !(agent.agentRole === "Advisor Agent" && agent.agentType === "Lead Maker") &&
-            <Card>
-              <CardHeader>
-                <div className="flex items-center gap-2">
-                  <Bell className="size-5 text-primary" />
-                  <CardTitle>Follow-up & Assignment</CardTitle>
-                </div>
-                <CardDescription>Set reminders and assign to team members</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {/* Reminder */}
-                <div className="space-y-2">
-                  <Label htmlFor="reminder">Set Reminder</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        id="reminder"
-                        variant="outline"
-                        className={cn(
-                          "w-full justify-start text-left font-normal",
-                          !reminderDate && "text-muted-foreground",
-                        )}
-                      >
-                        <CalendarIcon className="mr-2 size-4" />
-                        {reminderDate ? reminderDate.toLocaleDateString() : <span>Pick a reminder date</span>}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar mode="single" selected={reminderDate} onSelect={setReminderDate} initialFocus />
-                    </PopoverContent>
-                  </Popover>
-                </div>
 
-                {/* Assign */}
-                <div className="space-y-2">
-                  <Label htmlFor="assign">Assign To</Label>
-                  <Popover open={open} onOpenChange={setOpen}>
-                    <PopoverTrigger asChild>
-                      <Button
-                        id="assign"
-                        variant="outline"
-                        role="combobox"
-                        aria-expanded={open}
-                        className="w-full justify-between font-normal bg-transparent"
-                      >
-                        {assignedTo
-                          ? teamMembers.find((member) => member.id === assignedTo)?.name
-                          : "Select team member..."}
-                        <Check className={cn("ml-2 size-4 shrink-0 opacity-0", assignedTo && "opacity-100")} />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-full p-0" align="start">
-                      <Command>
-                        <CommandInput placeholder="Search team members..." />
-                        <CommandList>
-                          <CommandEmpty>No team member found.</CommandEmpty>
-                          <CommandGroup>
-                            {teamMembers.map((member) => (
-                              <CommandItem
-                                key={member.id}
-                                value={member.name}
-                                onSelect={() => {
-                                  setAssignedTo(member.id === assignedTo ? "" : member.id)
-                                  setOpen(false)
-                                }}
-                              >
-                                <Check
-                                  className={cn("mr-2 size-4", assignedTo === member.id ? "opacity-100" : "opacity-0")}
-                                />
-                                <div className="flex flex-col">
-                                  <span className="font-medium">{member.name}</span>
-                                  <span className="text-xs text-muted-foreground">{member.email}</span>
-                                </div>
-                              </CommandItem>
-                            ))}
-                          </CommandGroup>
-                        </CommandList>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
-                </div>
-              </CardContent>
-            </Card>
-          }
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <Bell className="size-5 text-primary" />
+                <CardTitle>Follow-up & Assignment</CardTitle>
+              </div>
+              <CardDescription>Set reminders and assign to team members</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Reminder */}
+              <div className="space-y-2">
+                <Label htmlFor="reminder">Set Reminder</Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      id="reminder"
+                      variant="outline"
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !reminderDate && "text-muted-foreground",
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 size-4" />
+                      {reminderDate ? reminderDate.toLocaleDateString() : <span>Pick a reminder date</span>}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar mode="single" selected={reminderDate} onSelect={setReminderDate} initialFocus />
+                  </PopoverContent>
+                </Popover>
+              </div>
+
+              {/* Assign */}
+              <div className="space-y-2">
+                <Label htmlFor="assign">Assign To</Label>
+                <Popover open={open} onOpenChange={setOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      id="assign"
+                      variant="outline"
+                      role="combobox"
+                      aria-expanded={open}
+                      className="w-full justify-between font-normal bg-transparent"
+                    >
+                      {assignedTo
+                        ? teamMembers.find((member) => member.id === assignedTo)?.name
+                        : "Select team member..."}
+                      <Check className={cn("ml-2 size-4 shrink-0 opacity-0", assignedTo && "opacity-100")} />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-full p-0" align="start">
+                    <Command>
+                      <CommandInput placeholder="Search team members..." />
+                      <CommandList>
+                        <CommandEmpty>No team member found.</CommandEmpty>
+                        <CommandGroup>
+                          {teamMembers.map((member) => (
+                            <CommandItem
+                              key={member.id}
+                              value={member.name}
+                              onSelect={() => {
+                                setAssignedTo(member.id === assignedTo ? "" : member.id)
+                                setOpen(false)
+                              }}
+                            >
+                              <Check
+                                className={cn("mr-2 size-4", assignedTo === member.id ? "opacity-100" : "opacity-0")}
+                              />
+                              <div className="flex flex-col">
+                                <span className="font-medium">{member.name}</span>
+                                <span className="text-xs text-muted-foreground">{member.email}</span>
+                              </div>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              </div>
+            </CardContent>
+          </Card>
 
 
           {/* Submit Buttons */}

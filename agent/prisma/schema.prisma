@@ -6,6 +6,7 @@ model Prospect {
   phoneNumber   String?
   description   String?
   amount        Float?
+  address        String?
   status        String   @default("New") // e.g., New, Contacted, Qualified, Lost, Converted
   notes         String?
   nextFollowUp  DateTime?
@@ -17,7 +18,8 @@ model Prospect {
   updatedAt     DateTime @updatedAt
   opportunities Opportunity[] @relation("ProspectOpportunities")
   archived      Boolean  @default(false) // If true, this prospect is archived (e.g., converted to opportunity)
-  leadSource    String? // Source of the lead (e.g., Referral, Website, etc.)
+  leadSourceId   String?
+  leadSource     LeadSource? @relation(fields: [leadSourceId], references: [id])
   comments      Comment[] // Comments/interactions for this prospect
 }
 
@@ -371,4 +373,22 @@ model ServiceRecord {
 
   createdBy     String @db.ObjectId
   createdByUser User   @relation("UserServiceRecords", fields: [createdBy], references: [id])
+}
+
+model LeadSource {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  name        String   
+  description String?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  prospects   Prospect[]
+}
+
+model ProspectAssignmentSetting {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  prospectsPerAgent   Int  @default(1)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 }

@@ -27,17 +27,18 @@ import {
 
 
 import { useEffect } from "react"
+import { useAgentContext } from "@/lib/agent-context"
 
 type Followup = {
-  id: string
-  date: string
-  time?: string
-  client?: string
-  phone?: string
-  type?: string
-  description?: string
-  status?: string
-  priority?: string
+    id: string
+    date: string
+    time?: string
+    client?: string
+    phone?: string
+    type?: string
+    description?: string
+    status?: string
+    priority?: string
 }
 
 const daysOfWeek = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
@@ -57,7 +58,21 @@ const months = [
 ]
 
 
+const formatDateIST = (dateStr: string) =>
+    new Intl.DateTimeFormat("en-IN", {
+        timeZone: "Asia/Kolkata",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+    })
+        .format(new Date(dateStr))
+        .split("/")
+        .reverse()
+        .join("-");
+
 export default function CalendarPage() {
+    const agent = useAgentContext()
+    const router = useRouter()
     const [currentDate, setCurrentDate] = useState(new Date())
     const [selectedDate, setSelectedDate] = useState<Date | null>(new Date())
     const [isFilterOpen, setIsFilterOpen] = useState(false)
@@ -65,41 +80,77 @@ export default function CalendarPage() {
     const [followups, setFollowups] = useState<Followup[]>([])
 
     useEffect(() => {
+        if (!agent?.id) return
         async function fetchFollowups() {
-            const resProspects = await fetch("/api/prospects")
-            const dataProspects = await resProspects.json()
-            const prospectFollowups: Followup[] = (dataProspects.prospects || [])
-                .filter((p: { nextFollowUp?: string }) => p.nextFollowUp)
-                .map((p: { id: string, nextFollowUp: string, name: string, phoneNumber?: string, description?: string }) => ({
+            const [prospectRes, opportunityRes] = await Promise.all([
+                fetch("/api/prospects"),
+                fetch("/api/opportunities"),
+            ]);
+
+            const prospectData = await prospectRes.json();
+            const opportunityData = await opportunityRes.json();
+
+            const getFollowupStatus = (
+                nextFollowUp: string,
+                comments: { createdAt: string; authorId: string }[] = []
+            ): "upcoming" | "missed" => {
+                const agentComments = comments
+                    .filter(c => c.authorId === agent?.id)
+                    .sort(
+                        (a, b) =>
+                            new Date(b.createdAt).getTime() -
+                            new Date(a.createdAt).getTime()
+                    );
+                if (agentComments.length === 0) return "upcoming";
+
+                const lastCommentDate = new Date(agentComments[0].createdAt);
+                const followUpDate = new Date(nextFollowUp);
+
+                return followUpDate > lastCommentDate ? "upcoming" : "missed";
+            };
+
+            const prospectFollowups: Followup[] = (prospectData.prospects || [])
+                .filter(
+                    (p: any) =>
+                        p.nextFollowUp &&
+                        (p.status === "New" || p.status === "In Progress")
+                )
+                .map((p: any) => ({
                     id: p.id,
-                    date: typeof p.nextFollowUp === 'string' ? p.nextFollowUp.split("T")[0] : '',
-                    time: typeof p.nextFollowUp === 'string' && p.nextFollowUp.includes('T') ? p.nextFollowUp.split("T")[1]?.slice(0, 5) : '',
+                    date: p.nextFollowUp.split("T")[0],
+                    time: p.nextFollowUp.split("T")[1]?.slice(0, 5) || "",
                     client: p.name,
                     phone: p.phoneNumber,
                     type: "Prospect Follow-up",
                     description: p.description,
-                    status: "upcoming",
+                    status: getFollowupStatus(p.nextFollowUp, p.comments),
                     priority: "medium",
-                }))
-            const resTasks = await fetch("/api/tasks")
-            const dataTasks = await resTasks.json()
-            const taskFollowups: Followup[] = (dataTasks.tasks || [])
-                .filter((t: { dueDate?: string }) => t.dueDate)
-                .map((t: { id: string, dueDate: string, client?: { name?: string, phoneNumber?: string }, title?: string, description?: string, status?: string, priority?: string }) => ({
-                    id: t.id,
-                    date: typeof t.dueDate === 'string' ? t.dueDate.split("T")[0] : '',
-                    time: typeof t.dueDate === 'string' && t.dueDate.includes('T') ? t.dueDate.split("T")[1]?.slice(0, 5) : '',
-                    client: t.client?.name,
-                    phone: t.client?.phoneNumber,
-                    type: t.title,
-                    description: t.description,
-                    status: t.status,
-                    priority: t.priority,
-                }))
-            setFollowups([...prospectFollowups, ...taskFollowups])
+                }));
+
+            const opportunityFollowups: Followup[] = (opportunityData.opportunities || [])
+                .filter(
+                    (o: any) =>
+                        o.nextFollowUp &&
+                        o.status === "Proposal Issued"
+                )
+                .map((o: any) => ({
+                    id: o.id,
+                    date: o.nextFollowUp.split("T")[0],
+                    time: o.nextFollowUp.split("T")[1]?.slice(0, 5) || "",
+                    client: o.prospect?.name,
+                    phone: o.prospect?.phoneNumber,
+                    type: "Opportunity Follow-up",
+                    description: o.description,
+                    status: getFollowupStatus(o.nextFollowUp, o.comments),
+                    priority: "medium",
+                }));
+
+            setFollowups([...prospectFollowups, ...opportunityFollowups]);
         }
-        fetchFollowups()
-    }, [])
+
+        fetchFollowups();
+    }, [agent?.id]);
+
 
     const getDaysInMonth = (date: Date) => {
         const year = date.getFullYear()
@@ -310,7 +361,7 @@ export default function CalendarPage() {
                                                     title={`${followup.client} - ${followup.type} at ${followup.time}`}
                                                 >
                                                     <div className="font-medium truncate">{followup.client}</div>
-                                                    <div className="truncate opacity-80">{followup.time}</div>
+                                                    <div className="truncate opacity-80">{followup.type?.split(" ")[0]}</div>
                                                 </button>
                                             ))}
                                         </div>
@@ -325,24 +376,43 @@ export default function CalendarPage() {
             <Dialog open={!!selectedFollowup} onOpenChange={(open) => !open && setSelectedFollowup(null)}>
                 <DialogContent className="max-w-2xl">
                     <DialogHeader>
-                        <DialogTitle className="text-2xl">{selectedFollowup?.client}</DialogTitle>
+                        <DialogTitle className="text-2xl cursor-pointer" onClick={() => {
+                            if (selectedFollowup?.type?.split(" ")[0] == "Opportunity") {
+                                router.push(`/sales/opportunites/${selectedFollowup?.id} `)
+                            } else {
+                                router.push(`/sales/prospects/${selectedFollowup?.id} `)
+                            }
+                        }
+                        }>{selectedFollowup?.client}</DialogTitle>
                         <DialogDescription>{selectedFollowup?.type}</DialogDescription>
+                        <div className="flex gap-3">
+                            <Badge className={`${getStatusBadge(selectedFollowup?.status)} px - 3 py - 1`}>
+                                {selectedFollowup?.status === "missed" ? "Missed" : "Upcoming"}
+                            </Badge>
+                        </div>
                     </DialogHeader>
                     {selectedFollowup && (
                         <div className="space-y-6 py-4">
                             {/* Status and Priority */}
-                            <div className="flex gap-3">
-                                <Badge className={`${getStatusBadge(selectedFollowup.status)} px-3 py-1`}>
-                                    {selectedFollowup.status === "missed" ? "Missed" : "Upcoming"}
-                                </Badge>
-                            </div>
+
 
                             {/* Date and Time */}
                             <div className="flex items-center gap-2 text-slate-700">
                                 <Clock className="h-5 w-5 text-blue-600" />
                                 <div>
-                                    <div className="font-semibold">{selectedFollowup.date}</div>
-                                    <div className="text-sm text-slate-600">{selectedFollowup.time}</div>
+                                    <div className="text-sm text-slate-600">Day</div>
+                                    <div className="font-semibold text-slate-900">
+                                        {(() => {
+                                            const date = new Date(selectedFollowup.date);
+                                            date.setDate(date.getDate() + 1);
+
+                                            const day = String(date.getDate()).padStart(2, "0");
+                                            const month = String(date.getMonth() + 1).padStart(2, "0");
+                                            const year = date.getFullYear();
+
+                                            return `${day}-${month}-${year}`;
+                                        })()}
+                                    </div>
                                 </div>
                             </div>
 

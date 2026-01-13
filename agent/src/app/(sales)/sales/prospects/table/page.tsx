@@ -33,8 +33,19 @@ import {
     DropdownMenuTrigger,
     DropdownMenuCheckboxItem,
 } from "@/components/ui/dropdown-menu"
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 
 import type { Prospect } from "@/types"
+import { toast } from "react-toastify"
 
 const statuses = ["New", "In Progress"]
 
@@ -49,20 +60,21 @@ export default function ProspectsTable() {
     const [currentPage, setCurrentPage] = useState(1)
     const [itemsPerPage, setItemsPerPage] = useState(20)
     const [deletingId, setDeletingId] = useState<string | null>(null);
+    const [sourceToDelete, setSourceToDelete] = useState<Prospect | null>(null)
 
     // Delete handler
     const handleDelete = async (id: string) => {
-        if (!window.confirm("Are you sure you want to delete this prospect?")) return;
         setDeletingId(id);
         try {
             const res = await fetch(`/api/prospects/${id}`, { method: "DELETE" });
             if (res.ok) {
                 setProspects((prev) => prev.filter((p) => p.id !== id));
+                toast.success("Successfully deleted")
             } else {
-                alert("Failed to delete prospect.");
+                toast.error("Failed to delete prospect.");
             }
         } catch {
-            alert("Failed to delete prospect.");
+            toast.error("Failed to delete prospect.");
         } finally {
             setDeletingId(null);
         }
@@ -284,17 +296,17 @@ export default function ProspectsTable() {
                                             </TableRow>
                                         ) : (
                                             currentProspects.map((prospect) => (
-                                                <TableRow key={prospect.id}>
-                                                    <TableCell className="font-medium">{prospect.name}</TableCell>
-                                                    <TableCell>{prospect.phoneNumber}</TableCell>
-                                                    <TableCell className="max-w-[300px] truncate">{prospect.description}</TableCell>
-                                                    <TableCell>
+                                                <TableRow key={prospect.id} className="cursor-pointer" >
+                                                    <TableCell className="font-medium max-w-[150px] truncate" onClick={() => router.push(`/sales/prospects/${prospect.id}`)}>{prospect.name}</TableCell>
+                                                    < TableCell > {prospect.phoneNumber}</TableCell>
+                                                    <TableCell className="max-w-[300px] truncate" onClick={() => router.push(`/sales/prospects/${prospect.id}`)}>{prospect.description || "N/A"}</TableCell>
+                                                    <TableCell onClick={() => router.push(`/sales/prospects/${prospect.id}`)}>
                                                         <div className="flex items-center gap-2">
                                                             <Calendar className="h-4 w-4 text-muted-foreground" />
                                                             {formatDate(prospect.nextFollowUp)}
                                                         </div>
                                                     </TableCell>
-                                                    <TableCell>
+                                                    <TableCell onClick={() => router.push(`/sales/prospects/${prospect.id}`)}>
                                                         <Badge
                                                             className={
                                                                 prospect.status === "New" ? "bg-green-100 text-green-800" : "bg-sky-100 text-sky-800"
@@ -321,7 +333,7 @@ export default function ProspectsTable() {
                                                                     Edit
                                                                 </DropdownMenuItem>
                                                                 <DropdownMenuSeparator />
-                                                                <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(prospect.id)} disabled={deletingId === prospect.id}>
+                                                                <DropdownMenuItem className="text-destructive" onClick={() => setSourceToDelete(prospect)} disabled={deletingId === prospect.id}>
                                                                     <Trash2 className="mr-2 h-4 w-4" />
                                                                     {deletingId === prospect.id ? "Deleting..." : "Delete"}
                                                                 </DropdownMenuItem>
@@ -380,7 +392,23 @@ export default function ProspectsTable() {
                         </>
                     )}
                 </CardContent>
-            </Card>
+            </Card >
+            <AlertDialog open={!!sourceToDelete} onOpenChange={() => setSourceToDelete(null)}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            This will permanently delete the prospect "{sourceToDelete?.name}". This action cannot be undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={() => handleDelete(sourceToDelete?.id!)} className="bg-red-600 hover:bg-red-700">
+                            Delete
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div >
     )
 }

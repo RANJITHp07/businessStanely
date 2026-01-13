@@ -1,9 +1,7 @@
 "use client"
 
-import type React from "react"
-
-import { useState, useEffect, use } from "react"
-import { useRouter } from "next/navigation"
+import { useParams } from "next/navigation"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -29,53 +27,43 @@ import {
 import Link from "next/link"
 import { Separator } from "@/components/ui/separator"
 import { cn } from "@/lib/utils"
-import { useAgentContext } from "@/lib/agent-context"
 
-interface Prospect {
-    id: string;
-    name: string;
-    phoneNumber: string;
-    address?: string;
-    email: string;
-    leadSource: string;
-    description: string;
-    amount?: number | null;
-    nextFollowUp?: string;
-    lastFollowUp?: string;
-    status: "New" | "In Progress" | "Opportunity" | "Converted";
-    archived: boolean;
-    createdAt: string;
-    updatedAt: string;
-    assignedTo?: string;
-    assignedAgent?: {
-        id: string;
+interface oppurtunities {
+    id: string
+    name: string
+    phoneNumber: string
+    description: string
+    amount?: number
+    nextFollowUp?: string
+    status: "Proposal Issued" | "Closed as Won" | "Closed as Loss"
+    createdAt: string
+    updatedAt: string
+    prospect?: {
         name: string;
-        email: string;
-    };
-    createdByAgentId?: string;
-    createdByAgent?: {
-        id: string;
-        name: string;
-        email: string;
+        email?: string;
+        leadSource?: string;
+        createdByAgent?: { name?: string };
+        address?: string;
+        assignedAgent?: {
+            id?: string;
+            name?: string;
+            email?: string;
+        };
     };
 }
 
+export default function OppurtunitiesDetailPage() {
+    const [oppurtunities, setoppurtunities] = useState<oppurtunities | null>(null)
+    interface Comment {
+        id: string;
+        content: string;
+        createdAt: string;
+        agent?: { name?: string };
+        user?: { username?: string };
+        attachmentName?: string;
+        attachmentUrl?: string;
+    }
 
-interface Comment {
-    id: string;
-    content: string;
-    createdAt: string;
-    agent?: { name?: string };
-    user?: { username?: string };
-    attachmentName?: string;
-    attachmentUrl?: string;
-}
-
-export default function ProspectDetailPage({ params }: { params: Promise<{ id: string }> }) {
-    const resolvedParams = use(params)
-    const router = useRouter()
-    const agent = useAgentContext()
-    const [prospect, setProspect] = useState<Prospect | null>(null)
     const [comments, setComments] = useState<Comment[]>([])
     const [loading, setLoading] = useState(true)
     const [newComment, setNewComment] = useState("")
@@ -84,76 +72,57 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
     const [nextFollowUpDate, setNextFollowUpDate] = useState<Date | undefined>(undefined)
 
 
-    console.log(agent)
+    // Use useParams from next/navigation for dynamic route params in client components
+    const params = useParams();
+    const opportunityId = params.id;
+
     useEffect(() => {
-        setLoading(true)
-        fetch(`/api/prospects/${resolvedParams.id}`)
-            .then(res => res.json())
-            .then(data => {
-                setProspect(data.prospect || null)
-                setComments(data.prospect?.comments || [])
-                if (data.prospect && data.prospect.nextFollowUp) {
-                    setNextFollowUpDate(new Date(data.prospect.nextFollowUp))
+        async function fetchData() {
+            setLoading(true);
+            try {
+                const res = await fetch(`/api/opportunities/${opportunityId}`);
+                const data = await res.json();
+                setoppurtunities(data.opportunity || null);
+                setComments(data.opportunity?.comments || []);
+                if (data.opportunity && data.opportunity.nextFollowUp) {
+                    setNextFollowUpDate(new Date(data.opportunity.nextFollowUp));
                 }
-                setLoading(false)
-            })
-            .catch(() => setLoading(false))
-    }, [resolvedParams.id])
+            } catch {
+                // ignore
+            }
+            setLoading(false);
+        }
+        fetchData();
+    }, [opportunityId]);
 
     const handleNextFollowUpChange = async (date: Date | undefined) => {
         setNextFollowUpDate(date)
-        if (prospect && date) {
-            const res = await fetch(`/api/prospects/${prospect.id}`, {
+        if (oppurtunities && date) {
+            setoppurtunities({ ...oppurtunities, nextFollowUp: date.toISOString().split("T")[0] })
+            const res = await fetch(`/api/opportunities/${oppurtunities.id}`, {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ ...prospect, nextFollowUp: date }),
-            });
-            if (!res.ok) {
-                return;
-            }
-            setProspect({ ...prospect, nextFollowUp: date.toISOString().split("T")[0] })
-        }
-    }
-
-    const handleStatusChange = async (newStatus: Prospect["status"]) => {
-        if (!prospect) return;
-        // If status is Opportunity, create and redirect immediately
-        if (newStatus === "Opportunity") {
-            try {
-                const res = await fetch(`/api/prospects/${prospect.id}`, {
-                    method: "PUT",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ ...prospect, status: newStatus }),
-                });
-                if (!res.ok) {
-                    console.error("Failed to update status");
-                    return;
-                }
-                const data = await res.json();
-                if (data.opportunity && data.opportunity.id) {
-                    // Redirect to new opportunity and prevent rendering deleted prospect
-                    router.replace(`/sales/opportunites/${data.opportunity.id}`);
-                } else {
-                    router.replace(`/sales/opportunites/table`);
-                }
-            } catch (err) {
-                console.error("Error updating status:", err);
-            }
-            return;
-        }
-        // Otherwise, update prospect as usual
-        setProspect({ ...prospect, status: newStatus });
-        try {
-            const res = await fetch(`/api/prospects/${prospect.id}`, {
-                method: "PUT",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ ...prospect, status: newStatus }),
+                body: JSON.stringify({ ...oppurtunities, nextFollowUp: date }),
             });
             if (!res.ok) {
                 console.error("Failed to update status");
+                return;
             }
-        } catch (err) {
-            console.error("Error updating status:", err);
+        }
+    }
+
+    const handleStatusChange = async (newStatus: "Proposal Issued" | "Closed as Won" | "Closed as Loss") => {
+        if (oppurtunities) {
+            setoppurtunities({ ...oppurtunities, status: newStatus })
+            const res = await fetch(`/api/opportunities/${oppurtunities.id}`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ ...oppurtunities, status: newStatus }),
+            });
+            if (!res.ok) {
+                console.error("Failed to update status");
+                return;
+            }
         }
     }
 
@@ -167,22 +136,16 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
         setAttachments(attachments.filter((_, i) => i !== index))
     }
 
-    const isCommentDisabled = prospect?.archived || prospect?.status === "Converted" || prospect?.status === "Opportunity";
     const handleSubmitComment = async () => {
-        if (isCommentDisabled) return;
         if (!newComment.trim() && attachments.length === 0) return;
         setSubmitting(true);
         try {
             // TODO: Replace with actual user context
-            const authorId = "current-user-id";
-            const authorType = "AGENT";
-            const res = await fetch(`/api/prospects/${resolvedParams.id}`, {
+            const res = await fetch(`/api/opportunities/${opportunityId}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     content: newComment,
-                    authorId,
-                    authorType,
                     // Attachments logic can be expanded here
                 }),
             });
@@ -192,7 +155,7 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
                 setNewComment("");
                 setAttachments([]);
             }
-        } catch (err) {
+        } catch {
             // Handle error
         }
         setSubmitting(false);
@@ -216,13 +179,13 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
         )
     }
 
-    if (!prospect) {
+    if (!oppurtunities) {
         return (
             <div className="container mx-auto p-6 max-w-7xl">
                 <div className="text-center py-12">
-                    <h2 className="text-2xl font-bold">Prospect not found</h2>
-                    <Link href="/prospects">
-                        <Button className="mt-4">Back to Prospects</Button>
+                    <h2 className="text-2xl font-bold">oppurtunities not found</h2>
+                    <Link href="/oppurtunitiess">
+                        <Button className="mt-4">Back to oppurtunitiess</Button>
                     </Link>
                 </div>
             </div>
@@ -233,17 +196,17 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
         <div className="container mx-auto p-6 max-w-7xl">
             <div className="mb-6">
                 <div className="mb-7">
-                    <h1 className="text-[28px] md:text-3xl font-bold">Prospect Details</h1>
+                    <h1 className="text-[28px] md:text-3xl font-bold">Oppurtunities Details</h1>
                     <p className="text-[18px] md:text-[16px] text-muted-foreground mt-2">
-                        Detailed overview of prospect information, engagement, and current status
+                        Detailed overview of oppurtunities information, engagement, and current status
                     </p>
                 </div>
                 <Card>
                     <CardContent className="space-y-4">
                         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                             <div>
-                                <h1 className="text-3xl font-bold">{prospect.name}</h1>
-                                <p className="text-muted-foreground mt-1">Prospect Details</p>
+                                <h1 className="text-3xl font-bold">{oppurtunities?.prospect?.name}</h1>
+                                <p className="text-muted-foreground mt-1">{oppurtunities?.prospect?.email}</p>
                             </div>
                             <div className="gap-2 flex">
                                 <div>
@@ -256,7 +219,7 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
                                                     "w-full justify-start text-left font-normal",
                                                     !nextFollowUpDate && "text-muted-foreground",
                                                 )}
-                                                disabled={Boolean(agent && agent.agentRole === "Advisor Agent" && agent.agentType === "Lead Maker")}
+                                                disabled={true}
                                             >
                                                 <CalendarIcon className="mr-2 h-4 w-4" />
                                                 {nextFollowUpDate ? (
@@ -276,11 +239,7 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
                                                 selected={nextFollowUpDate}
                                                 onSelect={handleNextFollowUpChange}
                                                 initialFocus
-                                                disabled={(date: Date) => {
-                                                    const today = new Date();
-                                                    today.setHours(0, 0, 0, 0); // Reset to midnight for accurate comparison
-                                                    return date < today; // disable all dates before today
-                                                }}
+                                                disabled={true}
                                             />
                                         </PopoverContent>
                                     </Popover>
@@ -289,15 +248,15 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
                                     <div className="flex flex-col gap-1">
                                         <p className="text-sm text-muted-foreground mb-1">Status</p>
                                         <Select
-                                            disabled={Boolean(agent && agent.agentRole === "Advisor Agent" && agent.agentType === "Lead Maker")}
-                                            value={prospect.status} onValueChange={handleStatusChange}>
+                                            disabled={true}
+                                            value={oppurtunities.status} onValueChange={handleStatusChange}>
                                             <SelectTrigger className="w-[180px]">
                                                 <SelectValue />
                                             </SelectTrigger>
                                             <SelectContent>
-                                                <SelectItem value="New">New</SelectItem>
-                                                <SelectItem value="In Progress">In Progress</SelectItem>
-                                                <SelectItem value="Opportunity">Opportunity</SelectItem>
+                                                <SelectItem value="Proposal Issued">Proposal Issued</SelectItem>
+                                                <SelectItem value="Closed as Won">Closed as Won</SelectItem>
+                                                <SelectItem value="Closed as Loss">Closed as Loss</SelectItem>
                                             </SelectContent>
                                         </Select>
                                     </div>
@@ -308,8 +267,8 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
                 </Card>
             </div>
 
-            <div className="grid gap-6 lg:grid-cols-3">
-                <div className="lg:col-span-2 space-y-6">
+            <div className="grid gap-6 md:grid-cols-3">
+                <div className="md:col-span-2 space-y-6">
                     <Card>
                         <CardHeader>
                             <CardTitle>Contact Information</CardTitle>
@@ -322,7 +281,7 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <p className="text-sm text-muted-foreground">Phone Number</p>
-                                        <p className="font-medium truncate">{prospect.phoneNumber}</p>
+                                        <p className="font-medium truncate">{oppurtunities.phoneNumber}</p>
                                     </div>
                                 </div>
                                 <div className="flex items-start gap-3">
@@ -331,18 +290,18 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <p className="text-sm text-muted-foreground">Email</p>
-                                        <p className="font-medium truncate">{prospect.email}</p>
+                                        <p className="font-medium truncate">{oppurtunities.prospect?.email || '-'}</p>
                                     </div>
                                 </div>
                             </div>
-                            {prospect.address && (
+                            {oppurtunities.prospect?.address && (
                                 <div className="flex items-start gap-3">
                                     <div className="p-2 rounded-lg bg-purple-100 text-purple-700">
                                         <MapPin className="h-5 w-5" />
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <p className="text-sm text-muted-foreground">Address</p>
-                                        <p className="font-medium">{prospect.address}</p>
+                                        <p className="font-medium">{oppurtunities.prospect.address}</p>
                                     </div>
                                 </div>
                             )}
@@ -354,7 +313,7 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
                             <CardTitle>Description</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <p className="text-muted-foreground leading-relaxed">{prospect.description}</p>
+                            <p className="text-muted-foreground leading-relaxed">{oppurtunities.description}</p>
                         </CardContent>
                     </Card>
                     <Card>
@@ -362,14 +321,9 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
                             <CardTitle>Amount</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <p className="text-muted-foreground  leading-relaxed">
-                                {prospect.amount !== null && prospect.amount !== undefined
-                                    ? `The amount for this prospect is ₹${prospect.amount}`
-                                    : 'No amount has been set for this prospect.'}
-                            </p>
+                            <p className="text-muted-foreground leading-relaxed">{oppurtunities.amount !== undefined ? `$${oppurtunities.amount}` : '—'}</p>
                         </CardContent>
                     </Card>
-
 
                     <Card>
                         <CardHeader>
@@ -377,7 +331,7 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
                                 <MessageSquare className="h-5 w-5" />
                                 Interactions
                             </CardTitle>
-                            <CardDescription>Add notes, comments, and track all interactions with this prospect</CardDescription>
+                            <CardDescription>Add notes, comments, and track all interactions with this oppurtunities</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-6">
                             <div className="space-y-4">
@@ -423,7 +377,7 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
                                 <Label htmlFor="new-interaction">Add Interaction</Label>
                                 <Textarea
                                     id="new-interaction"
-                                    placeholder="Add a note or comment about this prospect..."
+                                    placeholder="Add a note or comment about this oppurtunities..."
                                     value={newComment}
                                     onChange={(e) => setNewComment(e.target.value)}
                                     rows={4}
@@ -447,7 +401,7 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
                                 )}
 
                                 <div className="flex items-center gap-2">
-                                    <Button onClick={handleSubmitComment} disabled={submitting || isCommentDisabled} className="gap-2">
+                                    <Button onClick={handleSubmitComment} disabled={submitting} className="gap-2">
                                         {submitting ? (
                                             <>
                                                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -461,13 +415,12 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
                                         )}
                                     </Button>
                                     <div>
-                                        <input type="file" id="file-upload" multiple className="hidden" onChange={handleFileSelect} disabled={isCommentDisabled} />
+                                        <input type="file" id="file-upload" multiple className="hidden" onChange={handleFileSelect} />
                                         <Button
                                             type="button"
                                             variant="outline"
-                                            onClick={() => !isCommentDisabled && document.getElementById("file-upload")?.click()}
+                                            onClick={() => document.getElementById("file-upload")?.click()}
                                             className="gap-2"
-                                            disabled={isCommentDisabled}
                                         >
                                             <Paperclip className="h-4 w-4" />
                                             Attach Files
@@ -488,15 +441,19 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
                             <div>
                                 <p className="text-sm text-muted-foreground">Status</p>
                                 <Badge
-                                    className={`mt-1 ${prospect.status === "New" ? "bg-green-100 text-green-800" : "bg-sky-100 text-sky-800"}`}
+                                    className={`mt-1 ${oppurtunities.status === "Proposal Issued"
+                                        ? "bg-amber-100 text-amber-800"
+                                        : oppurtunities.status === "Closed as Won"
+                                            ? "bg-green-100 text-green-800"
+                                            : "bg-red-100 text-red-800"}`}
                                 >
-                                    {prospect.status}
+                                    {oppurtunities.status}
                                 </Badge>
                             </div>
                             <Separator />
                             <div>
                                 <p className="text-sm text-muted-foreground">Lead Source</p>
-                                <p className="font-medium mt-1">{prospect.leadSource?.name}</p>
+                                <p className="font-medium mt-1">{oppurtunities.prospect?.leadSource?.name || 'N/A'}</p>
                             </div>
                             <Separator />
                             <div>
@@ -505,7 +462,7 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
                                     <div className="h-6 w-6 rounded-full bg-emerald-100 flex items-center justify-center">
                                         <User className="h-3 w-3 text-emerald-700" />
                                     </div>
-                                    <p className="font-medium">{prospect.createdByAgent?.name || "Unknown"}</p>
+                                    <p className="font-medium">{oppurtunities.prospect?.createdByAgent?.name || "Unknown"}</p>
                                 </div>
                             </div>
                             <Separator />
@@ -516,19 +473,49 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
                                         <User className="h-3 w-3 text-primary" />
                                     </div>
                                     <p className="font-medium">
-                                        {prospect.assignedAgent?.name
-                                            ? prospect.assignedAgent.name
-                                            : prospect.assignedTo || "Unassigned"}
+                                        {oppurtunities.prospect?.assignedAgent?.name
+                                            ? oppurtunities.prospect?.assignedAgent.name
+                                            : oppurtunities.prospect?.assignedTo || "Unassigned"}
                                     </p>
                                 </div>
                             </div>
                             <Separator />
+                            {/*
+                            <div>
+                                <p className="text-sm text-muted-foreground">Assigned To</p>
+                                <div className="flex items-center gap-2 mt-1">
+                                    <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center">
+                                        <User className="h-3 w-3 text-primary" />
+                                    </div>
+                                    <p className="font-medium">{oppurtunities.assignedTo || "Unassigned"}</p>
+                                </div>
+                            </div>
+                            <Separator />
+                            */}
+                            {/*
+                            <div>
+                                <p className="text-sm text-muted-foreground">Last Follow Up</p>
+                                <div className="flex items-center gap-2 mt-1">
+                                    <Clock className="h-4 w-4 text-muted-foreground" />
+                                    <p className="font-medium">
+                                        {oppurtunities.lastFollowUp
+                                            ? new Date(oppurtunities.lastFollowUp).toLocaleDateString("en-US", {
+                                                month: "short",
+                                                day: "numeric",
+                                                year: "numeric",
+                                            })
+                                            : "No follow-up yet"}
+                                    </p>
+                                </div>
+                            </div>
+                            <Separator />
+                            */}
 
                             <div>
                                 <p className="text-sm text-muted-foreground">Created</p>
                                 <div className="flex items-center gap-2 mt-1">
                                     <Calendar className="h-4 w-4 text-muted-foreground" />
-                                    <p className="font-medium">{formatDate(prospect.createdAt)}</p>
+                                    <p className="font-medium">{formatDate(oppurtunities.createdAt)}</p>
                                 </div>
                             </div>
                             <Separator />
@@ -536,7 +523,7 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
                                 <p className="text-sm text-muted-foreground">Last Updated</p>
                                 <div className="flex items-center gap-2 mt-1">
                                     <Calendar className="h-4 w-4 text-muted-foreground" />
-                                    <p className="font-medium">{formatDate(prospect.updatedAt)}</p>
+                                    <p className="font-medium">{formatDate(oppurtunities.updatedAt)}</p>
                                 </div>
                             </div>
                         </CardContent>

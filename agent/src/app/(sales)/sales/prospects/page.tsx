@@ -4,10 +4,11 @@ import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { ClipboardList, Loader2, Clock, Eye, Calendar } from "lucide-react"
+import { ClipboardList, Loader2, Clock, Eye, Calendar, Plus } from "lucide-react"
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip"
 import { Progress } from "@/components/ui/progress"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 
 // Mock data type for prospects
 interface Prospect {
@@ -21,9 +22,9 @@ interface Prospect {
 }
 
 function formatDate(dateString?: string) {
-    if (!dateString) return "-"
+    if (!dateString) return "N/A"
     const d = new Date(dateString)
-    if (isNaN(d.getTime())) return "-"
+    if (isNaN(d.getTime())) return "N/A"
     return d.toLocaleDateString("en-GB", {
         day: "2-digit",
         month: "2-digit",
@@ -172,16 +173,18 @@ function SectionTable({ label, prospects }: { label: string; prospects: Prospect
                                                             </div>
                                                         </TableCell>
 
-                                                        <TableCell className="truncate max-w-[150px] align-top">{p.phoneNumber || "-"}</TableCell>
+                                                        <TableCell className="truncate max-w-[150px] align-top">{p.phoneNumber || "N/A"}</TableCell>
 
                                                         <TableCell className="truncate max-w-[250px] align-top" title={p.description}>
-                                                            {p.description || "-"}
+                                                            {p.description || "N/A"}
                                                         </TableCell>
 
-                                                        <TableCell className="whitespace-nowrap align-top" title={p.nextFollowUp || ""}>
+                                                        <TableCell className="whitespace-nowrap align-top" title={p.nextFollowUp || "N/A"}>
                                                             <div className="flex items-center gap-2">
                                                                 <Calendar className="h-4 w-4 text-muted-foreground" />
-                                                                <span>{formatDate(p.nextFollowUp)}</span>
+                                                                <span>{formatDate(p.nextFollowUp)
+
+                                                                    || "N/A"}</span>
                                                             </div>
                                                         </TableCell>
 
@@ -250,7 +253,7 @@ function SectionTable({ label, prospects }: { label: string; prospects: Prospect
                                                 <div className="mt-3 grid grid-cols-2 gap-2 text-sm text-muted-foreground">
                                                     <div>
                                                         <div className="font-medium text-foreground">Description</div>
-                                                        <div className="truncate">{p.description || "-"}</div>
+                                                        <div className="truncate">{p.description || "N/A"}</div>
                                                     </div>
                                                     <div>
                                                         <div className="font-medium text-foreground">Status</div>
@@ -274,7 +277,7 @@ function SectionTable({ label, prospects }: { label: string; prospects: Prospect
             <div className="flex justify-end">
                 <Link
                     href={`/sales/prospects/table?status=${encodeURIComponent(label === "New Prospects" ? "New" : "In Progress")}`}
-                    className="bg-[#003459] cursor-pointer text-white text-[14px] py-[10px] mt-[10px] px-[10px] rounded-[5px] inline-block"
+                    className="bg-[#002FFF] cursor-pointer text-white text-[14px] py-[10px] mt-[10px] px-[10px] rounded-[5px] inline-block"
                 >
                     View more
                 </Link>
@@ -284,6 +287,7 @@ function SectionTable({ label, prospects }: { label: string; prospects: Prospect
 }
 
 export default function ProspectsPage() {
+    const router = useRouter()
     const [prospects, setProspects] = useState<Prospect[]>([])
     const [loading, setLoading] = useState(true)
 
@@ -321,6 +325,10 @@ export default function ProspectsPage() {
                     <h1 className="text-3xl font-bold">My Prospects</h1>
                     <p className="text-muted-foreground mt-1">Track and manage your prospects</p>
                 </div>
+                <Button onClick={() => router.push("/sales/prospects/add")} className="mt-[20px] md:mt-none text-white rounded-lg px-4 py-2 flex items-center gap-2 cursor-pointer shadow-none hover:shadow-md transition-shadow duration-300">
+                    <Plus className="h-4 w-4" />
+                    Create Prospect
+                </Button>
             </div>
 
             {loading ? (
@@ -353,6 +361,7 @@ export default function ProspectsPage() {
                     </div>
                 </>
             )}
+
         </div>
     )
 }

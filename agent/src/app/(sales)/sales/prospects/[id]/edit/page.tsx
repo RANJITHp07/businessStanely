@@ -339,13 +339,13 @@ export default function EditProspectPage() {
               <CardHeader>
                 <div className="flex items-center gap-2">
                   <Bell className="size-5 text-primary" />
-                  <CardTitle>Follow-up & Assignment</CardTitle>
+                  <CardTitle>Assignment</CardTitle>
                 </div>
-                <CardDescription>Set reminders and assign to team members</CardDescription>
+                <CardDescription>Assign to team members</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 {/* Reminder */}
-                <div className="space-y-2">
+                {/* <div className="space-y-2">
                   <Label htmlFor="reminder">Set Reminder</Label>
                   <Popover>
                     <PopoverTrigger asChild>
@@ -365,7 +365,7 @@ export default function EditProspectPage() {
                       <Calendar mode="single" selected={reminderDate} onSelect={setReminderDate} initialFocus />
                     </PopoverContent>
                   </Popover>
-                </div>
+                </div> */}
 
                 {/* Assign */}
                 <div className="space-y-2">

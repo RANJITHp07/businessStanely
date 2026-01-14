@@ -103,34 +103,13 @@ function groupActivitiesByDate(activities: AgentActivity[]) {
 
 function formatDateDMY(dateString: string) {
   if (!dateString) return "-";
-
-  let d: Date;
-
-  // ISO format YYYY-MM-DD
-  if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
-    const [year, month, day] = dateString.split("-").map(Number);
-    // Use Date.UTC to avoid timezone issues, then convert to local
-    d = new Date(year, month - 1, day);
-  }
-  // DD-MM-YYYY
-  else if (/^\d{2}-\d{2}-\d{4}$/.test(dateString)) {
-    const [day, month, year] = dateString.split("-").map(Number);
-    d = new Date(year, month - 1, day);
-  }
-  // fallback
-  else {
-    // Try to parse safely using Date constructor
-    const parsed = new Date(dateString);
-    if (isNaN(parsed.getTime())) return "-";
-    d = parsed;
-  }
-
-  // Format manually to avoid iOS locale quirks
-  const day = d.getDate();
-  const month = d.toLocaleString("en-US", { month: "long" });
-  const year = d.getFullYear();
-
-  return `${month} ${day}, ${year}`;
+  const d = new Date(dateString);
+  if (isNaN(d.getTime())) return "-";
+  return d.toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
 }
 
 

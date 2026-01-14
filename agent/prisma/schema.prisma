@@ -141,6 +141,8 @@ model Agent {
   otpExpiry     DateTime?
   isOtpVerified Boolean   @default(false)
 
+  autoAssign           Boolean @default(true)
+
   // Team Management (multiple superiors via join table)
   superiorsLinks    AgentSuperior[] @relation("AgentSuperiors_superior")
   subordinatesLinks AgentSuperior[] @relation("AgentSuperiors_subordinate")

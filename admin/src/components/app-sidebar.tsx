@@ -59,14 +59,12 @@ type MenuItem = {
 
 const items: MenuItem[] = [
   {
-    title: "Dashboard",
+    title: "Agent Panel",
     icon: Home,
-    children: [
-      { title: "Agents", url: "/dashboard", icon: UserRoundPen, },
-      { title: "Prospects", url: "/dashboard/prospects", icon: UserSearch },
-      { title: "Opportunites", url: "/dashboard/opportunities", icon: ClipboardList },
-    ],
+    url: "/"
   },
+  { title: "Prospects", url: "/dashboard/prospects", icon: UserSearch },
+  { title: "Opportunites", url: "/dashboard/opportunities", icon: ClipboardList },
   {
     title: "Agent",
     url: "/agent",

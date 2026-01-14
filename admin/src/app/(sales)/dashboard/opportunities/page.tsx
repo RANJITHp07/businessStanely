@@ -176,14 +176,14 @@ function ProspectTable({ label, prospects, statusFilter }: { label: string; pros
                                                         <Tooltip>
                                                             <TooltipTrigger asChild>
                                                                 <Link
-                                                                    href={`/sales/prospects/${prospect.id}`}
+                                                                    href={`/dashboard/opportunities/${prospect.id}`}
                                                                     className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-muted"
                                                                     aria-label="View prospect details"
                                                                 >
                                                                     <Eye className="h-4 w-4" />
                                                                 </Link>
                                                             </TooltipTrigger>
-                                                            <TooltipContent sideOffset={6}>View prospects with this status</TooltipContent>
+                                                            <TooltipContent sideOffset={6}>View opportunities with this status</TooltipContent>
                                                         </Tooltip>
                                                     </TooltipProvider>
                                                 </td>

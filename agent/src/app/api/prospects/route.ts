@@ -93,6 +93,7 @@ export async function POST(req: NextRequest) {
         where: {
           agentType: { in: ["Client Manager", "Client Advisor"] },
           status: "active",
+          autoAssign: true,
           id: { not: agent.id },
         },
         orderBy: { createdAt: "asc" },

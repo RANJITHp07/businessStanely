@@ -185,6 +185,7 @@ export default function AgentForm({ agent }: AgentFormProps) {
     agentType: string;
     barAssociationId: string;
     jurisdiction: string;
+    autoAssign?: boolean
   };
   const [formData, setFormData] = useState<AgentFormData>({
     name: agent?.name || "",
@@ -195,6 +196,7 @@ export default function AgentForm({ agent }: AgentFormProps) {
     agentType: agent?.agentType || "",
     barAssociationId: agent?.barAssociationId || "",
     jurisdiction: agent?.jurisdiction || "",
+    autoAssign: agent?.autoAssign || true
   });
   const [agentSearch, setAgentSearch] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -536,6 +538,27 @@ export default function AgentForm({ agent }: AgentFormProps) {
                     ))}
                   </SelectContent>
                 </Select>
+
+                {
+                  formData.agentRole === "Advisor Agent" && formData.agentType && formData.agentType != "Lead Maker" &&
+                  < div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id="auto-assign"
+                      className="h-4 w-4"
+                      checked={formData.autoAssign}
+                      onChange={(e) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          autoAssign: e.target.checked,
+                        }))
+                      }
+                    />
+                    <Label htmlFor="auto-assign" className="ml-2 text-xs font-medium">
+                      If this checkbox is selected, the prospect will be automatically assigned to this agent.
+                    </Label>
+                  </div>
+                }
               </div>
               <div className="space-y-2">
                 <Label htmlFor="jurisdiction">Jurisdiction *</Label>
@@ -884,6 +907,6 @@ export default function AgentForm({ agent }: AgentFormProps) {
           </Button>
         </div>
       </form>
-    </div>
+    </div >
   );
 }

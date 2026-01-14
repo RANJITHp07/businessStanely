@@ -8,7 +8,17 @@ import { sendAgentInviteEmail } from "@/lib/email";
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-  const { specializations, superiors, subordinates, photo, password: providedPassword, agentRole, agentType, ...agentData } = body;
+    const {
+      specializations,
+      superiors,
+      subordinates,
+      photo,
+      password: providedPassword,
+      agentRole,
+      agentType,
+      autoAssign,
+      ...agentData
+    } = body;
 
     // Generate a random password if not provided
     const password = providedPassword || Math.random().toString(36).slice(-8);
@@ -31,14 +41,13 @@ export async function POST(req: NextRequest) {
       }
     }
 
-
     // Always store emails in lowercase for case-insensitive uniqueness
     if (agentData.email) {
       agentData.email = agentData.email.toLowerCase();
     }
 
     // Remove subordinates from agentData if present
-    if ('subordinates' in agentData) {
+    if ("subordinates" in agentData) {
       delete agentData.subordinates;
     }
     // Validate agentRole and agentType
@@ -47,7 +56,10 @@ export async function POST(req: NextRequest) {
       // Only allow advisor agent types
       const advisorTypes = ["Lead Maker", "Client Advisor", "Client Manager"];
       if (!advisorTypes.includes(agentType)) {
-        return NextResponse.json({ error: "Invalid agent type for Advisor Agent." }, { status: 400 });
+        return NextResponse.json(
+          { error: "Invalid agent type for Advisor Agent." },
+          { status: 400 }
+        );
       }
     }
     // For Execution Agent, keep previous logic (no restriction)
@@ -59,6 +71,7 @@ export async function POST(req: NextRequest) {
       password: hashedPassword,
       photo: photoS3Key,
       status: "active",
+      autoAssign,
       ...(specializations?.length && {
         specializations: {
           set: specializations,
@@ -101,8 +114,8 @@ export async function POST(req: NextRequest) {
     });
     const agentWithLinks = {
       ...newAgent,
-      superiors: superiorsLinks.map(link => link.superior),
-      subordinates: subordinatesLinks.map(link => link.subordinate),
+      superiors: superiorsLinks.map((link) => link.superior),
+      subordinates: subordinatesLinks.map((link) => link.subordinate),
     };
 
     // Send email with credentials to the agent
@@ -118,7 +131,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Return agent data (password is not included in the response by default)
-  return NextResponse.json(agentWithLinks, { status: 201 });
+    return NextResponse.json(agentWithLinks, { status: 201 });
   } catch (error) {
     console.error("Error creating agent:", error);
 

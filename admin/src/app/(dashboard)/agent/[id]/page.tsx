@@ -102,10 +102,31 @@ function groupActivitiesByDate(activities: AgentActivity[]) {
 }
 
 function formatDateDMY(dateString: string) {
-  const d = new Date(dateString);
+  if (!dateString) return "-";
+
+  let d: Date;
+
+  // ISO format YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+    const [year, month, day] = dateString.split("-").map(Number);
+    d = new Date(year, month - 1, day);
+  }
+  // DD-MM-YYYY
+  else if (/^\d{2}-\d{2}-\d{4}$/.test(dateString)) {
+    const [day, month, year] = dateString.split("-").map(Number);
+    d = new Date(year, month - 1, day);
+  }
+  // fallback
+  else {
+    d = new Date(dateString);
+  }
+
+  if (isNaN(d.getTime())) return "-";
+
   const day = d.getDate();
   const month = d.toLocaleString("en-US", { month: "long" });
   const year = d.getFullYear();
+
   return `${month} ${day}, ${year}`;
 }
 

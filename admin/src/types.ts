@@ -30,6 +30,7 @@ export interface Agent {
   photo: string | null;
   superior: Agent | null;
   subordinates: Agent[];
+  autoAssign?: boolean;
 }
 
 // export interface Client {

@@ -629,7 +629,7 @@ export default function ProspectDashboard() {
                         <p className="">Track and manage your sales prospects</p>
                     </div>
                     <div className="flex flex-col md:flex-row md:items-center gap-4">
-                        <Button onClick={() => router.push("/sales/prospects/add")} className="mt-[20px] md:mt-none text-white rounded-lg px-4 py-2 flex items-center gap-2 cursor-pointer shadow-none hover:shadow-md transition-shadow duration-300">
+                        <Button onClick={() => router.push("/dashboard/prospects/add")} >
                             <Plus className="h-4 w-4" />
                             Create Prospect
                         </Button>

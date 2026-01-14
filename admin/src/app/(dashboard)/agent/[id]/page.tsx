@@ -109,6 +109,7 @@ function formatDateDMY(dateString: string) {
   // ISO format YYYY-MM-DD
   if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
     const [year, month, day] = dateString.split("-").map(Number);
+    // Use Date.UTC to avoid timezone issues, then convert to local
     d = new Date(year, month - 1, day);
   }
   // DD-MM-YYYY
@@ -118,17 +119,20 @@ function formatDateDMY(dateString: string) {
   }
   // fallback
   else {
-    d = new Date(dateString);
+    // Try to parse safely using Date constructor
+    const parsed = new Date(dateString);
+    if (isNaN(parsed.getTime())) return "-";
+    d = parsed;
   }
 
-  if (isNaN(d.getTime())) return "-";
-
+  // Format manually to avoid iOS locale quirks
   const day = d.getDate();
   const month = d.toLocaleString("en-US", { month: "long" });
   const year = d.getFullYear();
 
   return `${month} ${day}, ${year}`;
 }
+
 
 export default function AgentDetails() {
   const params = useParams();

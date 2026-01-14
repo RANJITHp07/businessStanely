@@ -21,9 +21,12 @@ export interface Agent {
   phoneNumber: string;
   secondaryPhoneNumber: string | null;
   agentType: string;
+  agentRole: "Execution Agent" | "Advisor Agent";
   barAssociationId: string;
   jurisdiction: string;
   specializations: string[];
+  // For Advisor Agent, agentType can be: 'Lead Maker', 'Client Advisor', 'Client Manager'
+  // For Execution Agent, agentType can be: 'CEO', 'Partner', 'Manager', etc.
   photo: string | null;
   superior: Agent | null;
   subordinates: Agent[];
@@ -67,7 +70,7 @@ export interface Task {
   followUpDuration?: string; // e.g., '24hr', '48hr', '1w', 'None'
   statusCheckDuration?: string; // e.g., '24hr', '48hr', '1w', 'None'
   completed?: boolean;
-  recurring?: number | null; // Recurring in months (1-12), null means not recurring
+  recurring?: number | string | null; // Recurring in months (1-12), or string for new format
   createdAt: string;
   updatedAt: string;
   client?: Client;
@@ -81,7 +84,6 @@ export interface Task {
     status: string;
   };
   comments?: Comment[];
-  triggerDate?: string;
   recurringType?: string;
   legislationId?: string; // Added to link tasks to legislations
   legislation?: {
@@ -91,9 +93,37 @@ export interface Task {
     status: string;
     createdAt: string;
     updatedAt: string;
-  }; // Added legislation object to include detailed information
+    triggerDate?: Date | null;
+  };
+  triggerDate?: string; // <-- Add this line for direct access
 }
-
+export interface Prospect {
+  id: string;
+  name: string;
+  email?: string;
+  phone?: string;
+  phoneNumber?: string;
+  address?: string;
+  leadSource?: string;
+  description?: string;
+  nextFollowUp?: string;
+  lastFollowUp?: string;
+  status: string; // e.g., New, Contacted, Qualified, Lost, Converted
+  notes?: string;
+  assignedTo?: string;
+  createdByAgentId?: string;
+  createdByAgent?: {
+    id: string;
+    name: string;
+    email: string;
+  };
+  amount?: string;
+  assignedAgentId?: string;
+  assignedAgent?: Agent;
+  createdAt: string;
+  updatedAt: string;
+  archived?: boolean;
+}
 export interface TaskCategory {
   id: string;
   name: string;

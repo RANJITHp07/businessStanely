@@ -8,10 +8,15 @@ import {
   UserRoundPen,
   UserSearch,
   Boxes,
-  ShieldUser
+  ShieldUser,
+  ChevronDown,
+  ClipboardList,
+  CircleFadingPlusIcon
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
+import { usePathname } from "next/navigation";
 
 import {
   Sidebar,
@@ -36,14 +41,31 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import Image from "next/image";
+
 import Logo from "./../../public/Logo.jpg";
-// Menu items.
-const items = [
+
+type ChildItem = {
+  title: string;
+  url: string;
+  icon: any;
+};
+
+type MenuItem = {
+  title: string;
+  icon: any;
+  url?: string;
+  children?: ChildItem[];
+};
+
+const items: MenuItem[] = [
   {
     title: "Dashboard",
-    url: "/dashboard",
     icon: Home,
+    children: [
+      { title: "Agents", url: "/dashboard", icon: UserRoundPen, },
+      { title: "Prospects", url: "/dashboard/prospects", icon: UserSearch },
+      { title: "Opportunites", url: "/dashboard/opportunities", icon: ClipboardList },
+    ],
   },
   {
     title: "Agent",
@@ -55,11 +77,6 @@ const items = [
     url: "/client",
     icon: UserSearch,
   },
-  // {
-  //   title: "Task",
-  //   url: "/task",
-  //   icon: ClipboardCheck,
-  // },
   {
     title: "Task",
     url: "/my-task",
@@ -76,6 +93,11 @@ const items = [
     icon: Boxes,
   },
   {
+    title: "Lead Source",
+    url: "/lead_source",
+    icon: CircleFadingPlusIcon,
+  },
+  {
     title: "Admin",
     url: "/admin",
     icon: ShieldUser,
@@ -88,26 +110,39 @@ const items = [
 ];
 
 export function AppSidebar() {
+  const pathname = usePathname();
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
+  const [openMenus, setOpenMenus] = useState<Record<string, boolean>>({});
   const { setOpenMobile, isMobile } = useSidebar();
+
+  useEffect(() => {
+    items.forEach((item) => {
+      if (item.children?.some((child) => pathname.startsWith(child.url))) {
+        setOpenMenus((prev) => ({
+          ...prev,
+          [item.title]: true,
+        }));
+      }
+    });
+  }, [pathname]);
+
+  const toggleMenu = (title: string) => {
+    setOpenMenus((prev) => ({
+      ...prev,
+      [title]: !prev[title],
+    }));
+  };
 
   const handleLogout = async () => {
     try {
-      // Clear localStorage immediately to prevent flash
       localStorage.removeItem("token");
       localStorage.removeItem("user");
-
-      // Call logout API to clear server-side cookie
       await fetch("/api/auth/logout", {
         method: "POST",
         credentials: "include",
       });
-
-      // Force page reload to ensure clean state
       window.location.replace("/login");
-    } catch (error) {
-      console.error("Logout error:", error);
-      // Even if API fails, localStorage is already cleared
+    } catch {
       window.location.replace("/login");
     } finally {
       setShowLogoutDialog(false);
@@ -119,53 +154,101 @@ export function AppSidebar() {
       <Sidebar className="hidden md:flex flex-shrink-0">
         <SidebarContent>
           <SidebarGroup>
-            <SidebarGroupLabel className="mt-[10px] ">
+            <SidebarGroupLabel className="mt-[10px]">
               <Image src={Logo} alt="logo" />
             </SidebarGroupLabel>
+
             <SidebarGroupContent>
               <SidebarMenu>
-                {items.map((item) => (
-                  <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton asChild>
-                      <Link
-                        href={item.url}
-                        onClick={() => {
-                          console.log(isMobile)
-                          if (isMobile) {
-                            console.log("jii")
-                            setOpenMobile(false);
-                          }
-                        }}>
-                        <item.icon />
-                        <span className="text-[16px]">{item.title}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
+                {items.map((item) => {
+                  const isParentActive =
+                    item.children?.some((c) => pathname.startsWith(c.url)) ||
+                    pathname === item.url;
+
+                  return (
+                    <SidebarMenuItem key={item.title}>
+                      {item.children ? (
+                        <>
+                          <button
+                            onClick={() => toggleMenu(item.title)}
+                            className={`flex w-full items-center justify-between  p-2 rounded-md transition ${isParentActive
+                              ? ""
+                              : "hover:bg-white hover:text-primary"
+                              }`}
+                          >
+                            <div className="flex items-center gap-2">
+                              <item.icon className="w-5 h-5" />
+                              <span className="text-[16px]">{item.title}</span>
+                            </div>
+                            <ChevronDown
+                              className={`w-5 h-5 transition-transform ${openMenus[item.title] ? "rotate-180" : ""
+                                }`}
+                            />
+                          </button>
+
+                          {openMenus[item.title] && (
+                            <div className="ml-7 mt-1 space-y-1">
+                              {item.children.map((child) => {
+                                const isActive = pathname === child.url;
+
+                                return (
+                                  <SidebarMenuButton key={child.url} asChild>
+                                    <Link
+                                      href={child.url}
+                                      onClick={() => {
+                                        if (isMobile) setOpenMobile(false);
+                                      }}
+                                      className={`block px-3 py-2 text-[16px] my-2 rounded-md transition ${isActive
+                                        ? "bg-white text-primary"
+                                        : "hover:bg-white hover:text-primary"
+                                        }`}
+                                    >
+                                      <child.icon className="w-5 h-5" />
+                                      {child.title}
+                                    </Link>
+                                  </SidebarMenuButton>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </>
+                      ) : (
+                        <SidebarMenuButton asChild>
+                          <Link
+                            href={item.url!}
+                            onClick={() => {
+                              if (isMobile) setOpenMobile(false);
+                            }}
+                            className={`flex items-center gap-2 ${pathname === item.url
+                              ? "bg-white text-primary"
+                              : ""
+                              }`}
+                          >
+                            <item.icon className="w-5 h-5" />
+                            <span className="text-[16px]">{item.title}</span>
+                          </Link>
+                        </SidebarMenuButton>
+                      )}
+                    </SidebarMenuItem>
+                  );
+                })}
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
         </SidebarContent>
 
         <SidebarFooter>
-          <SidebarGroup>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    onClick={() => setShowLogoutDialog(true)}
-                    className="flex items-center gap-[5px] mb-[20px] px-3 py-2 rounded-md text-red-600 hover:text-red-700 hover:bg-red-50 transition-all duration-200"
-                  >
-                    <LogOut className="w-5 h-5" />
-                    <span className="text-[18px] font-semibold bg-gradient-to-r from-red-500 to-pink-500 bg-clip-text text-transparent hover:scale-105 transition-transform duration-200">
-                      Logout
-                    </span>
-                  </SidebarMenuButton>
-
-                </SidebarMenuItem>
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                onClick={() => setShowLogoutDialog(true)}
+                className="flex items-center gap-2 mb-4 text-red-600 hover:bg-red-50"
+              >
+                <LogOut className="w-5 h-5" />
+                <span className="text-[16px] font-semibold">Logout</span>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
         </SidebarFooter>
       </Sidebar>
 
@@ -174,22 +257,17 @@ export function AppSidebar() {
           <AlertDialogHeader>
             <AlertDialogTitle>Confirm Logout</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to logout? You will need to sign in again to
-              access your account.
+              Are you sure you want to logout?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setShowLogoutDialog(false)}>
-              Cancel
-            </AlertDialogCancel>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleLogout}
               className="bg-red-600 hover:bg-red-700"
             >
               Logout
             </AlertDialogAction>
-
-
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

@@ -56,7 +56,7 @@ export default function LoginPage() {
       // Store authentication data
       localStorage.setItem("agent", JSON.stringify(data.agent));
       localStorage.setItem("token", data.token);
-      router.push("/dashboard");
+      router.push("/");
     } catch (err) {
       setError("Login failed. Please try again.");
     } finally {

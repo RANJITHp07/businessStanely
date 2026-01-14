@@ -24,7 +24,8 @@ import {
     Phone,
     Mail,
     Calendar,
-    AlertCircle
+    AlertCircle,
+    PlusCircle
 } from "lucide-react"
 import {
     Table, TableBody, TableCell, TableHead, TableHeader, TableRow
@@ -84,11 +85,11 @@ interface DashboardRetainership {
 
 export default function RetainershipTable() {
     const [retainerships, setRetainerships] = useState<DashboardRetainership[]>([])
+    const [myLegislations, setMyLegislations] = useState<any[]>([]);
     const [searchTerm, setSearchTerm] = useState("")
     // Removed unused sortBy and sortByDate state
     const [currentPage, setCurrentPage] = useState(1)
     const [itemsPerPage, setItemsPerPage] = useState(20)
-    const [retainershipToDelete, setRetainershipToDelete] = useState<DashboardRetainership | null>(null)
     const [loading, setLoading] = useState(true)
     const [activeTab, setActiveTab] = useState("my-retainerships")
     const [currentUserRole, setCurrentUserRole] = useState<string>("")
@@ -118,111 +119,65 @@ export default function RetainershipTable() {
     // State to store all retainerships for counting
     const [allRetainerships, setAllRetainerships] = useState<DashboardRetainership[]>([]);
 
-    // Fetch all retainerships for counting tabs
-    useEffect(() => {
-        const fetchAllRetainerships = async () => {
-            try {
-                const response = await fetchWithAuth(`/api/retainerships`);
 
-                if (!response.ok) {
-                    throw new Error('Failed to fetch all retainerships');
-                }
-
-                const data = await response.json();
-                setAllRetainerships(data || []); // Ensure default empty array
-            } catch (error) {
-                console.error("Error fetching all retainerships:", error);
-                setAllRetainerships([]); // Default to empty array on error
-            }
-        };
-        fetchAllRetainerships();
-    }, []);
-
-    // Added debugging logs to inspect API response and filtering logic
-    useEffect(() => {
-        const fetchRetainerships = async () => {
-            try {
-                setLoading(true);
-                // Fetch retainerships from API based on active tab
-                const status = activeTab === 'approved' ? 'approved' : 'pending';
-                const response = await fetchWithAuth(`/api/retainerships?status=${status}`);
-
-                if (!response.ok) {
-                    throw new Error('Failed to fetch retainerships');
-                }
-
-                const data = await response.json();
-                setRetainerships(data || []); // Ensure default empty array
-            } catch (error) {
-                console.error("Error fetching retainerships:", error)
-                setRetainerships([]) // Default to empty array on error
-                if (error instanceof Error) {
-                    toast.error(error.message)
-                }
-            } finally {
-                setLoading(false)
-            }
-        }
-        fetchRetainerships()
-    }, [activeTab])
 
     // Fetch retainerships and clients assigned to the agent
     useEffect(() => {
-        const fetchMyRetainerships = async () => {
-
+        const fetchDashboardData = async () => {
             try {
                 setLoading(true);
-                const response = await fetchWithAuth(`/api/tasks?retainershipTasks=true`);
 
-                if (!response.ok) {
-                    throw new Error('Failed to fetch my retainerships');
+                const [
+                    retainershipRes,
+                    clientsRes,
+                    legislationsRes,
+                ] = await Promise.all([
+                    fetchWithAuth(`/api/tasks?retainershipTasks=true`),
+                    fetchWithAuth(`/api/clients?assignedToId=me`),
+                    fetchWithAuth(`/api/legislation?assignedAgent=me`),
+                ]);
+
+                if (!retainershipRes.ok || !clientsRes.ok || !legislationsRes.ok) {
+                    throw new Error("Failed to fetch dashboard data");
                 }
 
-                const data = await response.json();
-                setMyRetainerships(data.tasks || []);
+                const [
+                    retainershipData,
+                    clientsData,
+                    legislationsData,
+                ] = await Promise.all([
+                    retainershipRes.json(),
+                    clientsRes.json(),
+                    legislationsRes.json(),
+                ]);
+
+                console.log(retainershipData, clientsData, legislationsData);
+                setMyRetainerships(retainershipData.tasks || []);
+                setMyClients(clientsData || []);
+                setMyLegislations(legislationsData || []);
             } catch (error) {
-                console.error("Error fetching my retainerships:", error);
                 setMyRetainerships([]);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        const fetchMyClients = async () => {
-            try {
-                setLoading(true);
-                const response = await fetchWithAuth(`/api/clients?assignedToId=me`);
-
-                if (!response.ok) {
-                    throw new Error('Failed to fetch my clients');
-                }
-
-                const data = await response.json();
-                setMyClients(data || []);
-            } catch (error) {
-                console.error("Error fetching my clients:", error);
                 setMyClients([]);
+                setMyLegislations([]);
             } finally {
                 setLoading(false);
             }
         };
 
-        fetchMyRetainerships();
-        fetchMyClients();
-
+        fetchDashboardData();
     }, []);
 
+
     // Updated filtering logic to normalize status field for case-insensitive comparison
-    const filteredRetainerships = (retainerships || []).filter((retainership) => {
+    const filteredRetainerships = (myLegislations || []).filter((retainership) => {
         const matchesSearch =
             !searchTerm || // Skip search filtering if searchTerm is empty
             (retainership.name?.toLowerCase() || "").includes(searchTerm.toLowerCase()) ||
             (retainership.description?.toLowerCase() || "").includes(searchTerm.toLowerCase()) ||
-            (retainership.createdBy?.name?.toLowerCase() || "").includes(searchTerm.toLowerCase());
+            (retainership.assignedAgent?.name?.toLowerCase() || "").includes(searchTerm.toLowerCase());
 
-        const matchesTab = retainership.status === activeTab;
 
-        return matchesSearch && matchesTab;
+        return matchesSearch;
     });
 
     // Apply sorting to filtered retainerships
@@ -237,72 +192,9 @@ export default function RetainershipTable() {
     const startIndex = (currentPage - 1) * itemsPerPage
     const endIndex = startIndex + itemsPerPage
     // Explicitly type the retainership object in the component
-    const currentRetainerships: DashboardRetainership[] = sortedRetainerships.slice(startIndex, endIndex)
 
-    const handlePageChange = (page: number) => {
-        setCurrentPage(page)
-    }
-
-    const handleItemsPerPageChange = (value: string) => {
-        setItemsPerPage(Number.parseInt(value))
-        setCurrentPage(1)
-    }
-
-    const handleDelete = async () => {
-        if (!retainershipToDelete) return
-        try {
-            // Call API to delete retainership
-            const response = await fetchWithAuth(`/api/retainerships/${retainershipToDelete.id}`, {
-                method: 'DELETE',
-            })
-
-            if (!response.ok) {
-                throw new Error('Failed to delete retainership')
-            }
-
-            // Update both retainership lists in the UI
-            setRetainerships(retainerships.filter((retainership) => retainership.id !== retainershipToDelete.id))
-            setAllRetainerships(allRetainerships.filter((retainership) => retainership.id !== retainershipToDelete.id))
-            setRetainershipToDelete(null)
-            toast.success("Retainership deleted successfully")
-        } catch (error) {
-            console.error("Error deleting retainership:", error)
-            const errorMessage = error instanceof Error ? error.message : "Failed to delete retainership"
-            toast.error(errorMessage)
-        }
-    }
-
-
-
-    const getStatusBadge = (status: string) => {
-        return (
-            <Badge
-                variant={status === "approved" ? "default" : "secondary"}
-                className={status === "approved" ? "bg-green-100 text-green-800" : "bg-yellow-100 text-yellow-800"}
-            >
-                {status}
-            </Badge>
-        )
-    }
 
     // Get counts for tabs from allRetainerships to always show correct counts
-    const approvedCount = allRetainerships.filter((cat) => cat.status === "approved").length
-    const pendingCount = allRetainerships.filter((cat) => cat.status === "pending").length
-
-    const renderCreatedBy = (createdBy: { id?: string; name: string; type: "User" | "Agent" | "Unknown" } | null) => {
-        if (!createdBy || createdBy.type === "Unknown") return "Unknown";
-        return (
-            <>
-                {createdBy.name}
-                {createdBy.type === "Agent" && (
-                    <span className="ml-1 text-xs text-blue-600">(Agent)</span>
-                )}
-                {createdBy.type === "User" && (
-                    <span className="ml-1 text-xs text-purple-600">(User)</span>
-                )}
-            </>
-        );
-    };
 
     const getClientTypeBadge = (type: string) => {
         const colors = {
@@ -323,47 +215,12 @@ export default function RetainershipTable() {
         )
     }
 
-    const getCommunicationBadge = (communication: string) => {
-        const colors = {
-            email: "bg-green-100 text-green-800",
-            phone: "bg-blue-100 text-blue-800",
-            sms: "bg-yellow-100 text-yellow-800",
-            mail: "bg-gray-100 text-gray-800",
-            "in-person": "bg-orange-100 text-orange-800",
-        }
-
-        return (
-            <Badge className={colors[communication as keyof typeof colors] || "bg-gray-100 text-gray-800"}>
-                {communication.charAt(0).toUpperCase() + communication.slice(1).replace("-", " ")}
-            </Badge>
-        )
-    }
-
     const getClientDisplayName = (client: any) => {
         return client.clientType === "individual" ? `${client.firstName} ${client.lastName}` : client.organizationName
     }
 
-    console.log(myRetainerships)
-
-    const getPriorityBadge = (priority: string) => {
-        const colors = {
-            low: "bg-green-100 text-green-800 border-green-200",
-            medium: "bg-yellow-100 text-yellow-800 border-yellow-200",
-            high: "bg-red-100 text-red-800 border-red-200",
-        };
-
-        const icons = {
-            low: <AlertCircle className="w-3 h-3 mr-1" />,
-            medium: <AlertCircle className="w-3 h-3 mr-1" />,
-            high: <AlertCircle className="w-3 h-3 mr-1" />,
-        };
-
-        return (
-            <Badge className={`${colors[priority as keyof typeof colors]} border`}>
-                {icons[priority as keyof typeof icons]}
-                {priority.charAt(0).toUpperCase() + priority.slice(1)}
-            </Badge>
-        );
+    const handlePageChange = (page: number) => {
+        setCurrentPage(page);
     };
 
     const formatDate = (dateString: string | undefined) => {
@@ -451,14 +308,10 @@ export default function RetainershipTable() {
 
             {/* Retainerships Table with Tabs */}
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-                <TabsList className="grid w-full grid-cols-4">
+                <TabsList className="grid w-full grid-cols-3">
                     <TabsTrigger value="approved" className="flex items-center gap-2">
                         <CheckCircle className="h-4 w-4" />
-                        Approved Retainerships ({approvedCount})
-                    </TabsTrigger>
-                    <TabsTrigger value="pending" className="flex items-center gap-2">
-                        <Clock className="h-4 w-4" />
-                        Pending Retainerships ({pendingCount})
+                        My Legislation ({myLegislations.length})
                     </TabsTrigger>
                     <TabsTrigger value="my-retainerships" className="flex items-center gap-2">
                         <CheckCircle className="h-4 w-4" />
@@ -470,13 +323,14 @@ export default function RetainershipTable() {
                     </TabsTrigger>
                 </TabsList>
 
+
                 <TabsContent value="approved">
                     <Card>
                         <CardHeader>
                             <div className="flex items-center justify-between">
                                 <CardTitle className="flex items-center gap-2">
                                     <CheckCircle className="h-5 w-5" />
-                                    Approved Retainerships ({sortedRetainerships.length})
+                                    Legislations ({sortedRetainerships.length})
                                 </CardTitle>
                                 {/* <div className="flex items-center gap-2">
                                     <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
@@ -512,71 +366,41 @@ export default function RetainershipTable() {
                                         <Table>
                                             <TableHeader>
                                                 <TableRow>
-                                                    <TableHead>Retainership</TableHead>
+                                                    <TableHead>Legislation Name</TableHead>
                                                     <TableHead>Description</TableHead>
-                                                    <TableHead>Client</TableHead>
-                                                    <TableHead>Created By</TableHead>
+                                                    <TableHead>Assigned Agent</TableHead>
                                                     <TableHead className="text-right">Actions</TableHead>
                                                 </TableRow>
                                             </TableHeader>
                                             <TableBody>
-                                                {currentRetainerships.length === 0 ? (
+                                                {sortedRetainerships?.length === 0 ? (
                                                     <TableRow>
-                                                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                                                            No approved retainerships found matching your criteria.
+                                                        <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                                                            No legislation found for this retainership.
                                                         </TableCell>
                                                     </TableRow>
                                                 ) : (
-                                                    currentRetainerships.map((retainership) => (
-                                                        <TableRow key={retainership.id} className="cursor-pointer hover:bg-muted/50" onClick={() => router.push(`/retainership/${retainership.id}`)}>
+                                                    sortedRetainerships?.map((legislation) => (
+                                                        <TableRow
+                                                            key={legislation.id}
+                                                            onClick={() => router.push(`/legislation/${legislation.id}`)}
+                                                            className="cursor-pointer hover:bg-muted/50"
+                                                        >
                                                             <TableCell>
-                                                                <div className="flex items-center space-x-3">
-                                                                    <Avatar className="h-10 w-10">
-                                                                        <AvatarImage src={retainership.photo || ""} />
-                                                                        <AvatarFallback>
-                                                                            {(retainership.name?.toUpperCase() || "Unknown")
-                                                                                .split(" ")
-                                                                                .map((n) => n[0])
-                                                                                .join("")}
-                                                                        </AvatarFallback>
-                                                                    </Avatar>
-                                                                    <div className="w-60">
-                                                                        <div className="font-medium truncate">
-                                                                            {retainership.name.charAt(0).toUpperCase() + retainership.name.slice(1)}
-                                                                        </div>
-                                                                        <div className="text-sm text-muted-foreground">
-                                                                            Created: {new Date(retainership.createdAt).toLocaleDateString()}
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
+                                                                {legislation.title.length > 30
+                                                                    ? legislation.title.slice(0, 42) + '...'
+                                                                    : legislation.title
+                                                                }
                                                             </TableCell>
                                                             <TableCell>
-                                                                <div className="max-w-xs">
-                                                                    <p className="text-sm truncate" title={retainership.description}>
-                                                                        {retainership.description.length > 30
-                                                                            ? retainership.description.slice(0, 35) + '...'
-                                                                            : retainership.description
-                                                                        }
-                                                                    </p>
-                                                                </div>
+                                                                {legislation.description
+                                                                    ? legislation.description.length > 30
+                                                                        ? legislation.description.slice(0, 45) + '...'
+                                                                        : legislation.description
+                                                                    : 'N/A'
+                                                                }
                                                             </TableCell>
-                                                            <TableCell>
-                                                                <div className="text-sm w-60 truncate">
-                                                                    <p>
-                                                                        {retainership.client?.name
-                                                                            ? retainership.client.name.length > 30
-                                                                                ? retainership.client.name.slice(0, 30) + '...'
-                                                                                : retainership.client.name
-                                                                            : "N/A"
-                                                                        }
-                                                                    </p>                                                                    <p className="text-muted-foreground text-xs">{retainership.client?.email || "N/A"}</p>
-                                                                </div>
-                                                            </TableCell>
-                                                            <TableCell>
-                                                                <div className="text-sm">
-                                                                    {renderCreatedBy(retainership.createdBy)}
-                                                                </div>
-                                                            </TableCell>
+                                                            <TableCell>{legislation.assignedAgent?.name || "Unknown"}</TableCell>
                                                             <TableCell className="text-right">
                                                                 <DropdownMenu>
                                                                     <DropdownMenuTrigger asChild>
@@ -588,29 +412,20 @@ export default function RetainershipTable() {
                                                                     <DropdownMenuContent align="end">
                                                                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
                                                                         <DropdownMenuItem asChild>
-                                                                            <Link href={`/retainership/${retainership.id}`} onClick={(e) => e.stopPropagation()}>
+                                                                            <a href={`/legislation/${legislation.id}`} onClick={(e) => e.stopPropagation()}>
                                                                                 <Eye className="mr-2 h-4 w-4" />
                                                                                 View Details
-                                                                            </Link>
+                                                                            </a>
                                                                         </DropdownMenuItem>
-                                                                        {currentUserRole === "owner" && (
-                                                                            <>
-                                                                                <DropdownMenuItem asChild>
-                                                                                    <Link href={`/retainership/${retainership.id}/edit`} onClick={(e) => e.stopPropagation()}>
-                                                                                        <Edit className="mr-2 h-4 w-4" />
-                                                                                        Edit Retainership
-                                                                                    </Link>
-                                                                                </DropdownMenuItem>
-                                                                                <DropdownMenuSeparator />
-                                                                                <DropdownMenuItem
-                                                                                    className="text-destructive"
-                                                                                    onClick={(e) => { e.stopPropagation(); setRetainershipToDelete(retainership); }}
-                                                                                >
-                                                                                    <Trash2 className="mr-2 h-4 w-4" />
-                                                                                    Delete Retainership
-                                                                                </DropdownMenuItem>
-                                                                            </>
-                                                                        )}
+                                                                        <DropdownMenuItem asChild>
+                                                                            <a
+                                                                                href={`/task/create?legislationId=${legislation.id}&assignedAgent=${legislation.assignedAgent?.id}&client=${legislation?.retainership?.clientId}`}
+                                                                                onClick={(e) => e.stopPropagation()}
+                                                                            >
+                                                                                <PlusCircle className="mr-2 h-4 w-4" />
+                                                                                Create Task
+                                                                            </a>
+                                                                        </DropdownMenuItem>
                                                                     </DropdownMenuContent>
                                                                 </DropdownMenu>
                                                             </TableCell>
@@ -620,14 +435,16 @@ export default function RetainershipTable() {
                                             </TableBody>
                                         </Table>
                                     </div>
-                                    {/* Pagination */}
                                     {totalPages > 1 && (
                                         <div className="flex items-center justify-between space-x-2 py-4">
                                             <div className="text-sm text-muted-foreground">
                                                 Page {currentPage} of {totalPages}
                                             </div>
                                             <div className="flex items-center space-x-2">
-                                                <Select value={itemsPerPage.toString()} onValueChange={handleItemsPerPageChange}>
+                                                <Select
+                                                    value={itemsPerPage.toString()}
+                                                    onValueChange={handleItemsPerPageChange}
+                                                >
                                                     <SelectTrigger className="w-24">
                                                         <SelectValue />
                                                     </SelectTrigger>
@@ -656,230 +473,33 @@ export default function RetainershipTable() {
                                                     <ChevronLeft className="h-4 w-4" />
                                                 </Button>
                                                 {/* Page Numbers */}
-                                                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                                                    const pageNumber = Math.max(1, Math.min(totalPages - 4, currentPage - 2)) + i
-                                                    if (pageNumber <= totalPages) {
-                                                        return (
-                                                            <Button
-                                                                key={pageNumber}
-                                                                variant={currentPage === pageNumber ? "default" : "outline"}
-                                                                size="sm"
-                                                                onClick={() => handlePageChange(pageNumber)}
-                                                            >
-                                                                {pageNumber}
-                                                            </Button>
-                                                        )
+                                                {Array.from(
+                                                    { length: Math.min(5, totalPages) },
+                                                    (_, i) => {
+                                                        const pageNumber =
+                                                            Math.max(
+                                                                1,
+                                                                Math.min(totalPages - 4, currentPage - 2)
+                                                            ) + i;
+                                                        if (pageNumber <= totalPages) {
+                                                            return (
+                                                                <Button
+                                                                    key={pageNumber}
+                                                                    variant={
+                                                                        currentPage === pageNumber
+                                                                            ? "default"
+                                                                            : "outline"
+                                                                    }
+                                                                    size="sm"
+                                                                    onClick={() => handlePageChange(pageNumber)}
+                                                                >
+                                                                    {pageNumber}
+                                                                </Button>
+                                                            );
+                                                        }
+                                                        return null;
                                                     }
-                                                    return null
-                                                })}
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={() => handlePageChange(currentPage + 1)}
-                                                    disabled={currentPage === totalPages}
-                                                >
-                                                    <ChevronRight className="h-4 w-4" />
-                                                </Button>
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={() => handlePageChange(totalPages)}
-                                                    disabled={currentPage === totalPages}
-                                                >
-                                                    <ChevronsRight className="h-4 w-4" />
-                                                </Button>
-                                            </div>
-                                        </div>
-                                    )}
-                                </CardContent>
-                            </>
-                        )}
-                    </Card>
-                </TabsContent>
-
-                <TabsContent value="pending">
-                    <Card>
-                        <CardHeader>
-                            <div className="flex items-center justify-between">
-                                <CardTitle className="flex items-center gap-2">
-                                    <Clock className="h-5 w-5" />
-                                    Pending Retainerships ({sortedRetainerships.length})
-                                </CardTitle>
-                                {/* <div className="flex items-center gap-2">
-                                    <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
-                                    <Select value={sortBy} onValueChange={setSortBy}>
-                                        <SelectTrigger className="w-32">
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="a-z">A-Z</SelectItem>
-                                            <SelectItem value="z-a">Z-A</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                    <Select value={sortByDate} onValueChange={setSortByDate}>
-                                        <SelectTrigger className="w-32">
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="newest">Newest</SelectItem>
-                                            <SelectItem value="oldest">Oldest</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div> */}
-                            </div>
-                        </CardHeader>
-                        {loading ? (
-                            <div className="flex justify-center items-center py-8">
-                                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                            </div>
-                        ) : (
-                            <>
-                                <CardContent>
-                                    <div className="rounded-md border">
-                                        <Table>
-                                            <TableHeader>
-                                                <TableRow>
-                                                    <TableHead>Retainership</TableHead>
-                                                    <TableHead>Description</TableHead>
-                                                    <TableHead>Client</TableHead>
-                                                    <TableHead>Created By</TableHead>
-                                                    <TableHead className="text-right">Actions</TableHead>
-                                                </TableRow>
-                                            </TableHeader>
-                                            <TableBody>
-                                                {currentRetainerships.length === 0 ? (
-                                                    <TableRow>
-                                                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                                                            No pending retainerships found matching your criteria.
-                                                        </TableCell>
-                                                    </TableRow>
-                                                ) : (
-                                                    currentRetainerships.map((retainership) => (
-                                                        <TableRow key={retainership.id} className="cursor-pointer hover:bg-muted/50" onClick={() => router.push(`/retainership/${retainership.id}`)}>
-                                                            <TableCell>
-                                                                <div className="flex items-center space-x-3">
-                                                                    <Avatar className="h-10 w-10">
-                                                                        <AvatarImage src={retainership.photo || ""} />
-                                                                        <AvatarFallback>
-                                                                            {(retainership.name?.toUpperCase() || "Unknown")
-                                                                                .split(" ")
-                                                                                .map((n) => n[0])
-                                                                                .join("")}
-                                                                        </AvatarFallback>
-                                                                    </Avatar>
-                                                                    <div className="w-60">
-                                                                        <div className="font-medium truncate">
-                                                                            {retainership.name.charAt(0).toUpperCase() + retainership.name.slice(1)}
-                                                                        </div>
-                                                                        <div className="text-sm text-muted-foreground">
-                                                                            Created: {new Date(retainership.createdAt).toLocaleDateString()}
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                            </TableCell>
-                                                            <TableCell>
-                                                                <div className="max-w-xs">
-                                                                    <p className="text-sm truncate" title={retainership.description}>
-                                                                        {retainership.description}
-                                                                    </p>
-                                                                </div>
-                                                            </TableCell>
-                                                            <TableCell>
-                                                                <div className="text-sm w-60 truncate">
-                                                                    <p>{retainership.client?.name || "N/A"}</p>
-                                                                    <p className="text-muted-foreground text-xs">{retainership.client?.email || "N/A"}</p>
-                                                                </div>
-                                                            </TableCell>
-                                                            <TableCell>
-                                                                <div className="text-sm">
-                                                                    {renderCreatedBy(retainership.createdBy)}
-                                                                </div>
-                                                            </TableCell>
-                                                            <TableCell className="text-right">
-                                                                <DropdownMenu>
-                                                                    <DropdownMenuTrigger asChild>
-                                                                        <Button variant="ghost" className="h-8 w-8 p-0" onClick={(e) => e.stopPropagation()}>
-                                                                            <span className="sr-only">Open menu</span>
-                                                                            <MoreHorizontal className="h-4 w-4" />
-                                                                        </Button>
-                                                                    </DropdownMenuTrigger>
-                                                                    <DropdownMenuContent align="end">
-                                                                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                                                        <DropdownMenuItem asChild>
-                                                                            <Link href={`/retainership/${retainership.id}`} onClick={(e) => e.stopPropagation()}>
-                                                                                <Eye className="mr-2 h-4 w-4" />
-                                                                                View Details
-                                                                            </Link>
-                                                                        </DropdownMenuItem>
-                                                                        {currentUserRole === "owner" && (
-                                                                            <DropdownMenuItem asChild>
-                                                                                <Link href={`/retainership/approve/${retainership.id}`} onClick={(e) => e.stopPropagation()}>
-                                                                                    <CheckCircle className="mr-2 h-4 w-4" />
-                                                                                    Approve/Reject Retainership
-                                                                                </Link>
-                                                                            </DropdownMenuItem>
-                                                                        )}
-                                                                    </DropdownMenuContent>
-                                                                </DropdownMenu>
-                                                            </TableCell>
-                                                        </TableRow>
-                                                    ))
                                                 )}
-                                            </TableBody>
-                                        </Table>
-                                    </div>
-                                    {/* Pagination */}
-                                    {totalPages > 1 && (
-                                        <div className="flex items-center justify-between space-x-2 py-4">
-                                            <div className="text-sm text-muted-foreground">
-                                                Page {currentPage} of {totalPages}
-                                            </div>
-                                            <div className="flex items-center space-x-2">
-                                                <Select value={itemsPerPage.toString()} onValueChange={handleItemsPerPageChange}>
-                                                    <SelectTrigger className="w-24">
-                                                        <SelectValue />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        {[5, 10, 20, 50].map((value) => (
-                                                            <SelectItem key={value} value={value.toString()}>
-                                                                {value} / page
-                                                            </SelectItem>
-                                                        ))}
-                                                    </SelectContent>
-                                                </Select>
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={() => handlePageChange(1)}
-                                                    disabled={currentPage === 1}
-                                                >
-                                                    <ChevronsLeft className="h-4 w-4" />
-                                                </Button>
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={() => handlePageChange(currentPage - 1)}
-                                                    disabled={currentPage === 1}
-                                                >
-                                                    <ChevronLeft className="h-4 w-4" />
-                                                </Button>
-                                                {/* Page Numbers */}
-                                                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                                                    const pageNumber = Math.max(1, Math.min(totalPages - 4, currentPage - 2)) + i
-                                                    if (pageNumber <= totalPages) {
-                                                        return (
-                                                            <Button
-                                                                key={pageNumber}
-                                                                variant={currentPage === pageNumber ? "default" : "outline"}
-                                                                size="sm"
-                                                                onClick={() => handlePageChange(pageNumber)}
-                                                            >
-                                                                {pageNumber}
-                                                            </Button>
-                                                        )
-                                                    }
-                                                    return null
-                                                })}
                                                 <Button
                                                     variant="outline"
                                                     size="sm"
@@ -904,7 +524,6 @@ export default function RetainershipTable() {
                         )}
                     </Card>
                 </TabsContent>
-
                 <TabsContent value="my-retainerships">
 
                     {loading ? (
@@ -1023,22 +642,6 @@ export default function RetainershipTable() {
                     </Card>
                 </TabsContent>
             </Tabs >
-
-            <AlertDialog open={!!retainershipToDelete} onOpenChange={() => setRetainershipToDelete(null)}>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            This action cannot be undone. This will permanently delete the task retainership and may affect existing tasks
-                            Ownership to this retainership.
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleDelete}>Delete</AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
         </div >
     )
 }

@@ -2,7 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Users, UserPlus, Calendar, TrendingUp, ArrowRight, Activity, BarChart3, Loader2, Eye } from "lucide-react"
+import { Users, UserPlus, Calendar, TrendingUp, ArrowRight, Activity, BarChart3, Loader2, Eye, Plus } from "lucide-react"
 import {
     PieChart,
     Pie,
@@ -30,6 +30,7 @@ import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 
 const statusColors = {
     New: "bg-emerald-50 text-emerald-700 border-emerald-200",
@@ -485,6 +486,7 @@ function SegregationTable({
 
 
 export default function ProspectDashboard() {
+    const router = useRouter()
     const [prospects, setProspects] = useState<any>([])
     const [loading, setLoading] = useState(false)
     const [leadSources, setLeadSources] = useState<any>([])
@@ -626,7 +628,14 @@ export default function ProspectDashboard() {
                         <h1 className="text-3xl font-bold text-slate-800 mb-1">Prospect Reports Dashboard</h1>
                         <p className="">Track and manage your sales prospects</p>
                     </div>
-                    <Button onClick={() => setOpen(true)}>Set Prospects per Agent</Button>
+                    <div className="flex flex-col md:flex-row md:items-center gap-4">
+                        <Button onClick={() => router.push("/sales/prospects/add")} className="mt-[20px] md:mt-none text-white rounded-lg px-4 py-2 flex items-center gap-2 cursor-pointer shadow-none hover:shadow-md transition-shadow duration-300">
+                            <Plus className="h-4 w-4" />
+                            Create Prospect
+                        </Button>
+                        <Button onClick={() => setOpen(true)}>Set Prospects per Agent</Button>
+                    </div>
+
 
                     <Dialog open={open} onOpenChange={setOpen}>
                         <DialogContent className="sm:max-w-md">

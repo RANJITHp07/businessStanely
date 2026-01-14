@@ -9,12 +9,9 @@ export async function GET(
   try {
     // Get the current admin user
     const currentAdmin = await getCurrentAdmin(req);
-    
+
     if (!currentAdmin) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const { id } = params;
@@ -76,7 +73,7 @@ export async function GET(
             email: true,
           },
         },
-      }
+      },
     });
 
     if (!retainership) {
@@ -85,7 +82,7 @@ export async function GET(
         { status: 404 }
       );
     }
-    
+
     // Determine creator name, type, and role
     let creatorName = null;
     let creatorType = null;
@@ -107,7 +104,10 @@ export async function GET(
     let photo = null;
     if (retainership.createdByUser && retainership.createdByUser.photo) {
       photo = retainership.createdByUser.photo;
-    } else if (retainership.createdByAgent && retainership.createdByAgent.photo) {
+    } else if (
+      retainership.createdByAgent &&
+      retainership.createdByAgent.photo
+    ) {
       photo = retainership.createdByAgent.photo;
     } else {
       photo = null;
@@ -125,16 +125,20 @@ export async function GET(
       createdByType: creatorType,
       createdByRole: creatorRole,
       createdById: creatorId,
-      createdByUser: retainership.createdByUser ? {
-        id: retainership.createdByUser.id,
-        username: retainership.createdByUser.username,
-        email: retainership.createdByUser.email,
-      } : null,
-      createdByAgent: retainership.createdByAgent ? {
-        id: retainership.createdByAgent.id,
-        name: retainership.createdByAgent.name,
-        email: retainership.createdByAgent.email,
-      } : null,
+      createdByUser: retainership.createdByUser
+        ? {
+            id: retainership.createdByUser.id,
+            username: retainership.createdByUser.username,
+            email: retainership.createdByUser.email,
+          }
+        : null,
+      createdByAgent: retainership.createdByAgent
+        ? {
+            id: retainership.createdByAgent.id,
+            name: retainership.createdByAgent.name,
+            email: retainership.createdByAgent.email,
+          }
+        : null,
       approvedById: retainership.approvedById || null,
       approvedBy: retainership.approvedBy?.username || null,
       approvedAt: retainership.approvedAt || null,
@@ -157,16 +161,22 @@ export async function GET(
             firstName: retainership.client.firstName,
             lastName: retainership.client.lastName,
             organizationName: retainership.client.organizationName,
-            email: retainership.client.email
+            email: retainership.client.email,
           }
         : null,
     };
 
     // Add debugging logs to inspect legislation details
-    console.log("Legislation details fetched from database:", retainership.legislation);
+    console.log(
+      "Legislation details fetched from database:",
+      retainership.legislation
+    );
 
     // Add debugging logs to inspect the formatted retainership object
-    console.log("Formatted Retainership object being sent to frontend:", formattedRetainership);
+    console.log(
+      "Formatted Retainership object being sent to frontend:",
+      formattedRetainership
+    );
 
     return NextResponse.json(formattedRetainership);
   } catch (error) {
@@ -183,17 +193,12 @@ export async function PUT(
   { params }: { params: { id: string } }
 ) {
   try {
-    // Get the current admin user
     const currentAdmin = await getCurrentAdmin(req);
-    
+
     if (!currentAdmin) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Only owner can edit retainerships
     if (currentAdmin.adminType !== "owner") {
       return NextResponse.json(
         { error: "Only owners can edit retainerships" },
@@ -202,20 +207,18 @@ export async function PUT(
     }
 
     const { id } = params;
-    const body = await req.json();    
+    const body = await req.json();
     const { name, description, color, legislation } = body;
 
-    // Validate required fields
     if (!name) {
-      return NextResponse.json(
-        { error: "Name is required" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Name is required" }, { status: 400 });
     }
 
-    // Check if retainership exists
     const existingRetainership = await prisma.retainership.findUnique({
       where: { id },
+      include: {
+        legislation: true,
+      },
     });
 
     if (!existingRetainership) {
@@ -225,45 +228,74 @@ export async function PUT(
       );
     }
 
-    // Update the retainership
-    const updatedRetainership = await prisma.retainership.update({
-      where: { id },
-      data: {
-        name,
-        description: description || "",
-        color: color || "blue",
-        legislation: {
-          deleteMany: {}, // Clear existing legislation
-          create: legislation.map((leg: { title: string; description: string; assignedAgent: string }) => ({
-            title: leg.title,
-            description: leg.description,
-            assignedAgentId: leg.assignedAgent,
-          })),
+    // 🔹 Map existing legislation by ID
+    const existingLegislationMap = new Map(
+      existingRetainership.legislation.map((l) => [l.id, l.assignedAgentId])
+    );
+
+    await prisma.$transaction(async (tx) => {
+      // 🔹 Update tasks if assigned agent changed
+      for (const leg of legislation) {
+        if (!leg.id) continue;
+
+        const oldAgentId = existingLegislationMap.get(leg.id);
+        const newAgentId = leg.assignedAgent;
+
+        if (oldAgentId && oldAgentId !== newAgentId) {
+          await tx.task.updateMany({
+            where: {
+              legislationId: leg.id,
+            },
+            data: {
+              assignedToId: newAgentId,
+            },
+          });
+        }
+      }
+
+      // 🔹 Update retainership + legislation
+      await tx.retainership.update({
+        where: { id },
+        data: {
+          name,
+          description: description || "",
+          color: color || "blue",
+          legislation: {
+            deleteMany: {},
+            create: legislation.map(
+              (leg: {
+                title: string;
+                description: string;
+                assignedAgent: string;
+              }) => ({
+                title: leg.title,
+                description: leg.description,
+                assignedAgentId: leg.assignedAgent,
+              })
+            ),
+          },
         },
-      },
+      });
+    });
+
+    const updatedRetainership = await prisma.retainership.findUnique({
+      where: { id },
       include: {
         createdByUser: {
-          select: {
-            id: true,
-            username: true,
-          }
+          select: { id: true, username: true },
         },
         approvedBy: {
-          select: {
-            id: true,
-            username: true,
-          }
+          select: { id: true, username: true },
         },
-        legislation: true, // Include updated legislation
-      }
+        legislation: true,
+      },
     });
 
     return NextResponse.json(updatedRetainership);
   } catch (error) {
     console.error("Error updating retainership:", error);
-    
-    // Check for unique constraint violations
-    if (error instanceof Error && 'code' in error && error.code === 'P2002') {
+
+    if (error instanceof Error && "code" in error && error.code === "P2002") {
       return NextResponse.json(
         { error: "A retainership with this name already exists" },
         { status: 409 }
@@ -284,12 +316,9 @@ export async function DELETE(
   try {
     // Get the current admin user
     const currentAdmin = await getCurrentAdmin(req);
-    
+
     if (!currentAdmin) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     // Only owner can delete retainerships
@@ -322,11 +351,13 @@ export async function DELETE(
     return NextResponse.json({ message: "Retainership deleted successfully" });
   } catch (error) {
     console.error("Error deleting retainership:", error);
-    
+
     // Check for foreign key constraint violations
-    if (error instanceof Error && 'code' in error && error.code === 'P2003') {
+    if (error instanceof Error && "code" in error && error.code === "P2003") {
       return NextResponse.json(
-        { error: "Cannot delete retainership because it is being used by tasks" },
+        {
+          error: "Cannot delete retainership because it is being used by tasks",
+        },
         { status: 409 }
       );
     }

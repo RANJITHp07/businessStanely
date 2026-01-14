@@ -32,42 +32,66 @@ export async function GET(req: Request, context: { params: { id: string } }) {
 }
 
 export async function POST(req: Request, context: { params: { id: string } }) {
-  const { params } = context;
-  const { id } = params;
+  const { id } = context.params;
 
   try {
-    // Parse the request body as JSON
     const body = await req.json();
     const { title, description, assignedAgentId } = body;
 
-    // Update legislation
-    const updatedLegislation = await prisma.legislation.update({
+    const existingLegislation = await prisma.legislation.findUnique({
       where: { id },
-      data: {
-        title,
-        description,
-        assignedAgentId,
+      select: {
+        assignedAgentId: true,
       },
-      include: {
-        assignedAgent: true,
-        retainership: {
-          include: {
-            client: true,
+    });
+
+    if (!existingLegislation) {
+      return new Response("Legislation not found", { status: 404 });
+    }
+
+    const updatedLegislation = await prisma.$transaction(async (tx) => {
+      if (
+        assignedAgentId &&
+        existingLegislation.assignedAgentId !== assignedAgentId
+      ) {
+        await tx.task.updateMany({
+          where: {
+            legislationId: id,
           },
+          data: {
+            assignedToId: assignedAgentId,
+          },
+        });
+      }
+
+      return tx.legislation.update({
+        where: { id },
+        data: {
+          title,
+          description,
+          assignedAgentId,
         },
-        tasks: true,
-      },
+        include: {
+          assignedAgent: true,
+          retainership: {
+            include: {
+              client: true,
+            },
+          },
+          tasks: true,
+        },
+      });
     });
 
     return new Response(JSON.stringify(updatedLegislation), {
       headers: { "Content-Type": "application/json" },
     });
   } catch (error: any) {
-    // Prisma throws error if the record does not exist
     if (error.code === "P2025") {
       return new Response("Legislation not found", { status: 404 });
     }
 
+    console.error("Error updating legislation:", error);
     return new Response("Internal Server Error", { status: 500 });
   }
 }

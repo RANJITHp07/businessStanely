@@ -448,7 +448,7 @@ export default function AgentsTable() {
                                   </Link>
                                 </DropdownMenuItem>
                                 <DropdownMenuItem asChild>
-                                  <Link href={`/ agent / ${agent.id} / edit`}>
+                                  <Link href={`/agent/${agent.id}/edit`}>
                                     <Edit className="mr-2 h-4 w-4" />
                                     Edit Agent
                                   </Link>

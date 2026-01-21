@@ -201,6 +201,7 @@ model Task {
 
   // Optional field for recurring tasks
   triggerDate      DateTime?
+   active           Boolean @default(true)
 
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt

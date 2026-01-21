@@ -312,7 +312,12 @@ export default function TasksTable() {
                 Manage and track all legal tasks and assignments
               </p>
             </div>
-            <Link href="/task/create" className="flex justify-end">
+            <Link href={
+              searchParams.get("retainershipTasks")
+                ? `/task/create?retainershipTasks=${searchParams.get("retainershipTasks")}`
+                : "/task/create"
+            }
+              className="flex justify-end">
               <Button className=" mt-[20px] md:mt-none   text-white rounded-lg px-4 py-2 flex items-center gap-2 cursor-pointer shadow-none hover:shadow-md transition-shadow duration-300">
                 <Plus className="h-4 w-4" />
                 Create Task

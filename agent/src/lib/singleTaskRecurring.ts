@@ -4,7 +4,7 @@ import prisma from "@/lib/prisma";
 // Calculate next due date based on recurring type
 export function calculateNextDueDate(
   currentDate: Date,
-  recurring: { type: "day" | "week" | "month"; value: number }
+  recurring: { type: "day" | "week" | "month"; value: number },
 ): Date {
   const nextDate = new Date(currentDate);
   if (recurring.type === "day") {
@@ -19,91 +19,65 @@ export function calculateNextDueDate(
 
 // Auto-update recurring tasks based on calendar schedule (not completion)
 export async function updateRecurringTaskSchedule(taskId: string) {
-  const task = await prisma.task.findUnique({
+  const task: any = await prisma.task.findUnique({
     where: { id: taskId },
     include: { category: true },
   });
 
-  if (
-    !task ||
-    !task.recurring ||
-    !task.recurringType ||
-    !task.triggerDate ||
-    !task.category?.timePeriod
-  ) {
-    return null;
-  }
+  if (!task || !task.recurring) return null;
 
-  const now = new Date();
-  const taskDueDate = new Date(task.dueDate);
-
-  // Parse recurring type
   let recurringType: "day" | "week" | "month" = "month";
-  let recurringValue: number =
-    typeof task.recurring === "number" ? task.recurring : 1;
-  if (
-    typeof task.recurring === "string" &&
-    (task.recurring as string).includes("-")
-  ) {
-    const [type, value] = (task.recurring as string).split("-");
+  let recurringValue = typeof task.recurring === "number" ? task.recurring : 1;
+
+  if (typeof task.recurring === "string" && task.recurring.includes("-")) {
+    const [type, value] = task.recurring.split("-");
     recurringType = type as "day" | "week" | "month";
     recurringValue = parseInt(value, 10);
   }
 
-  // Check if the current period has passed
-  if (now > taskDueDate) {
-    let periodsPassed = 0;
-    if (recurringType === "day") {
-      const daysDiff = Math.floor(
-        (now.getTime() - taskDueDate.getTime()) / (1000 * 60 * 60 * 24)
-      );
-      periodsPassed = Math.floor(daysDiff / recurringValue);
-    } else if (recurringType === "week") {
-      const weeksDiff = Math.floor(
-        (now.getTime() - taskDueDate.getTime()) / (1000 * 60 * 60 * 24 * 7)
-      );
-      periodsPassed = Math.floor(weeksDiff / recurringValue);
-    } else if (recurringType === "month") {
-      const monthsDiff =
-        (now.getFullYear() - taskDueDate.getFullYear()) * 12 +
-        (now.getMonth() - taskDueDate.getMonth());
-      periodsPassed = Math.floor(monthsDiff / recurringValue);
-    }
-    if (periodsPassed > 0) {
-      // Calculate new due date by adding the required periods
-      const newDueDate = new Date(taskDueDate);
-      if (recurringType === "day") {
-        newDueDate.setDate(
-          newDueDate.getDate() + (periodsPassed + 1) * recurringValue
-        );
-      } else if (recurringType === "week") {
-        newDueDate.setDate(
-          newDueDate.getDate() + (periodsPassed + 1) * recurringValue * 7
-        );
-      } else if (recurringType === "month") {
-        newDueDate.setMonth(
-          newDueDate.getMonth() + (periodsPassed + 1) * recurringValue
-        );
-      }
-      // Update task with new due date and reset status
-      const updatedTask = await prisma.task.update({
-        where: { id: taskId },
-        data: {
-          dueDate: newDueDate,
-          nextDueDate: newDueDate as Date,
-          currentPeriodStart: now as Date,
-          completed: false, // Reset for new period
-          progress: 0, // Reset progress
-          status: "To Do", // Reset status
-        },
-      });
-      console.log(
-        `🔄 Auto-updated recurring task. New due date: ${newDueDate.toISOString()}`
-      );
-      return updatedTask;
-    }
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+
+  const endOfToday = new Date();
+  endOfToday.setHours(23, 59, 59, 999);
+
+  const triggerDate = new Date(task.triggerDate || task.dueDate);
+  if (triggerDate < startOfToday || triggerDate > endOfToday) return null;
+
+  const nextTriggerDate = new Date(triggerDate);
+  if (recurringType === "day")
+    nextTriggerDate.setDate(nextTriggerDate.getDate() + recurringValue);
+  else if (recurringType === "week")
+    nextTriggerDate.setDate(nextTriggerDate.getDate() + recurringValue * 7);
+  else nextTriggerDate.setMonth(nextTriggerDate.getMonth() + recurringValue);
+
+  const nextDueDate = new Date(nextTriggerDate);
+  if (task.category?.timePeriod) {
+    nextDueDate.setDate(
+      nextDueDate.getDate() + Number(task.category.timePeriod),
+    );
   }
-  return task; // No update needed
+
+  const dueDate = new Date(task.triggerDate || task.dueDate);
+  if (task.category?.timePeriod) {
+    dueDate.setDate(dueDate.getDate() + Number(task.category.timePeriod));
+  }
+
+  const updatedTask = await prisma.task.update({
+    where: { id: taskId },
+    data: {
+      triggerDate: nextTriggerDate,
+      dueDate: dueDate,
+      nextDueDate: nextDueDate,
+      currentPeriodStart: triggerDate,
+      completed: false,
+      progress: 0,
+      status: "To Do",
+      active: true,
+    },
+  });
+
+  return updatedTask;
 }
 
 // Update due dates for tasks in "Hold" status
@@ -158,7 +132,6 @@ export async function updateAllRecurringTasks() {
     where: {
       recurring: { not: null },
       recurringType: { not: null },
-      dueDate: { not: null },
       triggerDate: {
         gte: startOfToday,
         lt: startOfTomorrow,
@@ -186,7 +159,7 @@ export async function updateAllRecurringTasks() {
   updatedTasks.push(...holdTasks);
 
   console.log(
-    `📅 Auto-updated ${updatedTasks.length} tasks (recurring + hold).`
+    `📅 Auto-updated ${updatedTasks.length} tasks (recurring + hold).`,
   );
   return updatedTasks;
 }
@@ -195,7 +168,7 @@ export async function updateAllRecurringTasks() {
 export async function initializeRecurringTask(
   taskId: string,
   recurringMonths: number,
-  dueDate: Date
+  dueDate: Date,
 ) {
   const currentPeriodStart = new Date();
 
@@ -208,7 +181,7 @@ export async function initializeRecurringTask(
   });
 
   console.log(
-    `🔄 Initialized recurring task. First due: ${dueDate.toISOString()}`
+    `🔄 Initialized recurring task. First due: ${dueDate.toISOString()}`,
   );
   return updatedTask;
 }

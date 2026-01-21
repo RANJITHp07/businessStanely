@@ -3,7 +3,7 @@ import prisma from "@/lib/prisma";
 // Calculate next due date based on recurring months
 export function calculateNextDueDate(
   currentDate: Date,
-  recurringMonths: number
+  recurringMonths: number,
 ): Date {
   const nextDate = new Date(currentDate);
   nextDate.setMonth(nextDate.getMonth() + recurringMonths);
@@ -17,9 +17,7 @@ export async function updateRecurringTaskSchedule(taskId: string) {
     include: { category: true },
   });
 
-  if (!task || !task.recurring || !task.dueDate) {
-    return null;
-  }
+  if (!task || !task.recurring) return null;
 
   let recurringType: "day" | "week" | "month" = "month";
   let recurringValue = typeof task.recurring === "number" ? task.recurring : 1;
@@ -30,61 +28,47 @@ export async function updateRecurringTaskSchedule(taskId: string) {
     recurringValue = parseInt(value, 10);
   }
 
-  const now = new Date();
-  const taskDueDate = new Date(task.dueDate);
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
 
-  if (now <= taskDueDate) return null;
+  const endOfToday = new Date();
+  endOfToday.setHours(23, 59, 59, 999);
 
-  let periodsPassed = 0;
+  const triggerDate = new Date(task.triggerDate || task.dueDate);
+  if (triggerDate < startOfToday || triggerDate > endOfToday) return null;
 
-  if (recurringType === "day") {
-    const daysDiff =
-      (now.getTime() - taskDueDate.getTime()) / (1000 * 60 * 60 * 24);
-    periodsPassed = Math.floor(daysDiff / recurringValue);
-  } else if (recurringType === "week") {
-    const weeksDiff =
-      (now.getTime() - taskDueDate.getTime()) / (1000 * 60 * 60 * 24 * 7);
-    periodsPassed = Math.floor(weeksDiff / recurringValue);
-  } else {
-    const monthsDiff =
-      (now.getFullYear() - taskDueDate.getFullYear()) * 12 +
-      (now.getMonth() - taskDueDate.getMonth());
-    periodsPassed = Math.floor(monthsDiff / recurringValue);
+  const nextTriggerDate = new Date(triggerDate);
+  if (recurringType === "day")
+    nextTriggerDate.setDate(nextTriggerDate.getDate() + recurringValue);
+  else if (recurringType === "week")
+    nextTriggerDate.setDate(nextTriggerDate.getDate() + recurringValue * 7);
+  else nextTriggerDate.setMonth(nextTriggerDate.getMonth() + recurringValue);
+
+  const nextDueDate = new Date(nextTriggerDate);
+  if (task.category?.timePeriod) {
+    nextDueDate.setDate(
+      nextDueDate.getDate() + Number(task.category.timePeriod),
+    );
   }
 
-  if (periodsPassed <= 0) return null;
-
-  const newDueDate = new Date(taskDueDate);
-
-  if (recurringType === "day") {
-    newDueDate.setDate(
-      newDueDate.getDate() + (periodsPassed + 1) * recurringValue
-    );
-  } else if (recurringType === "week") {
-    newDueDate.setDate(
-      newDueDate.getDate() + (periodsPassed + 1) * recurringValue * 7
-    );
-  } else {
-    newDueDate.setMonth(
-      newDueDate.getMonth() + (periodsPassed + 1) * recurringValue
-    );
+  const dueDate = new Date(task.triggerDate || task.dueDate);
+  if (task.category?.timePeriod) {
+    dueDate.setDate(dueDate.getDate() + Number(task.category.timePeriod));
   }
 
   const updatedTask = await prisma.task.update({
     where: { id: taskId },
     data: {
-      dueDate: newDueDate,
-      nextDueDate: newDueDate,
-      currentPeriodStart: now,
+      triggerDate: nextTriggerDate,
+      dueDate: dueDate,
+      nextDueDate: nextDueDate,
+      currentPeriodStart: triggerDate,
       completed: false,
       progress: 0,
       status: "To Do",
+      active: true,
     },
   });
-
-  console.log(
-    `🔄 Recurring task updated → newDueDate: ${newDueDate.toISOString()}`
-  );
 
   return updatedTask;
 }
@@ -141,7 +125,6 @@ export async function updateAllRecurringTasks() {
     where: {
       recurring: { not: null },
       recurringType: { not: null },
-      dueDate: { not: null },
       triggerDate: {
         gte: startOfToday,
         lt: startOfTomorrow,
@@ -166,7 +149,7 @@ export async function updateAllRecurringTasks() {
   updatedTasks.push(...holdTasks);
 
   console.log(
-    `📅 Auto-updated ${updatedTasks.length} tasks (recurring + hold).`
+    `📅 Auto-updated ${updatedTasks.length} tasks (recurring + hold).`,
   );
   return updatedTasks;
 }
@@ -175,7 +158,7 @@ export async function updateAllRecurringTasks() {
 export async function initializeRecurringTask(
   taskId: string,
   recurringMonths: number,
-  dueDate: Date
+  dueDate: Date,
 ) {
   const currentPeriodStart = new Date();
 
@@ -188,7 +171,7 @@ export async function initializeRecurringTask(
   });
 
   console.log(
-    `🔄 Initialized recurring task. First due: ${dueDate.toISOString()}`
+    `🔄 Initialized recurring task. First due: ${dueDate.toISOString()}`,
   );
   return updatedTask;
 }

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import prisma from '@/lib/prisma';
+import prisma from "@/lib/prisma";
 
 export async function GET() {
   try {
@@ -13,7 +13,7 @@ export async function GET() {
     console.error("Error fetching agents:", error);
     return NextResponse.json(
       { error: "Failed to fetch agents" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

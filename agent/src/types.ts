@@ -119,6 +119,7 @@ export interface Task {
   client?: Client;
   createdBy: Agent;
   assignedTo?: Agent;
+  active: boolean;
   category?: {
     id: string;
     name: string;

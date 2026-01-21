@@ -61,8 +61,10 @@ interface Category {
   timePeriod?: number; // Added timePeriod property
   agentCanEditDays?: boolean;
 }
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "react-toastify";
+import { Checkbox } from "@/components/ui/checkbox";
+import { useAgentContext } from "@/lib/agent-context";
 
 const taskPriorities = [
   {
@@ -87,6 +89,7 @@ type TaskFormProps = {
 };
 
 export default function TaskForm({ id }: TaskFormProps) {
+  const agent = useAgentContext();
   const [formData, setFormData] = useState({
     title: "",
     clientId: "",
@@ -99,7 +102,8 @@ export default function TaskForm({ id }: TaskFormProps) {
     recurring: "0",
     triggerDate: "", // Added triggerDate to formData
     recurringType: "",
-    status: ""
+    status: "",
+    active: true
   });
   const [clients, setClients] = useState<Client[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
@@ -142,12 +146,11 @@ export default function TaskForm({ id }: TaskFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCreatingCategory, setIsCreatingCategory] = useState(false);
   const [isCreatingClient, setIsCreatingClient] = useState(false);
-
+  const searchParams = useSearchParams().get("retainershipTasks")
   const [legislationSearchQuery, setLegislationSearchQuery] = useState("");
-  const [showLegislationSuggestions, setShowLegislationSuggestions] = useState(false);
+  const [showLegislationSuggestions, setShowLegislationSuggestions] = useState(searchParams || false);
   const [legislationList, setLegislationList] = useState<Legislation[]>([]);
   const [isFromRetainership, setIsFromRetainership] = useState(false); // New state to track if form is from retainership
-
   // Add this handler function
   const handleNewCategoryInputChange = (field: string, value: string) => {
     setNewCategoryData((prev) => ({ ...prev, [field]: value }));
@@ -286,6 +289,11 @@ export default function TaskForm({ id }: TaskFormProps) {
     const serviceId = query.get("serviceId");
     const assignedAgent = query.get("assignedAgent");
     const client = query.get("client");
+    const retainershipTasks = query.get("retainershipTasks");
+
+    if (retainershipTasks) {
+      setIsFromRetainership(true);
+    }
 
     if (legislationId || assignedAgent || client || serviceId) {
       setFormData((prev) => ({
@@ -387,13 +395,15 @@ export default function TaskForm({ id }: TaskFormProps) {
               recurring: task.recurring?.toString() || "0",
               recurringType: task.recurringType || "",
               triggerDate: task.triggerDate || "", // Ensure triggerDate is included
-              status: task?.status
+              status: task?.status,
+              active: task?.active !== false || true
             });
             if (task.category) {
               setCategorySearchQuery(task.category.name);
             }
             if (task.dueDate) {
               setDueDate(new Date(task.dueDate));
+
             }
           }
         } catch (error) {
@@ -430,7 +440,7 @@ export default function TaskForm({ id }: TaskFormProps) {
     }
   }, [formData.legislationId, legislationList]);
 
-  const handleInputChange = (field: string, value: string) => {
+  const handleInputChange = (field: string, value: string | boolean) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
@@ -638,14 +648,6 @@ export default function TaskForm({ id }: TaskFormProps) {
     }
   };
 
-  // Define the filteredLegislations variable
-  const filteredLegislations = legislationList.filter((legislation) => {
-    return (
-      legislation.title.toLowerCase().includes(legislationSearchQuery.toLowerCase()) ||
-      (legislation.description && legislation.description.toLowerCase().includes(legislationSearchQuery.toLowerCase()))
-    );
-  });
-
 
   // Log API call and response for /api/legislations
   useEffect(() => {
@@ -706,8 +708,20 @@ export default function TaskForm({ id }: TaskFormProps) {
       const calculatedDueDate = new Date();
       calculatedDueDate.setDate(calculatedDueDate.getDate() + category.timePeriod);
       setDueDate(calculatedDueDate);
+      handleInputChange("triggerDate", "");
     }
   };
+
+
+  // Define the filteredLegislations variable
+  const filteredLegislations = legislationList.filter((legislation) => {
+    return (
+      (legislation.title.toLowerCase().includes(legislationSearchQuery.toLowerCase()) ||
+        (legislation.description && legislation.description.toLowerCase().includes(legislationSearchQuery.toLowerCase()))) && legislation?.assignedAgent?.id == agent?.id
+    );
+  });
+
+
 
   // Add handler for recurring selection to show information
   const handleRecurringChange = (value: string) => {
@@ -994,6 +1008,89 @@ export default function TaskForm({ id }: TaskFormProps) {
               </div>
             </CardContent>
           </Card>
+
+          {/* Legislation Information */}
+          {
+            isFromRetainership && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <FileText className="h-5 w-5" />
+                    Legislation Information
+                  </CardTitle>
+                  <CardDescription>
+                    Optionally, select legislation for this task
+                  </CardDescription>
+                </CardHeader>
+
+                <CardContent className="space-y-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="legislation">Legislation *</Label>
+                    <div className="relative">
+                      <Input
+                        id="legislation"
+                        placeholder="Search or select legislation"
+                        value={legislationSearchQuery}
+                        onChange={(e) => {
+                          setLegislationSearchQuery(e.target.value);
+                        }}
+                        disabled={Boolean(searchParams) ? false : isFromRetainership} // Disable field if accessed from retainership
+                        required
+                      />
+
+                      {showLegislationSuggestions && legislationSearchQuery && filteredLegislations.length > 0 && (
+                        <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto">
+                          {filteredLegislations.map((legislation) => (
+                            <div
+                              key={legislation.id}
+                              className="flex items-center justify-between p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
+                              onClick={() => {
+                                setFormData((prev) => ({ ...prev, legislationId: legislation.id }));
+                                setLegislationSearchQuery(legislation.title);
+                                setShowLegislationSuggestions(false);
+
+                                const clientName =
+                                  legislation.retainership?.client?.clientType === "individual"
+                                    ? `${legislation.retainership?.client?.firstName || ""} ${legislation.retainership?.client?.lastName || ""}`.trim()
+                                    : legislation.retainership?.client?.organizationName || "";
+
+                                setSearchQuery(clientName);
+                                handleInputChange("clientId", legislation.retainership?.client?.id);
+
+                                const agentName =
+                                  legislation?.assignedAgent?.name.charAt(0).toUpperCase() +
+                                  legislation?.assignedAgent?.name.slice(1);
+                                setAgentSearchQuery(agentName);
+                                handleInputChange("assignedToId", legislation.assignedAgent?.id!);
+                              }}
+
+                            >
+                              <div className="flex items-center gap-2">
+                                <div>
+                                  <span className="font-medium">{legislation.title}</span>
+                                  {legislation.description && (
+                                    <div className="text-xs text-gray-500 mt-1">
+                                      {legislation.description}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {showLegislationSuggestions && legislationSearchQuery && filteredLegislations.length === 0 && (
+                        <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg p-3">
+                          <span className="text-gray-500">No legislations found</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          }
 
           {/* Client Information */}
           <Card>
@@ -1395,6 +1492,7 @@ export default function TaskForm({ id }: TaskFormProps) {
             </CardContent>
           </Card>
 
+
           {/* Task Priority, Assignment & Completion Date */}
           <Card>
             <CardHeader>
@@ -1513,53 +1611,46 @@ export default function TaskForm({ id }: TaskFormProps) {
               </div>
 
               {/* Completion Date */}
-              <div className="space-y-2">
-                <Label className="flex items-center gap-1">
-                  Task Completion Date
-                  <span className="text-red-500">*</span>
-                </Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn(
-                        "w-full justify-start text-left font-normal",
-                        !dueDate &&
-                        "text-muted-foreground border-red-200 focus:border-red-500"
-                      )}
-                      disabled={isDueDateDisabled}
-                      tabIndex={isDueDateDisabled ? -1 : 0}
-                      aria-disabled={isDueDateDisabled}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {dueDate ? format(dueDate, "PPP") : "Select completion date"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar
-                      mode="single"
-                      selected={dueDate}
-                      onSelect={(date) => {
-                        setDueDate(date);
-                        handleInputChange("triggerDate", "");
-                      }}
-                      fromDate={new Date(formData.triggerDate || new Date())}
-                      initialFocus
-                      disabled={Boolean(isDueDateDisabled)}
-                    // disabled={{ before: new Date() }}
-                    />
-                  </PopoverContent>
-                </Popover>
-                {isDueDateDisabled ? (
-                  <p className="text-xs text-red-500 flex items-center gap-1">
-                    <span className="font-semibold">Locked:</span> The admin has locked the days for this service. You cannot change the completion date.
-                  </p>
-                ) : (
+              {
+                formData.active &&
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-1">
+                    Task Completion Date
+                    <span className="text-red-500">*</span>
+                  </Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full justify-start text-left font-normal",
+                          !dueDate &&
+                          "text-muted-foreground border-red-200 focus:border-red-500"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {dueDate ? format(dueDate, "PPP") : "Select completion date"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                      <Calendar
+                        mode="single"
+                        selected={dueDate}
+                        onSelect={(date) => {
+                          setDueDate(date);
+                          handleInputChange("triggerDate", "");
+                        }}
+                        fromDate={new Date()}
+                        initialFocus
+                        disabled={{ before: new Date() }}
+                      />
+                    </PopoverContent>
+                  </Popover>
                   <p className="text-xs text-muted-foreground">
                     Choose the date when this task should be completed (required)
                   </p>
-                )}
-              </div>
+                </div>
+              }
 
               {/* Recurring Field */}
               <div className="flex gap-3">
@@ -1613,29 +1704,66 @@ export default function TaskForm({ id }: TaskFormProps) {
                     )}
                   </p>
                 </div>
-                <div className="w-1/2">
-                  {/* Trigger Date Field - Shown only when recurring is set */}
-                  {formData.recurring && formData.recurring !== "0" && (
-                    <div className="space-y-2">
-                      <Label htmlFor="triggerDate">Trigger Date</Label>
-                      <Input
-                        id="triggerDate"
-                        type="date"
-                        value={formData.triggerDate || format(new Date(), "yyyy-MM-dd")}
-                        min={format(new Date(), "yyyy-MM-dd")}
-                        onChange={(e) => {
-                          const newTriggerDate = e.target.value;
-                          handleInputChange("triggerDate", newTriggerDate);
-                          // Ensure Completion Date is not earlier than Trigger Date
-                          if (dueDate && new Date(newTriggerDate) > new Date(dueDate)) {
-                            setDueDate(new Date(newTriggerDate));
-                          }
-                        }}
-                      />
-                    </div>
+                {formData.recurring && formData.recurring !== "0" && (
+                  <div className="space-y-2 w-1/2">
+                    <Label className="flex items-center gap-1">
+                      Trigger Date
+                      <span className="text-red-500">*</span>
+                    </Label>
 
-                  )}
-                </div>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className={cn(
+                            "w-full justify-start text-left font-normal",
+                            !formData.triggerDate &&
+                            "text-muted-foreground border-red-200 focus:border-red-500"
+                          )}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {formData.triggerDate
+                            ? format(new Date(formData.triggerDate), "PPP")
+                            : "Select trigger date"}
+                        </Button>
+                      </PopoverTrigger>
+
+                      <PopoverContent className="w-auto p-0">
+                        <Calendar
+                          mode="single"
+                          selected={
+                            formData.triggerDate
+                              ? new Date(formData.triggerDate)
+                              : undefined
+                          }
+                          fromDate={new Date()}
+                          disabled={{
+                            before: formData.active && dueDate ? new Date(dueDate.getTime() + 86400000) : new Date(),
+                          }}
+                          onSelect={(date) => {
+                            if (!date) return
+                            handleInputChange("triggerDate", format(date, "yyyy-MM-dd"))
+                          }}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    {
+                      !isEditMode &&
+                      <div className="flex items-start gap-2">
+                        <Checkbox
+                          checked={!formData.active}
+                          onCheckedChange={(checked) =>
+                            handleInputChange("active", !checked)
+                          }
+                        />
+                        <p className="text-sm text-muted-foreground">
+                          If selected, the task will be created only on the trigger date.
+                        </p>
+                      </div>
+                    }
+                  </div>
+                )}
               </div>
 
               {/* Assignment Preview */}
@@ -1675,71 +1803,6 @@ export default function TaskForm({ id }: TaskFormProps) {
             </CardContent>
           </Card>
 
-          {/* Legislation Information */}
-          {
-            isFromRetainership && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <FileText className="h-5 w-5" />
-                    Legislation Information
-                  </CardTitle>
-                  <CardDescription>
-                    Optionally, select legislation for this task
-                  </CardDescription>
-                </CardHeader>
-
-                <CardContent className="space-y-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="legislation">Legislation *</Label>
-                    <div className="relative">
-                      <Input
-                        id="legislation"
-                        placeholder="Search or select legislation"
-                        value={legislationSearchQuery}
-                        onChange={(e) => handleInputChange("legislationId", e.target.value)}
-                        disabled={isFromRetainership} // Disable field if accessed from retainership
-                        required
-                      />
-
-                      {showLegislationSuggestions && legislationSearchQuery.trim() && filteredLegislations.length > 0 && (
-                        <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto">
-                          {filteredLegislations.map((legislation) => (
-                            <div
-                              key={legislation.id}
-                              className="flex items-center justify-between p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
-                              onClick={() => {
-                                setFormData((prev) => ({ ...prev, legislationId: legislation.id }));
-                                setLegislationSearchQuery(legislation.title);
-                                setShowLegislationSuggestions(false);
-                              }}
-                            >
-                              <div className="flex items-center gap-2">
-                                <div>
-                                  <span className="font-medium">{legislation.title}</span>
-                                  {legislation.description && (
-                                    <div className="text-xs text-gray-500 mt-1">
-                                      {legislation.description}
-                                    </div>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-
-                      {showLegislationSuggestions && legislationSearchQuery && filteredLegislations.length === 0 && (
-                        <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg p-3">
-                          <span className="text-gray-500">No legislations found</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )
-          }
 
           {/* Submit Buttons */}
           <div className="flex justify-end gap-4">

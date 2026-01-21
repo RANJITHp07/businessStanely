@@ -71,6 +71,11 @@ export async function GET(req: NextRequest) {
           {
             OR: [{ category: null }, { category: { status: "approved" } }],
           },
+          {
+            legislationId: {
+              equals: null,
+            },
+          },
         ],
       };
     }
@@ -85,7 +90,7 @@ export async function GET(req: NextRequest) {
 
     // Fetch all tasks (no pagination)
     const tasks = await prisma.task.findMany({
-      where,
+      where: { ...where, active: true },
       include: {
         legislation: true,
         client: {
@@ -158,7 +163,7 @@ export async function GET(req: NextRequest) {
     console.error("Error fetching tasks:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   } finally {
     await prisma.$disconnect();
@@ -187,6 +192,7 @@ export async function POST(req: NextRequest) {
       recurring,
       triggerDate, // Added triggerDate to destructured fields
       recurringType,
+      active,
     } = body;
 
     // Validate required fields
@@ -197,7 +203,7 @@ export async function POST(req: NextRequest) {
     if (recurring && recurring !== "0" && !triggerDate) {
       return NextResponse.json(
         { error: "Trigger Date is required for recurring tasks" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -221,7 +227,8 @@ export async function POST(req: NextRequest) {
         categoryId: categoryId || null,
         legislationId: legislationId || null, // Save legislationId
         recurring: recurringValue, // Save recurring field
-        recurringType
+        recurringType,
+        active,
       },
       include: {
         client: {
@@ -254,9 +261,8 @@ export async function POST(req: NextRequest) {
     // Initialize recurring fields if this is a recurring task
     if (recurringValue && taskDueDate) {
       try {
-        const { initializeRecurringTask } = await import(
-          "@/lib/singleTaskRecurring"
-        );
+        const { initializeRecurringTask } =
+          await import("@/lib/singleTaskRecurring");
         await initializeRecurringTask(newTask.id, recurringValue, taskDueDate);
       } catch (error) {
         console.error("Error initializing recurring task:", error);
@@ -314,13 +320,13 @@ export async function POST(req: NextRequest) {
         message: "Task created successfully",
         task: formattedTask,
       },
-      { status: 201 }
+      { status: 201 },
     );
   } catch (error) {
     console.error("Error creating task:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   } finally {
     await prisma.$disconnect();

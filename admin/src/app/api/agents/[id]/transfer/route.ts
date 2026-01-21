@@ -47,14 +47,17 @@ export async function PUT(
       await tx.task.updateMany({
         where: {
           assignedToId: agentId,
-          status: { notIn: ["Completed"] },
+          status: { notIn: ["Completed", "Abandoned"] },
         },
         data: { assignedToId: transferAgentId },
       });
 
       // Mark completed tasks as inactive
       await tx.task.updateMany({
-        where: { assignedToId: agentId, status: "Completed" },
+        where: {
+          assignedToId: agentId,
+          status: { in: ["Completed", "Abandoned"] },
+        },
         data: { active: false },
       });
 

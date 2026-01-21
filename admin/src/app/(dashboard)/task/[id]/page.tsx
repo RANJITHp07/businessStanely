@@ -552,14 +552,14 @@ export default function TaskDetails() {
               Comprehensive view of task progress and activity
             </p>
           </div>
-          <div className="flex justify-end">
+          {taskData.active && < div className="flex justify-end">
             <Button className="mt-[20px] md:mt-0 w-fit f bg-[#003459] hover:bg-[#003459] text-white rounded-lg px-4 py-2 flex items-center gap-2 cursor-pointer shadow-none hover:shadow-md transition-shadow duration-300">
               <a href={`/task/${id}/edit`} className="flex items-center gap-1">
                 <Edit className="h-4 w-4" />
                 Edit Task
               </a>
             </Button>
-          </div>
+          </div>}
         </div>
 
         {/* Task Summary Card */}
@@ -1086,6 +1086,7 @@ export default function TaskDetails() {
                     <Textarea
                       placeholder="Add a comment..."
                       value={newComment}
+                      disabled={taskData.active}
                       onChange={(e) => setNewComment(e.target.value)}
                       rows={3}
                     />
@@ -1374,6 +1375,6 @@ export default function TaskDetails() {
           </Card>
         </TabsContent>
       </Tabs>
-    </div>
+    </div >
   );
 }

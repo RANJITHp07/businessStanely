@@ -977,6 +977,7 @@ export default function AgentDetails() {
                         className="w-full min-h-[100px] p-3 border rounded-md resize-vertical"
                         placeholder="Enter your note or remark here..."
                         value={newNote}
+                        disabled={agent.status !== "active"}
                         onChange={(e) => setNewNote(e.target.value)}
                       />
                     </div>

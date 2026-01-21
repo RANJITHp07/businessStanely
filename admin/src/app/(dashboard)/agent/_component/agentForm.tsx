@@ -25,7 +25,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Upload, X, User, FileText, Users } from "lucide-react";
 import { toast } from "react-toastify";
 import { Agent } from "@/types";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 const executionAgentTypes = [
   "Owner",
@@ -187,12 +187,14 @@ export default function AgentForm({ agent }: AgentFormProps) {
     jurisdiction: string;
     autoAssign?: boolean
   };
+  const searchParams = useSearchParams();
+  const agentRole = searchParams.get("agentRole");
   const [formData, setFormData] = useState<AgentFormData>({
     name: agent?.name || "",
     email: agent?.email || "",
     phoneNumber: agent?.phoneNumber || "",
     secondaryPhoneNumber: agent?.secondaryPhoneNumber || "",
-    agentRole: agent?.agentRole || "Execution Agent",
+    agentRole: agentRole || agent?.agentRole || "Execution Agent",
     agentType: agent?.agentType || "",
     barAssociationId: agent?.barAssociationId || "",
     jurisdiction: agent?.jurisdiction || "",
@@ -201,6 +203,7 @@ export default function AgentForm({ agent }: AgentFormProps) {
   const [agentSearch, setAgentSearch] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false)
   const router = useRouter();
+
 
   // Fetch all agents from API and collect all subordinate IDs
   const fetchAgents = async () => {
@@ -241,6 +244,7 @@ export default function AgentForm({ agent }: AgentFormProps) {
       setSelectedSubordinates([]);
     }
   }, [agent?.subordinates]);
+
 
   // Get available agents based on selected agent type hierarchy
   const getAvailableAgents = () => {
@@ -359,7 +363,7 @@ export default function AgentForm({ agent }: AgentFormProps) {
 
       if (response.ok) {
         toast.success(`Agent ${agent ? "updated" : "created"} successfully!`);
-        router.push("/agent");
+        router.back();
       } else {
         const errorData = await response.json();
         toast.error(`${errorData.error}`);
@@ -890,7 +894,7 @@ export default function AgentForm({ agent }: AgentFormProps) {
         {/* Submit Button */}
         <div className="flex justify-end gap-4">
           <Button
-            onClick={() => router.push("/agent")}
+            onClick={() => router.back()}
             className="bg-[#f42b03] hover:bg-[#f42b03] shadow-none hover:shadow-lg transition-shadow duration-300 text-white hover:text-white cursor-pointer"
             type="button"
             variant="outline"

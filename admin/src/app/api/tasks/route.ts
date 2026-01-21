@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
     if (!title || !createdById) {
       return NextResponse.json(
         { error: "Title and createdById are required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -61,13 +61,12 @@ export async function POST(req: NextRequest) {
     // Initialize recurring fields if this is a recurring task
     if (recurringValue && dueDate) {
       try {
-        const { initializeRecurringTask } = await import(
-          "@/lib/singleTaskRecurring"
-        );
+        const { initializeRecurringTask } =
+          await import("@/lib/singleTaskRecurring");
         await initializeRecurringTask(
           newTask.id,
           recurringValue,
-          new Date(dueDate)
+          new Date(dueDate),
         );
       } catch (error) {
         console.error("Error initializing recurring task:", error);
@@ -82,7 +81,7 @@ export async function POST(req: NextRequest) {
     }
     return NextResponse.json(
       { error: "Failed to create task" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -118,6 +117,8 @@ export async function GET(req: NextRequest) {
     }
     if (assignedToId) {
       whereClause.assignedToId = assignedToId;
+    } else {
+      whereClause.active = true;
     }
     if (clientId) {
       whereClause.clientId = clientId;
@@ -128,7 +129,7 @@ export async function GET(req: NextRequest) {
       whereClause.status = status;
     }
     const tasks = await prisma.task.findMany({
-      where: whereClause,
+      where: { ...whereClause },
       include: {
         client: true,
         createdBy: true,
@@ -146,7 +147,7 @@ export async function GET(req: NextRequest) {
       error instanceof Error ? error.message : "Internal server error";
     return NextResponse.json(
       { error: "Failed to fetch tasks", details: errorMessage },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

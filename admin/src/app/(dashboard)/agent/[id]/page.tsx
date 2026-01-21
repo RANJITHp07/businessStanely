@@ -441,14 +441,17 @@ export default function AgentDetails() {
               Comprehensive view of agent information and performance
             </p>
           </div>
-          <div className="flex justify-end">
-            <Link href={`/agent/${agent?.id}/edit`}>
-              <Button className="mt-[20px] md:mt-0 w-fit bg-[#003459] hover:bg-[#003459] text-white rounded-lg px-4 py-2 flex items-center gap-2 cursor-pointer shadow-none hover:shadow-md transition-shadow duration-300">
-                <Edit className="h-4 w-4" />
-                Edit Agent
-              </Button>
-            </Link>
-          </div>
+          {
+            agent.status == "active" &&
+            <div className="flex justify-end">
+              <Link href={`/agent/${agent?.id}/edit`}>
+                <Button className="mt-[20px] md:mt-0 w-fit bg-[#003459] hover:bg-[#003459] text-white rounded-lg px-4 py-2 flex items-center gap-2 cursor-pointer shadow-none hover:shadow-md transition-shadow duration-300">
+                  <Edit className="h-4 w-4" />
+                  Edit Agent
+                </Button>
+              </Link>
+            </div>
+          }
         </div>
 
         {/* Agent Summary Card */}

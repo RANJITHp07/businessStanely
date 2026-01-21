@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
       if (!advisorTypes.includes(agentType)) {
         return NextResponse.json(
           { error: "Invalid agent type for Advisor Agent." },
-          { status: 400 }
+          { status: 400 },
         );
       }
     }
@@ -139,21 +139,27 @@ export async function POST(req: NextRequest) {
       if (error.code === "P2002") {
         return NextResponse.json(
           { error: "An agent with this email already exists." },
-          { status: 409 }
+          { status: 409 },
         );
       }
     }
 
     return NextResponse.json(
       { error: "Failed to create agent" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    const statusParam = req.nextUrl.searchParams.get("status");
+
+    const whereClause = statusParam
+      ? { status: "inactive" } // if status is given, use it
+      : { status: { not: "inactive" } }; // otherwise, active agents
     const agents = await prisma.agent.findMany({
+      where: whereClause,
       include: {
         superiorsLinks: { include: { superior: true } },
         subordinatesLinks: { include: { subordinate: true } },
@@ -167,7 +173,7 @@ export async function GET() {
     console.error("Error fetching agents:", error);
     return NextResponse.json(
       { error: "Failed to fetch agents" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

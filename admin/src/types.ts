@@ -31,6 +31,7 @@ export interface Agent {
   superior: Agent | null;
   subordinates: Agent[];
   autoAssign?: boolean;
+  status: string;
 }
 
 // export interface Client {
@@ -84,6 +85,7 @@ export interface Task {
     color: string;
     status: string;
   };
+  active: boolean;
   comments?: Comment[];
   recurringType?: string;
   legislationId?: string; // Added to link tasks to legislations

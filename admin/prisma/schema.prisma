@@ -195,6 +195,7 @@ model Task {
   completed        Boolean   @default(false)
   recurring        Int?      // Recurring in months (1-12), null means not recurring
   recurringType  String?  // 'DAY' | 'WEEK' | 'MONTH'
+  active           Boolean   @default(true)
 
   triggerDate      DateTime?
 

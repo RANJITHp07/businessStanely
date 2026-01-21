@@ -62,7 +62,8 @@ const allItems: MenuItem[] = [
   { title: "Dashboard", icon: Home, url: "/" },
   { title: "Prospects", url: "/dashboard/prospects", icon: UserSearch },
   { title: "Opportunities", url: "/dashboard/opportunities", icon: ClipboardList },
-  { title: "Agent", url: "/agent", icon: UserRoundPen },
+  { title: "Execution Agent", url: "/agent", icon: UserRoundPen },
+  { title: "Advisor Agent", url: "/dashboard/agent", icon: UserRoundPen },
   { title: "Client", url: "/client", icon: UserSearch },
   { title: "Task", url: "/my-task", icon: ClipboardCheck },
   { title: "Services", url: "/task_category", icon: Boxes },
@@ -70,14 +71,15 @@ const allItems: MenuItem[] = [
   { title: "Lead Source", url: "/lead_source", icon: CircleFadingPlusIcon },
   { title: "Admin", url: "/admin", icon: ShieldUser },
   { title: "Settings", url: "/setting", icon: Settings },
+  { title: "Deleted Agent", url: "/deleted-agent", icon: UserRoundPen },
 ];
 
 // Split items into two panels
 const agentPanelItems = allItems.filter(
-  (item) => !["Prospects", "Opportunities", "Lead Source", "Settings"].includes(item.title)
+  (item) => !["Prospects", "Advisor Agent", "Opportunities", "Lead Source", "Settings"].includes(item.title)
 );
 const salesPanelItems = allItems.filter((item) =>
-  ["Prospects", "Opportunities", "Lead Source"].includes(item.title)
+  ["Advisor Agent", "Prospects", "Opportunities", "Lead Source"].includes(item.title)
 );
 
 const settingsPanelItems = allItems.filter((item) => item.title === "Settings");

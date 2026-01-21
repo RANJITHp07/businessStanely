@@ -800,20 +800,26 @@ export default function TasksTable() {
                                       View Details
                                     </Link>
                                   </DropdownMenuItem>
-                                  <DropdownMenuItem asChild>
-                                    <Link href={`/task/${task.id}/edit`}>
-                                      <Edit className="mr-2 h-4 w-4" />
-                                      Edit Task
-                                    </Link>
-                                  </DropdownMenuItem>
-                                  <DropdownMenuSeparator />
-                                  <DropdownMenuItem
-                                    className="text-destructive"
-                                    onClick={() => setTaskToDelete(task)}
-                                  >
-                                    <Trash2 className="mr-2 h-4 w-4" />
-                                    Delete Task
-                                  </DropdownMenuItem>
+                                  {
+                                    task.active &&
+                                    <>
+                                      <DropdownMenuItem asChild>
+                                        <Link href={`/task/${task.id}/edit`}>
+                                          <Edit className="mr-2 h-4 w-4" />
+                                          Edit Task
+                                        </Link>
+                                      </DropdownMenuItem>
+                                      <DropdownMenuSeparator />
+                                      <DropdownMenuItem
+                                        className="text-destructive"
+                                        onClick={() => setTaskToDelete(task)}
+                                      >
+                                        <Trash2 className="mr-2 h-4 w-4" />
+                                        Delete Task
+                                      </DropdownMenuItem>
+                                    </>
+                                  }
+
                                 </DropdownMenuContent>
                               </DropdownMenu>
                             </TableCell>

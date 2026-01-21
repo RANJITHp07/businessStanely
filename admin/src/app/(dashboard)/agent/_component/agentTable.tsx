@@ -80,6 +80,7 @@ const agentTypes = [
 const jurisdictions = ["All Jurisdictions", "India", "USA", "UAE", "Others"];
 
 import { Agent } from "@/types";
+import { toast } from "react-toastify";
 
 export default function AgentsTable() {
   const router = useRouter();
@@ -92,6 +93,10 @@ export default function AgentsTable() {
   const [itemsPerPage, setItemsPerPage] = useState(20);
   const [agentToDelete, setAgentToDelete] = useState<Agent | null>(null);
   const [loading, setLoading] = useState(true)
+  const [transferAgentId, setTransferAgentId] = useState<string | null>(null);
+  const [agentSearchQuery, setAgentSearchQuery] = useState("");
+  const [showAgentSuggestions, setShowAgentSuggestions] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     const fetchAgents = async () => {
@@ -99,7 +104,7 @@ export default function AgentsTable() {
         const response = await fetchWithAuth("/api/agents");
         if (response.ok) {
           const data = await response.json();
-          setAgents(data);
+          setAgents(data.filter((agent: Agent) => agent?.agentRole !== "Advisor Agent" && agent.status == "active"));
         } else {
           console.error("Failed to fetch agents");
         }
@@ -133,6 +138,26 @@ export default function AgentsTable() {
     return matchesSearch && matchesType && matchesJurisdiction;
   });
 
+
+  const deleteFilteredAgents = agents.filter((agent) => {
+    if (!agentToDelete) return false;
+
+    const matchesSearch = agent.name
+      .toLowerCase()
+      .includes(agentSearchQuery.toLowerCase());
+
+    const notDeletedAgent = agent.id !== agentToDelete.id;
+
+    // Compare ranks using the agentTypes array
+    const deleteAgentRank = agentTypes.indexOf(agentToDelete.agentType);
+    const currentAgentRank = agentTypes.indexOf(agent.agentType);
+
+    // Include only agents of same rank or higher (lower index = higher rank)
+    const allowedByRank = currentAgentRank <= deleteAgentRank;
+
+    return matchesSearch && notDeletedAgent && allowedByRank;
+  });
+
   // Apply sorting to filtered agents
   const sortedAgents = filteredAgents;
 
@@ -161,18 +186,25 @@ export default function AgentsTable() {
     if (!agentToDelete) return;
 
     try {
-      const response = await fetchWithAuth(`/api/agents/${agentToDelete.id}`, {
-        method: "DELETE",
+      setIsSubmitting(true);
+      const response = await fetch(`/api/agents/${agentToDelete.id}/transfer`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          transferAgentId
+        }),
       });
-
-      if (response.ok) {
-        setAgents(agents.filter((agent) => agent.id !== agentToDelete.id));
-        setAgentToDelete(null);
-      } else {
-        console.error("Failed to delete agent");
-      }
+      setAgents(agents.filter((agent) => agent.id !== agentToDelete.id));
+      toast.success(`Agent deleted successfully and all task transferred to ${agentSearchQuery}`);
     } catch (error) {
       console.error("Error deleting agent:", error);
+    } finally {
+      setIsSubmitting(false);
+      setAgentToDelete(null);
+      setAgentSearchQuery("");
+      setTransferAgentId(null);
     }
   };
 
@@ -203,13 +235,13 @@ export default function AgentsTable() {
         <div className="flex flex-col gap-4 md:flex-row md:justify-between md:items-center mb-6">
           <div>
             <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold break-words">
-              Agent Management
+              Execution Agent Management
             </h1>
             <p className="text-sm sm:text-base text-muted-foreground mt-2">
               Manage and organize your legal team members
             </p>
           </div>
-          <Link href="/agent/create" className="w-full md:w-auto">
+          <Link href="/agent/create?agentRole=Execution Agent" className="w-full md:w-auto">
             <Button className="w-full md:w-auto bg-[#003459] hover:bg-[#003459] text-white rounded-lg px-4 py-2 flex items-center justify-center gap-2 cursor-pointer shadow-none hover:shadow-md transition-shadow duration-300">
               <Plus className="h-4 w-4" />
               Create Agent
@@ -244,7 +276,7 @@ export default function AgentsTable() {
               {/* Search */}
               <div className="flex flex-col items-start gap-2 md:gap-4">
                 <div className="w-full">
-                  <Label htmlFor="search" className="text-sm sm:text-base">Search Agents</Label>
+                  <Label htmlFor="search" className="text-sm sm:text-base">Search Execution Agents</Label>
                   <div className="relative mt-2">
                     <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                     <Input
@@ -317,7 +349,7 @@ export default function AgentsTable() {
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
               <Users className="h-5 w-5 flex-shrink-0" />
-              <span className="truncate">Agents ({sortedAgents.length})</span>
+              <span className="truncate">Execution Agents ({sortedAgents.length})</span>
             </CardTitle>
           </div>
         </CardHeader>
@@ -410,13 +442,13 @@ export default function AgentsTable() {
                               <DropdownMenuContent align="end">
                                 <DropdownMenuLabel>Actions</DropdownMenuLabel>
                                 <DropdownMenuItem asChild>
-                                  <Link href={`/agent/${agent.id}`}>
+                                  <Link href={`/ agent / ${agent.id}`}>
                                     <Eye className="mr-2 h-4 w-4" />
                                     View Details
                                   </Link>
                                 </DropdownMenuItem>
                                 <DropdownMenuItem asChild>
-                                  <Link href={`/agent/${agent.id}/edit`}>
+                                  <Link href={`/ agent / ${agent.id} / edit`}>
                                     <Edit className="mr-2 h-4 w-4" />
                                     Edit Agent
                                   </Link>
@@ -467,7 +499,7 @@ export default function AgentsTable() {
                       return (
                         <TableRow
                           key={agent.id}
-                          onClick={() => router.push(`/agent/${agent.id}?tab=tasks`)}
+                          onClick={() => router.push(`/ agent / ${agent.id} ? tab = tasks`)}
                           className="cursor-pointer hover:bg-muted/50"
                         >
                           <TableCell>
@@ -521,13 +553,13 @@ export default function AgentsTable() {
                               <DropdownMenuContent align="end">
                                 <DropdownMenuLabel className="text-xs">Actions</DropdownMenuLabel>
                                 <DropdownMenuItem asChild>
-                                  <Link href={`/agent/${agent.id}`}>
+                                  <Link href={`/ agent / ${agent.id}`}>
                                     <Eye className="mr-2 h-3 w-3" />
                                     <span className="text-xs">View Details</span>
                                   </Link>
                                 </DropdownMenuItem>
                                 <DropdownMenuItem asChild>
-                                  <Link href={`/agent/${agent.id}/edit`}>
+                                  <Link href={`/ agent / ${agent.id} / edit`}>
                                     <Edit className="mr-2 h-3 w-3" />
                                     <span className="text-xs">Edit Agent</span>
                                   </Link>
@@ -650,22 +682,106 @@ export default function AgentsTable() {
       </Card>
       <AlertDialog
         open={!!agentToDelete}
-        onOpenChange={() => setAgentToDelete(null)}
+        onOpenChange={() => {
+          setTransferAgentId(null);
+          setAgentSearchQuery("");
+        }}
       >
-        <AlertDialogContent>
+        <AlertDialogContent className="max-w-lg">
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the
-              agent and remove their data from our servers.
+              This action cannot be undone.
+              <br />
+              <br />
+              <strong>
+                All Todo, In-Progress, On-Hold, and Abandoned tasks will be transferred
+                to the selected agent below.
+              </strong>
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete}>Delete</AlertDialogAction>
+
+          {/* Assign Agent Input */}
+          <div className="space-y-2 mt-4">
+            <Label htmlFor="assigned-agent">Transfer Tasks To *</Label>
+
+            <div className="relative">
+              <Input
+                id="assigned-agent"
+                type="text"
+                placeholder="Type to search agents..."
+                value={agentSearchQuery}
+                onChange={(e) => {
+                  if (e.target.value === "") {
+                    setTransferAgentId(null);
+                  }
+                  setAgentSearchQuery(e.target.value);
+                  setShowAgentSuggestions(!!e.target.value.trim());
+                }
+                }
+                onFocus={() => {
+                  if (agentSearchQuery.trim()) setShowAgentSuggestions(true);
+                }}
+              />
+
+              {showAgentSuggestions &&
+                agentSearchQuery.trim() &&
+                agents.length > 0 && (
+                  <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto">
+                    {deleteFilteredAgents.map((agent) => (
+                      <div
+                        key={agent.id}
+                        className="flex items-center gap-2 p-3 hover:bg-gray-50 cursor-pointer border-b last:border-b-0"
+                        onClick={() => {
+                          setAgentSearchQuery(agent.name);
+                          setTransferAgentId(agent.id);
+                          setShowAgentSuggestions(false);
+                        }}
+                      >
+                        <Avatar className="h-6 w-6">
+                          <AvatarFallback className="text-xs">
+                            {agent.name
+                              .split(" ")
+                              .map((n) => n[0])
+                              .join("")}
+                          </AvatarFallback>
+                        </Avatar>
+
+                        <div>
+                          <span className="font-medium">{agent.name}</span>
+                          <span className="text-sm text-muted-foreground ml-2">
+                            ({agent.agentType})
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+              {showAgentSuggestions &&
+                agentSearchQuery.trim() &&
+                filteredAgents.length === 0 && (
+                  <div className="absolute z-10 w-full mt-1 bg-white border rounded-md p-3">
+                    <span className="text-gray-500">No agents found</span>
+                  </div>
+                )}
+            </div>
+          </div>
+
+          <AlertDialogFooter className="mt-6">
+            <AlertDialogCancel onClick={() => setAgentToDelete(null)}>Cancel</AlertDialogCancel>
+
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={!transferAgentId}
+              className="bg-red-600 hover:bg-red-700 disabled:opacity-50"
+            >
+              {isSubmitting ? "Transfering..." : "Delete & Transfer Tasks"}
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
     </div>
   );
 }

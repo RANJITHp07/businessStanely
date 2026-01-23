@@ -115,7 +115,11 @@ export async function GET(req: NextRequest) {
     if (categoryId) {
       whereClause = { categoryId };
     } else {
-      whereClause = { AND: [{ category: { status: "approved" } }] };
+      whereClause = {
+        AND: [
+          { OR: [{ category: null }, { category: { status: "approved" } }] },
+        ],
+      };
     }
     if (assignedToId) {
       whereClause.assignedToId = assignedToId;

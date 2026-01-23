@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
       where = { categoryId };
     } else if (assignedToId) {
       where = {
-        assignedToId,
+        assignedToId: agent.id,
         AND: [
           {
             OR: [{ category: null }, { category: { status: "approved" } }],
@@ -71,11 +71,12 @@ export async function GET(req: NextRequest) {
           {
             OR: [{ category: null }, { category: { status: "approved" } }],
           },
-          {
-            legislationId: {
-              equals: null,
-            },
-          },
+          // {
+          //   legislationId: {
+          //     equals: null,
+          //     isSet: true,
+          //   },
+          // },
         ],
       };
     }

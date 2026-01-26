@@ -23,6 +23,9 @@ export async function POST(req: NextRequest) {
       attachmentUrl,
       attachmentSize,
       attachmentType,
+      commentDate,
+      startTime,
+      endTime,
     } = body;
 
     if (!content || !taskId) {
@@ -70,6 +73,17 @@ export async function POST(req: NextRequest) {
       commentData.attachmentUrl = attachmentUrl;
       commentData.attachmentSize = attachmentSize;
       commentData.attachmentType = attachmentType;
+    }
+
+    // Add timesheet fields if provided
+    if (commentDate) {
+      commentData.commentDate = new Date(commentDate);
+    }
+    if (startTime) {
+      commentData.startTime = new Date(startTime);
+    }
+    if (endTime) {
+      commentData.endTime = new Date(endTime);
     }
 
     const newComment = await prisma.comment.create({

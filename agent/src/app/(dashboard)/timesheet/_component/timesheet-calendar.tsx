@@ -14,6 +14,14 @@ interface TimesheetCalendarProps {
 }
 
 const timeSlots = [
+  "12 AM",
+  "1 AM",
+  "2 AM",
+  "3 AM",
+  "4 AM",
+  "5 AM",
+  "6 AM",
+  "7 AM",
   "8 AM",
   "9 AM",
   "10 AM",
@@ -30,7 +38,6 @@ const timeSlots = [
   "9 PM",
   "10 PM",
   "11 PM",
-  "12 AM",
 ];
 
 
@@ -65,7 +72,12 @@ const colorClasses: Record<string, { bg: string; text: string; border: string }>
     text: "text-white",
     border: "border border-white",
   },
-
+  // Default fallback
+  default: {
+    bg: "bg-gray-100",
+    text: "text-gray-900",
+    border: "border border-gray-400",
+  },
 }
 
 function parseTime(timeStr: string): { hours: number; minutes: number } {
@@ -77,13 +89,13 @@ function getPositionAndHeight(startTime: string, endTime: string) {
   const start = parseTime(startTime)
   const end = parseTime(endTime)
 
-  // Calculate position from 8 AM (start of calendar)
-  const startMinutesFrom8AM = (start.hours - 8) * 60 + start.minutes
-  const endMinutesFrom8AM = (end.hours - 8) * 60 + end.minutes
+  // Calculate position from 12 AM (start of calendar)
+  const startMinutesFrom12AM = start.hours * 60 + start.minutes
+  const endMinutesFrom12AM = end.hours * 60 + end.minutes
 
   // Each hour slot is 60px
-  const top = (startMinutesFrom8AM / 60) * 60
-  const height = Math.max(((endMinutesFrom8AM - startMinutesFrom8AM) / 60) * 60, 20)
+  const top = (startMinutesFrom12AM / 60) * 60
+  const height = Math.max(((endMinutesFrom12AM - startMinutesFrom12AM) / 60) * 60, 20)
 
   return { top, height }
 }
@@ -129,10 +141,8 @@ export function TimesheetCalendar({
     const hours = currentTime.getHours()
     const minutes = currentTime.getMinutes()
 
-    if (hours < 8 || hours >= 20) return null
-
-    const minutesFrom8AM = (hours - 8) * 60 + minutes
-    return (minutesFrom8AM / 60) * 60
+    const minutesFrom12AM = hours * 60 + minutes
+    return (minutesFrom12AM / 60) * 60
   }, [currentTime])
 
   return (
@@ -197,7 +207,7 @@ export function TimesheetCalendar({
                   {/* Entries */}
                   {dayEntries.map((entry) => {
                     const { top, height } = getPositionAndHeight(entry.startTime, entry.endTime)
-                    const colors = colorClasses[entry.status]
+                    const colors = colorClasses[entry.status] || colorClasses.default
                     const isLoginLogout = entry.type === "login" || entry.type === "logout"
 
                     return (

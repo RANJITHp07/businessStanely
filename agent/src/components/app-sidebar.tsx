@@ -92,7 +92,7 @@ const dashboardItems = [
   },
   {
     title: "Time sheet",
-    url: "/time-sheet",
+    url: "/timesheet",
     icon: ClipboardList,
   },
   {

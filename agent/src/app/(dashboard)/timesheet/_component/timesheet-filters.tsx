@@ -14,9 +14,10 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Badge } from "@/components/ui/badge"
-import { TaskStatus, User, users } from "../page"
+import { TaskStatus, User } from "../page"
 
 interface TimesheetFiltersProps {
+  users: User[]
   startDate: Date
   endDate: Date
   onStartDateChange: (date: Date) => void
@@ -32,6 +33,7 @@ interface TimesheetFiltersProps {
 }
 
 export function TimesheetFilters({
+  users,
   startDate,
   endDate,
   onStartDateChange,

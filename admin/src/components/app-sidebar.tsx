@@ -12,7 +12,8 @@ import {
   ChevronDown,
   ClipboardList,
   CircleFadingPlusIcon,
-  ChartLine
+  ChartLine,
+  Calendar
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -65,6 +66,7 @@ const allItems: MenuItem[] = [
   { title: "Agent", url: "/agent", icon: UserRoundPen },
   { title: "Client", url: "/client", icon: UserSearch },
   { title: "Task", url: "/my-task", icon: ClipboardCheck },
+  { title: "Timesheet", url: "/timesheet", icon: Calendar },
   { title: "Services", url: "/task_category", icon: Boxes },
   { title: "Retainership", url: "/retainership", icon: Boxes },
   { title: "Lead Source", url: "/lead_source", icon: CircleFadingPlusIcon },

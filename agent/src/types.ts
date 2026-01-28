@@ -148,7 +148,13 @@ export interface Comment {
   content: string;
   createdAt: string;
   updatedAt: string;
-  taskId: string;
+  // Timesheet fields for task comments
+  commentDate?: string; // The date when the comment/work was done (defaults to createdAt if not provided)
+  startTime?: string;   // Start time of the work session
+  endTime?: string;     // End time of the work session
+  taskId?: string;
+  prospectId?: string;
+  opportunityId?: string;
   authorId: string;
   authorType: "USER" | "AGENT";
   attachmentName?: string;

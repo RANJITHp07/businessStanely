@@ -304,6 +304,11 @@ model Comment {
   attachmentSize Int?
   attachmentType String?
 
+  // Timesheet fields for task comments
+  commentDate DateTime? // The date when the comment/work was done (defaults to createdAt if not provided)
+  startTime   DateTime? // Start time of the work session
+  endTime     DateTime? // End time of the work session
+
   taskId String? @db.ObjectId
   task   Task?   @relation(fields: [taskId], references: [id], onDelete: Cascade)
   prospectId   String? @db.ObjectId

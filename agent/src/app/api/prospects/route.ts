@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
     console.log(error);
     return NextResponse.json(
       { error: "Failed to fetch prospects" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -61,6 +61,8 @@ export async function POST(req: NextRequest) {
       leadSourceId,
       amount,
       address,
+      dialCode,
+      serviceId,
     } = body;
 
     if (!name) {
@@ -75,7 +77,7 @@ export async function POST(req: NextRequest) {
     ) {
       return NextResponse.json(
         { error: "Assigned agent is required for this role." },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -138,7 +140,7 @@ export async function POST(req: NextRequest) {
           } else {
             // Move to next agent
             const lastIndex = eligibleAgents.findIndex(
-              (a) => a.id === lastProspect.assignedAgentId
+              (a) => a.id === lastProspect.assignedAgentId,
             );
             const nextIndex = (lastIndex + 1) % eligibleAgents.length;
             finalAssignedAgentId = eligibleAgents[nextIndex].id;
@@ -152,17 +154,32 @@ export async function POST(req: NextRequest) {
       data: {
         name,
         email,
-        phone,
+        dialCode,
         phoneNumber,
         description,
         address,
-        leadSourceId,
+        ...(leadSourceId && {
+          leadSource: {
+            connect: {
+              id: leadSourceId,
+            },
+          },
+        }),
         status: status || "New",
         notes,
         nextFollowUp: nextFollowUp ? new Date(nextFollowUp) : undefined,
-        assignedAgentId: finalAssignedAgentId,
-        createdByAgentId: agent.id,
+        assignedAgent: {
+          connect: { id: assignedAgentId },
+        },
+        createdByAgent: {
+          connect: { id: agent.id },
+        },
         amount: typeof amount === "number" ? amount : undefined,
+        ...(serviceId && {
+          service: {
+            connect: { id: serviceId },
+          },
+        }),
       },
       include: { createdByAgent: true, assignedAgent: true },
     });
@@ -172,7 +189,7 @@ export async function POST(req: NextRequest) {
     console.error(error);
     return NextResponse.json(
       { error: "Failed to create prospect" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

@@ -7,12 +7,14 @@ export interface Prospect {
   address?: string;
   leadSource?: string;
   description?: string;
+  dialCode: string;
   nextFollowUp?: string;
   lastFollowUp?: string;
   status: string; // e.g., New, Contacted, Qualified, Lost, Converted
   notes?: string;
   assignedTo?: string;
   createdByAgentId?: string;
+  serviceId: string;
   createdByAgent?: {
     id: string;
     name: string;

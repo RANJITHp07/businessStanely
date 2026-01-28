@@ -7,6 +7,7 @@ import { ClipboardList, Loader2, FileText, CheckCircle, XCircle, Eye, Calendar }
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip"
 import { Progress } from "@/components/ui/progress"
 import Link from "next/link"
+import { normalizePhoneNumber } from "@/lib/normalizePhoneNumber"
 
 // Mock data type for opportunities
 interface Opportunity {
@@ -127,7 +128,7 @@ function StatCard({
     )
 }
 
-function SectionTable({ label, opportunities }: { label: string; opportunities: Opportunity[] }) {
+function SectionTable({ label, opportunities }: { label: string; opportunities: any[] }) {
     const labelColor = (() => {
         const l = label.toLowerCase()
         if (l.includes("won")) return "text-green-600"
@@ -200,20 +201,20 @@ function SectionTable({ label, opportunities }: { label: string; opportunities: 
                                                     <TableRow key={opp.id} className="hover:bg-muted/50 even:bg-muted/30">
                                                         <TableCell className="truncate max-w-[180px] align-top" title={opp.name}>
                                                             <div className="flex flex-col">
-                                                                <span className="text-foreground font-medium truncate">{opp.name || shortId}</span>
+                                                                <span className="text-foreground font-medium truncate">{opp.prospect?.name || shortId}</span>
                                                             </div>
                                                         </TableCell>
 
-                                                        <TableCell className="truncate max-w-[140px] align-top">{opp.phoneNumber || "N/A"}</TableCell>
+                                                        <TableCell className="truncate max-w-[140px] align-top">{normalizePhoneNumber(opp.prospect.phoneNumber!, opp.prospect.dialCode).internationalNumber || "N/A"}</TableCell>
 
-                                                        <TableCell className="truncate max-w-[200px] align-top" title={opp.description}>
+                                                        <TableCell className="truncate max-w-[200px] align-top" title={opp.prospect.description}>
                                                             {opp.description || "N/A"}
                                                         </TableCell>
 
                                                         <TableCell className="whitespace-nowrap align-top font-semibold">
                                                             {
-                                                                opp.amount !== null && opp.amount !== undefined
-                                                                    ? new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(opp.amount)
+                                                                opp.prospect?.amount !== null && opp.prospect?.amount !== undefined
+                                                                    ? new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(opp.prospect?.amount)
                                                                     : "0"
                                                             }
                                                         </TableCell>
@@ -340,7 +341,7 @@ function SectionTable({ label, opportunities }: { label: string; opportunities: 
 }
 
 export default function OpportunitiesPage() {
-    const [opportunities, setOpportunities] = useState<Opportunity[]>([])
+    const [opportunities, setOpportunities] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
 
     useEffect(() => {
@@ -352,7 +353,7 @@ export default function OpportunitiesPage() {
                 const data = await res.json()
                 // Ensure all frontend fields are present, fallback to empty string/zero if missing
                 const safeData = Array.isArray(data.opportunities)
-                    ? data.opportunities.map((opp: Opportunity) => ({
+                    ? data.opportunities.map((opp: any) => ({
                         id: opp.id || "",
                         name: opp.name || "",
                         phoneNumber: opp.phoneNumber || "",
@@ -360,6 +361,7 @@ export default function OpportunitiesPage() {
                         amount: typeof opp.amount === "number" ? opp.amount : 0,
                         nextFollowUp: opp.nextFollowUp || "",
                         status: opp.status || "Proposal Issued",
+                        prospect: opp.prospect
                     }))
                     : []
                 setOpportunities(safeData)

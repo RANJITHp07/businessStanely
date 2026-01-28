@@ -5,7 +5,7 @@ import { getCurrentAgent } from "@/lib/auth";
 // GET: Get a single prospect by ID
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: { id: string } },
 ) {
   try {
     // Await params if it's a Promise (Next.js 14+)
@@ -30,14 +30,14 @@ export async function GET(
     if (!prospect) {
       return NextResponse.json(
         { error: "Prospect not found" },
-        { status: 404 }
+        { status: 404 },
       );
     }
     return NextResponse.json({ prospect });
   } catch (error) {
     return NextResponse.json(
       { error: "Failed to fetch prospect" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -45,7 +45,7 @@ export async function GET(
 // PUT: Update a prospect by ID
 export async function PUT(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: { id: string } },
 ) {
   try {
     const agent = await getCurrentAgent(req);
@@ -67,20 +67,23 @@ export async function PUT(
       description,
       status,
       notes,
+      dialCode,
       nextFollowUp,
       assignedAgentId,
+      assignedTo,
       amount,
+      serviceId,
     } = body;
 
+    let prospect = await prisma.prospect.findUnique({ where: { id } });
     // If status is being set to 'Opportunity', create Opportunity and archive prospect
     if (status === "Opportunity") {
       try {
         // Get the current prospect data
-        const prospect = await prisma.prospect.findUnique({ where: { id } });
         if (!prospect) {
           return NextResponse.json(
             { error: "Prospect not found" },
-            { status: 404 }
+            { status: 404 },
           );
         }
         // Create Opportunity
@@ -104,34 +107,51 @@ export async function PUT(
       } catch (opportunityError) {
         console.error(
           "Error creating opportunity and archiving prospect:",
-          opportunityError
+          opportunityError,
         );
         return NextResponse.json(
           {
             error: "Failed to create opportunity or archive prospect",
             details: opportunityError?.message || opportunityError,
           },
-          { status: 500 }
+          { status: 500 },
         );
       }
     }
 
     // Otherwise, just update the prospect
-    const prospect = await prisma.prospect.update({
+    prospect = await prisma.prospect.update({
       where: { id },
       data: {
         name,
         email,
-        phone,
+        dialCode,
         phoneNumber,
         address,
-        leadSourceId,
+        ...(leadSourceId && {
+          leadSource: {
+            connect: {
+              id: leadSourceId,
+            },
+          },
+        }),
         description,
         status,
         notes,
         nextFollowUp: nextFollowUp ? new Date(nextFollowUp) : undefined,
-        assignedAgentId,
+        prevFollowup:
+          nextFollowUp && prospect?.nextFollowUp
+            ? prospect?.nextFollowUp
+            : undefined,
+        assignedAgent: {
+          connect: { id: assignedAgentId || assignedTo },
+        },
         amount: parseFloat(amount),
+        ...(serviceId && {
+          service: {
+            connect: { id: serviceId },
+          },
+        }),
       },
     });
     return NextResponse.json({ prospect });
@@ -139,7 +159,7 @@ export async function PUT(
     console.error("Error in PUT /api/prospects/[id] route:", error);
     return NextResponse.json(
       { error: "Failed to update prospect", details: error?.message || error },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -148,7 +168,7 @@ export async function PUT(
 // POST: Add a comment to a prospect
 export async function POST(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: { id: string } },
 ) {
   try {
     const agent = await getCurrentAgent(req);
@@ -169,7 +189,7 @@ export async function POST(
     if (!content) {
       return NextResponse.json(
         { error: "Comment content required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
     const created = await prisma.comment.create({
@@ -196,13 +216,13 @@ export async function POST(
   } catch (error) {
     return NextResponse.json(
       { error: "Failed to add comment", details: error?.message || error },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: { id: string } },
 ) {
   try {
     const agent = await getCurrentAgent(req);
@@ -218,7 +238,7 @@ export async function DELETE(
   } catch (error) {
     return NextResponse.json(
       { error: "Failed to delete prospect" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

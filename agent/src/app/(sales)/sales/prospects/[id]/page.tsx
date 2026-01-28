@@ -30,6 +30,7 @@ import Link from "next/link"
 import { Separator } from "@/components/ui/separator"
 import { cn } from "@/lib/utils"
 import { useAgentContext } from "@/lib/agent-context"
+import { normalizePhoneNumber } from "@/lib/normalizePhoneNumber"
 
 interface Prospect {
     id: string;
@@ -47,6 +48,7 @@ interface Prospect {
     createdAt: string;
     updatedAt: string;
     assignedTo?: string;
+    prevFollowup?: string;
     assignedAgent?: {
         id: string;
         name: string;
@@ -82,9 +84,8 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
     const [attachments, setAttachments] = useState<File[]>([])
     const [submitting, setSubmitting] = useState(false)
     const [nextFollowUpDate, setNextFollowUpDate] = useState<Date | undefined>(undefined)
+    const [opprunity, setOppurtunity] = useState(false)
 
-
-    console.log(agent)
     useEffect(() => {
         setLoading(true)
         fetch(`/api/prospects/${resolvedParams.id}`)
@@ -120,6 +121,7 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
         // If status is Opportunity, create and redirect immediately
         if (newStatus === "Opportunity") {
             try {
+                setOppurtunity(true)
                 const res = await fetch(`/api/prospects/${prospect.id}`, {
                     method: "PUT",
                     headers: { "Content-Type": "application/json" },
@@ -138,6 +140,8 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
                 }
             } catch (err) {
                 console.error("Error updating status:", err);
+            } finally {
+                setOppurtunity(false)
             }
             return;
         }
@@ -169,12 +173,34 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
 
     const isCommentDisabled = prospect?.archived || prospect?.status === "Converted" || prospect?.status === "Opportunity";
     const handleSubmitComment = async () => {
-        if (isCommentDisabled) return;
         if (!newComment.trim() && attachments.length === 0) return;
         setSubmitting(true);
         try {
+            let attachmentData = {}
+            if (attachments && attachments.length > 0) {
+                const formData = new FormData();
+                formData.append("file", attachments[0]);
+
+                const uploadResponse = await fetch("/api/upload", {
+                    method: "POST",
+                    body: formData,
+                });
+
+                if (uploadResponse.ok) {
+                    const uploadResult = await uploadResponse.json();
+                    attachmentData = {
+                        attachmentName: uploadResult.originalName,
+                        attachmentSize: uploadResult.size,
+                        attachmentType: uploadResult.type,
+                        attachmentUrl: uploadResult.url,
+                    };
+                } else {
+                    console.error("Failed to upload file", error)
+                    return;
+                }
+            }
             // TODO: Replace with actual user context
-            const authorId = "current-user-id";
+            const authorId = agent?.id;
             const authorType = "AGENT";
             const res = await fetch(`/api/prospects/${resolvedParams.id}`, {
                 method: "POST",
@@ -183,6 +209,7 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
                     content: newComment,
                     authorId,
                     authorType,
+                    ...attachmentData
                     // Attachments logic can be expanded here
                 }),
             });
@@ -192,7 +219,7 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
                 setNewComment("");
                 setAttachments([]);
             }
-        } catch (err) {
+        } catch {
             // Handle error
         }
         setSubmitting(false);
@@ -245,7 +272,7 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
                                 <h1 className="text-3xl font-bold">{prospect.name}</h1>
                                 <p className="text-muted-foreground mt-1">Prospect Details</p>
                             </div>
-                            <div className="gap-2 flex">
+                            <div className="gap-2 flex items-center">
                                 <div>
                                     <p className="text-sm text-muted-foreground mb-2">Next Follow Up</p>
                                     <Popover>
@@ -297,11 +324,15 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
                                             <SelectContent>
                                                 <SelectItem value="New">New</SelectItem>
                                                 <SelectItem value="In Progress">In Progress</SelectItem>
-                                                <SelectItem value="Opportunity">Opportunity</SelectItem>
+                                                <SelectItem value="Relevant but not Now">Relevant but not Now</SelectItem>
+                                                <SelectItem value="Career">Career</SelectItem>
+                                                <SelectItem value="Not Relevant">Not Relevant
+                                                </SelectItem>
                                             </SelectContent>
                                         </Select>
                                     </div>
                                 </div>
+                                <Button className="mt-6" disabled={opprunity} onClick={() => handleStatusChange("Opportunity")}>Convert to Oppurtunity</Button>
                             </div>
                         </div>
                     </CardContent>
@@ -322,7 +353,7 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <p className="text-sm text-muted-foreground">Phone Number</p>
-                                        <p className="font-medium truncate">{prospect.phoneNumber}</p>
+                                        <p className="font-medium truncate">{normalizePhoneNumber(prospect.phoneNumber!, prospect.dialCode).internationalNumber}</p>
                                     </div>
                                 </div>
                                 <div className="flex items-start gap-3">
@@ -403,13 +434,24 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
                                             <p className="text-sm leading-relaxed">{comment.content}</p>
                                             {comment.attachmentUrl && (
                                                 <div className="flex flex-wrap gap-2 pt-2">
-                                                    <a
-                                                        href={comment.attachmentUrl}
-                                                        className="flex items-center gap-2 px-3 py-1.5 bg-muted rounded-md text-sm hover:bg-muted/80 transition-colors"
-                                                    >
-                                                        <Paperclip className="h-3 w-3" />
-                                                        {comment.attachmentName}
-                                                    </a>
+                                                    {comment.attachmentUrl.match(/\.(mp3|wav|ogg)$/i) ? (
+                                                        <div className="flex flex-col gap-1 px-2 py-1 bg-muted rounded-md text-sm w-full">
+                                                            <audio controls className="w-full">
+                                                                <source src={"https://management.legalstanley.com/" + comment.attachmentUrl} />
+                                                                Your browser does not support the audio element.
+                                                            </audio>
+                                                        </div>
+                                                    ) : (
+                                                        <a
+                                                            href={comment.attachmentUrl}
+                                                            className="flex items-center gap-2 px-3 py-1.5 bg-muted rounded-md text-sm hover:bg-muted/80 transition-colors"
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                        >
+                                                            <Paperclip className="h-3 w-3" />
+                                                            {comment.attachmentName}
+                                                        </a>
+                                                    )}
                                                 </div>
                                             )}
                                         </div>
@@ -461,7 +503,7 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
                                         )}
                                     </Button>
                                     <div>
-                                        <input type="file" id="file-upload" multiple className="hidden" onChange={handleFileSelect} disabled={isCommentDisabled} />
+                                        <input type="file" id="file-upload" className="hidden" onChange={handleFileSelect} disabled={isCommentDisabled} />
                                         <Button
                                             type="button"
                                             variant="outline"
@@ -537,6 +579,14 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
                                 <div className="flex items-center gap-2 mt-1">
                                     <Calendar className="h-4 w-4 text-muted-foreground" />
                                     <p className="font-medium">{formatDate(prospect.updatedAt)}</p>
+                                </div>
+                            </div>
+                            <Separator />
+                            <div>
+                                <p className="text-sm text-muted-foreground">Last FollowUp</p>
+                                <div className="flex items-center gap-2 mt-1">
+                                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                                    <p className="font-medium">{formatDate(prospect.prevFollowup || "")}</p>
                                 </div>
                             </div>
                         </CardContent>

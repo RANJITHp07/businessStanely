@@ -4,7 +4,7 @@ import prisma from "@/lib/prisma";
 // GET: Get a single opportunity by ID
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: { id: string } },
 ) {
   try {
     const { id } = await params;
@@ -38,7 +38,7 @@ export async function GET(
     if (!opportunity) {
       return NextResponse.json(
         { error: "Opportunity not found" },
-        { status: 404 }
+        { status: 404 },
       );
     }
     // Merge comments from prospect and opportunity, sort by createdAt desc
@@ -46,7 +46,7 @@ export async function GET(
     const opportunityComments = opportunity.comments || [];
     const allComments = [...prospectComments, ...opportunityComments].sort(
       (a, b) =>
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
     );
     // Return opportunity with merged comments
     return NextResponse.json({
@@ -58,7 +58,7 @@ export async function GET(
   } catch (error) {
     return NextResponse.json(
       { error: "Failed to fetch opportunity" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -66,13 +66,18 @@ export async function GET(
 // PUT: Update an opportunity by ID
 export async function PUT(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: { id: string } },
 ) {
   try {
     const { id } = await params;
     const body = await req.json();
     const { name, phoneNumber, description, amount, nextFollowUp, status } =
       body;
+    const opp = await prisma.opportunity.findUnique({
+      where: {
+        id,
+      },
+    });
     const opportunity = await prisma.opportunity.update({
       where: { id },
       data: {
@@ -81,6 +86,8 @@ export async function PUT(
         description,
         amount,
         nextFollowUp: nextFollowUp ? new Date(nextFollowUp) : undefined,
+        prevFollowup:
+          nextFollowUp && opp?.nextFollowUp ? opp?.nextFollowUp : undefined,
         status,
       },
     });
@@ -88,7 +95,7 @@ export async function PUT(
   } catch (error) {
     return NextResponse.json(
       { error: "Failed to update opportunity" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -99,7 +106,7 @@ import { getCurrentAgent } from "@/lib/auth";
 
 export async function POST(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: { id: string } },
 ) {
   try {
     const agent = await getCurrentAgent(req);
@@ -118,7 +125,7 @@ export async function POST(
     if (!content) {
       return NextResponse.json(
         { error: "Comment content required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
     const created = await prisma.comment.create({
@@ -145,13 +152,13 @@ export async function POST(
   } catch (error) {
     return NextResponse.json(
       { error: "Failed to add comment", details: error?.message || error },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: { id: string } },
 ) {
   try {
     const { id } = await params;
@@ -160,7 +167,7 @@ export async function DELETE(
   } catch (error) {
     return NextResponse.json(
       { error: "Failed to delete opportunity" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

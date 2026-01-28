@@ -46,8 +46,9 @@ import {
 
 import type { Prospect } from "@/types"
 import { toast } from "react-toastify"
+import { normalizePhoneNumber } from "@/lib/normalizePhoneNumber"
 
-const statuses = ["New", "In Progress"]
+const statuses = ["New", "In Progress", "Relevant but not Now", "Career", "Not Relevant"]
 
 export default function ProspectsTable() {
     const agent = useAgentContext();
@@ -298,7 +299,7 @@ export default function ProspectsTable() {
                                             currentProspects.map((prospect) => (
                                                 <TableRow key={prospect.id} className="cursor-pointer" >
                                                     <TableCell className="font-medium max-w-[150px] truncate" onClick={() => router.push(`/sales/prospects/${prospect.id}`)}>{prospect.name}</TableCell>
-                                                    < TableCell > {prospect.phoneNumber}</TableCell>
+                                                    < TableCell > {normalizePhoneNumber(prospect.phoneNumber!, prospect.dialCode).internationalNumber}</TableCell>
                                                     <TableCell className="max-w-[300px] truncate" onClick={() => router.push(`/sales/prospects/${prospect.id}`)}>{prospect.description || "N/A"}</TableCell>
                                                     <TableCell onClick={() => router.push(`/sales/prospects/${prospect.id}`)}>
                                                         <div className="flex items-center gap-2">
@@ -332,11 +333,16 @@ export default function ProspectsTable() {
                                                                     <Edit className="mr-2 h-4 w-4" />
                                                                     Edit
                                                                 </DropdownMenuItem>
-                                                                <DropdownMenuSeparator />
-                                                                <DropdownMenuItem className="text-destructive" onClick={() => setSourceToDelete(prospect)} disabled={deletingId === prospect.id}>
-                                                                    <Trash2 className="mr-2 h-4 w-4" />
-                                                                    {deletingId === prospect.id ? "Deleting..." : "Delete"}
-                                                                </DropdownMenuItem>
+                                                                {
+                                                                    agent?.agentType == "Client Manager" &&
+                                                                    <>
+                                                                        <DropdownMenuSeparator />
+                                                                        <DropdownMenuItem className="text-destructive" onClick={() => setSourceToDelete(prospect)} disabled={deletingId === prospect.id}>
+                                                                            <Trash2 className="mr-2 h-4 w-4" />
+                                                                            {deletingId === prospect.id ? "Deleting..." : "Delete"}
+                                                                        </DropdownMenuItem>
+                                                                    </>
+                                                                }
                                                             </DropdownMenuContent>
                                                         </DropdownMenu>
                                                     </TableCell>

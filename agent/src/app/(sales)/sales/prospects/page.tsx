@@ -9,6 +9,7 @@ import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/comp
 import { Progress } from "@/components/ui/progress"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { normalizePhoneNumber } from "@/lib/normalizePhoneNumber"
 
 // Mock data type for prospects
 interface Prospect {
@@ -17,7 +18,7 @@ interface Prospect {
     phoneNumber: string
     description: string
     nextFollowUp?: string
-    status: "New" | "In Progress"
+    status: string
     archived?: boolean
 }
 
@@ -108,19 +109,21 @@ function StatCard({
 }
 
 function SectionTable({ label, prospects }: { label: string; prospects: Prospect[] }) {
+    const router = useRouter()
     const labelColor = (() => {
         const l = label.toLowerCase()
         if (l.includes("progress")) return "text-sky-600"
         if (l.includes("new")) return "text-green-600"
+        if (l.includes("career")) return "text-gray-600"
         return "text-blue-600"
     })()
 
     return (
         <>
             <div className="flex items-center gap-4 min-w-0">
-                <div className="w-[96px] h-auto hidden md:flex items-center justify-center self-stretch flex-shrink-0 bg-white rounded-lg py-6 px-2">
+                <div className="w-[96px] hidden md:flex items-center justify-center self-stretch flex-shrink-0 bg-white rounded-lg py-6 px-2 overflow-hidden">
                     <span
-                        className={`block rotate-[-90deg] origin-center whitespace-nowrap tracking-widest font-semibold select-none text-[24px] ${labelColor}`}
+                        className={`text-[24px] tracking-widest font-semibold select-none whitespace-nowrap [writing-mode:vertical-rl] rotate-180 ${labelColor}`}
                     >
                         {label}
                     </span>
@@ -166,14 +169,14 @@ function SectionTable({ label, prospects }: { label: string; prospects: Prospect
                                             prospects.map((p) => {
                                                 const shortId = `P-${p.id.slice(0, 6).toUpperCase()}`
                                                 return (
-                                                    <TableRow key={p.id} className="hover:bg-muted/50 even:bg-muted/30">
+                                                    <TableRow onClick={() => `/sales/prospects/${p.id}`} key={p.id} className="hover:bg-muted/50 cursor-pointer even:bg-muted/30">
                                                         <TableCell className="truncate max-w-[200px] align-top" title={p.name}>
                                                             <div className="flex flex-col">
                                                                 <span className="text-foreground font-medium truncate">{p.name || shortId}</span>
                                                             </div>
                                                         </TableCell>
 
-                                                        <TableCell className="truncate max-w-[150px] align-top">{p.phoneNumber || "N/A"}</TableCell>
+                                                        <TableCell className="truncate max-w-[150px] align-top">{normalizePhoneNumber(p.phoneNumber, p.dialCode).internationalNumber || "N/A"}</TableCell>
 
                                                         <TableCell className="truncate max-w-[250px] align-top" title={p.description}>
                                                             {p.description || "N/A"}
@@ -188,7 +191,7 @@ function SectionTable({ label, prospects }: { label: string; prospects: Prospect
                                                             </div>
                                                         </TableCell>
 
-                                                        <TableCell className="truncate max-w-[120px] align-top">
+                                                        <TableCell className=" align-top">
                                                             <span
                                                                 className={`inline-flex items-center px-3 py-1 rounded-full text-sm ${p.status === "New" ? "bg-green-100 text-green-800" : "bg-sky-100 text-sky-800"
                                                                     }`}
@@ -276,7 +279,7 @@ function SectionTable({ label, prospects }: { label: string; prospects: Prospect
             </div>
             <div className="flex justify-end">
                 <Link
-                    href={`/sales/prospects/table?status=${encodeURIComponent(label === "New Prospects" ? "New" : "In Progress")}`}
+                    href={`/sales/prospects/table?status=${encodeURIComponent(label === "New Prospects" ? "New" : label)}`}
                     className="bg-[#002FFF] cursor-pointer text-white text-[14px] py-[10px] mt-[10px] px-[10px] rounded-[5px] inline-block"
                 >
                     View more
@@ -297,6 +300,7 @@ export default function ProspectsPage() {
             .then(res => res.json())
             .then(data => {
                 if (data.prospects) {
+                    console.log(data.prospects)
                     setProspects(data.prospects.filter((p: Prospect) => !p.archived))
                 } else {
                     setProspects([])
@@ -311,6 +315,9 @@ export default function ProspectsPage() {
 
     const newProspects = prospects.filter((p) => p.status === "New")
     const inProgressProspects = prospects.filter((p) => p.status === "In Progress")
+    const inRelevantNotNowProspects = prospects.filter((p) => p.status === "Relevant but not Now")
+    const inCarrerProspects = prospects.filter((p) => p.status === "Career")
+    const inRelevantNotProspects = prospects.filter((p) => p.status === "Not Relevant")
     const totalProspects = prospects.length
     const newCount = newProspects.length
     const inProgressCount = inProgressProspects.length
@@ -358,6 +365,9 @@ export default function ProspectsPage() {
                     <div className="space-y-8">
                         <SectionTable label="New Prospects" prospects={newProspects.slice(0, 5)} />
                         <SectionTable label="In Progress" prospects={inProgressProspects.slice(0, 5)} />
+                        <SectionTable label="Relevant but not Now" prospects={inRelevantNotNowProspects.slice(0, 5)} />
+                        <SectionTable label="Career" prospects={inCarrerProspects.slice(0, 5)} />
+                        <SectionTable label="Not Relevant" prospects={inRelevantNotProspects.slice(0, 5)} />
                     </div>
                 </>
             )}

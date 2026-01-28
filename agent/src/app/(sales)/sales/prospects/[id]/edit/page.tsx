@@ -17,6 +17,10 @@ import type { Agent, Prospect } from "@/types"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useAgentContext } from "@/lib/agent-context"
 import { toast } from "react-toastify"
+import type { CountryData } from "react-phone-input-2"
+import PhoneInput from "react-phone-input-2"
+import "react-phone-input-2/lib/style.css"
+import { Badge } from "@/components/ui/badge"
 
 
 export default function EditProspectPage() {
@@ -33,6 +37,10 @@ export default function EditProspectPage() {
   const [assignedTo, setAssignedTo] = useState("")
   const [leadSources, setLeadSources] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [categories, setCategories] = useState<any[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<any | null>(null);
+  const [categorySearchQuery, setCategorySearchQuery] = useState("");
+  const [showCategorySuggestions, setShowCategorySuggestions] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -61,6 +69,7 @@ export default function EditProspectPage() {
         // 3️⃣ Set prospect form data AFTER lead sources are available
         const prospect = prospectData.prospect || {};
         setFormData({
+          id: prospect.id,
           name: prospect.name ?? "",
           phoneNumber: prospect.phoneNumber ?? "",
           address: prospect.address ?? "",
@@ -70,6 +79,8 @@ export default function EditProspectPage() {
           notes: prospect.notes ?? "",
           status: prospect.status ?? "",
           amount: prospect.amount?.toString() ?? "",
+          dialCode: prospect.dialCode,
+          serviceId: prospect.serviceId
         });
 
         setReminderDate(prospect.nextFollowUp ? new Date(prospect.nextFollowUp) : undefined);
@@ -138,6 +149,40 @@ export default function EditProspectPage() {
       setIsSubmitting(false)
     }
   }
+
+  useEffect(() => {
+    const fetchTaskCategories = async () => {
+      try {
+        const res = await fetch("/api/task-categories")
+        const data = await res.json()
+        setCategories(data)
+        console.log(formData)
+        setCategorySearchQuery(data.find((service: any) => service.id == formData.serviceId).name)
+      } finally {
+        setLoading(false)
+      }
+    }
+    formData.id && fetchTaskCategories()
+  }, [formData.id])
+
+  const filteredCategories = Array.isArray(categories)
+    ? categories.filter((category) => {
+      // Only show approved and pending categories, not rejected ones
+      if (!category || typeof category !== 'object') return false;
+      if (category.status === "rejected") return false;
+      return (
+        typeof category.name === 'string' &&
+        category.name.toLowerCase().includes(categorySearchQuery.toLowerCase())
+      );
+    })
+    : [];
+
+  const handleCategorySelection = (category: any) => {
+    setFormData((prev) => ({ ...prev, serviceId: category.id }));
+    setCategorySearchQuery(category.name);
+    setShowCategorySuggestions(false);
+    setSelectedCategory(category);
+  };
 
   if (loading) {
     return (
@@ -208,18 +253,29 @@ export default function EditProspectPage() {
 
                 <div className="space-y-2">
                   <Label htmlFor="phoneNumber" className="flex items-center gap-2">
-                    <Phone className="size-4" />
+                    <Phone className="h-4 w-4" />
                     <span>Phone Number</span>
                     <span className="text-destructive">*</span>
                   </Label>
-                  <Input
-                    id="phoneNumber"
-                    name="phoneNumber"
-                    type="tel"
-                    placeholder="Enter phone number"
+
+                  <PhoneInput
+                    country={"in"}
                     value={formData.phoneNumber}
-                    onChange={handleInputChange}
-                    required
+                    onChange={(phone, country) =>
+                      setFormData({ ...formData, phoneNumber: phone, dialCode: (country as CountryData).dialCode })
+                    }
+                    inputProps={{
+                      name: "phoneNumber",
+                      required: true,
+                    }}
+                    inputStyle={{
+                      width: "100%",
+                      height: "2.5rem",
+                      borderRadius: "0.5rem",
+                    }}
+                    buttonStyle={{
+                      borderRadius: "0.5rem 0 0 0.5rem",
+                    }}
                   />
                 </div>
               </div>
@@ -258,6 +314,78 @@ export default function EditProspectPage() {
                     value={formData.amount}
                     onChange={handleInputChange}
                   />
+                </div>
+              </div>
+
+              <div className="space-y-2 relative">
+                <Label htmlFor="taskCategory">Service</Label>
+                <div className="relative">
+                  <Input
+                    id="taskCategory"
+                    type="text"
+                    placeholder="Type to search services..."
+                    value={categorySearchQuery}
+                    onChange={(e) => {
+                      setCategorySearchQuery(e.target.value);
+                      if (e.target.value.trim()) {
+                        setShowCategorySuggestions(true);
+                      } else {
+                        setShowCategorySuggestions(false);
+                      }
+                    }}
+                    onFocus={() => {
+                      if (categorySearchQuery.trim()) {
+                        setShowCategorySuggestions(true);
+                      }
+                    }}
+                    className="w-full"
+                    required
+                  />
+
+                  {/* Category Suggestions Dropdown - Only show when searching */}
+                  {showCategorySuggestions &&
+                    categorySearchQuery.trim() &&
+                    filteredCategories.length > 0 && (
+                      <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto">
+                        {filteredCategories.map((category) => (
+                          <div
+                            key={category.id}
+                            className="flex items-center justify-between p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
+                            onClick={() => {
+                              handleCategorySelection(category);
+                            }}
+                          >
+                            <div className="flex items-center gap-2">
+                              <div>
+                                <span className="font-medium">{category.name}</span>
+                                {category.description && (
+                                  <div className="text-xs text-gray-500 mt-1">
+                                    {category.description}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            <Badge
+                              className={`text-xs ${category.status === "approved"
+                                ? "bg-green-100 text-green-800"
+                                : "bg-yellow-100 text-yellow-800"
+                                }`}
+                            >
+                              {category.status}
+                            </Badge>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                  {/* No results message - Only when searching */}
+                  {showCategorySuggestions &&
+                    categorySearchQuery &&
+                    filteredCategories.length === 0 && (
+                      <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg p-3">
+                        <span className="text-gray-500">No services found</span>
+                      </div>
+                    )}
                 </div>
               </div>
 

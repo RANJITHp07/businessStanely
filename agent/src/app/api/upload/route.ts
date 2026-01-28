@@ -18,11 +18,16 @@ export async function POST(request: NextRequest) {
       "image/webp",
       "application/pdf",
       "text/plain",
+      "audio/mpeg",
+      "audio/wav",
+      "audio/ogg",
+      "audio/webm",
+      "audio/mp4",
     ];
     if (!allowedTypes.includes(file.type)) {
       return NextResponse.json(
         { error: "File type not allowed" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -30,7 +35,7 @@ export async function POST(request: NextRequest) {
     if (file.size > maxSize) {
       return NextResponse.json(
         { error: "File size too large (max 10MB)" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -54,7 +59,7 @@ export async function POST(request: NextRequest) {
       console.error("Error uploading to S3:", error);
       return NextResponse.json(
         { error: "Failed to upload file to S3." },
-        { status: 500 }
+        { status: 500 },
       );
     }
   } catch (error) {

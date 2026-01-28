@@ -196,7 +196,7 @@ export default function OppurtunitiesDetailPage() {
         <div className="container mx-auto p-6 max-w-7xl">
             <div className="mb-6">
                 <div className="mb-7">
-                    <h1 className="text-[28px] md:text-3xl font-bold">Oppurtunities Details</h1>
+                    <h1 className="text-[28px] md:text-3xl font-bold"></h1>
                     <p className="text-[18px] md:text-[16px] text-muted-foreground mt-2">
                         Detailed overview of oppurtunities information, engagement, and current status
                     </p>

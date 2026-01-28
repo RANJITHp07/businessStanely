@@ -34,6 +34,7 @@ import {
     DropdownMenuCheckboxItem,
 } from "@/components/ui/dropdown-menu"
 import Link from "next/link"
+import { normalizePhoneNumber } from "@/lib/normalizePhoneNumber"
 
 interface Opportunity {
     id: string
@@ -142,7 +143,7 @@ export default function OpportunitiesTable() {
             <div className="mb-8">
                 <div className="flex flex-col md:flex-row justify-between md:items-center mb-6 md:mb-4">
                     <div>
-                        <h1 className="text-3xl font-bold">Opportunities Management</h1>
+                        <h1 className="text-3xl font-bold">Opportunity Management</h1>
                         <p className="text-muted-foreground mt-2">Manage and track all sales opportunities</p>
                     </div>
                 </div>
@@ -305,7 +306,7 @@ export default function OpportunitiesTable() {
                                             currentOpportunities.map((opportunity) => (
                                                 <TableRow key={opportunity.id} className="cursor-pointer">
                                                     <TableCell className="max-w-[150px] truncate" onClick={() => router.push(`/sales/opportunites/${opportunity.id}`)}>{opportunity?.prospect?.name}</TableCell>
-                                                    <TableCell onClick={() => router.push(`/sales/opportunites/${opportunity.id}`)}>{opportunity.phoneNumber}</TableCell>
+                                                    <TableCell onClick={() => router.push(`/sales/opportunites/${opportunity.id}`)}>{normalizePhoneNumber(opportunity.prospect.phoneNumber!, opportunity.prospect.dialCode).internationalNumber || "N/A"}</TableCell>
                                                     <TableCell className="max-w-[300px] truncate" onClick={() => router.push(`/sales/opportunites/${opportunity.id}`)}>{opportunity.description}</TableCell>
                                                     <TableCell className="font-semibold" onClick={() => router.push(`/sales/opportunites/${opportunity.id}`)}>{formatCurrency(opportunity?.prospect.amount)}</TableCell>
                                                     <TableCell>

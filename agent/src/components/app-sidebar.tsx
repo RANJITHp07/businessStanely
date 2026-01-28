@@ -62,6 +62,16 @@ const salesItems = [
     icon: Calendar,
   },
   {
+    title: "Client Detail",
+    url: "/sales/client",
+    icon: UserRoundPen,
+  },
+  {
+    title: "Service Records",
+    url: "/service-records",
+    icon: FileText,
+  },
+  {
     title: "Settings",
     url: "/setting",
     icon: Settings,

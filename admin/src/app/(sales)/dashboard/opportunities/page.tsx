@@ -570,7 +570,7 @@ export default function ProspectDashboard() {
                 {/* Header */}
                 <div className="flex items-center justify-between mb-6">
                     <div>
-                        <h1 className="text-3xl font-bold text-slate-800 mb-1">Opportunities Reports Dashboard</h1>
+                        <h1 className="text-3xl font-bold text-slate-800 mb-1">Opportunity Reports Dashboard</h1>
                         <p className="">Track and manage your sales opportunities</p>
                     </div>
                 </div>

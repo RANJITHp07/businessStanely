@@ -28,6 +28,7 @@ import Link from "next/link"
 import { Separator } from "@/components/ui/separator"
 import { cn } from "@/lib/utils"
 import { useAgentContext } from "@/lib/agent-context"
+import { normalizePhoneNumber } from "@/lib/normalizePhoneNumber"
 
 interface oppurtunities {
     id: string
@@ -142,12 +143,36 @@ export default function OppurtunitiesDetailPage() {
         if (!newComment.trim() && attachments.length === 0) return;
         setSubmitting(true);
         try {
+            let attachmentData = {}
+            if (attachments && attachments.length > 0) {
+                const formData = new FormData();
+                formData.append("file", attachments[0]);
+
+                const uploadResponse = await fetch("/api/upload", {
+                    method: "POST",
+                    body: formData,
+                });
+
+                if (uploadResponse.ok) {
+                    const uploadResult = await uploadResponse.json();
+                    attachmentData = {
+                        attachmentName: uploadResult.originalName,
+                        attachmentSize: uploadResult.size,
+                        attachmentType: uploadResult.type,
+                        attachmentUrl: uploadResult.url,
+                    };
+                } else {
+                    console.error("Failed to upload file", error)
+                    return;
+                }
+            }
             // TODO: Replace with actual user context
             const res = await fetch(`/api/opportunities/${opportunityId}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     content: newComment,
+                    ...attachmentData
                     // Attachments logic can be expanded here
                 }),
             });
@@ -198,7 +223,7 @@ export default function OppurtunitiesDetailPage() {
         <div className="container mx-auto p-6 max-w-7xl">
             <div className="mb-6">
                 <div className="mb-7">
-                    <h1 className="text-[28px] md:text-3xl font-bold">Oppurtunities Details</h1>
+                    <h1 className="text-[28px] md:text-3xl font-bold">Opportunity Details</h1>
                     <p className="text-[18px] md:text-[16px] text-muted-foreground mt-2">
                         Detailed overview of oppurtunities information, engagement, and current status
                     </p>
@@ -287,7 +312,7 @@ export default function OppurtunitiesDetailPage() {
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <p className="text-sm text-muted-foreground">Phone Number</p>
-                                        <p className="font-medium truncate">{oppurtunities.phoneNumber}</p>
+                                        <p className="font-medium truncate">{normalizePhoneNumber(oppurtunities?.prospect?.phoneNumber!, oppurtunities?.prospect?.dialCode!).internationalNumber || "N/A"}</p>
                                     </div>
                                 </div>
                                 <div className="flex items-start gap-3">
@@ -363,15 +388,27 @@ export default function OppurtunitiesDetailPage() {
                                             <p className="text-sm leading-relaxed">{comment.content}</p>
                                             {comment.attachmentUrl && (
                                                 <div className="flex flex-wrap gap-2 pt-2">
-                                                    <a
-                                                        href={comment.attachmentUrl}
-                                                        className="flex items-center gap-2 px-3 py-1.5 bg-muted rounded-md text-sm hover:bg-muted/80 transition-colors"
-                                                    >
-                                                        <Paperclip className="h-3 w-3" />
-                                                        {comment.attachmentName}
-                                                    </a>
+                                                    {comment.attachmentUrl.match(/\.(mp3|wav|ogg)$/i) ? (
+                                                        <div className="flex flex-col gap-1 px-2 py-1 bg-muted rounded-md text-sm w-full">
+                                                            <audio controls className="w-full">
+                                                                <source src={"https://management.legalstanley.com/" + comment.attachmentUrl} />
+                                                                Your browser does not support the audio element.
+                                                            </audio>
+                                                        </div>
+                                                    ) : (
+                                                        <a
+                                                            href={comment.attachmentUrl}
+                                                            className="flex items-center gap-2 px-3 py-1.5 bg-muted rounded-md text-sm hover:bg-muted/80 transition-colors"
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                        >
+                                                            <Paperclip className="h-3 w-3" />
+                                                            {comment.attachmentName}
+                                                        </a>
+                                                    )}
                                                 </div>
                                             )}
+
                                         </div>
                                     ))
                                 )}
@@ -421,7 +458,7 @@ export default function OppurtunitiesDetailPage() {
                                         )}
                                     </Button>
                                     <div>
-                                        <input type="file" id="file-upload" multiple className="hidden" onChange={handleFileSelect} />
+                                        <input type="file" id="file-upload" className="hidden" onChange={handleFileSelect} />
                                         <Button
                                             type="button"
                                             variant="outline"
@@ -530,6 +567,14 @@ export default function OppurtunitiesDetailPage() {
                                 <div className="flex items-center gap-2 mt-1">
                                     <Calendar className="h-4 w-4 text-muted-foreground" />
                                     <p className="font-medium">{formatDate(oppurtunities.updatedAt)}</p>
+                                </div>
+                            </div>
+                            <Separator />
+                            <div>
+                                <p className="text-sm text-muted-foreground">Last FollowUp</p>
+                                <div className="flex items-center gap-2 mt-1">
+                                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                                    <p className="font-medium">{formatDate(oppurtunities.prevFollowup || "")}</p>
                                 </div>
                             </div>
                         </CardContent>

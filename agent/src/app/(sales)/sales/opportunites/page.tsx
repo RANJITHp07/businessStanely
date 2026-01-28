@@ -8,6 +8,7 @@ import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/comp
 import { Progress } from "@/components/ui/progress"
 import Link from "next/link"
 import { normalizePhoneNumber } from "@/lib/normalizePhoneNumber"
+import { useRouter } from "next/navigation"
 
 // Mock data type for opportunities
 interface Opportunity {
@@ -129,6 +130,7 @@ function StatCard({
 }
 
 function SectionTable({ label, opportunities }: { label: string; opportunities: any[] }) {
+    const router = useRouter()
     const labelColor = (() => {
         const l = label.toLowerCase()
         if (l.includes("won")) return "text-green-600"
@@ -198,7 +200,7 @@ function SectionTable({ label, opportunities }: { label: string; opportunities: 
                                             opportunities.map((opp) => {
                                                 const shortId = `O-${opp.id.slice(0, 6).toUpperCase()}`
                                                 return (
-                                                    <TableRow key={opp.id} className="hover:bg-muted/50 even:bg-muted/30">
+                                                    <TableRow onClick={() => router.push(`/sales/opportunites/${opp.id}`)} key={opp.id} className="hover:bg-muted/50 even:bg-muted/30">
                                                         <TableCell className="truncate max-w-[180px] align-top" title={opp.name}>
                                                             <div className="flex flex-col">
                                                                 <span className="text-foreground font-medium truncate">{opp.prospect?.name || shortId}</span>
@@ -330,7 +332,7 @@ function SectionTable({ label, opportunities }: { label: string; opportunities: 
             </div>
             <div className="flex justify-end">
                 <Link
-                    href={`/sales/opportunites/table?status=${encodeURIComponent(statusValue)}`}
+                    href={`/sales/opportunites/table?status=${encodeURIComponent(label)}`}
                     className="bg-[#002FFF] cursor-pointer text-white text-[14px] py-[10px] mt-[10px] px-[10px] rounded-[5px] inline-block"
                 >
                     View more
@@ -374,6 +376,7 @@ export default function OpportunitiesPage() {
     }, [])
 
     const proposalOpportunities = opportunities.filter((o) => o.status === "Proposal Issued")
+    const newOpportunities = opportunities.filter((o) => o.status === "New Opportunity")
     const wonOpportunities = opportunities.filter((o) => o.status === "Closed as Won")
     const lossOpportunities = opportunities.filter((o) => o.status === "Closed as Loss")
 
@@ -432,6 +435,7 @@ export default function OpportunitiesPage() {
                     </div>
 
                     <div className="space-y-8">
+                        <SectionTable label="New Opportunity" opportunities={newOpportunities.slice(0, 5)} />
                         <SectionTable label="Proposal Issued" opportunities={proposalOpportunities.slice(0, 5)} />
                         <SectionTable label="Closed as Won" opportunities={wonOpportunities.slice(0, 5)} />
                         <SectionTable label="Closed as Loss" opportunities={lossOpportunities.slice(0, 5)} />

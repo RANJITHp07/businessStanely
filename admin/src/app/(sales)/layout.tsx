@@ -20,7 +20,7 @@ export default function RootLayout({
                 <SidebarProvider>
                     <AppSidebar />
                     <main className="flex flex-col flex-1 min-w-0">
-                        <div className="flex gap-[20px] items-center py-[20px] p-6 md:pl-[20px] md:py-[15px] border-b">
+                        <div className="flex gap-[20px] items-center pl-[20px] p-6 md:pl-[20px]  border-b">
                             <Navigator />
                             <div className="flex justify-between items-center flex-1 pr-4">
                                 <h1 className="text-[25px] block md:hidden">

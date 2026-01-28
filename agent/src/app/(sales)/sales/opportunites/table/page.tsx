@@ -46,7 +46,7 @@ interface Opportunity {
     status: "Proposal Issued" | "Closed as Won" | "Closed as Loss"
 }
 
-const statuses = ["Proposal Issued", "Closed as Won", "Closed as Loss"]
+const statuses = ["New Opportunity", "Proposal Issued", "Closed as Won", "Closed as Loss"]
 
 export default function OpportunitiesTable() {
     const agent = useAgentContext();
@@ -345,11 +345,15 @@ export default function OpportunitiesTable() {
                                                                     <Edit className="mr-2 h-4 w-4" />
                                                                     Edit
                                                                 </DropdownMenuItem>
-                                                                <DropdownMenuSeparator />
-                                                                <DropdownMenuItem className="text-destructive">
-                                                                    <Trash2 className="mr-2 h-4 w-4" />
-                                                                    Delete
-                                                                </DropdownMenuItem>
+                                                                {
+                                                                    agent?.agentType == "Client Manager" &&
+                                                                    <>
+                                                                        <DropdownMenuSeparator />
+                                                                        <DropdownMenuItem className="text-destructive">
+                                                                            <Trash2 className="mr-2 h-4 w-4" />
+                                                                            Delete
+                                                                        </DropdownMenuItem></>
+                                                                }
                                                             </DropdownMenuContent>
                                                         </DropdownMenu>
                                                     </TableCell>

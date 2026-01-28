@@ -38,7 +38,7 @@ export default function RootLayout({
             <div className="w-full flex-1 bg-[#e3f2fd] relative">
               {children}
 
-              <div className="fixed bottom-6 right-6 z-50">
+              {/* <div className="fixed bottom-6 right-6 z-50">
                 <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
                   <PopoverTrigger asChild>
                     <Button className="bg-blue-600 text-white rounded-full w-14 h-14 flex items-center justify-center shadow-lg hover:bg-blue-700 transition-colors">
@@ -87,7 +87,7 @@ export default function RootLayout({
                     </div>
                   </PopoverContent>
                 </Popover>
-              </div>
+              </div> */}
             </div>
           </main>
         </SidebarProvider>

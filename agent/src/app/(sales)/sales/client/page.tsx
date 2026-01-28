@@ -193,7 +193,7 @@ export default function StatusTable() {
                                                 onClick={() =>
                                                     router.push(
                                                         item.status === "Converted"
-                                                            ? `/sales/opportunities/${item.opportunities.id}`
+                                                            ? `/sales/opportunites/${item.opportunities[0].id}`
                                                             : `/sales/prospects/${item.id}`
                                                     )
                                                 }

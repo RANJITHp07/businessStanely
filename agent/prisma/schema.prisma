@@ -31,7 +31,7 @@ model Opportunity {
   id            String   @id @default(auto()) @map("_id") @db.ObjectId
   name          String
   phoneNumber   String?
-  prevFollowup  Date?
+  prevFollowup  DateTime?
   description   String?
   amount        Float?
   nextFollowUp  DateTime?

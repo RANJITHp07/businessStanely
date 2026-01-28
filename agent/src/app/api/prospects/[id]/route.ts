@@ -73,6 +73,7 @@ export async function PUT(
       assignedTo,
       amount,
       serviceId,
+      quote,
     } = body;
 
     let prospect = await prisma.prospect.findUnique({ where: { id } });
@@ -94,7 +95,12 @@ export async function PUT(
             description: description || prospect.description,
             amount: typeof amount === "number" ? amount : 0,
             nextFollowUp: nextFollowUp ? new Date(nextFollowUp) : undefined,
-            status: "Proposal Issued",
+            prevFollowup:
+              nextFollowUp && prospect?.nextFollowUp
+                ? prospect?.nextFollowUp
+                : undefined,
+            quote: quote || "",
+            status: quote ? "Proposal Issued" : "New Opportunity",
             prospectId: prospect.id,
           },
         });

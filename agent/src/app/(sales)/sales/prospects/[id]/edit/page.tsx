@@ -1,5 +1,5 @@
 "use client"
-import type React from "react"
+import React from "react"
 import { useEffect, useState } from "react"
 import { useRouter, useParams, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -11,7 +11,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar"
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { CalendarIcon, Check, Mail, Phone, MapPin, FileText, UserPlus, Bell, Banknote } from "lucide-react"
+import { CalendarIcon, Check, Mail, Phone, MapPin, FileText, UserPlus, Bell, Banknote, Paperclip } from "lucide-react"
 import { cn } from "@/lib/utils"
 import type { Agent, Prospect } from "@/types"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -41,6 +41,16 @@ export default function EditProspectPage() {
   const [selectedCategory, setSelectedCategory] = useState<any | null>(null);
   const [categorySearchQuery, setCategorySearchQuery] = useState("");
   const [showCategorySuggestions, setShowCategorySuggestions] = useState(false);
+  const fileRef = React.useRef<HTMLInputElement | null>(null)
+  const [file, setFile] = React.useState<File | null>(null)
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files?.length) {
+      setFile(e.target.files[0])
+    } else {
+      setFile(null)
+    }
+  }
 
   useEffect(() => {
     if (!id) return;
@@ -125,12 +135,30 @@ export default function EditProspectPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     const searchQuery = searchParams.get("opportunities") || "";
+    let quote = null;
+    if (file) {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const uploadResponse = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (uploadResponse.ok) {
+        const uploadResult = await uploadResponse.json();
+        quote = uploadResult.url
+      }
+    }
     const payload = {
       ...formData,
       assignedTo,
       nextFollowUp: reminderDate ? reminderDate.toISOString() : undefined,
       leadSourceId: leadSources.find((source) => source.name == formData.leadSource)?.id,
-      archived: !!searchQuery
+      archived: !!searchQuery,
+      quote,
+      status: searchParams.get("opportunity") ? "Opportunity" : formData.status
+
     }
     try {
       setIsSubmitting(true)
@@ -141,8 +169,10 @@ export default function EditProspectPage() {
       })
       if (!res.ok) throw new Error("Failed to update prospect")
 
+      const data = await res.json()
       toast.success("Updated successfully")
-      router.back()
+      searchParams.get("opportunity") ? router.push(`/sales/opportunites/${data?.opportunity?.id}`) :
+        router.back()
     } catch (err) {
       toast.error("Failed to update prospect")
     } finally {
@@ -339,7 +369,6 @@ export default function EditProspectPage() {
                       }
                     }}
                     className="w-full"
-                    required
                   />
 
                   {/* Category Suggestions Dropdown - Only show when searching */}
@@ -366,7 +395,7 @@ export default function EditProspectPage() {
                               </div>
                             </div>
                             <Badge
-                              className={`text-xs ${category.status === "approved"
+                              className={`text - xs ${category.status === "approved"
                                 ? "bg-green-100 text-green-800"
                                 : "bg-yellow-100 text-yellow-800"
                                 }`}
@@ -467,9 +496,11 @@ export default function EditProspectPage() {
               <CardHeader>
                 <div className="flex items-center gap-2">
                   <Bell className="size-5 text-primary" />
-                  <CardTitle>Assignment</CardTitle>
+                  <CardTitle>{searchParams.get("opportunity") ? "Attach Quote" : "Assignment"}</CardTitle>
                 </div>
-                <CardDescription>Assign to team members</CardDescription>
+                {!searchParams.get("opportunity") &&
+                  <CardDescription>Assign to team members</CardDescription>
+                }
               </CardHeader>
               <CardContent className="space-y-4">
                 {/* Reminder */}
@@ -496,53 +527,88 @@ export default function EditProspectPage() {
                 </div> */}
 
                 {/* Assign */}
-                <div className="space-y-2">
-                  <Label htmlFor="assign">Assign To</Label>
-                  <Popover open={open} onOpenChange={setOpen}>
-                    <PopoverTrigger asChild>
-                      <Button
-                        id="assign"
-                        variant="outline"
-                        role="combobox"
-                        aria-expanded={open}
-                        className="w-full justify-between font-normal bg-transparent"
-                      >
-                        {assignedTo
-                          ? teamMembers.find((member) => member.id === assignedTo)?.name
-                          : "Select team member..."}
-                        <Check className={cn("ml-2 size-4 shrink-0 opacity-0", assignedTo && "opacity-100")} />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-full p-0" align="start">
-                      <Command>
-                        <CommandInput placeholder="Search team members..." />
-                        <CommandList>
-                          <CommandEmpty>No team member found.</CommandEmpty>
-                          <CommandGroup>
-                            {teamMembers.map((member) => (
-                              <CommandItem
-                                key={member.id}
-                                value={member.name}
-                                onSelect={() => {
-                                  setAssignedTo(member.id === assignedTo ? "" : member.id)
-                                  setOpen(false)
-                                }}
-                              >
-                                <Check
-                                  className={cn("mr-2 size-4", assignedTo === member.id ? "opacity-100" : "opacity-0")}
-                                />
-                                <div className="flex flex-col">
-                                  <span className="font-medium">{member.name}</span>
-                                  <span className="text-xs text-muted-foreground">{member.email}</span>
-                                </div>
-                              </CommandItem>
-                            ))}
-                          </CommandGroup>
-                        </CommandList>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
-                </div>
+                {
+                  searchParams.get("opportunity") ?
+                    <div className="flex flex-col w-full space-y-2">
+                      <Label className="flex items-center gap-2">
+                        <Paperclip className="h-4 w-4" />
+                        Attach the quote
+                      </Label>
+
+                      <div className="flex gap-2">
+                        <Input
+                          type="text"
+                          placeholder="No file chosen"
+                          readOnly
+                          value={fileRef.current?.files?.[0]?.name || ""}
+                          className="flex-1"
+                        />
+
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => fileRef.current?.click()}
+                        >
+                          Browse
+                        </Button>
+                      </div>
+
+                      <input
+                        type="file"
+                        ref={fileRef}
+                        className="hidden"
+                        onChange={handleFileChange}
+                      />
+                    </div>
+                    :
+                    <div className="space-y-2">
+                      <Label htmlFor="assign">Assign To</Label>
+                      <Popover open={open} onOpenChange={setOpen}>
+                        <PopoverTrigger asChild>
+                          <Button
+                            id="assign"
+                            variant="outline"
+                            role="combobox"
+                            aria-expanded={open}
+                            className="w-full justify-between font-normal bg-transparent"
+                          >
+                            {assignedTo
+                              ? teamMembers.find((member) => member.id === assignedTo)?.name
+                              : "Select team member..."}
+                            <Check className={cn("ml-2 size-4 shrink-0 opacity-0", assignedTo && "opacity-100")} />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-full p-0" align="start">
+                          <Command>
+                            <CommandInput placeholder="Search team members..." />
+                            <CommandList>
+                              <CommandEmpty>No team member found.</CommandEmpty>
+                              <CommandGroup>
+                                {teamMembers.map((member) => (
+                                  <CommandItem
+                                    key={member.id}
+                                    value={member.name}
+                                    onSelect={() => {
+                                      setAssignedTo(member.id === assignedTo ? "" : member.id)
+                                      setOpen(false)
+                                    }}
+                                  >
+                                    <Check
+                                      className={cn("mr-2 size-4", assignedTo === member.id ? "opacity-100" : "opacity-0")}
+                                    />
+                                    <div className="flex flex-col">
+                                      <span className="font-medium">{member.name}</span>
+                                      <span className="text-xs text-muted-foreground">{member.email}</span>
+                                    </div>
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                }
               </CardContent>
             </Card>
           }
@@ -560,7 +626,7 @@ export default function EditProspectPage() {
               Cancel
             </Button>
             <Button type="submit" disabled={isSubmitting} className=" text-white rounded-lg px-4 py-2 flex items-center gap-2 cursor-pointer shadow-none hover:shadow-md transition-shadow duration-300" >
-              {isSubmitting ? "Updating..." : " Update Prospect"}
+              {isSubmitting ? "Updating..." : (searchParams.get("opportunity") ? "Convert to Opportunity" : "Update Prospect")}
             </Button>
           </div>
         </form>

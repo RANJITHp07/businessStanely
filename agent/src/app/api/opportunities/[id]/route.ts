@@ -71,8 +71,15 @@ export async function PUT(
   try {
     const { id } = await params;
     const body = await req.json();
-    const { name, phoneNumber, description, amount, nextFollowUp, status } =
-      body;
+    const {
+      name,
+      phoneNumber,
+      description,
+      amount,
+      nextFollowUp,
+      status,
+      quote,
+    } = body;
     const opp = await prisma.opportunity.findUnique({
       where: {
         id,
@@ -89,6 +96,7 @@ export async function PUT(
         prevFollowup:
           nextFollowUp && opp?.nextFollowUp ? opp?.nextFollowUp : undefined,
         status,
+        quote,
       },
     });
     return NextResponse.json({ opportunity });

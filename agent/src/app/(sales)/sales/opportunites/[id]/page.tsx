@@ -1,7 +1,7 @@
 "use client"
 
 import { useParams } from "next/navigation"
-import { useState, useEffect } from "react"
+import React, { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -29,6 +29,7 @@ import { Separator } from "@/components/ui/separator"
 import { cn } from "@/lib/utils"
 import { useAgentContext } from "@/lib/agent-context"
 import { normalizePhoneNumber } from "@/lib/normalizePhoneNumber"
+import { Input } from "@/components/ui/input"
 
 interface oppurtunities {
     id: string
@@ -37,9 +38,10 @@ interface oppurtunities {
     description: string
     amount?: number
     nextFollowUp?: string
-    status: "Proposal Issued" | "Closed as Won" | "Closed as Loss"
+    status: "Proposal Issued" | "Closed as Won" | "Closed as Loss" | "New Opportunity"
     createdAt: string
     updatedAt: string
+    quote: string;
     prospect?: {
         name: string;
         email?: string;
@@ -73,6 +75,8 @@ export default function OppurtunitiesDetailPage() {
     const [attachments, setAttachments] = useState<File[]>([])
     const [submitting, setSubmitting] = useState(false)
     const [nextFollowUpDate, setNextFollowUpDate] = useState<Date | undefined>(undefined)
+    const fileRef = React.useRef<HTMLInputElement | null>(null)
+    const [file, setFile] = React.useState<File | null>(null)
 
 
     // Use useParams from next/navigation for dynamic route params in client components
@@ -139,6 +143,37 @@ export default function OppurtunitiesDetailPage() {
         setAttachments(attachments.filter((_, i) => i !== index))
     }
 
+    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files?.length) {
+            const formData = new FormData();
+            formData.append("file", e.target.files[0]);
+
+            const uploadResponse = await fetch("/api/upload", {
+                method: "POST",
+                body: formData,
+            });
+
+            if (uploadResponse.ok) {
+                const uploadResult = await uploadResponse.json();
+                let quote = uploadResult.url
+                console.log("hiii", uploadResult)
+                setoppurtunities({ ...oppurtunities, status: "Proposal Issued", quote: uploadResult.url! })
+                const res = await fetch(`/api/opportunities/${oppurtunities?.id}`, {
+                    method: "PUT",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ ...oppurtunities, status: "Proposal Issued", quote: uploadResult.url! }),
+                });
+                if (!res.ok) {
+                    console.error("Failed to update status");
+                    return;
+                }
+                setFile(e.target.files[0])
+            }
+        } else {
+            setFile(null)
+        }
+    }
+
     const handleSubmitComment = async () => {
         if (!newComment.trim() && attachments.length === 0) return;
         setSubmitting(true);
@@ -189,6 +224,7 @@ export default function OppurtunitiesDetailPage() {
     }
 
     const formatDate = (dateString: string) => {
+        if (!dateString) return "N/A    "
         return new Date(dateString).toLocaleDateString("en-US", {
             month: "short",
             day: "numeric",
@@ -285,6 +321,7 @@ export default function OppurtunitiesDetailPage() {
                                                 <SelectValue />
                                             </SelectTrigger>
                                             <SelectContent>
+                                                <SelectItem value="New Opportunity">New Opportunity</SelectItem>
                                                 <SelectItem value="Proposal Issued">Proposal Issued</SelectItem>
                                                 <SelectItem value="Closed as Won">Closed as Won</SelectItem>
                                                 <SelectItem value="Closed as Loss">Closed as Loss</SelectItem>
@@ -574,9 +611,56 @@ export default function OppurtunitiesDetailPage() {
                                 <p className="text-sm text-muted-foreground">Last FollowUp</p>
                                 <div className="flex items-center gap-2 mt-1">
                                     <Calendar className="h-4 w-4 text-muted-foreground" />
-                                    <p className="font-medium">{formatDate(oppurtunities.prevFollowup || "")}</p>
+                                    <p className="font-medium">{formatDate(oppurtunities.prevFollowup)}</p>
                                 </div>
                             </div>
+                            <Separator />
+                            <div className="flex flex-col w-full space-y-2">
+
+                                <>
+                                    <Label className="flex items-center gap-2">
+                                        <Paperclip className="h-4 w-4" />
+                                        Attach the quote
+                                    </Label>
+                                    <div className="flex gap-2">
+                                        <Input
+                                            type="text"
+                                            placeholder="No file chosen"
+                                            readOnly
+                                            value={fileRef.current?.files?.[0]?.name || ""}
+                                            className="flex-1"
+                                        />
+
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            onClick={() => fileRef.current?.click()}
+                                        >
+                                            Browse
+                                        </Button>
+                                    </div>
+
+                                    <input
+                                        type="file"
+                                        ref={fileRef}
+                                        className="hidden"
+                                        onChange={handleFileChange}
+                                    />
+                                </>
+                                {
+                                    oppurtunities.quote &&
+                                    <a
+                                        href={oppurtunities.quote} // URL of the already uploaded quote
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="flex items-center gap-2 px-3 py-1.5 bg-muted rounded-md text-sm hover:bg-muted/80 transition-colors"
+                                    >
+                                        <Paperclip className="h-3 w-3" />
+                                        View Quote
+                                    </a>
+                                }
+                            </div>
+
                         </CardContent>
                     </Card>
                 </div>

@@ -332,7 +332,7 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
                                         </Select>
                                     </div>
                                 </div>
-                                <Button className="mt-6" disabled={opprunity} onClick={() => handleStatusChange("Opportunity")}>Convert to Oppurtunity</Button>
+                                <Button className="mt-6" disabled={opprunity} onClick={() => router.push(`/sales/prospects/${prospect.id}/edit?opportunity=true`)}>Convert to Oppurtunity</Button>
                             </div>
                         </div>
                     </CardContent>

@@ -41,6 +41,7 @@ model Opportunity {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   comments      Comment[] // Comments/interactions for this opportunity
+  quote         String?
 }
 datasource db {
   provider = "mongodb"

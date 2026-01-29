@@ -36,7 +36,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 
 import {
   FileText,
@@ -123,6 +124,9 @@ interface Comment {
   authorType: string;
   content: string;
   createdAt: string;
+  commentDate?: string;
+  startTime?: string;
+  endTime?: string;
   attachmentName?: string;
   attachmentSize?: number;
   attachmentType?: string;
@@ -168,6 +172,11 @@ export default function TaskDetails() {
   const [newComment, setNewComment] = useState("");
   const [submittingComment, setSubmittingComment] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+
+  // Timesheet fields for comments
+  const [commentDate, setCommentDate] = useState<Date | undefined>(new Date());
+  const [startTime, setStartTime] = useState("");
+  const [endTime, setEndTime] = useState("");
 
   // Use subordinates from assignedTo if available (from API)
   // Type guard for subordinates
@@ -365,6 +374,15 @@ export default function TaskDetails() {
     });
   };
 
+  // Helper function to convert 24-hour format to 12-hour AM/PM format
+  const get12HourFormat = (hour24: string): string => {
+    const h = parseInt(hour24, 10);
+    if (h === 0) return "12 AM";
+    if (h < 12) return `${h} AM`;
+    if (h === 12) return "12 PM";
+    return `${h - 12} PM`;
+  };
+
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
@@ -373,7 +391,10 @@ export default function TaskDetails() {
   };
 
   const handleAddComment = async () => {
-    if (!newComment.trim() || !task) return;
+    if (!newComment.trim() || !task || !commentDate || !startTime || !endTime) {
+      alert("Please fill in all required fields (comment, date, start time, and end time)");
+      return;
+    }
     setSubmittingComment(true);
 
     try {
@@ -404,6 +425,15 @@ export default function TaskDetails() {
         }
       }
 
+      // Combine date and time values
+      const startDateTime = new Date(commentDate);
+      const [startHour, startMinute] = startTime.split(":").map(Number);
+      startDateTime.setHours(startHour, startMinute, 0);
+
+      const endDateTime = new Date(commentDate);
+      const [endHour, endMinute] = endTime.split(":").map(Number);
+      endDateTime.setHours(endHour, endMinute, 0);
+
       const response = await fetch(`/api/comments`, {
         method: "POST",
         headers: {
@@ -412,6 +442,9 @@ export default function TaskDetails() {
         body: JSON.stringify({
           taskId: task.id,
           content: newComment,
+          commentDate: commentDate.toISOString(),
+          startTime: startDateTime.toISOString(),
+          endTime: endDateTime.toISOString(),
           ...attachmentData,
         }),
       });
@@ -428,6 +461,9 @@ export default function TaskDetails() {
         );
         setNewComment("");
         setSelectedFile(null);
+        setCommentDate(new Date()); // Reset to current date
+        setStartTime("");
+        setEndTime("");
       } else {
         const errorData = await response.json();
         console.error("Failed to add comment:", errorData);
@@ -1287,6 +1323,160 @@ export default function TaskDetails() {
                       onChange={(e) => setNewComment(e.target.value)}
                       rows={3}
                     />
+                    
+                    {/* Timesheet fields */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-muted/50 p-4 rounded-lg">
+                      {/* Date picker */}
+                      <div className="space-y-2">
+                        <Label className="text-sm">Work Date</Label>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              className="w-full justify-start text-left font-normal"
+                            >
+                              <Calendar className="mr-2 h-4 w-4" />
+                              {commentDate
+                                ? format(commentDate, "MMM dd, yyyy")
+                                : "Pick a date"}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <CalendarComponent
+                              mode="single"
+                              selected={commentDate}
+                              onSelect={setCommentDate}
+                              disabled={(date) => date > new Date()}
+                              initialFocus
+                            />
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+
+                      {/* Start time - 12 hour format with AM/PM */}
+                      <div className="space-y-2">
+                        <Label className="text-sm">Start Time</Label>
+                        <div className="flex gap-2">
+                          <Select 
+                            value={startTime.split(":")[0] || ""}
+                            onValueChange={(hour) => {
+                              const minute = startTime.split(":")[1] || "00";
+                              setStartTime(`${hour}:${minute}`);
+                            }}
+                          >
+                            <SelectTrigger className="flex-1">
+                              <SelectValue placeholder="Hour">
+                                {startTime.split(":")[0] ? get12HourFormat(startTime.split(":")[0]) : "Hour"}
+                              </SelectValue>
+                            </SelectTrigger>
+                            <SelectContent>
+                              {Array.from({ length: 24 }, (_, i) => {
+                                const hour = String(i).padStart(2, "0");
+                                let displayHour = "";
+                                if (i === 0) {
+                                  displayHour = "12 AM";
+                                } else if (i < 12) {
+                                  displayHour = `${i} AM`;
+                                } else if (i === 12) {
+                                  displayHour = "12 PM";
+                                } else {
+                                  displayHour = `${i - 12} PM`;
+                                }
+                                return (
+                                  <SelectItem key={`start-hour-${hour}`} value={hour}>
+                                    {displayHour}
+                                  </SelectItem>
+                                );
+                              })}
+                            </SelectContent>
+                          </Select>
+                          <Select
+                            value={startTime.split(":")[1] || ""}
+                            onValueChange={(minute) => {
+                              const hour = startTime.split(":")[0] || "00";
+                              setStartTime(`${hour}:${minute}`);
+                            }}
+                          >
+                            <SelectTrigger className="flex-1">
+                              <SelectValue placeholder="Min" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {Array.from({ length: 60 }, (_, i) => {
+                                const minute = String(i).padStart(2, "0");
+                                return (
+                                  <SelectItem key={`start-min-${minute}`} value={minute}>
+                                    {minute}
+                                  </SelectItem>
+                                );
+                              })}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+
+                      {/* End time - 12 hour format with AM/PM */}
+                      <div className="space-y-2">
+                        <Label className="text-sm">End Time</Label>
+                        <div className="flex gap-2">
+                          <Select 
+                            value={endTime.split(":")[0] || ""}
+                            onValueChange={(hour) => {
+                              const minute = endTime.split(":")[1] || "00";
+                              setEndTime(`${hour}:${minute}`);
+                            }}
+                          >
+                            <SelectTrigger className="flex-1">
+                              <SelectValue placeholder="Hour">
+                                {endTime.split(":")[0] ? get12HourFormat(endTime.split(":")[0]) : "Hour"}
+                              </SelectValue>
+                            </SelectTrigger>
+                            <SelectContent>
+                              {Array.from({ length: 24 }, (_, i) => {
+                                const hour = String(i).padStart(2, "0");
+                                let displayHour = "";
+                                if (i === 0) {
+                                  displayHour = "12 AM";
+                                } else if (i < 12) {
+                                  displayHour = `${i} AM`;
+                                } else if (i === 12) {
+                                  displayHour = "12 PM";
+                                } else {
+                                  displayHour = `${i - 12} PM`;
+                                }
+                                return (
+                                  <SelectItem key={`end-hour-${hour}`} value={hour}>
+                                    {displayHour}
+                                  </SelectItem>
+                                );
+                              })}
+                            </SelectContent>
+                          </Select>
+                          <Select
+                            value={endTime.split(":")[1] || ""}
+                            onValueChange={(minute) => {
+                              const hour = endTime.split(":")[0] || "00";
+                              setEndTime(`${hour}:${minute}`);
+                            }}
+                          >
+                            <SelectTrigger className="flex-1">
+                              <SelectValue placeholder="Min" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {Array.from({ length: 60 }, (_, i) => {
+                                const minute = String(i).padStart(2, "0");
+                                return (
+                                  <SelectItem key={`end-min-${minute}`} value={minute}>
+                                    {minute}
+                                  </SelectItem>
+                                );
+                              })}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* File upload and submit button */}
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <input
@@ -1321,7 +1511,7 @@ export default function TaskDetails() {
                       <Button
                         type="button"
                         onClick={handleAddComment}
-                        disabled={!newComment.trim() || submittingComment}
+                        disabled={!newComment.trim() || submittingComment || !commentDate || !startTime || !endTime}
                       >
                         <Send className="h-4 w-4 mr-2" />
                         {submittingComment ? "Adding..." : "Add Comment"}
@@ -1367,6 +1557,39 @@ export default function TaskDetails() {
                               {formatDateTime(comment.createdAt)}
                             </span>
                           </div>
+                          
+                          {/* Display timesheet information if available */}
+                          {(comment.commentDate || comment.startTime || comment.endTime) && (
+                            <div className="bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900 border border-blue-200 dark:border-blue-800 p-3 rounded-lg mt-3 mb-3">
+                              <div className="flex flex-wrap items-center gap-6 text-blue-900 dark:text-blue-100">
+                                {comment.commentDate && (
+                                  <div className="flex items-center gap-3">
+                                    <div className="bg-blue-500 rounded-full p-1.5">
+                                      <Calendar className="h-3.5 w-3.5 text-white" />
+                                    </div>
+                                    <div className="flex flex-col">
+                                      <span className="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wide">Work Date</span>
+                                      <span className="text-sm font-medium">{format(new Date(comment.commentDate), "EEEE, MMM dd, yyyy")}</span>
+                                    </div>
+                                  </div>
+                                )}
+                                {comment.startTime && comment.endTime && (
+                                  <div className="flex items-center gap-3">
+                                    <div className="bg-blue-500 rounded-full p-1.5">
+                                      <Clock className="h-3.5 w-3.5 text-white" />
+                                    </div>
+                                    <div className="flex flex-col">
+                                      <span className="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase tracking-wide">Time Logged</span>
+                                      <span className="text-sm font-medium">
+                                        {format(new Date(comment.startTime), "h:mm a")} - {format(new Date(comment.endTime), "h:mm a")}
+                                      </span>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                          
                           <p className="text-sm">{comment.content}</p>
                           {comment.attachmentName && (
                             <div className="mt-2">

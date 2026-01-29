@@ -543,7 +543,7 @@ export default function TaskForm({ id }: TaskFormProps) {
       return;
     }
 
-    if (!dueDate) {
+    if (!dueDate && !formData.active) {
       toast.error("Due date is required");
       return;
     }

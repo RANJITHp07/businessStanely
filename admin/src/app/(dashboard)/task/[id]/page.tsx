@@ -69,7 +69,7 @@ export default function TaskDetails() {
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   // const [isFromRetainership, setIsFromRetainership] = useState(false);
   const [agents, setAgents] = useState<Agent[]>([]);
-  
+
   const filteredAgents = useMemo(() => {
     if (!Array.isArray(agents)) return [];
     return agents.filter((agent) => {
@@ -1130,11 +1130,11 @@ export default function TaskDetails() {
                     <Textarea
                       placeholder="Add a comment..."
                       value={newComment}
-                      disabled={taskData.active}
+                      disabled={!taskData.active}
                       onChange={(e) => setNewComment(e.target.value)}
                       rows={3}
                     />
-                    
+
                     {/* Timesheet fields */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-muted/50 p-4 rounded-lg">
                       {/* Date picker */}
@@ -1168,7 +1168,7 @@ export default function TaskDetails() {
                       <div className="space-y-2">
                         <Label className="text-sm">Start Time</Label>
                         <div className="flex gap-2">
-                          <Select 
+                          <Select
                             value={startTime.split(":")[0] || ""}
                             onValueChange={(hour) => {
                               const minute = startTime.split(":")[1] || "00";
@@ -1229,7 +1229,7 @@ export default function TaskDetails() {
                       <div className="space-y-2">
                         <Label className="text-sm">End Time</Label>
                         <div className="flex gap-2">
-                          <Select 
+                          <Select
                             value={endTime.split(":")[0] || ""}
                             onValueChange={(hour) => {
                               const minute = endTime.split(":")[1] || "00";
@@ -1368,7 +1368,7 @@ export default function TaskDetails() {
                               {formatDateTime(comment.createdAt, true)}
                             </span>
                           </div>
-                          
+
                           {/* Display timesheet information if available */}
                           {(comment.commentDate || comment.startTime || comment.endTime) && (
                             <div className="bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900 border border-blue-200 dark:border-blue-800 p-3 rounded-lg mt-3 mb-3">
@@ -1400,7 +1400,7 @@ export default function TaskDetails() {
                               </div>
                             </div>
                           )}
-                          
+
                           <p className="text-sm">{comment.content}</p>
                           {comment.attachmentName && (
                             <div className="mt-2">

@@ -38,6 +38,7 @@ export async function POST(req: NextRequest) {
     const newTask = await prisma.task.create({
       data: {
         title,
+        ownerShipId: assignedToId!,
         description,
         status,
         priority,

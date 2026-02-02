@@ -888,9 +888,15 @@ export default function TaskDetails() {
                   </span>
                 </div>
                 <div className="flex items-center gap-2 text-sm">
-                  <User className="h-4 w-4 text-gray-500" />
+                  <span className="inline-flex"><Avatar className="h-4 w-4"><AvatarFallback className="text-xs">{task.assignedTo?.name?.split(" ").map((n) => n[0]).join("") || "U"}</AvatarFallback></Avatar></span>
                   <span className="text-gray-600">
-                    Ownership to {task.assignedTo?.name || "Unassigned"}
+                    Asssigned to {task.assignedTo?.name || "Unassigned"}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="inline-flex"><Avatar className="h-4 w-4"><AvatarFallback className="text-xs">{task.ownerShipBy?.name?.split(" ").map((n) => n[0]).join("") || "U"}</AvatarFallback></Avatar></span>
+                  <span className="text-gray-600">
+                    Ownership to {task.ownerShipBy?.name || "Unassigned"}
                   </span>
                 </div>
                 <div className="flex items-center gap-2 text-sm">
@@ -1284,6 +1290,30 @@ export default function TaskDetails() {
                       </div>
                     </div>
                   </div>
+                  {
+                    task?.lastCompletedDate &&
+                    <div className="flex items-center gap-2">
+                      <Calendar className="h-4 w-4 text-muted-foreground" />
+                      <div>
+                        <div className="text-sm font-medium">Completed Date</div>
+                        <div className="text-sm text-muted-foreground">
+                          {formatDateTime(task?.lastCompletedDate)}
+                        </div>
+                      </div>
+                    </div>
+                  }
+                  {
+                    task?.holdDate &&
+                    <div className="flex items-center gap-2">
+                      <Calendar className="h-4 w-4 text-muted-foreground" />
+                      <div>
+                        <div className="text-sm font-medium">Hold Date</div>
+                        <div className="text-sm text-muted-foreground">
+                          {formatDateTime(task?.holdDate)}
+                        </div>
+                      </div>
+                    </div>
+                  }
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-gray-600">
                       Days Remaining
@@ -1323,7 +1353,7 @@ export default function TaskDetails() {
                       onChange={(e) => setNewComment(e.target.value)}
                       rows={3}
                     />
-                    
+
                     {/* Timesheet fields */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-muted/50 p-4 rounded-lg">
                       {/* Date picker */}
@@ -1357,7 +1387,7 @@ export default function TaskDetails() {
                       <div className="space-y-2">
                         <Label className="text-sm">Start Time</Label>
                         <div className="flex gap-2">
-                          <Select 
+                          <Select
                             value={startTime.split(":")[0] || ""}
                             onValueChange={(hour) => {
                               const minute = startTime.split(":")[1] || "00";
@@ -1418,7 +1448,7 @@ export default function TaskDetails() {
                       <div className="space-y-2">
                         <Label className="text-sm">End Time</Label>
                         <div className="flex gap-2">
-                          <Select 
+                          <Select
                             value={endTime.split(":")[0] || ""}
                             onValueChange={(hour) => {
                               const minute = endTime.split(":")[1] || "00";
@@ -1557,7 +1587,7 @@ export default function TaskDetails() {
                               {formatDateTime(comment.createdAt)}
                             </span>
                           </div>
-                          
+
                           {/* Display timesheet information if available */}
                           {(comment.commentDate || comment.startTime || comment.endTime) && (
                             <div className="bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900 border border-blue-200 dark:border-blue-800 p-3 rounded-lg mt-3 mb-3">
@@ -1589,7 +1619,7 @@ export default function TaskDetails() {
                               </div>
                             </div>
                           )}
-                          
+
                           <p className="text-sm">{comment.content}</p>
                           {comment.attachmentName && (
                             <div className="mt-2">

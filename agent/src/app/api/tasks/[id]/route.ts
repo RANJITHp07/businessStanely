@@ -8,7 +8,7 @@ interface TaskWithFields {
 
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: { id: string } },
 ) {
   try {
     const agent = await getCurrentAgent(req);
@@ -40,7 +40,7 @@ export async function DELETE(
     if (!isAuthorized) {
       return NextResponse.json(
         { error: "Not authorized to delete this task" },
-        { status: 403 }
+        { status: 403 },
       );
     }
     await prisma.task.delete({ where: { id: taskId } });
@@ -50,14 +50,14 @@ export async function DELETE(
     console.error(`Error deleting task ${taskId}:`, error);
     return NextResponse.json(
       { error: "Failed to delete task" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: { id: string } },
 ) {
   try {
     const agent = await getCurrentAgent(req);
@@ -72,6 +72,7 @@ export async function GET(
     const task = await prisma.task.findUnique({
       where: { id: taskId },
       include: {
+        ownerShipBy: true,
         client: {
           select: {
             id: true,
@@ -197,14 +198,14 @@ export async function GET(
     console.error("Error fetching task:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
 
 export async function PUT(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: { id: string } },
 ) {
   try {
     const agent = await getCurrentAgent(req);
@@ -219,7 +220,7 @@ export async function PUT(
     // Allow update if agent is creator, assigned, or superior of assigned agent
     const task = await prisma.task.findUnique({
       where: { id: taskId },
-      select: { createdById: true, assignedToId: true },
+      select: { createdById: true, assignedToId: true, dueDate: true },
     });
     if (!task) {
       return NextResponse.json({ error: "Task not found" }, { status: 404 });
@@ -240,7 +241,7 @@ export async function PUT(
     if (!isAuthorized) {
       return NextResponse.json(
         { error: "Not authorized to update this task" },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
@@ -294,6 +295,9 @@ export async function PUT(
       // Remove legislationId from updateData regardless
       delete updateData.legislationId;
     }
+    if (body.status === "Hold" && task.dueDate) {
+      updateData.holdDate = new Date();
+    }
     // Handle recurring field conversion
     if (updateData.recurring) {
       const recurringValue = updateData.recurring as string;
@@ -305,9 +309,17 @@ export async function PUT(
 
     if (!updateData.triggerDate) {
       delete updateData.triggerDate;
+    } else {
+      updateData.triggerDate = new Date(updateData?.triggerDate as string);
     }
     // Remove any frontend-only fields
     delete updateData.legislationName;
+
+    if ((body.status = "Completed")) {
+      updateData.lastCompletedDate = new Date();
+    } else {
+      updateData.lastCompletedDate = null;
+    }
 
     const updatedTask = await prisma.task.update({
       where: { id: taskId },
@@ -374,10 +386,10 @@ export async function PUT(
         const dueDate = new Date(taskDetails.dueDate);
         if (currentDate < dueDate) {
           const remainingDays = Math.ceil(
-            (dueDate.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24)
+            (dueDate.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24),
           );
           updateData.dueDate = new Date(
-            currentDate.getTime() + remainingDays * 24 * 60 * 60 * 1000
+            currentDate.getTime() + remainingDays * 24 * 60 * 60 * 1000,
           );
         }
       }
@@ -393,7 +405,7 @@ export async function PUT(
     console.error("Error updating task:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

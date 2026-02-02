@@ -151,6 +151,7 @@ model Agent {
   assignedTasks Task[]    @relation("AssignedTasks")
   comments      Comment[] @relation("CommentAuthor")
   timeLogs      TimeLog[] @relation("TimeLogAgent")
+  ownerShipTasks Task[]    @relation("OwnerShipTasks")
 
   // TaskCategory agent-created relation
   createdCategories    TaskCategory[] @relation("AgentCreatedCategories")
@@ -196,6 +197,8 @@ model Task {
   recurring        Int?      // Recurring in months (1-12), null means not recurring
   recurringType  String?  // 'DAY' | 'WEEK' | 'MONTH'
   active           Boolean   @default(true)
+  holdDate         DateTime? 
+  holdDaysLeft     Int?
 
   triggerDate      DateTime?
 
@@ -213,6 +216,10 @@ model Task {
 
   createdById String? @db.ObjectId
   createdBy   Agent?  @relation("CreatedTasks", fields: [createdById], references: [id])
+
+  ownerShipId   String? @db.ObjectId
+  ownerShipBy   Agent?  @relation("OwnerShipTasks", fields: [ownerShipId], references: [id])
+
 
   assignedToId String? @db.ObjectId
   assignedTo   Agent?  @relation("AssignedTasks", fields: [assignedToId], references: [id])

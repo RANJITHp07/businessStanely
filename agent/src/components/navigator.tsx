@@ -59,7 +59,7 @@ export default function Navigator() {
                             Create Task
                         </Button>
                         <Button size="sm" onClick={() => router.push("/task_category/create")}>
-                            View Service
+                            Create Service
                         </Button>
                         <Button size="sm" onClick={() => router.push("/retainership/create")}>
                             Create Retainership

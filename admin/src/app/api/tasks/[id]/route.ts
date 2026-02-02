@@ -3,13 +3,14 @@ import prisma from "@/lib/prisma";
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: { id: string } },
 ) {
   try {
     const { id } = await params;
     const task = await prisma.task.findUnique({
       where: { id },
       include: {
+        ownerShipBy: true,
         client: true,
         createdBy: true,
         assignedTo: true,
@@ -63,14 +64,14 @@ export async function GET(
     console.error(`Error fetching task ${params.id}:`, error);
     return NextResponse.json(
       { error: "Failed to fetch task" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
 
 export async function PUT(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: { id: string } },
 ) {
   try {
     const { id } = await params;
@@ -86,15 +87,28 @@ export async function PUT(
     }
 
     const allowedFields = [
-      "title", "description", "status", "priority", "dueDate", "progress", "followUpRequired", "completed", "recurring",
-      "followUpDuration", "statusCheckDuration", "statusProgressMap"
+      "title",
+      "description",
+      "status",
+      "priority",
+      "dueDate",
+      "progress",
+      "followUpRequired",
+      "completed",
+      "recurring",
+      "followUpDuration",
+      "statusCheckDuration",
+      "statusProgressMap",
     ];
     const data: Record<string, unknown> = {};
     for (const key of allowedFields) {
       if (body[key] !== undefined) {
         if (key === "recurring") {
           const recurringValue = body[key] as string;
-          data[key] = recurringValue && recurringValue !== "0" ? parseInt(recurringValue) : null;
+          data[key] =
+            recurringValue && recurringValue !== "0"
+              ? parseInt(recurringValue)
+              : null;
         } else if (key === "statusProgressMap") {
           data[key] = body[key];
         } else {
@@ -109,6 +123,7 @@ export async function PUT(
     }
     if (body.assignedToId) {
       data.assignedTo = { connect: { id: body.assignedToId } };
+      data.ownerShipBy = { connect: { id: body.assignedToId } };
     }
     if (body.categoryId) {
       data.category = { connect: { id: body.categoryId } };
@@ -119,16 +134,13 @@ export async function PUT(
 
     // Extend due date if status is set to "Hold"
     if (body.status === "Hold" && currentTask.dueDate) {
-      const currentDate = new Date();
-      const dueDate = new Date(currentTask.dueDate);
-
-      if (currentDate < dueDate) {
-        const remainingDays = Math.ceil((dueDate.getTime() - currentDate.getTime()) / (1000 * 60 * 60 * 24));
-        const newDueDate = new Date(currentDate.getTime() + remainingDays * 24 * 60 * 60 * 1000);
-        data.dueDate = newDueDate;
-      }
+      data.holdDate = new Date();
     }
-
+    if ((body.status = "Completed")) {
+      data.lastCompletedDate = new Date();
+    } else {
+      data.lastCompletedDate = null;
+    }
     const updatedTask = await prisma.task.update({
       where: { id },
       data,
@@ -139,14 +151,14 @@ export async function PUT(
     console.error(`Error updating task ${params.id}:`, error);
     return NextResponse.json(
       { error: "Failed to update task" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
 
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: { id: string } },
 ) {
   try {
     const { id } = await params;
@@ -159,7 +171,7 @@ export async function DELETE(
     console.error(`Error deleting task ${id}:`, error);
     return NextResponse.json(
       { error: "Failed to delete task" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

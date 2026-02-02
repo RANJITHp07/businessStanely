@@ -154,6 +154,7 @@ model Agent {
   subordinatesLinks AgentSuperior[] @relation("AgentSuperiors_subordinate")
   createdTasks  Task[]    @relation("CreatedTasks")
   assignedTasks Task[]    @relation("AssignedTasks")
+  ownerShipTasks Task[]    @relation("OwnerShipTasks")
   comments      Comment[] @relation("CommentAuthor")
   timeLogs      TimeLog[] @relation("TimeLogAgent")
 
@@ -198,6 +199,8 @@ model Task {
   completed        Boolean   @default(false)
   recurring        Int?      // Recurring in months (1-12), null means not recurring
   recurringType  String?  // 'DAY' | 'WEEK' | 'MONTH'
+  holdDate         DateTime? 
+  holdDaysLeft     Int?
 
   // New recurring tracking fields
   lastCompletedDate    DateTime? // When the current period was completed
@@ -217,6 +220,9 @@ model Task {
 
   createdById String? @db.ObjectId
   createdBy   Agent?  @relation("CreatedTasks", fields: [createdById], references: [id])
+
+  ownerShipId   String? @db.ObjectId
+  ownerShipBy   Agent?  @relation("OwnerShipTasks", fields: [ownerShipId], references: [id])
 
   assignedToId String? @db.ObjectId
   assignedTo   Agent?  @relation("AssignedTasks", fields: [assignedToId], references: [id])

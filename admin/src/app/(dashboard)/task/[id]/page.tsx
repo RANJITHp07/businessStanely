@@ -645,7 +645,13 @@ export default function TaskDetails() {
                 <div className="flex items-center gap-2 text-sm">
                   <span className="inline-flex"><Avatar className="h-4 w-4"><AvatarFallback className="text-xs">{taskData.assignedTo?.name?.split(" ").map((n) => n[0]).join("") || "U"}</AvatarFallback></Avatar></span>
                   <span className="text-gray-600">
-                    Ownership to {taskData.assignedTo?.name || "Unassigned"}
+                    Asssigned to {taskData.assignedTo?.name || "Unassigned"}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="inline-flex"><Avatar className="h-4 w-4"><AvatarFallback className="text-xs">{taskData.ownerShipBy?.name?.split(" ").map((n) => n[0]).join("") || "U"}</AvatarFallback></Avatar></span>
+                  <span className="text-gray-600">
+                    Ownership to {taskData.ownerShipBy?.name || "Unassigned"}
                   </span>
                 </div>
 
@@ -1093,6 +1099,30 @@ export default function TaskDetails() {
                       </div>
                     </div>
                   </div>
+                  {
+                    taskData?.lastCompletedDate &&
+                    <div className="flex items-center gap-2">
+                      <Calendar className="h-4 w-4 text-muted-foreground" />
+                      <div>
+                        <div className="text-sm font-medium">Completed Date</div>
+                        <div className="text-sm text-muted-foreground">
+                          {formatDateTime(taskData?.lastCompletedDate, true)}
+                        </div>
+                      </div>
+                    </div>
+                  }
+                  {
+                    taskData?.holdDate &&
+                    <div className="flex items-center gap-2">
+                      <Calendar className="h-4 w-4 text-muted-foreground" />
+                      <div>
+                        <div className="text-sm font-medium">Hold Date</div>
+                        <div className="text-sm text-muted-foreground">
+                          {formatDateTime(taskData?.holdDate, true)}
+                        </div>
+                      </div>
+                    </div>
+                  }
                 </CardContent>
               </Card>
             </div>

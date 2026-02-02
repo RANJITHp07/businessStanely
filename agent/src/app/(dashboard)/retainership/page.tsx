@@ -151,10 +151,10 @@ export default function RetainershipTable() {
                     legislationsRes.json(),
                 ]);
 
-                console.log(retainershipData, clientsData, legislationsData);
                 setMyRetainerships(retainershipData.tasks || []);
                 setMyClients(clientsData || []);
                 setMyLegislations(legislationsData || []);
+                console.log(legislationsData)
             } catch (error) {
                 setMyRetainerships([]);
                 setMyClients([]);
@@ -180,6 +180,10 @@ export default function RetainershipTable() {
         return matchesSearch;
     });
 
+    const handleItemsPerPageChange = (value: string) => {
+        setItemsPerPage(Number.parseInt(value))
+        setCurrentPage(1)
+    }
     // Apply sorting to filtered retainerships
     const sortedRetainerships = filteredRetainerships
 
@@ -216,7 +220,8 @@ export default function RetainershipTable() {
     }
 
     const getClientDisplayName = (client: any) => {
-        return client.clientType === "individual" ? `${client.firstName} ${client.lastName}` : client.organizationName
+        if (!client) return ""
+        return client?.clientType === "individual" ? `${client.firstName} ${client.lastName}` : client.organizationName
     }
 
     const handlePageChange = (page: number) => {
@@ -366,8 +371,10 @@ export default function RetainershipTable() {
                                         <Table>
                                             <TableHeader>
                                                 <TableRow>
-                                                    <TableHead>Legislation Name</TableHead>
+                                                    <TableHead>Client Name</TableHead>
+                                                    <TableHead> Legislation Name</TableHead>
                                                     <TableHead>Description</TableHead>
+                                                    <TableHead>Tasks</TableHead>
                                                     <TableHead>Assigned Agent</TableHead>
                                                     <TableHead className="text-right">Actions</TableHead>
                                                 </TableRow>
@@ -387,6 +394,40 @@ export default function RetainershipTable() {
                                                             className="cursor-pointer hover:bg-muted/50"
                                                         >
                                                             <TableCell>
+                                                                <div className="flex items-center space-x-3 max-w-32">
+                                                                    <Avatar className="h-10 w-10 flex-shrink-0">
+                                                                        <AvatarFallback>
+                                                                            {legislation.retainership?.client?.clientType === "individual"
+                                                                                ? `${legislation.retainership?.client.firstName?.[0] ?? ''}${legislation.retainership?.client.lastName?.[0] ?? ''}`
+                                                                                : legislation.retainership?.client?.organizationName
+                                                                                    ?.toUpperCase()
+                                                                                    ?.split(" ")
+                                                                                    .map((n) => n[0])
+                                                                                    .join("")
+                                                                                    .slice(0, 2)}
+                                                                        </AvatarFallback>
+                                                                    </Avatar>
+                                                                    <div className="min-w-0">
+                                                                        <div className="font-medium text-sm w-60 truncate">
+                                                                            {getClientDisplayName(legislation.retainership?.client)
+                                                                                ? getClientDisplayName(legislation.retainership?.client)!.length > 35
+                                                                                    ? getClientDisplayName(legislation.retainership?.client)!.slice(0, 35) + '...'
+                                                                                    : getClientDisplayName(legislation.retainership?.client)
+                                                                                : 'N/A'
+                                                                            }
+                                                                        </div>
+                                                                        <div className="text-xs text-muted-foreground truncate">
+                                                                            {legislation.retainership?.client?.clientType === "organization" && legislation.retainership?.client?.authorizedPersonName && (
+                                                                                <>Contact: {legislation.retainership?.client.authorizedPersonName.charAt(0).toUpperCase() + legislation.retainership?.client?.authorizedPersonName?.slice(1)}</>
+                                                                            )}
+                                                                            {legislation.retainership?.client?.clientType === "individual" && legislation.retainership?.client?.gender && (
+                                                                                <>{legislation.retainership?.client?.gender.charAt(0).toUpperCase() + legislation.retainership?.client.gender.slice(1)}</>
+                                                                            )}
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            </TableCell>
+                                                            <TableCell>
                                                                 {legislation.title.length > 30
                                                                     ? legislation.title.slice(0, 42) + '...'
                                                                     : legislation.title
@@ -399,6 +440,18 @@ export default function RetainershipTable() {
                                                                         : legislation.description
                                                                     : 'N/A'
                                                                 }
+                                                            </TableCell>
+                                                            <TableCell className="flex flex-col gap-2">
+                                                                <Badge>Total Task: {legislation.tasks?.length || 0}</Badge>
+                                                                <Badge>
+                                                                    Running Task: {legislation.tasks?.filter((t: any) => t.active && !t.completed && t.status !== "Hold").length || 0}
+                                                                </Badge>
+                                                                <Badge>
+                                                                    Overdue Task: {legislation.tasks?.filter((t: any) => t.active && !t.completed && t.status !== "Hold" && t.dueDate && new Date(t.dueDate) < new Date()).length || 0}
+                                                                </Badge>
+                                                                <Badge>
+                                                                    Pending Triggers: {legislation.tasks?.filter((t: any) => !t.active && !t.completed && t.status !== "Hold").length || 0}
+                                                                </Badge>
                                                             </TableCell>
                                                             <TableCell>{legislation.assignedAgent?.name || "Unknown"}</TableCell>
                                                             <TableCell className="text-right">

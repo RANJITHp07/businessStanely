@@ -213,10 +213,12 @@ export async function POST(req: NextRequest) {
     const taskDueDate = dueDate ? new Date(dueDate) : null;
     const taskTriggerDate = triggerDate ? new Date(triggerDate) : null;
 
+    console.log(recurringValue);
     // Create new task
     const newTask = await prisma.task.create({
       data: {
         title,
+        ownerShipId: agent.id,
         description: description || null,
         status: status || "To Do",
         priority: priority || "Medium",

@@ -570,8 +570,6 @@ export default function TaskForm({ id }: TaskFormProps) {
     }
 
     setIsSubmitting(true);
-
-    console.log(formData)
     try {
       const response = await fetch(url, {
         method,
@@ -580,7 +578,7 @@ export default function TaskForm({ id }: TaskFormProps) {
         },
         body: JSON.stringify({
           ...formData,
-          recurring: formData.recurring.split("-")[1],
+          recurring: formData.recurring,
           dueDate,
           status: formData.status || "To Do",
           createdById: !isEditMode ? agents[0].id : undefined,

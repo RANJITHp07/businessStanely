@@ -88,13 +88,29 @@ export async function updateHoldTasks() {
     try {
       if (!task.dueDate) continue; // Ensure dueDate is not null
 
-      const currentDate = new Date();
-      const dueDate = new Date(task.dueDate);
-
       // Extend due date by 1 day if the task is still on "Hold"
-      if (currentDate >= dueDate) {
-        const newDueDate = new Date(dueDate);
-        newDueDate.setDate(newDueDate.getDate() + 1);
+      if (task.dueDate && task.createdAt) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        const due = new Date(task.dueDate);
+        due.setHours(0, 0, 0, 0);
+
+        const created = new Date(task.createdAt);
+        created.setHours(0, 0, 0, 0);
+
+        let newDueDate: Date;
+
+        if (due < today) {
+          const diffDays = Math.ceil(
+            (due.getTime() - task.createdAt.getTime()) / (1000 * 60 * 60 * 24),
+          );
+          newDueDate = new Date(today);
+          newDueDate.setDate(newDueDate.getDate() + diffDays);
+        } else {
+          newDueDate = new Date(due);
+          newDueDate.setDate(newDueDate.getDate() + 1);
+        }
 
         const updatedTask = await prisma.task.update({
           where: { id: task.id },

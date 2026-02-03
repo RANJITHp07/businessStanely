@@ -326,11 +326,11 @@ export default function RetainershipTable() {
                     </TabsTrigger>
                     <TabsTrigger value="my-retainerships" className="flex items-center gap-2">
                         <CheckCircle className="h-4 w-4" />
-                        My Task Trigger Retainer ({myRetainerships.length})
+                        My Task Retainer ({myRetainerships.length})
                     </TabsTrigger>
                     <TabsTrigger value="my-trigger" className="flex items-center gap-2">
                         <CheckCircle className="h-4 w-4" />
-                        My Task Retainer ({triggerTask.length})
+                        My Task Trigger Retainer ({triggerTask.length})
                     </TabsTrigger>
                     <TabsTrigger value="my-clients" className="flex items-center gap-2">
                         <CheckCircle className="h-4 w-4" />

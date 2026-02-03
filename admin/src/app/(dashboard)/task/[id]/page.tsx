@@ -1100,7 +1100,7 @@ export default function TaskDetails() {
                     </div>
                   </div>
                   {
-                    taskData?.lastCompletedDate &&
+                    taskData.status == "Completed" && taskData?.lastCompletedDate &&
                     <div className="flex items-center gap-2">
                       <Calendar className="h-4 w-4 text-muted-foreground" />
                       <div>
@@ -1112,8 +1112,8 @@ export default function TaskDetails() {
                     </div>
                   }
                   {
-                    taskData?.holdDate &&
-                    <div className="flex items-center gap-2">
+                    taskData.status == "Hold" && taskData?.holdDate &&
+                    < div className="flex items-center gap-2">
                       <Calendar className="h-4 w-4 text-muted-foreground" />
                       <div>
                         <div className="text-sm font-medium">Hold Date</div>

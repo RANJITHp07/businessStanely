@@ -807,6 +807,7 @@ export default function TaskDetails() {
     }
   };
 
+
   if (loading) {
     return (
       <div className="container mx-auto p-6 max-w-7xl">
@@ -1291,25 +1292,25 @@ export default function TaskDetails() {
                     </div>
                   </div>
                   {
-                    task?.lastCompletedDate &&
+                    task.status == "Completed" && task?.lastCompletedDate &&
                     <div className="flex items-center gap-2">
                       <Calendar className="h-4 w-4 text-muted-foreground" />
                       <div>
                         <div className="text-sm font-medium">Completed Date</div>
                         <div className="text-sm text-muted-foreground">
-                          {formatDateTime(task?.lastCompletedDate)}
+                          {formatDateTime(task?.lastCompletedDate, true)}
                         </div>
                       </div>
                     </div>
                   }
                   {
-                    task?.holdDate &&
-                    <div className="flex items-center gap-2">
+                    task.status == "Hold" && task?.holdDate &&
+                    < div className="flex items-center gap-2">
                       <Calendar className="h-4 w-4 text-muted-foreground" />
                       <div>
                         <div className="text-sm font-medium">Hold Date</div>
                         <div className="text-sm text-muted-foreground">
-                          {formatDateTime(task?.holdDate)}
+                          {formatDateTime(task?.holdDate, true)}
                         </div>
                       </div>
                     </div>

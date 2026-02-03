@@ -24,6 +24,7 @@ export async function GET(req: NextRequest) {
     const status = searchParams.get("status");
     const priority = searchParams.get("priority");
     const categoryId = searchParams.get("categoryId");
+    const trigger = searchParams.get("trigger");
 
     // If categoryId is present, return all tasks for that category (regardless of assignment)
     // If assignedToId is present, return all tasks for that agent
@@ -36,6 +37,29 @@ export async function GET(req: NextRequest) {
     } else if (assignedToId) {
       where = {
         assignedToId: agent.id,
+        AND: [
+          {
+            OR: [{ category: null }, { category: { status: "approved" } }],
+          },
+        ],
+      };
+    } else if (trigger === "true") {
+      where = {
+        assignedToId: agent.id,
+        active: false,
+        OR: [
+          {
+            retainershipId: {
+              not: null,
+            },
+          },
+          {
+            legislationId: {
+              not: null,
+            },
+          },
+        ],
+
         AND: [
           {
             OR: [{ category: null }, { category: { status: "approved" } }],

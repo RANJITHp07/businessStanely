@@ -95,6 +95,7 @@ export default function RetainershipTable() {
     const [currentUserRole, setCurrentUserRole] = useState<string>("")
 
     const [myRetainerships, setMyRetainerships] = useState<DashboardRetainership[]>([]);
+    const [triggerTask, setTriggerTask] = useState<any>([])
     const [myClients, setMyClients] = useState<DashboardRetainership[]>([]);
 
     const router = useRouter()
@@ -129,10 +130,12 @@ export default function RetainershipTable() {
 
                 const [
                     retainershipRes,
+                    triggerRes,
                     clientsRes,
                     legislationsRes,
                 ] = await Promise.all([
                     fetchWithAuth(`/api/tasks?retainershipTasks=true`),
+                    fetchWithAuth(`/api/tasks?trigger=true`),
                     fetchWithAuth(`/api/clients?assignedToId=me`),
                     fetchWithAuth(`/api/legislation?assignedAgent=me`),
                 ]);
@@ -143,15 +146,18 @@ export default function RetainershipTable() {
 
                 const [
                     retainershipData,
+                    triggerData,
                     clientsData,
                     legislationsData,
                 ] = await Promise.all([
                     retainershipRes.json(),
+                    triggerRes.json(),
                     clientsRes.json(),
                     legislationsRes.json(),
                 ]);
 
                 setMyRetainerships(retainershipData.tasks || []);
+                setTriggerTask(triggerData.tasks || [])
                 setMyClients(clientsData || []);
                 setMyLegislations(legislationsData || []);
                 console.log(legislationsData)
@@ -313,14 +319,18 @@ export default function RetainershipTable() {
 
             {/* Retainerships Table with Tabs */}
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-                <TabsList className="grid w-full grid-cols-3">
+                <TabsList className="grid w-full grid-cols-4">
                     <TabsTrigger value="approved" className="flex items-center gap-2">
                         <CheckCircle className="h-4 w-4" />
                         My Legislation ({myLegislations.length})
                     </TabsTrigger>
                     <TabsTrigger value="my-retainerships" className="flex items-center gap-2">
                         <CheckCircle className="h-4 w-4" />
-                        My Task Retainer ({myRetainerships.length})
+                        My Task Trigger Retainer ({myRetainerships.length})
+                    </TabsTrigger>
+                    <TabsTrigger value="my-trigger" className="flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4" />
+                        My Task Retainer ({triggerTask.length})
                     </TabsTrigger>
                     <TabsTrigger value="my-clients" className="flex items-center gap-2">
                         <CheckCircle className="h-4 w-4" />
@@ -599,6 +609,27 @@ export default function RetainershipTable() {
                                     label="Hold"
                                     tasks={myRetainerships.filter((t) => ["hold"].includes(statusKey(t.status))).slice(0, 3)}
                                     retainershipTasks={true}
+                                />
+                            </div>
+                        </div>
+                    )}
+                </TabsContent>
+                <TabsContent value="my-trigger">
+
+                    {loading ? (
+                        <div className="flex justify-center items-center py-8">
+                            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                        </div>
+                    ) : triggerTask.length === 0 ? (
+                        <p className="text-center text-muted-foreground">No retainership task assigned to you.</p>
+                    ) : (
+                        <div className="">
+
+                            <div className="space-y-3">
+                                <SectionTable
+                                    label="New Task"
+                                    tasks={triggerTask.filter((t) => ["todo"].includes(statusKey(t.status))).slice(0, 3)}
+                                    trigger={true}
                                 />
                             </div>
                         </div>

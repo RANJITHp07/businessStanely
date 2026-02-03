@@ -148,7 +148,7 @@ function StatCard({
   );
 }
 
-export function SectionTable({ label, tasks, retainershipTasks }: { label: string; tasks: Task[], retainershipTasks?: boolean }) {
+export function SectionTable({ label, tasks, retainershipTasks, trigger }: { label: string; tasks: Task[], retainershipTasks?: boolean, trigger?: boolean }) {
   const labelColor = (() => {
     const l = label.toLowerCase();
     if (l.includes("progress")) return "text-sky-600";
@@ -515,7 +515,7 @@ export function SectionTable({ label, tasks, retainershipTasks }: { label: strin
         <Link
           href={`/task?status=${encodeURIComponent(
             sectionLabelToStatus(label)
-          )}${retainershipTasks ? `&retainershipTasks=${encodeURIComponent(true)}` : ""}`}
+          )}${retainershipTasks ? `&retainershipTasks=${encodeURIComponent(true)}` : ""}${trigger ? `&trigger=${encodeURIComponent(true)}` : ""}`}
           className="bg-[#003459] cursor-pointer text-white text-[14px] py-[10px] mt-[10px] px-[10px] rounded-[5px] inline-block"
         >
           View more

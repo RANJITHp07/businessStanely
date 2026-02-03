@@ -58,6 +58,7 @@ import {
   Users,
 } from "lucide-react";
 import { format } from "date-fns";
+import { Checkbox } from "@/components/ui/checkbox";
 
 // Task interface based on the API response
 interface Task {
@@ -158,6 +159,7 @@ export default function TaskDetails() {
   const [showAssignSearch, setShowAssignSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+  const [duration, setDuration] = useState(0)
 
   const params = useParams();
   const router = useRouter();
@@ -786,6 +788,24 @@ export default function TaskDetails() {
     }
   };
 
+  const getNowTime = () => {
+    const d = new Date()
+    return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`
+  }
+
+  const timeToMinutes = (time: string) => {
+    const [h, m] = time.split(":").map(Number)
+    return h * 60 + m
+  }
+
+  const addMinutes = (time: string, mins: number) => {
+    const [h, m] = time.split(":").map(Number)
+    const d = new Date()
+    d.setHours(h, m + mins)
+    return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`
+  }
+
+
   const handleDeleteTimeLog = async (timeLogId: string) => {
     if (!confirm("Are you sure you want to delete this time log entry?"))
       return;
@@ -1357,19 +1377,13 @@ export default function TaskDetails() {
 
                     {/* Timesheet fields */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-muted/50 p-4 rounded-lg">
-                      {/* Date picker */}
                       <div className="space-y-2">
                         <Label className="text-sm">Work Date</Label>
                         <Popover>
                           <PopoverTrigger asChild>
-                            <Button
-                              variant="outline"
-                              className="w-full justify-start text-left font-normal"
-                            >
+                            <Button variant="outline" className="w-full justify-start text-left font-normal">
                               <Calendar className="mr-2 h-4 w-4" />
-                              {commentDate
-                                ? format(commentDate, "MMM dd, yyyy")
-                                : "Pick a date"}
+                              {commentDate ? format(commentDate, "MMM dd, yyyy") : "Pick a date"}
                             </Button>
                           </PopoverTrigger>
                           <PopoverContent className="w-auto p-0" align="start">
@@ -1384,128 +1398,60 @@ export default function TaskDetails() {
                         </Popover>
                       </div>
 
-                      {/* Start time - 12 hour format with AM/PM */}
                       <div className="space-y-2">
                         <Label className="text-sm">Start Time</Label>
-                        <div className="flex gap-2">
-                          <Select
-                            value={startTime.split(":")[0] || ""}
-                            onValueChange={(hour) => {
-                              const minute = startTime.split(":")[1] || "00";
-                              setStartTime(`${hour}:${minute}`);
-                            }}
-                          >
-                            <SelectTrigger className="flex-1">
-                              <SelectValue placeholder="Hour">
-                                {startTime.split(":")[0] ? get12HourFormat(startTime.split(":")[0]) : "Hour"}
-                              </SelectValue>
-                            </SelectTrigger>
-                            <SelectContent>
-                              {Array.from({ length: 24 }, (_, i) => {
-                                const hour = String(i).padStart(2, "0");
-                                let displayHour = "";
-                                if (i === 0) {
-                                  displayHour = "12 AM";
-                                } else if (i < 12) {
-                                  displayHour = `${i} AM`;
-                                } else if (i === 12) {
-                                  displayHour = "12 PM";
-                                } else {
-                                  displayHour = `${i - 12} PM`;
-                                }
-                                return (
-                                  <SelectItem key={`start-hour-${hour}`} value={hour}>
-                                    {displayHour}
-                                  </SelectItem>
-                                );
-                              })}
-                            </SelectContent>
-                          </Select>
-                          <Select
-                            value={startTime.split(":")[1] || ""}
-                            onValueChange={(minute) => {
-                              const hour = startTime.split(":")[0] || "00";
-                              setStartTime(`${hour}:${minute}`);
-                            }}
-                          >
-                            <SelectTrigger className="flex-1">
-                              <SelectValue placeholder="Min" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {Array.from({ length: 60 }, (_, i) => {
-                                const minute = String(i).padStart(2, "0");
-                                return (
-                                  <SelectItem key={`start-min-${minute}`} value={minute}>
-                                    {minute}
-                                  </SelectItem>
-                                );
-                              })}
-                            </SelectContent>
-                          </Select>
+                        <div className="flex gap-2 items-center">
+                          <Input
+                            type="time"
+                            value={startTime}
+                            onChange={(e) => setStartTime(e.target.value)}
+                          />
+                          <div className="flex items-center gap-1">
+                            <Checkbox onCheckedChange={(v) => v && setStartTime(getNowTime())} />
+                            <span className="text-xs">Now</span>
+                          </div>
                         </div>
                       </div>
 
-                      {/* End time - 12 hour format with AM/PM */}
                       <div className="space-y-2">
+                        <Label className="text-sm">Duration (minutes)</Label>
+                        <Input
+                          type="number"
+                          min={1}
+                          value={duration}
+                          onChange={(e) => {
+                            const mins = Number(e.target.value)
+                            setDuration(mins)
+                            if (startTime && mins) {
+                              setEndTime(addMinutes(startTime, mins))
+                            }
+                          }}
+                        />
+                      </div>
+
+                      <div className="space-y-2 md:col-span-3">
                         <Label className="text-sm">End Time</Label>
-                        <div className="flex gap-2">
-                          <Select
-                            value={endTime.split(":")[0] || ""}
-                            onValueChange={(hour) => {
-                              const minute = endTime.split(":")[1] || "00";
-                              setEndTime(`${hour}:${minute}`);
-                            }}
-                          >
-                            <SelectTrigger className="flex-1">
-                              <SelectValue placeholder="Hour">
-                                {endTime.split(":")[0] ? get12HourFormat(endTime.split(":")[0]) : "Hour"}
-                              </SelectValue>
-                            </SelectTrigger>
-                            <SelectContent>
-                              {Array.from({ length: 24 }, (_, i) => {
-                                const hour = String(i).padStart(2, "0");
-                                let displayHour = "";
-                                if (i === 0) {
-                                  displayHour = "12 AM";
-                                } else if (i < 12) {
-                                  displayHour = `${i} AM`;
-                                } else if (i === 12) {
-                                  displayHour = "12 PM";
-                                } else {
-                                  displayHour = `${i - 12} PM`;
-                                }
-                                return (
-                                  <SelectItem key={`end-hour-${hour}`} value={hour}>
-                                    {displayHour}
-                                  </SelectItem>
-                                );
-                              })}
-                            </SelectContent>
-                          </Select>
-                          <Select
-                            value={endTime.split(":")[1] || ""}
-                            onValueChange={(minute) => {
-                              const hour = endTime.split(":")[0] || "00";
-                              setEndTime(`${hour}:${minute}`);
-                            }}
-                          >
-                            <SelectTrigger className="flex-1">
-                              <SelectValue placeholder="Min" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {Array.from({ length: 60 }, (_, i) => {
-                                const minute = String(i).padStart(2, "0");
-                                return (
-                                  <SelectItem key={`end-min-${minute}`} value={minute}>
-                                    {minute}
-                                  </SelectItem>
-                                );
-                              })}
-                            </SelectContent>
-                          </Select>
+                        <div className="flex gap-2 items-center">
+                          <Input
+                            type="text"
+                            value={endTime}
+                            readOnly
+                          />
+                          {/* <div className="flex items-center gap-1">
+                            <Checkbox onCheckedChange={(v) => v && setEndTime(getNowTime())} />
+                            <span className="text-xs">Now</span>
+                          </div> */}
                         </div>
+
+                        {startTime && endTime && timeToMinutes(endTime) <= timeToMinutes(startTime) && (
+                          <p className="text-xs text-destructive">
+                            End time must be greater than start time
+                          </p>
+                        )}
                       </div>
                     </div>
+
+
 
                     {/* File upload and submit button */}
                     <div className="flex items-center justify-between">

@@ -115,6 +115,7 @@ export interface Prospect {
   notes?: string;
   assignedTo?: string;
   createdByAgentId?: string;
+  service?: string;
   createdByAgent?: {
     id: string;
     name: string;

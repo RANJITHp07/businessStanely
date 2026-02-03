@@ -37,6 +37,7 @@ export default function NewProspectPage() {
         leadSource: "",
         description: "",
         amount: "",
+        service: ""
     })
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -214,6 +215,22 @@ export default function NewProspectPage() {
                                 </div>
                             </div>
 
+                            <div className="space-y-2 relative">
+                                <Label htmlFor="taskCategory">Service</Label>
+                                <div className="relative">
+                                    <Input
+                                        id="service"
+                                        name="service"
+                                        type="text"
+                                        placeholder="Service"
+                                        value={formData.service}
+                                        onChange={handleInputChange}
+                                        className="w-full"
+                                    />
+
+
+                                </div>
+                            </div>
                             {/* Address */}
                             <div className="space-y-2">
                                 <Label htmlFor="address" className="flex items-center gap-2">

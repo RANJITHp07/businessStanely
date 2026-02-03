@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
       amount,
       address,
       dialCode,
-      serviceId,
+      service,
     } = body;
 
     if (!name) {
@@ -175,10 +175,8 @@ export async function POST(req: NextRequest) {
           connect: { id: agent.id },
         },
         amount: typeof amount === "number" ? amount : undefined,
-        ...(serviceId && {
-          service: {
-            connect: { id: serviceId },
-          },
+        ...(service && {
+          service,
         }),
       },
       include: { createdByAgent: true, assignedAgent: true },

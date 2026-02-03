@@ -72,7 +72,7 @@ export async function PUT(
       assignedAgentId,
       assignedTo,
       amount,
-      serviceId,
+      service,
       quote,
     } = body;
 
@@ -153,10 +153,8 @@ export async function PUT(
           connect: { id: assignedAgentId || assignedTo },
         },
         amount: parseFloat(amount),
-        ...(serviceId && {
-          service: {
-            connect: { id: serviceId },
-          },
+        ...(service && {
+          service,
         }),
       },
     });

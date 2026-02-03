@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
     console.log(error);
     return NextResponse.json(
       { error: "Failed to fetch prospects" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -52,6 +52,7 @@ export async function POST(req: NextRequest) {
       leadSourceId,
       amount,
       address,
+      service,
     } = body;
     if (!name) {
       return NextResponse.json({ error: "Name is required" }, { status: 400 });
@@ -59,7 +60,7 @@ export async function POST(req: NextRequest) {
     if (!assignedAgentId) {
       return NextResponse.json(
         { error: "Assigned agent is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
     let finalAssignedAgentId = assignedAgentId;
@@ -75,6 +76,7 @@ export async function POST(req: NextRequest) {
         leadSourceId,
         status: status || "New",
         notes,
+        service: service || "",
         nextFollowUp: nextFollowUp ? new Date(nextFollowUp) : undefined,
         assignedAgentId: finalAssignedAgentId,
         createdByAgentId: agent.id,
@@ -86,7 +88,7 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     return NextResponse.json(
       { error: "Failed to create prospect" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

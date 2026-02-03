@@ -373,7 +373,6 @@ export default function RetainershipTable() {
                                                 <TableRow>
                                                     <TableHead>Client Name</TableHead>
                                                     <TableHead> Legislation Name</TableHead>
-                                                    <TableHead>Description</TableHead>
                                                     <TableHead>Tasks</TableHead>
                                                     <TableHead>Assigned Agent</TableHead>
                                                     <TableHead className="text-right">Actions</TableHead>
@@ -394,7 +393,7 @@ export default function RetainershipTable() {
                                                             className="cursor-pointer hover:bg-muted/50"
                                                         >
                                                             <TableCell>
-                                                                <div className="flex items-center space-x-3 max-w-32">
+                                                                <div className="flex items-center space-x-3 max-w-56">
                                                                     <Avatar className="h-10 w-10 flex-shrink-0">
                                                                         <AvatarFallback>
                                                                             {legislation.retainership?.client?.clientType === "individual"
@@ -431,14 +430,6 @@ export default function RetainershipTable() {
                                                                 {legislation.title.length > 30
                                                                     ? legislation.title.slice(0, 42) + '...'
                                                                     : legislation.title
-                                                                }
-                                                            </TableCell>
-                                                            <TableCell>
-                                                                {legislation.description
-                                                                    ? legislation.description.length > 30
-                                                                        ? legislation.description.slice(0, 45) + '...'
-                                                                        : legislation.description
-                                                                    : 'N/A'
                                                                 }
                                                             </TableCell>
                                                             <TableCell className="flex flex-col gap-2">

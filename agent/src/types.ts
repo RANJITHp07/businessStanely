@@ -26,6 +26,7 @@ export interface Prospect {
   createdAt: string;
   updatedAt: string;
   archived?: boolean;
+  service?: string;
 }
 export interface TaskCategory {
   id: string;
@@ -150,8 +151,8 @@ export interface Comment {
   updatedAt: string;
   // Timesheet fields for task comments
   commentDate?: string; // The date when the comment/work was done (defaults to createdAt if not provided)
-  startTime?: string;   // Start time of the work session
-  endTime?: string;     // End time of the work session
+  startTime?: string; // Start time of the work session
+  endTime?: string; // End time of the work session
   taskId?: string;
   prospectId?: string;
   opportunityId?: string;

@@ -23,8 +23,7 @@ model Prospect {
   leadSource     LeadSource? @relation(fields: [leadSourceId], references: [id])
   comments      Comment[] // Comments/interactions for this prospect
 
-  serviceId         String? @db.ObjectId
-  service           TaskCategory? @relation(fields: [serviceId], references: [id])
+  service           String?
 }
 
 model Opportunity {
@@ -359,7 +358,6 @@ model TaskCategory {
 
   // Tasks relation
   tasks Task[]
-  prospect  Prospect[]
 
   // New optional field for time period in days
   timePeriod Int?

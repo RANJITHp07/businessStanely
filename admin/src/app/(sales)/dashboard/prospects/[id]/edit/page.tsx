@@ -66,6 +66,7 @@ export default function EditProspectPage() {
           notes: prospect.notes ?? "",
           status: prospect.status ?? "",
           amount: prospect.amount?.toString() ?? "",
+          service: prospect.service
         });
 
         setReminderDate(prospect.nextFollowUp ? new Date(prospect.nextFollowUp) : undefined);
@@ -242,6 +243,22 @@ export default function EditProspectPage() {
                     value={formData.amount}
                     onChange={handleInputChange}
                   />
+                </div>
+              </div>
+              <div className="space-y-2 relative">
+                <Label htmlFor="taskCategory">Service</Label>
+                <div className="relative">
+                  <Input
+                    id="service"
+                    name="service"
+                    type="text"
+                    placeholder="Service"
+                    value={formData.service}
+                    onChange={handleInputChange}
+                    className="w-full"
+                  />
+
+
                 </div>
               </div>
 

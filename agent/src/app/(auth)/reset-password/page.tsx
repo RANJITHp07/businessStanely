@@ -26,6 +26,7 @@ function ResetPasswordInner() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [resendLoading, setResendLoading] = useState(false)
 
   useEffect(() => {
     const emailParam = searchParams.get("email");
@@ -110,8 +111,36 @@ function ResetPasswordInner() {
   };
 
   // Stub for handleResendOTP to fix missing function error
-  const handleResendOTP = () => {
-    toast("Resend OTP not implemented yet.");
+  const handleResendOTP = async () => {
+
+    setResendLoading(true);
+    try {
+      const response = await fetch("/api/auth/forgot-password", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email,
+          action: "send-otp",
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to resend OTP");
+      }
+      toast("OTP has been sent again.");
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "Failed to resend OTP. Please try again.";
+      toast(errorMessage);
+    } finally {
+      setResendLoading(false);
+    }
   };
 
   return (
@@ -162,7 +191,7 @@ function ResetPasswordInner() {
                 <button
                   type="button"
                   onClick={handleResendOTP}
-                  disabled={isLoading}
+                  disabled={isLoading || resendLoading}
                   className="text-sm text-blue-600 hover:text-blue-500 hover:underline disabled:opacity-50"
                 >
                   Resend OTP
@@ -225,7 +254,7 @@ function ResetPasswordInner() {
               </div>
             </div>
 
-            <Button type="submit" className="w-full" disabled={isLoading}>
+            <Button type="submit" className="w-full" disabled={isLoading || resendLoading}>
               {isLoading ? (
                 <span className="flex items-center">
                   <svg

@@ -736,7 +736,7 @@ export default function ProspectDashboard() {
                                                             >
                                                                 {agent.name}
                                                             </Label>
-                                                            <p className="text-xs text-slate-500">{agent.role || "Agent"}</p>
+                                                            <p className="text-xs text-slate-500">{agent.agentType || "Agent"}</p>
                                                         </div>
                                                     </div>
                                                 ))

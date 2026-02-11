@@ -28,6 +28,7 @@ import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
@@ -494,6 +495,9 @@ export default function ProspectDashboard() {
     const [open, setOpen] = useState(false)
     const [prospectsPerAgent, setProspectsPerAgent] = useState<number>(1)
     const [isSubmitting, setIsSubmitting] = useState(false)
+    const [agents, setAgents] = useState<any>([])
+    const [selectedAgents, setSelectedAgents] = useState<string[]>([])
+    const [agentSearchQuery, setAgentSearchQuery] = useState<string>("")
 
     const handleConfirm = async () => {
         if (!prospectsPerAgent || prospectsPerAgent < 1) return
@@ -506,6 +510,7 @@ export default function ProspectDashboard() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     prospectsPerAgent,
+                    selectedAgentIds: selectedAgents,
                 }),
             })
 
@@ -518,6 +523,14 @@ export default function ProspectDashboard() {
         }
     }
 
+    const handleAgentToggle = (agentId: string) => {
+        setSelectedAgents((prev) =>
+            prev.includes(agentId)
+                ? prev.filter((id) => id !== agentId)
+                : [...prev, agentId]
+        )
+    }
+
     useEffect(() => {
         setLoading(true)
 
@@ -525,14 +538,23 @@ export default function ProspectDashboard() {
             fetch("/api/prospects").then(res => res.json()),
             fetch("/api/lead_source").then(res => res.json()),
             fetch("/api/prospectAssignmentSetting").then((res) => res.json()),
+            fetch("/api/agents").then((res) => res.json()),
         ])
-            .then(([prospectsRes, leadSourceRes, assignmentSettingRes]) => {
+            .then(([prospectsRes, leadSourceRes, assignmentSettingRes, agentsRes]) => {
                 const prospects = Array.isArray(prospectsRes?.prospects)
                     ? prospectsRes.prospects.filter((p: any) => !p.archived)
                     : []
 
                 setProspects(prospects)
 
+                /* Set agents */
+                const agentsList = Array.isArray(agentsRes) ? agentsRes : []
+                setAgents(agentsList.filter((agent) => agent.agentRole == "Advisor Agent"))
+                setSelectedAgents(
+                    agentsList?.filter(
+                        (agent) => agent.agentRole === "Advisor Agent" && agent.autoAssign
+                    ).map((agent) => agent.id) || []
+                );
                 /* ---------------- LEAD SOURCE DATA ---------------- */
                 const leadSourceColors = [
                     "#3b82f6",
@@ -638,39 +660,99 @@ export default function ProspectDashboard() {
 
 
                     <Dialog open={open} onOpenChange={setOpen}>
-                        <DialogContent className="sm:max-w-md">
+                        <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
                             <DialogHeader>
                                 <DialogTitle>Assign Prospects Automatically</DialogTitle>
                                 <DialogDescription>
-                                    Decide how many prospects each agent should be assigned automatically.
+                                    Decide how many prospects each agent should be assigned automatically, and select which agents will participate.
                                 </DialogDescription>
                             </DialogHeader>
 
-                            {/* Input Field */}
-                            <div className="my-4">
-                                <Label htmlFor="prospectsPerAgent" className="text-sm font-medium text-slate-700">
-                                    Prospects per Agent
-                                </Label>
-                                <Input
-                                    id="prospectsPerAgent"
-                                    type="number"
-                                    min={1}
-                                    defaultValue={1}
-                                    value={prospectsPerAgent}
-                                    onChange={(e) => setProspectsPerAgent(Number(e.target.value))}
-                                    className="mt-1"
-                                />
-                                <p className="mt-2 text-xs text-slate-500">
-                                    This number decides how many prospects each agent should be automatically assigned.
-                                </p>
+                            <div className="space-y-6">
+                                {/* Input Field */}
+                                <div>
+                                    <Label htmlFor="prospectsPerAgent" className="text-sm font-medium text-slate-700">
+                                        Prospects per Agent
+                                    </Label>
+                                    <Input
+                                        id="prospectsPerAgent"
+                                        type="number"
+                                        min={1}
+                                        defaultValue={1}
+                                        value={prospectsPerAgent}
+                                        onChange={(e) => setProspectsPerAgent(Number(e.target.value))}
+                                        className="mt-2"
+                                    />
+                                    <p className="mt-2 text-xs text-slate-500">
+                                        This number decides how many prospects each agent should be automatically assigned.
+                                    </p>
+                                </div>
+
+                                {/* Agents List */}
+                                <div>
+                                    <Label className="text-sm font-medium text-slate-700 mb-3 block">
+                                        Select Agents ({selectedAgents.length} selected)
+                                    </Label>
+
+                                    {/* Search Input */}
+                                    <Input
+                                        type="text"
+                                        placeholder="Search agents by name or role..."
+                                        value={agentSearchQuery}
+                                        onChange={(e) => setAgentSearchQuery(e.target.value)}
+                                        className="mb-3"
+                                    />
+
+                                    {/* Agents List */}
+                                    <div className="border border-slate-200 rounded-lg p-4 space-y-3 bg-slate-50/50 max-h-96 overflow-y-auto">
+                                        {agents.filter((agent: any) =>
+                                            agent.name.toLowerCase().includes(agentSearchQuery.toLowerCase()) ||
+                                            (agent.role && agent.role.toLowerCase().includes(agentSearchQuery.toLowerCase()))
+                                        ).length === 0 ? (
+                                            <p className="text-sm text-slate-500 text-center py-8">
+                                                {agents.length === 0 ? "No agents available" : "No agents match your search"}
+                                            </p>
+                                        ) : (
+                                            agents
+                                                .filter((agent: any) =>
+                                                    agent.name.toLowerCase().includes(agentSearchQuery.toLowerCase()) ||
+                                                    (agent.role && agent.role.toLowerCase().includes(agentSearchQuery.toLowerCase()))
+                                                )
+                                                .map((agent: any) => (
+                                                    <div
+                                                        key={agent.id}
+                                                        className="flex items-center gap-3 p-2 rounded-md hover:bg-slate-100/80 transition-colors cursor-pointer"
+                                                        onClick={() => handleAgentToggle(agent.id)}
+                                                    >
+                                                        <Checkbox
+                                                            id={`agent-${agent.id}`}
+                                                            checked={selectedAgents.includes(agent.id)}
+                                                            onCheckedChange={() => handleAgentToggle(agent.id)}
+                                                        />
+                                                        <div className="flex-1">
+                                                            <Label
+                                                                htmlFor={`agent-${agent.id}`}
+                                                                className="text-sm font-medium text-slate-800 cursor-pointer"
+                                                            >
+                                                                {agent.name}
+                                                            </Label>
+                                                            <p className="text-xs text-slate-500">{agent.role || "Agent"}</p>
+                                                        </div>
+                                                    </div>
+                                                ))
+                                        )}
+                                    </div>
+                                </div>
                             </div>
 
                             {/* Actions */}
-                            <DialogFooter className="flex justify-end gap-2">
+                            <DialogFooter className="flex justify-end gap-2 pt-4">
                                 <Button disabled={isSubmitting} variant="outline" onClick={() => setOpen(false)}>
                                     Cancel
                                 </Button>
-                                <Button disabled={isSubmitting} onClick={handleConfirm}>{isSubmitting ? "Processing..." : "Confirm"}</Button>
+                                <Button disabled={isSubmitting} onClick={handleConfirm}>
+                                    {isSubmitting ? "Processing..." : "Confirm"}
+                                </Button>
                             </DialogFooter>
                         </DialogContent>
                     </Dialog>

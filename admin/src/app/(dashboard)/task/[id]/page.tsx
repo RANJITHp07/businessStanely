@@ -429,6 +429,11 @@ export default function TaskDetails() {
         setCommentDate(new Date()); // Reset to current date
         setStartTime("");
         setEndTime("");
+
+        // Update task status from "To Do" to "In Progress" if needed
+        if (taskData.status === "To Do") {
+          setTaskData((prev) => prev ? { ...prev, status: "In Progress" } : null);
+        }
       } catch (error) {
         console.error(
           "Failed to add comment:",

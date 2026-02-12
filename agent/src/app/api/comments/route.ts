@@ -9,10 +9,7 @@ export async function POST(req: NextRequest) {
     const agent = await getCurrentAgent(req);
 
     if (!agent) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const body = await req.json();
@@ -31,15 +28,22 @@ export async function POST(req: NextRequest) {
     if (!content || !taskId) {
       return NextResponse.json(
         { error: "Content and taskId are required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     // Verify the task exists and agent has access to it (creator, assigned, or superior of assigned)
     const task = await prisma.task.findUnique({
       where: { id: taskId },
-      select: { createdById: true, assignedToId: true },
+      select: { createdById: true, assignedToId: true, status: true },
     });
+
+    if (task && task.status === "To Do") {
+      await prisma.task.update({
+        where: { id: taskId },
+        data: { status: "In Progress" },
+      });
+    }
 
     let isAuthorized = false;
     if (task?.createdById === agent.id || task?.assignedToId === agent.id) {
@@ -57,7 +61,7 @@ export async function POST(req: NextRequest) {
     if (!task || !isAuthorized) {
       return NextResponse.json(
         { error: "Task not found or access denied" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -115,7 +119,7 @@ export async function POST(req: NextRequest) {
     }
     return NextResponse.json(
       { error: "Failed to create comment" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -125,10 +129,7 @@ export async function GET(req: NextRequest) {
     const agent = await getCurrentAgent(req);
 
     if (!agent) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const { searchParams } = new URL(req.url);
@@ -137,7 +138,7 @@ export async function GET(req: NextRequest) {
     if (!taskId) {
       return NextResponse.json(
         { error: "taskId is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -145,17 +146,14 @@ export async function GET(req: NextRequest) {
     const task = await prisma.task.findFirst({
       where: {
         id: taskId,
-        OR: [
-          { createdById: agent.id },
-          { assignedToId: agent.id },
-        ],
+        OR: [{ createdById: agent.id }, { assignedToId: agent.id }],
       },
     });
 
     if (!task) {
       return NextResponse.json(
         { error: "Task not found or access denied" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -188,7 +186,7 @@ export async function GET(req: NextRequest) {
     console.error("Error fetching comments:", error);
     return NextResponse.json(
       { error: "Failed to fetch comments" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -198,10 +196,7 @@ export async function DELETE(req: NextRequest) {
     const agent = await getCurrentAgent(req);
 
     if (!agent) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const { searchParams } = new URL(req.url);
@@ -210,7 +205,7 @@ export async function DELETE(req: NextRequest) {
     if (!commentId) {
       return NextResponse.json(
         { error: "commentId is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -227,15 +222,13 @@ export async function DELETE(req: NextRequest) {
     }
 
     // Verify the agent has access to this comment (either they created it or have access to the task)
-    const hasAccess = comment.authorType === "AGENT" && comment.authorId === agent.id ||
+    const hasAccess =
+      (comment.authorType === "AGENT" && comment.authorId === agent.id) ||
       comment.task.createdById === agent.id ||
       comment.task.assignedToId === agent.id;
 
     if (!hasAccess) {
-      return NextResponse.json(
-        { error: "Access denied" },
-        { status: 403 }
-      );
+      return NextResponse.json({ error: "Access denied" }, { status: 403 });
     }
 
     // Delete attachment from S3 if exists
@@ -256,7 +249,7 @@ export async function DELETE(req: NextRequest) {
     console.error("Error deleting comment:", error);
     return NextResponse.json(
       { error: "Failed to delete comment" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

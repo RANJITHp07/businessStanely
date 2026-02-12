@@ -420,6 +420,10 @@ export default function TaskDetails() {
             attachmentType: uploadResult.type,
             attachmentUrl: uploadResult.url,
           };
+
+          if (task.status === "To Do") {
+            setTask((prev) => prev ? { ...prev, status: "In Progress" } : null);
+          }
         } else {
           console.error("Failed to upload file");
           setSubmittingComment(false);

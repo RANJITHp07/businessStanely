@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
     if (!clientType) {
       return NextResponse.json(
         { error: "Client type is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
     if (existingClient) {
       return NextResponse.json(
         { error: "A client with this email already exists" },
-        { status: 409 }
+        { status: 409 },
       );
     }
 
@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
     console.error("Error creating client:", error);
     return NextResponse.json(
       { error: "Failed to create client" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -59,11 +59,7 @@ export async function GET(req: NextRequest) {
               some: {
                 legislation: {
                   some: {
-                    tasks: {
-                      some: {
-                        assignedToId: agent?.id,
-                      },
-                    },
+                    assignedAgentId: agent?.id,
                   },
                 },
               },
@@ -88,7 +84,7 @@ export async function GET(req: NextRequest) {
     console.error("Error fetching clients:", error);
     return NextResponse.json(
       { error: "Failed to fetch clients" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

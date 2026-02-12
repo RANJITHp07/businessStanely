@@ -90,6 +90,19 @@ export async function POST(req: NextRequest) {
       },
     });
 
+    // Check if task is in "To Do" status and change it to "In Progress"
+    const task = await prisma.task.findUnique({
+      where: { id: taskId },
+      select: { status: true },
+    });
+
+    if (task && task.status === "To Do") {
+      await prisma.task.update({
+        where: { id: taskId },
+        data: { status: "In Progress" },
+      });
+    }
+
     return NextResponse.json(newComment, { status: 201 });
   } catch (error) {
     console.error("Error creating comment:", error);

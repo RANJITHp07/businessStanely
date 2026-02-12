@@ -64,14 +64,15 @@ function groupActivitiesByDate(activities: AgentActivity[]) {
   }, {} as Record<string, AgentActivity[]>);
 }
 
-function formatDateDMY(dateString?: string) {
+function formatDateDMY(dateString: string) {
   if (!dateString) return "-";
   const d = new Date(dateString);
   if (isNaN(d.getTime())) return "-";
-  const day = String(d.getDate()).padStart(2, '0');
-  const month = d.toLocaleString('en-US', { month: 'short' });
-  const year = d.getFullYear();
-  return `${day}/${month}/${year}`;
+  return d.toLocaleDateString("en-GB", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
 }
 
 function statusKey(s?: string) {

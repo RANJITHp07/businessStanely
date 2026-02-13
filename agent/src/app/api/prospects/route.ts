@@ -169,7 +169,7 @@ export async function POST(req: NextRequest) {
         notes,
         nextFollowUp: nextFollowUp ? new Date(nextFollowUp) : undefined,
         assignedAgent: {
-          connect: { id: assignedAgentId },
+          connect: { id: finalAssignedAgentId },
         },
         createdByAgent: {
           connect: { id: agent.id },

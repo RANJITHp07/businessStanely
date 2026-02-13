@@ -162,15 +162,16 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
-    await prisma.task.delete({
+    await prisma.task.update({
       where: { id },
+      data: { active: false },
     });
     return new NextResponse(null, { status: 204 });
   } catch (error) {
     const { id } = await params;
-    console.error(`Error deleting task ${id}:`, error);
+    console.error(`Error deactivating task ${id}:`, error);
     return NextResponse.json(
-      { error: "Failed to delete task" },
+      { error: "Failed to deactivate task" },
       { status: 500 },
     );
   }

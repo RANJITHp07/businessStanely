@@ -57,13 +57,13 @@ interface AgentActivity {
 
 function groupActivitiesByDate(activities: AgentActivity[]) {
   return activities.reduce((acc, activity) => {
-    const date = new Date(activity.createdAt).toLocaleDateString();
+    // Store the ISO date string instead of localized string
+    const date = new Date(activity.createdAt).toISOString().split('T')[0]; // "2024-01-15"
     if (!acc[date]) acc[date] = [];
     acc[date].push(activity);
     return acc;
   }, {} as Record<string, AgentActivity[]>);
 }
-
 function formatDateDMY(dateString: string) {
   if (!dateString) return "-";
   const d = new Date(dateString);

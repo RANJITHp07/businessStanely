@@ -69,6 +69,7 @@ export default function TaskDetails() {
   const [showAgentSuggestions, setShowAgentSuggestions] = useState(false);
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const [duration, setDuration] = useState(0)
+  const [progressInput, setProgressInput] = useState<string>("");
 
   // const [isFromRetainership, setIsFromRetainership] = useState(false);
   const [agents, setAgents] = useState<Agent[]>([]);
@@ -499,6 +500,116 @@ export default function TaskDetails() {
     }
   };
 
+  // Dropdown options for durations
+  const durationOptions = [
+    { value: "None", label: "None" },
+    { value: "24hr", label: "24 Hours" },
+    { value: "48hr", label: "48 Hours" },
+    { value: "1w", label: "1 Week" },
+  ];
+
+  const handleStatusChange = async (newStatus: string) => {
+    if (!taskData) return;
+    const prevTask = { ...taskData };
+    const restoredProgress = newStatus === "Completed" ? 100 : (newStatus === "In Progress" ? 30 : 0);
+
+    setTaskData({
+      ...taskData,
+      status: newStatus,
+      progress: restoredProgress,
+    });
+    setProgressInput(restoredProgress > 0 ? String(restoredProgress) : "");
+
+    try {
+      const response = await fetch(`/api/tasks/${id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          status: newStatus,
+          progress: restoredProgress,
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setTaskData((prevTaskState) => ({
+          ...prevTaskState!,
+          ...data.task,
+          comments: prevTaskState!.comments,
+        }));
+      } else {
+        setTaskData(prevTask);
+        console.error("Failed to update task status");
+      }
+    } catch (error) {
+      setTaskData(prevTask);
+      console.error("Error updating task status:", error);
+    }
+  };
+
+  const handleFollowUpDurationChange = async (value: string) => {
+    if (!taskData) return;
+    const prevTask = { ...taskData };
+    let newStatusCheckDuration = taskData.statusCheckDuration;
+    if (value !== "None" && taskData.statusCheckDuration !== "None") {
+      newStatusCheckDuration = "None";
+    }
+    setTaskData({ ...taskData, followUpDuration: value, statusCheckDuration: newStatusCheckDuration });
+    try {
+      const response = await fetch(`/api/tasks/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ followUpDuration: value, statusCheckDuration: newStatusCheckDuration }),
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setTaskData(prevTaskState => ({
+          ...prevTaskState!,
+          ...data.task,
+          comments: prevTaskState!.comments,
+        }));
+      } else {
+        setTaskData(prevTask);
+        console.error("Failed to update follow-up duration");
+      }
+    } catch (error) {
+      setTaskData(prevTask);
+      console.error("Error updating follow-up duration:", error);
+    }
+  };
+
+  const handleStatusCheckDurationChange = async (value: string) => {
+    if (!taskData) return;
+    const prevTask = { ...taskData };
+    let newFollowUpDuration = taskData.followUpDuration;
+    if (value !== "None" && taskData.followUpDuration !== "None") {
+      newFollowUpDuration = "None";
+    }
+    setTaskData({ ...taskData, statusCheckDuration: value, followUpDuration: newFollowUpDuration });
+    try {
+      const response = await fetch(`/api/tasks/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ statusCheckDuration: value, followUpDuration: newFollowUpDuration }),
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setTaskData(prevTaskState => ({
+          ...prevTaskState!,
+          ...data.task,
+          comments: prevTaskState!.comments,
+        }));
+      } else {
+        setTaskData(prevTask);
+        console.error("Failed to update status check duration");
+      }
+    } catch (error) {
+      setTaskData(prevTask);
+      console.error("Error updating status check duration:", error);
+    }
+  };
 
   const getNowTime = () => {
     const d = new Date()
@@ -857,6 +968,64 @@ export default function TaskDetails() {
             <div className="lg:col-span-2 space-y-6">
               <Card>
                 <CardHeader>
+                  <CardTitle>Task Management</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {/* Status and Progress */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="status">Status</Label>
+                      <Select
+                        value={taskData.status}
+                        onValueChange={handleStatusChange}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="To Do">To Do</SelectItem>
+                          <SelectItem value="In Progress">
+                            In Progress
+                          </SelectItem>
+                          <SelectItem value="Hold">Hold</SelectItem>
+                          <SelectItem value="Completed">Completed</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="progress">
+                        Progress ({taskData.progress}%)
+                      </Label>
+                      <div className="space-y-2">
+                        <Progress value={taskData.progress} className="w-full" />
+                        <Input
+                          type="text"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
+                          min="0"
+                          max="100"
+                          value={progressInput}
+                          placeholder=""
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (/^\d{0,3}$/.test(val) && parseInt(val) <= 100) {
+                              setProgressInput(val);
+                              setTaskData({
+                                ...taskData,
+                                progress: parseInt(val) || 0,
+                              });
+                            }
+                          }}
+                          className="w-full"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
                   <CardTitle>Task Information</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
@@ -1150,6 +1319,50 @@ export default function TaskDetails() {
                       </div>
                     </div>
                   }
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Task Actions</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="follow-up-duration" className="text-sm font-medium cursor-pointer">
+                      Follow-up Required
+                    </Label>
+                    <Select
+                      value={taskData.followUpDuration || "None"}
+                      onValueChange={handleFollowUpDurationChange}
+                    >
+                      <SelectTrigger id="follow-up-duration" className="w-full">
+                        <SelectValue placeholder="None" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {durationOptions.map(opt => (
+                          <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="status-check-duration" className="text-sm font-medium cursor-pointer">
+                      Status Check
+                    </Label>
+                    <Select
+                      value={taskData.statusCheckDuration || "None"}
+                      onValueChange={handleStatusCheckDurationChange}
+                    >
+                      <SelectTrigger id="status-check-duration" className="w-full">
+                        <SelectValue placeholder="None" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {durationOptions.map(opt => (
+                          <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </CardContent>
               </Card>
             </div>

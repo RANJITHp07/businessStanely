@@ -553,7 +553,7 @@ export default function AgentsTable() {
                               <DropdownMenuContent align="end">
                                 <DropdownMenuLabel className="text-xs">Actions</DropdownMenuLabel>
                                 <DropdownMenuItem asChild>
-                                  <Link href={`/ agent / ${agent.id}`}>
+                                  <Link href={`/agent/${agent.id}?tab=tasks`}>
                                     <Eye className="mr-2 h-3 w-3" />
                                     <span className="text-xs">View Details</span>
                                   </Link>

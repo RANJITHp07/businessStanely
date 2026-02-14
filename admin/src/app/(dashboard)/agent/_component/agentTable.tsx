@@ -499,7 +499,7 @@ export default function AgentsTable() {
                       return (
                         <TableRow
                           key={agent.id}
-                          onClick={() => router.push(`/ agent / ${agent.id} ? tab = tasks`)}
+                          onClick={() => router.push(`/agent/${agent.id}?tab=tasks`)}
                           className="cursor-pointer hover:bg-muted/50"
                         >
                           <TableCell>

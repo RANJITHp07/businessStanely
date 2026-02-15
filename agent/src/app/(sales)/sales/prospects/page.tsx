@@ -162,7 +162,7 @@ function SectionTable({ label, prospects }: { label: string; prospects: Prospect
                                         {prospects.length === 0 ? (
                                             <TableRow>
                                                 <TableCell colSpan={6} className="text-center py-4 text-muted-foreground">
-                                                    No prospects found.
+                                                    No leads found.
                                                 </TableCell>
                                             </TableRow>
                                         ) : (

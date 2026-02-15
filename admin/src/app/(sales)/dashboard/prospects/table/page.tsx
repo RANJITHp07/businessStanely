@@ -206,7 +206,7 @@ export default function ProspectsTable() {
                             <CardContent className="space-y-4">
                                 <div className="flex items-center gap-4">
                                     <div className="flex-1">
-                                        <Label htmlFor="search">Search Prospects</Label>
+                                        <Label htmlFor="search">Search Leads</Label>
                                         <div className="relative my-2">
                                             <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                                             <Input
@@ -467,7 +467,7 @@ export default function ProspectsTable() {
 
             <Card>
                 <CardHeader>
-                    <CardTitle>Prospects ({filteredProspects.length})</CardTitle>
+                    <CardTitle>Leads ({filteredProspects.length})</CardTitle>
                 </CardHeader>
                 <CardContent>
                     {loading ? (

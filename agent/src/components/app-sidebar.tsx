@@ -52,7 +52,7 @@ const salesItems = [
     icon: ClipboardList,
   },
   {
-    title: "Prospects",
+    title: "Leads",
     url: "/sales/prospects",
     icon: UserSearch,
   },

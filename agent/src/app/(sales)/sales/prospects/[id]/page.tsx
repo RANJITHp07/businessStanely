@@ -249,7 +249,7 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
                 <div className="text-center py-12">
                     <h2 className="text-2xl font-bold">Lead not found</h2>
                     <Link href="/prospects">
-                        <Button className="mt-4">Back to Prospects</Button>
+                        <Button className="mt-4">Back to Leads</Button>
                     </Link>
                 </div>
             </div>

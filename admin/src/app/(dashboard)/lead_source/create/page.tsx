@@ -53,7 +53,7 @@ export default function CreateLeadSource() {
         <div className="container mx-auto p-6 max-w-7xl">
             <div className="mb-8">
                 <h1 className="text-3xl font-bold">Create New Lead Source</h1>
-                <p className="text-muted-foreground mt-2">Add a new lead source to track where your prospects come from.</p>
+                <p className="text-muted-foreground mt-2">Add a new lead source to track where your leads come from.</p>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-8">

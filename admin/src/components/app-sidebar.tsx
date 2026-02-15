@@ -61,7 +61,7 @@ type MenuItem = {
 
 const allItems: MenuItem[] = [
   { title: "Dashboard", icon: Home, url: "/" },
-  { title: "Prospects", url: "/dashboard/prospects", icon: UserSearch },
+  { title: "Leads", url: "/dashboard/prospects", icon: UserSearch },
   { title: "Opportunities", url: "/dashboard/opportunities", icon: ClipboardList },
   { title: "Execution Agent", url: "/agent", icon: UserRoundPen },
   { title: "Advisor Agent", url: "/dashboard/agent", icon: UserRoundPen },
@@ -78,10 +78,10 @@ const allItems: MenuItem[] = [
 
 // Split items into two panels
 const agentPanelItems = allItems.filter(
-  (item) => !["Prospects", "Advisor Agent", "Opportunities", "Lead Source", "Settings"].includes(item.title)
+  (item) => !["Leads", "Advisor Agent", "Opportunities", "Lead Source", "Settings"].includes(item.title)
 );
 const salesPanelItems = allItems.filter((item) =>
-  ["Advisor Agent", "Prospects", "Opportunities", "Lead Source"].includes(item.title)
+  ["Advisor Agent", "Leads", "Opportunities", "Lead Source"].includes(item.title)
 );
 
 const settingsPanelItems = allItems.filter((item) => item.title === "Settings");

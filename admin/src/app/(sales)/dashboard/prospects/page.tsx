@@ -655,7 +655,7 @@ export default function ProspectDashboard() {
                             <Plus className="h-4 w-4" />
                             Create Lead
                         </Button>
-                        <Button onClick={() => setOpen(true)}>Set Prospects per Agent</Button>
+                        <Button onClick={() => setOpen(true)}>Set Leads per Agent</Button>
                     </div>
 
 

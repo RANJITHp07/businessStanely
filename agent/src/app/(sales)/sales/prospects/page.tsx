@@ -329,12 +329,12 @@ export default function ProspectsPage() {
         <div className="container mx-auto px-4 py-8 space-y-6 max-w-[1600px]">
             <div className="flex justify-between items-center">
                 <div>
-                    <h1 className="text-3xl font-bold">My Prospects</h1>
-                    <p className="text-muted-foreground mt-1">Track and manage your prospects</p>
+                    <h1 className="text-3xl font-bold">My Leads</h1>
+                    <p className="text-muted-foreground mt-1">Track and manage your leads</p>
                 </div>
                 <Button onClick={() => router.push("/sales/prospects/add")} className="mt-[20px] md:mt-none text-white rounded-lg px-4 py-2 flex items-center gap-2 cursor-pointer shadow-none hover:shadow-md transition-shadow duration-300">
                     <Plus className="h-4 w-4" />
-                    Create Prospect
+                    Create Lead
                 </Button>
             </div>
 

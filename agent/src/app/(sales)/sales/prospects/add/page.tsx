@@ -480,7 +480,7 @@ export default function NewProspectPage() {
                             Cancel
                         </Button>
                         <Button type="submit" disabled={loading} className=" text-white rounded-lg px-4 py-2 flex items-center gap-2 cursor-pointer shadow-none hover:shadow-md transition-shadow duration-300" >
-                            {loading ? "Creating..." : "Create Prospect"}
+                            {loading ? "Creating..." : "Create Lead"}
                         </Button>
                     </div>
                 </form>

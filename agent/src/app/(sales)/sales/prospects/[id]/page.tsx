@@ -247,7 +247,7 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
         return (
             <div className="container mx-auto p-6 max-w-7xl">
                 <div className="text-center py-12">
-                    <h2 className="text-2xl font-bold">Prospect not found</h2>
+                    <h2 className="text-2xl font-bold">Lead not found</h2>
                     <Link href="/prospects">
                         <Button className="mt-4">Back to Prospects</Button>
                     </Link>
@@ -260,9 +260,9 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
         <div className="container mx-auto p-6 max-w-7xl">
             <div className="mb-6">
                 <div className="mb-7">
-                    <h1 className="text-[28px] md:text-3xl font-bold">Prospect Details</h1>
+                    <h1 className="text-[28px] md:text-3xl font-bold">Lead Details</h1>
                     <p className="text-[18px] md:text-[16px] text-muted-foreground mt-2">
-                        Detailed overview of prospect information, engagement, and current status
+                        Detailed overview of lead information, engagement, and current status
                     </p>
                 </div>
                 <Card>
@@ -270,7 +270,7 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
                         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                             <div>
                                 <h1 className="text-3xl font-bold">{prospect.name}</h1>
-                                <p className="text-muted-foreground mt-1">Prospect Details</p>
+                                <p className="text-muted-foreground mt-1">Lead Details</p>
                             </div>
                             <div className="gap-2 flex items-center">
                                 <div>

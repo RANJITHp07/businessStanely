@@ -782,7 +782,7 @@ export default function ProspectDashboard() {
                         <div className="h-8 w-8 rounded-lg bg-slate-200 flex items-center justify-center">
                             <Users className="h-4 w-4 text-slate-700" />
                         </div>
-                        <h2 className="text-xl font-bold text-slate-800">Active Prospects</h2>
+                        <h2 className="text-xl font-bold text-slate-800">Active Lead</h2>
                     </div>
 
                     <ProspectsTable label="Proposal Issued" prospects={prospects.filter((prospect) => prospect.status == "Proposal Issued").slice(0, 5)} statusFilter="Proposal Issued" />

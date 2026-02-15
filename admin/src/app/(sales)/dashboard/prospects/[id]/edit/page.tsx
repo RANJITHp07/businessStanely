@@ -160,8 +160,8 @@ export default function EditProspectPage() {
       <div className="mx-auto ">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-foreground">Edit Prospect</h1>
-          <p className="text-muted-foreground mt-2">Update prospect details</p>
+          <h1 className="text-3xl font-bold text-foreground">Edit Lead</h1>
+          <p className="text-muted-foreground mt-2">Update lead details</p>
         </div>
 
         {/* Form */}
@@ -431,7 +431,7 @@ export default function EditProspectPage() {
               Cancel
             </Button>
             <Button type="submit" disabled={isSubmitting} className=" text-white rounded-lg px-4 py-2 flex items-center gap-2 cursor-pointer shadow-none hover:shadow-md transition-shadow duration-300" >
-              {isSubmitting ? "Updating..." : " Update Prospect"}
+              {isSubmitting ? "Updating..." : " Update Lead"}
             </Button>
           </div>
         </form>

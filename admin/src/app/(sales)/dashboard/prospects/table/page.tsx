@@ -175,12 +175,12 @@ export default function ProspectsTable() {
             <div className="mb-8">
                 <div className="flex flex-col md:flex-row justify-between md:items-center mb-6 md:mb-4">
                     <div>
-                        <h1 className="text-3xl font-bold">Prospects Management</h1>
-                        <p className="text-muted-foreground mt-2">Manage and track all prospects</p>
+                        <h1 className="text-3xl font-bold">Leads Management</h1>
+                        <p className="text-muted-foreground mt-2">Manage and track all leads</p>
                     </div>
                     <Button onClick={() => router.push("/dashboard/prospects/add")} className="mt-[20px] md:mt-none text-white rounded-lg px-4 py-2 flex items-center gap-2 cursor-pointer shadow-none hover:shadow-md transition-shadow duration-300">
                         <Plus className="h-4 w-4" />
-                        Create Prospect
+                        Create Lead
                     </Button>
                 </div>
 

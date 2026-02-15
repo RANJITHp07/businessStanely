@@ -647,13 +647,13 @@ export default function ProspectDashboard() {
                 {/* Header */}
                 <div className="flex items-center justify-between mb-6">
                     <div>
-                        <h1 className="text-3xl font-bold text-slate-800 mb-1">Prospect Reports Dashboard</h1>
+                        <h1 className="text-3xl font-bold text-slate-800 mb-1">Lead Reports Dashboard</h1>
                         <p className="">Track and manage your sales prospects</p>
                     </div>
                     <div className="flex flex-col md:flex-row md:items-center gap-4">
                         <Button onClick={() => router.push("/dashboard/prospects/add")} >
                             <Plus className="h-4 w-4" />
-                            Create Prospect
+                            Create Lead
                         </Button>
                         <Button onClick={() => setOpen(true)}>Set Prospects per Agent</Button>
                     </div>
@@ -662,9 +662,9 @@ export default function ProspectDashboard() {
                     <Dialog open={open} onOpenChange={setOpen}>
                         <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
                             <DialogHeader>
-                                <DialogTitle>Assign Prospects Automatically</DialogTitle>
+                                <DialogTitle>Assign Lead Automatically</DialogTitle>
                                 <DialogDescription>
-                                    Decide how many prospects each agent should be assigned automatically, and select which agents will participate.
+                                    Decide how many leads each agent should be assigned automatically, and select which agents will participate.
                                 </DialogDescription>
                             </DialogHeader>
 
@@ -672,7 +672,7 @@ export default function ProspectDashboard() {
                                 {/* Input Field */}
                                 <div>
                                     <Label htmlFor="prospectsPerAgent" className="text-sm font-medium text-slate-700">
-                                        Prospects per Agent
+                                        Leads per Agent
                                     </Label>
                                     <Input
                                         id="prospectsPerAgent"

@@ -133,7 +133,7 @@ export default function StatusTable() {
                                                 All Status
                                             </SelectItem>
                                             <SelectItem key={"Prospect"} value={"Prospect"} className="text-sm">
-                                                Prospect
+                                                Leads
                                             </SelectItem>
                                             <SelectItem key={"Opportunity"} value={"Opportunity"} className="text-sm">
                                                 Opportunity
@@ -203,7 +203,7 @@ export default function StatusTable() {
                                                 <TableCell>{item.email}</TableCell>
                                                 <TableCell>
                                                     <Badge className="bg-gray-200 text-black">
-                                                        {item.status === "Converted" ? "Oppurtunity" : "Prospect"}
+                                                        {item.status === "Converted" ? "Oppurtunity" : "Lead"}
                                                     </Badge>
                                                 </TableCell>
                                                 <TableCell>{item?.leadSource?.name || "N/A"}</TableCell>

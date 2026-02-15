@@ -128,8 +128,8 @@ export default function NewProspectPage() {
             <div className="mx-auto ">
                 {/* Header */}
                 <div className="mb-8">
-                    <h1 className="text-3xl font-bold text-foreground">Create New Prospect</h1>
-                    <p className="text-muted-foreground mt-2">Add a new prospect to your pipeline</p>
+                    <h1 className="text-3xl font-bold text-foreground">Create New Lead</h1>
+                    <p className="text-muted-foreground mt-2">Add a new lead to your pipeline</p>
                 </div>
 
                 {/* Form */}
@@ -407,7 +407,7 @@ export default function NewProspectPage() {
                             Cancel
                         </Button>
                         <Button type="submit" disabled={loading} className=" text-white rounded-lg px-4 py-2 flex items-center gap-2 cursor-pointer shadow-none hover:shadow-md transition-shadow duration-300" >
-                            {loading ? "Creating..." : "Create Prospect"}
+                            {loading ? "Creating..." : "Create lead"}
                         </Button>
                     </div>
                 </form>

@@ -68,7 +68,7 @@ export default function Navigator() {
                 ) : (
                     <>
                         <Button size="sm" onClick={() => router.push("/sales/prospects/add")}>
-                            Create Prospect
+                            Create Lead
                         </Button>
                         {agent?.agentType !== "Lead Maker" && (
                             <Button size="sm" onClick={() => router.push("/sales/calendar")}>

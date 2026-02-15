@@ -785,13 +785,13 @@ export default function ProspectDashboard() {
                         <h2 className="text-xl font-bold text-slate-800">Active Prospects</h2>
                     </div>
 
-                    <ProspectTable label="Proposal Issued" prospects={prospects.filter((prospect) => prospect.status == "Proposal Issued").slice(0, 5)} statusFilter="Proposal Issued" />
-                    <ProspectTable
+                    <ProspectsTable label="Proposal Issued" prospects={prospects.filter((prospect) => prospect.status == "Proposal Issued").slice(0, 5)} statusFilter="Proposal Issued" />
+                    <ProspectsTable
                         label="Closed as Won Prospects"
                         prospects={prospects.filter((prospect) => prospect.status == "Closed as Won").slice(0, 5)}
                         statusFilter="Closed as Won Prospects"
                     />
-                    <ProspectTable
+                    <ProspectsTable
                         label="Closed as Loss Prospects"
                         prospects={prospects.filter((prospect) => prospect.status == "Closed as Loss").slice(0, 5)}
                         statusFilter="Closed as Loss Prospects"

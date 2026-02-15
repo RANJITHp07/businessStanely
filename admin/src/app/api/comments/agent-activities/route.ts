@@ -9,7 +9,7 @@ export async function GET(req: NextRequest) {
     if (!agentId) {
       return NextResponse.json(
         { error: "agentId is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
     // Find all comments made by this agent, include task info
@@ -22,13 +22,14 @@ export async function GET(req: NextRequest) {
             title: true,
           },
         },
+        prospect: { select: { id: true, name: true } },
       },
       orderBy: { createdAt: "desc" },
     });
     // Format for activities tab
     const activities = comments.map((comment) => ({
-      taskId: comment.task?.id,
-      taskTitle: comment.task?.title,
+      taskId: comment.task?.id || comment.prospect?.id,
+      taskTitle: comment.task?.title || comment?.prospect?.name,
       content: comment.content,
       createdAt: comment.createdAt,
     }));
@@ -37,7 +38,7 @@ export async function GET(req: NextRequest) {
     console.error("Error fetching agent activities:", error);
     return NextResponse.json(
       { error: "Failed to fetch agent activities" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

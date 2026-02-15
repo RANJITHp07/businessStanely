@@ -15,56 +15,48 @@ class CronScheduler {
 
   // Start the recurring tasks scheduler
   public startRecurringTasksScheduler() {
-    const taskName = "recurring-tasks";
+    // Start only the daily activity email scheduler (runs once per day)
+    this.startDailyActivityEmailScheduler();
+
+    return null;
+  }
+
+  // Start the daily activity email scheduler (runs once at midnight)
+  public startDailyActivityEmailScheduler() {
+    const taskName = "daily-activity-email";
 
     // Stop existing task if any
     this.stopTask(taskName);
 
-    // Schedule to run daily at 9:00 AM UTC
+    // Schedule to run daily at 8:00 AM UTC (0 8 * * *)
     const task = cron.schedule(
-      "0 9 * * *",
+      "0 2 * * *",
       async () => {
         console.log(
-          "🔄 Running recurring tasks and hold tasks cron job at:",
-          new Date().toISOString()
+          "📧 Running daily activity email job at:",
+          new Date().toISOString(),
         );
 
         try {
-          const { updateAllRecurringTasks } = await import(
-            "./singleTaskRecurring"
-          );
-          const updatedTasks = await updateAllRecurringTasks();
-          console.log(
-            `✅ Cron job completed. Auto-updated ${updatedTasks.length} tasks.`
-          );
-
-          if (updatedTasks.length > 0) {
-            console.log("📝 Updated tasks:");
-            updatedTasks.forEach((task) => {
-              console.log(
-                `  - ${task.title} (New due date: ${
-                  task.dueDate?.toISOString()?.split("T")[0]
-                })`
-              );
-            });
-          }
+          const { sendActivityEmailsToAgents } =
+            (await import("./singleTaskRecurring")) as any;
+          await sendActivityEmailsToAgents();
+          console.log(`✅ Daily activity emails sent successfully.`);
         } catch (error) {
-          console.error(
-            "❌ Error in recurring tasks and hold tasks cron job:",
-            error
-          );
+          console.error("❌ Error in daily activity email cron job:", error);
         }
       },
       {
         timezone: "UTC",
-      }
+      },
     );
 
     this.scheduledTasks.set(taskName, task);
 
     console.log(
-      `🚀 Recurring tasks and hold tasks cron scheduler started (daily at 9:00 AM UTC)`
+      `🚀 Daily activity email scheduler started (daily at 8:00 AM UTC)`,
     );
+
     return task;
   }
 
@@ -101,12 +93,10 @@ class CronScheduler {
     console.log("🧪 Running recurring tasks manually...");
 
     try {
-      const { updateAllRecurringTasks } = await import("./singleTaskRecurring");
-      const updatedTasks = await updateAllRecurringTasks();
-      console.log(
-        `✅ Manual run completed. Auto-updated ${updatedTasks.length} recurring tasks.`
-      );
-      return updatedTasks;
+      const { sendActivityEmailsToAgents } =
+        (await import("./singleTaskRecurring")) as any;
+      await sendActivityEmailsToAgents();
+      console.log(`✅ Manual run completed. Sent activity emails to agents.`);
     } catch (error) {
       console.error("❌ Error in manual recurring tasks run:", error);
       throw error;

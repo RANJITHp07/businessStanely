@@ -22,6 +22,31 @@ export default function AuthSessionTimeout() {
   const [showDialog, setShowDialog] = useState(false);
   const router = useRouter();
 
+  const handleLogout = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const expiryTime = token ? getTokenExpiration(token) : null;
+
+      // Call logout API with expiry time
+      await fetch("/api/auth/logout", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          expiryTime: expiryTime,
+        }),
+      });
+    } catch (error) {
+      console.error("Error calling logout API:", error);
+    } finally {
+      // Clear local storage and redirect
+      localStorage.removeItem("token");
+      localStorage.removeItem("agent");
+      router.replace("/login");
+    }
+  };
+
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (!token) return;
@@ -33,18 +58,14 @@ export default function AuthSessionTimeout() {
       // Already expired
       setShowDialog(true);
       setTimeout(() => {
-        localStorage.removeItem("token");
-        localStorage.removeItem("agent");
-        router.replace("/login");
+        handleLogout();
       }, 2000);
       return;
     }
     const timeout = setTimeout(() => {
       setShowDialog(true);
       setTimeout(() => {
-        localStorage.removeItem("token");
-        localStorage.removeItem("agent");
-        router.replace("/login");
+        handleLogout();
       }, 2000);
     }, msUntilExpiry);
     return () => clearTimeout(timeout);

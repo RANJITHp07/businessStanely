@@ -52,7 +52,7 @@ const colorClasses: Record<string, { bg: string; text: string; border: string }>
     text: "text-yellow-900",
     border: "border border-yellow-400",
   },
-  "in-progress": {
+  "in progress": {
     bg: "bg-blue-100",
     text: "text-blue-900",
     border: "border border-blue-400",
@@ -81,7 +81,17 @@ const colorClasses: Record<string, { bg: string; text: string; border: string }>
 }
 
 function parseTime(timeStr: string): { hours: number; minutes: number } {
-  const [hours, minutes] = timeStr.split(":").map(Number)
+  const [time, modifier] = timeStr.split(" ")
+  let [hours, minutes] = time.split(":").map(Number)
+
+  if (modifier === "PM" && hours !== 12) {
+    hours += 12
+  }
+
+  if (modifier === "AM" && hours === 12) {
+    hours = 0
+  }
+
   return { hours, minutes }
 }
 
@@ -122,11 +132,11 @@ export function TimesheetCalendar({
     const map = new Map<string, TimeEntry[]>()
 
     entries.forEach((entry) => {
-      if (!showLoginLogout && (entry.type === "login" || entry.type === "logout")) {
-        return
-      }
+      // if (!showLoginLogout && (entry.type === "login" || entry.type === "logout")) {
+      //   return
+      // }
 
-      const dayKey = format(entry.date, "yyyy-MM-dd")
+      const dayKey = format(new Date(entry.date), "yyyy-MM-dd")
       if (!map.has(dayKey)) {
         map.set(dayKey, [])
       }
@@ -210,6 +220,7 @@ export function TimesheetCalendar({
                     const colors = colorClasses[entry.status] || colorClasses.default
                     const isLoginLogout = entry.type === "login" || entry.type === "logout"
 
+
                     return (
                       <div
                         key={entry.id}
@@ -231,11 +242,9 @@ export function TimesheetCalendar({
                           <>
                             <div className="flex items-center justify-between gap-1 text-xs opacity-80">
                               <span>{entry.startTime}</span>
-                              <span>{entry.projectCode}</span>
                             </div>
                             <div className="font-medium text-sm mt-0.5 line-clamp-2">
-                              {entry.project}
-                              <span className="opacity-80"> - {entry.title}</span>
+                              <span className="opacity-80">{entry.title}</span>
                             </div>
                           </>
                         )}

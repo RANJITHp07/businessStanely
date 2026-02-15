@@ -11,6 +11,9 @@ export async function GET(req: NextRequest) {
 
     // Get all agents first
     const allAgents = await prisma.agent.findMany({
+      where: {
+        status: "active",
+      },
       select: {
         id: true,
         name: true,
@@ -20,14 +23,16 @@ export async function GET(req: NextRequest) {
         createdAt: "desc",
       },
     });
-    
+
     // Filter for execution role agents only
-    const executionAgents = allAgents.filter(a => a.agentRole === "Execution Agent");
-    
+    const executionAgents = allAgents.filter(
+      (a) => a.agentRole === "Execution Agent",
+    );
+
     // Fetch full data for execution agents using their IDs
     const agents = await prisma.agent.findMany({
       where: {
-        id: { in: executionAgents.map(a => a.id) },
+        id: { in: executionAgents.map((a) => a.id) },
       },
       include: {
         superiorsLinks: { include: { superior: true } },
@@ -37,15 +42,19 @@ export async function GET(req: NextRequest) {
         createdAt: "desc",
       },
     });
-    
-    console.log("[DEBUG] Execution agents fetched for timesheet:", agents.length, "agents");
-    
+
+    console.log(
+      "[DEBUG] Execution agents fetched for timesheet:",
+      agents.length,
+      "agents",
+    );
+
     return NextResponse.json({ agents });
   } catch (error) {
     console.error("Error fetching execution agents for timesheet:", error);
     return NextResponse.json(
       { error: "Failed to fetch execution agents" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

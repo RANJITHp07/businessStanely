@@ -51,12 +51,9 @@ export default function TimesheetPage() {
     useEffect(() => {
         const fetchAgents = async () => {
             try {
-                console.log('[DEBUG] Fetching agents...');
                 const response = await fetch("/api/timesheet/agents"); // Use dedicated timesheet agents endpoint
                 const data = response.ok ? await response.json() : { agents: [] };
-                console.log('[DEBUG] Agents API response:', data);
                 const agentsList = (data.agents || []);
-                console.log('[DEBUG] Agents list:', agentsList.length, 'agents');
                 setAgents(agentsList);
                 // Default to first agent
                 if (agentsList.length > 0 && !selectedAgent) {
@@ -71,76 +68,38 @@ export default function TimesheetPage() {
         fetchAgents();
     }, [selectedAgent]);
 
+    const endDate = useMemo(() => addDays(startDate, daysToShow), [startDate, daysToShow])
+
     // Fetch timesheet data for selected agent
     useEffect(() => {
         const fetchTimesheetData = async () => {
             if (!selectedAgent) return;
             try {
-                const response = await fetch(`/api/timesheet?agentId=${selectedAgent.id}`);
-                const data = response.ok ? await response.json() : { tasks: [] };
-                const tasks = (data.tasks || []);
-                console.log('[DEBUG] API Response for agent', selectedAgent.name, ':', data);
-                console.log('[DEBUG] Tasks count:', tasks.length);
-                const commentEntries: TimeEntry[] = [];
-                let entryId = 1000;
-                tasks.forEach((task: { id: string, title: string, client?: { name: string }, status?: string, comments?: Array<any>, assignedTo?: { id: string, name: string } }) => {
-                    console.log('[DEBUG] Processing task:', task.id, 'with', task.comments?.length || 0, 'comments');
-                    (task.comments || []).forEach((commentRaw: { commentDate: string, startTime?: string, endTime?: string, content?: string, agent?: { id: string, name: string }, user?: { id: string, username: string } }) => {
-                        if (!commentRaw.commentDate) return;
-                        const startTimeDate = commentRaw.startTime ? new Date(commentRaw.startTime) : null;
-                        const endTimeDate = commentRaw.endTime ? new Date(commentRaw.endTime) : null;
-                        const startTimeStr = startTimeDate ? `${startTimeDate.getHours().toString().padStart(2, "0")}:${startTimeDate.getMinutes().toString().padStart(2, "0")}` : "";
-                        const endTimeStr = endTimeDate ? `${endTimeDate.getHours().toString().padStart(2, "0")}:${endTimeDate.getMinutes().toString().padStart(2, "0")}` : "";
-                        const userName = commentRaw.agent?.name || commentRaw.user?.username || task.assignedTo?.name || "";
-                        const userId = commentRaw.agent?.id || commentRaw.user?.id || task.assignedTo?.id || "";
-                        let projectCode = task.id.slice(0, 6).toUpperCase();
-                        if (/^[0-9A-F]{6}$/i.test(projectCode)) projectCode = "";
-                        // Normalize status to match colorClasses
-                        let normalizedStatus: TaskStatus = "completed";
-                        if (task.status) {
-                            const statusLower = task.status.toLowerCase().replace(/\\s+/g, "");
-                            if (["todo", "pending"].includes(statusLower)) normalizedStatus = "toDo";
-                            else if (["inprogress", "progress"].includes(statusLower)) normalizedStatus = "in-progress";
-                            else if (["completed"].includes(statusLower)) normalizedStatus = "completed";
-                        }
-                        const entry: TimeEntry = {
-                            id: `real-${entryId++}`,
-                            title: task.title,
-                            description: commentRaw.content || "",
-                            project: task.client?.name || "Project",
-                            projectCode,
-                            date: new Date(commentRaw.commentDate),
-                            startTime: startTimeStr,
-                            endTime: endTimeStr,
-                            status: normalizedStatus,
-                            color: "blue",
-                            userId,
-                            userName,
-                            type: "task",
-                        };
-                        console.log('[DEBUG] Created entry:', entry.id, 'for date:', entry.date, 'user:', entry.userName);
-                        commentEntries.push(entry);
-                    });
+                const params = new URLSearchParams({
+                    agentId: selectedAgent.id,
+                    startDate: startDate.toISOString(),
+                    endDate: endDate.toISOString(),
                 });
-                console.log('[DEBUG] Total comment entries created:', commentEntries.length);
-                setEntries(commentEntries);
-            } catch {
+                const response = await fetch(`/api/timesheet?${params.toString()}`);
+                const data = response.ok ? await response.json() : { timeEntries: [] };
+                setEntries(data.timeEntries || []);
+            } catch (err) {
+                console.error('[DEBUG] Error fetching timesheet data:', err);
                 setEntries([]);
             }
         };
         fetchTimesheetData();
-    }, [selectedAgent]);
+    }, [selectedAgent, startDate, endDate]);
 
-    const endDate = useMemo(() => addDays(startDate, daysToShow - 1), [startDate, daysToShow])
+
 
     // Filter entries by status and date (no user filtering for admin)
     const filteredEntries = useMemo(() => {
-        console.log('[DEBUG] Filtering entries. Selected statuses:', selectedStatuses);
         return entries.filter((entry) => {
             if (selectedStatuses.length > 0 && !selectedStatuses.includes(entry.status)) {
                 return false;
             }
-            const entryDate = entry.date.getTime();
+            const entryDate = new Date(entry.date).getTime();
             const start = startDate.getTime();
             const end = addDays(startDate, daysToShow).getTime();
             if (entryDate < start || entryDate >= end) {
@@ -150,9 +109,45 @@ export default function TimesheetPage() {
         });
     }, [entries, selectedStatuses, startDate, daysToShow])
 
-    useEffect(() => {
-        console.log('[DEBUG] Filtered entries for calendar:', filteredEntries);
+    const totalHours = useMemo(() => {
+        const taskEntries = filteredEntries.filter((e) => e.type === "task")
+        let totalMinutes = 0
+
+        const parseTimeToMinutes = (timeStr: string) => {
+            if (!timeStr) return null
+            const ampmMatch = timeStr.match(/(am|pm)$/i)
+            let hours = 0
+            let minutes = 0
+            if (ampmMatch) {
+                const cleaned = timeStr.replace(/\s*(am|pm)$/i, "")
+                const parts = cleaned.split(":").map((p) => p.trim())
+                hours = Number(parts[0] || 0)
+                minutes = Number(parts[1] || 0)
+                const isPM = /pm/i.test(ampmMatch[0])
+                if (isPM && hours < 12) hours += 12
+                if (!isPM && hours === 12) hours = 0
+            } else {
+                const parts = timeStr.split(":").map((p) => p.trim())
+                hours = Number(parts[0] || 0)
+                minutes = Number(parts[1] || 0)
+            }
+            if (Number.isNaN(hours) || Number.isNaN(minutes)) return null
+            return hours * 60 + minutes
+        }
+
+        taskEntries.forEach((entry) => {
+            const startMin = parseTimeToMinutes(entry.startTime)
+            const endMin = parseTimeToMinutes(entry.endTime)
+            if (startMin == null || endMin == null) return
+            let diff = endMin - startMin
+            if (diff < 0) diff += 24 * 60
+            totalMinutes += diff
+        })
+
+        const hours = totalMinutes / 60
+        return Number(hours.toFixed(2))
     }, [filteredEntries])
+
 
     // Handler for clicking an entry (show modal)
     const handleEntryClick = useCallback((entry: TimeEntry) => {

@@ -170,6 +170,8 @@ model Agent {
 
   // Service Records relation
   serviceRecords ServiceRecord[] @relation("AgentServiceRecords")
+  loginHistory   LoginHistory[]
+  timesheetEntries TimesheetEntry[] @relation("TimesheetEntries")
   
 }
 
@@ -406,4 +408,40 @@ model ProspectAssignmentSetting {
   prospectsPerAgent   Int  @default(1)
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
+}
+
+model LoginHistory {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  agentId   String   @db.ObjectId
+  agent     Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  ipAddress String?
+  userAgent String?
+  device    String?
+  location  String?
+
+  loginAt   DateTime @default(now())
+  logoutAt  DateTime?
+
+  createdAt DateTime @default(now())
+}
+
+model TimesheetEntry {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  title         String
+  description   String?
+  project       String?
+  projectCode   String?
+  date          DateTime
+  startTime     String
+  endTime       String
+  status        String   @default("pending")
+  type          String   @default("task")
+  color         String   @default("blue")
+
+  agentId       String   @db.ObjectId
+  agent         Agent    @relation("TimesheetEntries", fields: [agentId], references: [id], onDelete: Cascade)
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 }

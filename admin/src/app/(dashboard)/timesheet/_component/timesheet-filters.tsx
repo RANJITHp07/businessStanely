@@ -112,7 +112,7 @@ export function TimesheetFilters({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent>
-            {[3, 5, 7, 14, 30].map((days) => (
+            {[3, 5, 7, 14].map((days) => (
               <DropdownMenuCheckboxItem
                 key={days}
                 checked={daysToShow === days}
@@ -166,7 +166,7 @@ export function TimesheetFilters({
         </Popover>
 
         {/* Status Filter */}
-        <Popover>
+        {/* <Popover>
           <PopoverTrigger asChild>
             <Button variant="outline" size="sm" className="h-9 gap-2 bg-transparent">
               Status
@@ -200,7 +200,7 @@ export function TimesheetFilters({
               ))}
             </div>
           </PopoverContent>
-        </Popover>
+        </Popover> */}
 
         {/* Clear Filters */}
         {(selectedStatuses.length > 0 || daysToShow !== 7) && (

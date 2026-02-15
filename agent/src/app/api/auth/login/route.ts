@@ -63,12 +63,12 @@ export async function POST(req: NextRequest) {
       console.error("Database connection error:", dbError);
       return NextResponse.json(
         { error: "Database connection failed" },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
-  const body = await req.json();
-  const { email, password, force } = body;
+    const body = await req.json();
+    const { email, password, force } = body;
 
     // Basic validation - just check if credentials are provided
     if (!password || !email) {
@@ -77,7 +77,7 @@ export async function POST(req: NextRequest) {
           error:
             "Incorrect email or password. Please check your credentials and try again.",
         },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -92,14 +92,14 @@ export async function POST(req: NextRequest) {
             minutes !== 1 ? "s" : ""
           }.`,
         },
-        { status: 429 }
+        { status: 429 },
       );
     }
 
     // Find agent by email (case-insensitive)
     const agent = await prisma.agent.findFirst({
       where: {
-        email: { equals: email, mode: 'insensitive' },
+        email: { equals: email, mode: "insensitive" },
       },
     });
 
@@ -109,7 +109,7 @@ export async function POST(req: NextRequest) {
           error:
             "Incorrect email or password. Please check your credentials and try again.",
         },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -118,9 +118,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         {
           error: "already_logged_in",
-          message: "Agent is already logged in elsewhere. Please log out from other devices first.",
+          message:
+            "Agent is already logged in elsewhere. Please log out from other devices first.",
         },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
@@ -130,7 +131,7 @@ export async function POST(req: NextRequest) {
         {
           error: "Your account is inactive. Please contact support.",
         },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
@@ -142,15 +143,39 @@ export async function POST(req: NextRequest) {
           error:
             "Incorrect email or password. Please check your credentials and try again.",
         },
-        { status: 401 }
+        { status: 401 },
       );
     }
 
     // Reset rate limiter on successful login
     loginRateLimiter.reset(identifier);
 
-    // Generate a new session token and store in DB
-    const crypto = await import('crypto');
+    // Handle login history: close any open sessions and create a new one
+    const openLoginHistory = await prisma.loginHistory.findFirst({
+      where: {
+        agentId: agent.id,
+      },
+      orderBy: {
+        loginAt: "desc",
+      },
+    });
+
+    if (openLoginHistory && !openLoginHistory.logoutAt) {
+      // Close the previous session
+      await prisma.loginHistory.update({
+        where: { id: openLoginHistory.id },
+        data: { logoutAt: new Date() },
+      });
+    }
+
+    // Create a new login history entry
+    await prisma.loginHistory.create({
+      data: {
+        agentId: agent.id,
+      },
+    });
+
+    const crypto = await import("crypto");
     const sessionToken = crypto.randomUUID();
     await prisma.agent.update({
       where: { id: agent.id },
@@ -162,7 +187,7 @@ export async function POST(req: NextRequest) {
       console.error("JWT_SECRET is not set");
       return NextResponse.json(
         { error: "Server configuration error" },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -177,7 +202,7 @@ export async function POST(req: NextRequest) {
         sessionToken,
       },
       process.env.JWT_SECRET,
-      { expiresIn: "8h" }
+      { expiresIn: "8h" },
     );
 
     // Create response
@@ -229,7 +254,7 @@ export async function POST(req: NextRequest) {
         error: "Internal server error",
         details: errorMessage, // Remove this in production after debugging
       },
-      { status: 500 }
+      { status: 500 },
     );
   } finally {
     await prisma.$disconnect();

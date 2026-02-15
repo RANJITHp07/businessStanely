@@ -30,6 +30,7 @@ interface TimesheetFiltersProps {
   onSelectedStatusesChange: (statuses: TaskStatus[]) => void
   showLoginLogout: boolean
   onShowLoginLogoutChange: (show: boolean) => void
+  totalHours: number
 }
 
 export function TimesheetFilters({
@@ -46,6 +47,7 @@ export function TimesheetFilters({
   onSelectedStatusesChange,
   showLoginLogout,
   onShowLoginLogoutChange,
+  totalHours
 }: TimesheetFiltersProps) {
   const [userSearch, setUserSearch] = useState("")
 
@@ -123,7 +125,7 @@ export function TimesheetFilters({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent>
-            {[3, 5, 7, 14, 30].map((days) => (
+            {[3, 5, 7, 14].map((days) => (
               <DropdownMenuCheckboxItem
                 key={days}
                 checked={daysToShow === days}
@@ -201,7 +203,7 @@ export function TimesheetFilters({
         }
       </div>
       <div className="text-sm">
-        Worked this week: <span className="font-semibold">{24} hours</span>
+        Worked this week: <span className="font-semibold">{totalHours} hours</span>
       </div>
     </div >
   )

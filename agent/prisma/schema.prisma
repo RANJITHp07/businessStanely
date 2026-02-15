@@ -173,6 +173,24 @@ model Agent {
 
   // Service Records relation
   serviceRecords ServiceRecord[] @relation("AgentServiceRecords")
+  loginHistory   LoginHistory[]
+  timesheetEntries TimesheetEntry[] @relation("TimesheetEntries")
+}
+
+model LoginHistory {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  agentId   String   @db.ObjectId
+  agent     Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  ipAddress String?
+  userAgent String?
+  device    String?
+  location  String?
+
+  loginAt   DateTime @default(now())
+  logoutAt  DateTime?
+
+  createdAt DateTime @default(now())
 }
 
 model AgentSuperior {
@@ -235,6 +253,7 @@ model Task {
 
   comments Comment[]
   timeLogs TimeLog[]
+  timesheetEntries TimesheetEntry[] @relation("TimesheetEntryTasks")
 
   // Add this to the Task model
   retainershipId String? @db.ObjectId
@@ -410,4 +429,27 @@ model ProspectAssignmentSetting {
   prospectsPerAgent   Int  @default(1)
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
+}
+
+model TimesheetEntry {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  title         String
+  description   String?
+  project       String?
+  projectCode   String?
+  date          DateTime
+  startTime     String   // HH:MM format
+  endTime       String   // HH:MM format
+  status        String   @default("pending") // pending, in-progress, completed, break
+  type          String   @default("task") // task, login, logout
+  color         String   @default("blue") // blue, yellow, coral, green
+  
+  agentId       String   @db.ObjectId
+  agent         Agent    @relation("TimesheetEntries", fields: [agentId], references: [id], onDelete: Cascade)
+  
+  taskId        String?  @db.ObjectId
+  task          Task?    @relation("TimesheetEntryTasks", fields: [taskId], references: [id], onDelete: SetNull)
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 }

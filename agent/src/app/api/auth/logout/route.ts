@@ -6,6 +6,16 @@ export async function POST(req: NextRequest) {
   try {
     // Get token from cookies
     const token = req.cookies.get("agent-auth-token")?.value;
+
+    // Get expiryTime from request body if provided
+    let expiryTime: number | null = null;
+    try {
+      const body = await req.json();
+      expiryTime = body.expiryTime;
+    } catch {
+      // No body provided
+    }
+
     let agentId: string | null = null;
     if (token && process.env.JWT_SECRET) {
       try {
@@ -24,6 +34,27 @@ export async function POST(req: NextRequest) {
         where: { id: agentId },
         data: { currentSessionToken: null },
       });
+      const lastLogin = await prisma.loginHistory.findFirst({
+        where: {
+          agentId,
+          // logoutAt: null,
+        },
+        orderBy: {
+          loginAt: "desc",
+        },
+      });
+
+      if (lastLogin) {
+        // Use expiryTime if provided, otherwise use current date
+        const logoutTime = expiryTime ? new Date(expiryTime) : new Date();
+
+        await prisma.loginHistory.update({
+          where: { id: lastLogin.id },
+          data: {
+            logoutAt: logoutTime,
+          },
+        });
+      }
     }
 
     // Create response
@@ -47,7 +78,7 @@ export async function POST(req: NextRequest) {
     console.error("Logout error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

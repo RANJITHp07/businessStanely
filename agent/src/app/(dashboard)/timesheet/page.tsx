@@ -82,6 +82,8 @@ export default function TimesheetPage() {
         fetchUsers();
     }, [agent]);
 
+    const endDate = useMemo(() => addDays(startDate, daysToShow), [startDate, daysToShow])
+
     // Fetch all tasks for agent and team
     useEffect(() => {
         const fetchTimesheetData = async () => {
@@ -89,61 +91,25 @@ export default function TimesheetPage() {
             try {
                 // Fetch tasks for all user ids (agent + team) from new timesheet API
                 const userIds = users.map(u => u.id);
-                const response = await fetch(`/api/timesheet?assignedToIds=${userIds.join(",")}`);
-                const data = response.ok ? await response.json() : { tasks: [] };
-                const tasks = (data.tasks || []);
-                const commentEntries: TimeEntry[] = [];
-                let entryId = 1000;
-                tasks.forEach((task: { id: string, title: string, client?: { name: string }, status?: string, comments?: Array<any>, assignedTo?: { id: string, name: string } }) => {
-                    (task.comments || []).forEach((commentRaw: { commentDate: string, startTime?: string, endTime?: string, content?: string, agent?: { id: string, name: string }, user?: { id: string, username: string } }) => {
-                        if (!commentRaw.commentDate) return;
-                        const startTimeDate = commentRaw.startTime ? new Date(commentRaw.startTime) : null;
-                        const endTimeDate = commentRaw.endTime ? new Date(commentRaw.endTime) : null;
-                        const startTimeStr = startTimeDate ? `${startTimeDate.getHours().toString().padStart(2, "0")}:${startTimeDate.getMinutes().toString().padStart(2, "0")}` : "";
-                        const endTimeStr = endTimeDate ? `${endTimeDate.getHours().toString().padStart(2, "0")}:${endTimeDate.getMinutes().toString().padStart(2, "0")}` : "";
-                        const userName = commentRaw.agent?.name || commentRaw.user?.username || task.assignedTo?.name || "";
-                        const userId = commentRaw.agent?.id || commentRaw.user?.id || task.assignedTo?.id || "";
-                        let projectCode = task.id.slice(0, 6).toUpperCase();
-                        if (/^[0-9A-F]{6}$/i.test(projectCode)) projectCode = "";
-                        // Normalize status to match colorClasses
-                        let normalizedStatus: TaskStatus = "toDo"; // Default to toDo instead of completed
-                        if (task.status) {
-                            const statusLower = task.status.toLowerCase().replace(/\s+/g, "");
-                            if (["todo", "pending", "hold"].includes(statusLower)) normalizedStatus = "toDo";
-                            else if (["inprogress", "progress", "in-progress"].includes(statusLower)) normalizedStatus = "in-progress";
-                            else if (["completed", "done", "finished"].includes(statusLower)) normalizedStatus = "completed";
-                        }
-                        const entry: TimeEntry = {
-                            id: `real-${entryId++}`,
-                            title: task.title, // Show task name in timesheet
-                            description: commentRaw.content || "",
-                            project: task.client?.name || "Project",
-                            projectCode,
-                            date: new Date(commentRaw.commentDate),
-                            startTime: startTimeStr,
-                            endTime: endTimeStr,
-                            status: normalizedStatus,
-                            color: "blue",
-                            userId,
-                            userName,
-                            type: "task",
-                        };
-                        commentEntries.push(entry);
-                    });
+                const params = new URLSearchParams({
+                    assignedToIds: userIds.join(","),
+                    startDate: startDate.toISOString(),
+                    endDate: endDate.toISOString(),
                 });
-                setEntries(commentEntries);
-            } catch {
+                const response = await fetch(`/api/timesheet?${params.toString()}`);
+                const data = response.ok ? await response.json() : { timeEntries: [] };
+
+
+                setEntries(data.timeEntries || []);
+            } catch (error) {
                 setEntries([]);
             }
         };
         fetchTimesheetData();
-    }, [agent, users]);
-
-    const endDate = useMemo(() => addDays(startDate, daysToShow - 1), [startDate, daysToShow])
+    }, [agent, users, startDate, endDate]);
 
     // Filter entries by selected users, status, and date
     const filteredEntries = useMemo(() => {
-        console.log('[DEBUG] Filtering entries. Selected users:', selectedUsers.map(u => u.name), 'Selected statuses:', selectedStatuses);
         return entries.filter((entry) => {
             if (selectedUsers.length > 0 && !selectedUsers.find((u) => u.id === entry.userId)) {
                 return false;
@@ -151,7 +117,7 @@ export default function TimesheetPage() {
             if (selectedStatuses.length > 0 && !selectedStatuses.includes(entry.status)) {
                 return false;
             }
-            const entryDate = entry.date.getTime();
+            const entryDate = new Date(entry.date).getTime();
             const start = startDate.getTime();
             const end = addDays(startDate, daysToShow).getTime();
             if (entryDate < start || entryDate >= end) {
@@ -161,19 +127,46 @@ export default function TimesheetPage() {
         });
     }, [entries, selectedUsers, selectedStatuses, startDate, daysToShow])
 
-    useEffect(() => {
-        console.log('[DEBUG] Filtered entries for calendar:', filteredEntries);
-    }, [filteredEntries])
 
     const totalHours = useMemo(() => {
         const taskEntries = filteredEntries.filter((e) => e.type === "task")
         let totalMinutes = 0
+
+        const parseTimeToMinutes = (timeStr: string) => {
+            if (!timeStr) return null
+            // Handle formats: "HH:MM", "HH:MM AM/PM", "H:MM AM/PM"
+            const ampmMatch = timeStr.match(/(am|pm)$/i)
+            let hours = 0
+            let minutes = 0
+            if (ampmMatch) {
+                const cleaned = timeStr.replace(/\s*(am|pm)$/i, "")
+                const parts = cleaned.split(":").map((p) => p.trim())
+                hours = Number(parts[0] || 0)
+                minutes = Number(parts[1] || 0)
+                const isPM = /pm/i.test(ampmMatch[0])
+                if (isPM && hours < 12) hours += 12
+                if (!isPM && hours === 12) hours = 0
+            } else {
+                const parts = timeStr.split(":").map((p) => p.trim())
+                hours = Number(parts[0] || 0)
+                minutes = Number(parts[1] || 0)
+            }
+            if (Number.isNaN(hours) || Number.isNaN(minutes)) return null
+            return hours * 60 + minutes
+        }
+
         taskEntries.forEach((entry) => {
-            const [startH, startM] = entry.startTime.split(":").map(Number)
-            const [endH, endM] = entry.endTime.split(":").map(Number)
-            totalMinutes += endH * 60 + endM - (startH * 60 + startM)
+            const startMin = parseTimeToMinutes(entry.startTime)
+            const endMin = parseTimeToMinutes(entry.endTime)
+            if (startMin == null || endMin == null) return
+            let diff = endMin - startMin
+            // if end before start, assume spans midnight
+            if (diff < 0) diff += 24 * 60
+            totalMinutes += diff
         })
-        return Math.round(totalMinutes / 60)
+
+        const hours = totalMinutes / 60
+        return Number(hours.toFixed(2))
     }, [filteredEntries])
 
     const handleAddEntry = useCallback((newEntry: Omit<TimeEntry, "id">) => {
@@ -187,17 +180,6 @@ export default function TimesheetPage() {
         setDetailDialogOpen(true);
     }, [])
 
-    const handlePrevious = useCallback(() => {
-        setStartDate((prev) => addDays(prev, -daysToShow))
-    }, [daysToShow])
-
-    const handleNext = useCallback(() => {
-        setStartDate((prev) => addDays(prev, daysToShow))
-    }, [daysToShow])
-
-    const handleToday = useCallback(() => {
-        setStartDate(startOfWeek(new Date(), { weekStartsOn: 1 }))
-    }, [])
 
     return (
         <div className="h-screen flex flex-col bg-background">
@@ -225,6 +207,7 @@ export default function TimesheetPage() {
                 onSelectedStatusesChange={setSelectedStatuses}
                 showLoginLogout={showLoginLogout}
                 onShowLoginLogoutChange={setShowLoginLogout}
+                totalHours={totalHours}
             />
 
             {/* Calendar */}
@@ -233,7 +216,8 @@ export default function TimesheetPage() {
                 startDate={startDate}
                 daysToShow={daysToShow}
                 onEntryClick={handleEntryClick}
-                // showTaskName removed, not in props
+                showLoginLogout={true}
+            // showTaskName removed, not in props
             />
 
             {/* Floating Add Button */}

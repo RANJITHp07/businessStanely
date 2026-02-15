@@ -30,32 +30,95 @@ export function AddEntryDialog({ open, onOpenChange, onAddEntry }: AddEntryDialo
   const [endTime, setEndTime] = useState("10:00")
   const [status, setStatus] = useState<TaskStatus>("in-progress")
   const [color, setColor] = useState<TaskColor>("blue")
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const handleSubmit = () => {
-    onAddEntry({
-      title: entryType === "task" ? title : entryType === "login" ? "Login" : "Logout",
-      description: entryType === "task" ? description : `${entryType} entry`,
-      project: entryType === "task" ? project : "System",
-      projectCode: entryType === "task" ? projectCode : entryType.toUpperCase(),
-      date,
-      startTime,
-      endTime: entryType === "task" ? endTime : startTime,
-      status: "completed",
-      color: entryType === "task" ? color : "green",
-      userId: "1",
-      userName: "Me",
-      type: entryType,
-    })
+    (async () => {
+      setIsSubmitting(true)
+      const payload = {
+        title: entryType === "task" ? title : entryType === "login" ? "Login" : "Logout",
+        description: entryType === "task" ? description : `${entryType} entry`,
+        project: entryType === "task" ? project : "System",
+        projectCode: entryType === "task" ? projectCode : entryType.toUpperCase(),
+        date: date.toISOString(),
+        startTime,
+        endTime: entryType === "task" ? endTime : startTime,
+        status: entryType === "task" ? status : "completed",
+        color: entryType === "task" ? color : "green",
+        type: entryType,
+      }
 
-    // Reset form
-    setTitle("")
-    setDescription("")
-    setProject("")
-    setProjectCode("")
-    setStartTime("09:00")
-    setEndTime("10:00")
-    setEntryType("task")
-    onOpenChange(false)
+      try {
+        const res = await fetch('/api/timesheet/add', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        })
+
+        if (res.ok) {
+          const data = await res.json()
+          const e = data.entry
+          // Map API entry to UI TimeEntry shape (without id)
+          onAddEntry({
+            title: e.title,
+            description: e.description || "",
+            project: e.project || "",
+            projectCode: e.projectCode || "",
+            date: new Date(e.date),
+            startTime: e.startTime,
+            endTime: e.endTime,
+            status: e.status as any,
+            color: e.color as any,
+            userId: e.agentId,
+            userName: e.agent?.name || "Me",
+            type: e.type,
+          })
+        } else {
+          // Fallback: still add locally
+          onAddEntry({
+            title: payload.title,
+            description: payload.description,
+            project: payload.project,
+            projectCode: payload.projectCode,
+            date,
+            startTime: payload.startTime,
+            endTime: payload.endTime,
+            status: payload.status as any,
+            color: payload.color as any,
+            userId: "1",
+            userName: "Me",
+            type: payload.type,
+          })
+        }
+      } catch (err) {
+        console.error('Error creating timesheet entry', err)
+        onAddEntry({
+          title: payload.title,
+          description: payload.description,
+          project: payload.project,
+          projectCode: payload.projectCode,
+          date,
+          startTime: payload.startTime,
+          endTime: payload.endTime,
+          status: payload.status as any,
+          color: payload.color as any,
+          userId: "1",
+          userName: "Me",
+          type: payload.type,
+        })
+      }
+
+      // Reset form
+      setTitle("")
+      setDescription("")
+      setProject("")
+      setProjectCode("")
+      setStartTime("09:00")
+      setEndTime("10:00")
+      setEntryType("task")
+      onOpenChange(false)
+      setIsSubmitting(false)
+    })()
   }
 
   return (
@@ -140,7 +203,9 @@ export function AddEntryDialog({ open, onOpenChange, onAddEntry }: AddEntryDialo
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={handleSubmit}>Add Entry</Button>
+          <Button onClick={handleSubmit} disabled={isSubmitting}>
+            {isSubmitting ? "Adding..." : "Add Entry"}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

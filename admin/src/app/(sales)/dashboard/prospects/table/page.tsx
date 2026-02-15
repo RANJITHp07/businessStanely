@@ -499,10 +499,10 @@ export default function ProspectsTable() {
                                         ) : (
                                             currentProspects.map((prospect) => (
                                                 <TableRow key={prospect.id} className="cursor-pointer" >
-                                                    <TableCell className="font-medium max-w-[150px] truncate" onClick={() => router.push(`/sales/prospects/${prospect.id}`)}>{prospect.name}</TableCell>
+                                                    <TableCell className="font-medium max-w-[150px] truncate" onClick={() => router.push(`/dashboard/prospects/${prospect.id}`)}>{prospect.name}</TableCell>
                                                     < TableCell > {prospect.phoneNumber}</TableCell>
-                                                    <TableCell className="max-w-[300px] truncate" onClick={() => router.push(`/sales/prospects/${prospect.id}`)}>{prospect.description || "N/A"}</TableCell>
-                                                    <TableCell onClick={() => router.push(`/sales/prospects/${prospect.id}`)}>
+                                                    <TableCell className="max-w-[300px] truncate" onClick={() => router.push(`/dashboard/prospects/${prospect.id}`)}>{prospect.description || "N/A"}</TableCell>
+                                                    <TableCell onClick={() => router.push(`/dashboard/prospects/${prospect.id}`)}>
                                                         <div className="flex items-center gap-2">
                                                             <Calendar className="h-4 w-4 text-muted-foreground" />
                                                             {formatDate(prospect.nextFollowUp)}
@@ -519,7 +519,7 @@ export default function ProspectsTable() {
                                                             <span className="text-sm text-slate-700">{prospect?.assignedAgent?.name}</span>
                                                         </div>
                                                     </TableCell>
-                                                    <TableCell onClick={() => router.push(`/sales/prospects/${prospect.id}`)}>
+                                                    <TableCell onClick={() => router.push(`/dashboard/prospects/${prospect.id}`)}>
                                                         <Badge
                                                             className={
                                                                 prospect.status === "New" ? "bg-green-100 text-green-800" : "bg-sky-100 text-sky-800"

@@ -23,13 +23,22 @@ export async function GET(req: NextRequest) {
           },
         },
         prospect: { select: { id: true, name: true } },
+        opportunity: { select: { id: true, name: true } },
       },
       orderBy: { createdAt: "desc" },
     });
     // Format for activities tab
     const activities = comments.map((comment) => ({
-      taskId: comment.task?.id || comment.prospect?.id,
-      taskTitle: comment.task?.title || comment?.prospect?.name,
+      taskId:
+        comment.task?.id ||
+        comment.prospect?.id ||
+        comment.opportunity?.id ||
+        null,
+      taskTitle:
+        comment.task?.title ||
+        comment?.prospect?.name ||
+        comment?.opportunity?.name ||
+        "Unknown Task",
       content: comment.content,
       createdAt: comment.createdAt,
     }));

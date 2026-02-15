@@ -65,7 +65,7 @@ const formatDate = (dateString: string | undefined) => {
     })
 }
 
-function ProspectTable({ label, prospects, statusFilter }: { label: string; prospects: any[]; statusFilter: string }) {
+function ProspectsTable({ label, prospects, statusFilter }: { label: string; prospects: any[]; statusFilter: string }) {
 
     const labelColor = (() => {
         const l = label.toLowerCase()
@@ -785,16 +785,16 @@ export default function ProspectDashboard() {
                         <h2 className="text-xl font-bold text-slate-800">Active Prospects</h2>
                     </div>
 
-                    <ProspectTable label="Proposal Issued" prospects={prospects.filter((prospect) => prospect.status == "Proposal Issued").slice(0, 5)} statusFilter="New" />
+                    <ProspectTable label="Proposal Issued" prospects={prospects.filter((prospect) => prospect.status == "Proposal Issued").slice(0, 5)} statusFilter="Proposal Issued" />
                     <ProspectTable
                         label="Closed as Won Prospects"
                         prospects={prospects.filter((prospect) => prospect.status == "Closed as Won").slice(0, 5)}
-                        statusFilter="In Progress"
+                        statusFilter="Closed as Won Prospects"
                     />
                     <ProspectTable
                         label="Closed as Loss Prospects"
                         prospects={prospects.filter((prospect) => prospect.status == "Closed as Loss").slice(0, 5)}
-                        statusFilter="In Progress"
+                        statusFilter="Closed as Loss Prospects"
                     />
                 </div>
 

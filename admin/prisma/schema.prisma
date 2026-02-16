@@ -445,3 +445,13 @@ model TimesheetEntry {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 }
+
+model CronLog {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  jobName      String
+  ranAt        DateTime @default(now())
+  status       String   @default("running")
+  updatedCount Int?
+
+  @@map("cron_logs")
+}

@@ -239,7 +239,7 @@ export async function sendActivityEmailsToAgents() {
   today.setHours(0, 0, 0, 0);
 
   const yesterday = new Date(today);
-  yesterday.setDate(yesterday.getDate() - 1);
+  yesterday.setDate(yesterday.getDate());
 
   const endOfYesterday = new Date(today);
   // end of yesterday is start of today (midnight)
@@ -318,7 +318,7 @@ export async function sendActivityEmailsToAgents() {
           from: `"${process.env.COMPANY_NAME || "LegalStanley"}" <${process.env.EMAIL_USER}>`,
           to: agent.email,
           // cc: ownerEmails.join(","),
-          cc: "ranjithp5841@gmail.com",
+          // cc: "ranjithp5841@gmail.com",
           subject: `Daily Activity Report - ${formatDate(yesterday)}`,
           html: activityHTML,
           text: `Activity report for ${agent.name} on ${formatDate(yesterday)}`,
@@ -451,9 +451,18 @@ function buildActivityEmailHTML(
               <div class="activity-item comment-item">
                 <strong>${comment.task.title}</strong><br>
                 <p>${comment.content}</p>
-                <small>
-${comment.startTime ? `Start Time: ${comment.startTime}` : ""}
-${comment.endTime ? `End Time: ${comment.endTime}` : ""}
+<small>
+  {comment.startTime && (
+    <>
+      Start Time: ${formatTime(comment.startTime)}
+      <br />
+    </>
+  )}
+  {comment.endTime && (
+    <>
+      End Time: ${formatTime(comment.endTime)}
+    </>
+  )}
 </small>
               </div>
             `;

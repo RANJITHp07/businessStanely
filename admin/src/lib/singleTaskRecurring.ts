@@ -317,7 +317,7 @@ export async function sendActivityEmailsToAgents() {
         await transporter.sendMail({
           from: `"${process.env.COMPANY_NAME || "LegalStanley"}" <${process.env.EMAIL_USER}>`,
           to: agent.email,
-          // cc: ownerEmails.join(","),
+          cc: ownerEmails.join(","),
           // cc: "ranjithp5841@gmail.com",
           subject: `Daily Activity Report - ${formatDate(yesterday)}`,
           html: activityHTML,

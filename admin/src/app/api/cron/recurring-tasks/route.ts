@@ -50,12 +50,16 @@ export async function POST(request: NextRequest) {
       data: { status: "success", updatedCount: updatedTasks.length },
     });
 
+    console.log("✅ Cron job completed successfully:", {
+      updatedCount: updatedTasks.length,
+    });
     return NextResponse.json({
       success: true,
       updatedCount: updatedTasks.length,
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
+    console.log(error);
     await prisma.cronLog.updateMany({
       where: { jobName: "recurring-tasks", ranAt: { gte: today } },
       data: { status: "failed" },

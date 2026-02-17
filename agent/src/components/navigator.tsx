@@ -10,14 +10,16 @@ import {
     BreadcrumbPage,
 } from '@/components/ui/breadcrumb'
 import { Button } from '@/components/ui/button'
-import React from 'react'
+import React, { useState } from 'react'
 import { useAgentContext } from '@/lib/agent-context'
+import { AddEntryDialog } from '@/app/(dashboard)/timesheet/_component/add-entry-dialog'
 
 export default function Navigator() {
     const router = useRouter()
     const agent = useAgentContext()
     const pathname = usePathname()
     const segments = pathname.split('/').filter(Boolean)
+    const [addEntryDialogOpen, setAddEntryDialogOpen] = useState(false)
 
     return (
         <div className="hidden md:flex items-center justify-between container  mx-auto ">
@@ -64,6 +66,9 @@ export default function Navigator() {
                         <Button size="sm" onClick={() => router.push("/retainership/create")}>
                             Create Retainership
                         </Button>
+                        <Button size="sm" onClick={() => setAddEntryDialogOpen(true)}>
+                            Add Time Entry
+                        </Button>
                     </>
                 ) : (
                     <>
@@ -78,6 +83,16 @@ export default function Navigator() {
                     </>
                 )}
             </div>
+
+            {/* Add Entry Dialog */}
+            <AddEntryDialog
+                open={addEntryDialogOpen}
+                onOpenChange={setAddEntryDialogOpen}
+                onAddEntry={() => {
+                    // Handle entry added if needed
+                    setAddEntryDialogOpen(false)
+                }}
+            />
         </div>
 
     )

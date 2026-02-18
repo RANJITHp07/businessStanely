@@ -239,7 +239,7 @@ export async function sendActivityEmailsToAgents() {
   today.setHours(0, 0, 0, 0);
 
   const yesterday = new Date(today);
-  yesterday.setDate(yesterday.getDate());
+  yesterday.setDate(today.getDate() - 1);
 
   const endOfYesterday = new Date(today);
   // end of yesterday is start of today (midnight)
@@ -317,7 +317,7 @@ export async function sendActivityEmailsToAgents() {
         await transporter.sendMail({
           from: `"${process.env.COMPANY_NAME || "LegalStanley"}" <${process.env.EMAIL_USER}>`,
           to: agent.email,
-          cc: ownerEmails.join(","),
+          cc: "Riyas.LegalStanley@gmail.com",
           // cc: "ranjithp5841@gmail.com",
           subject: `Daily Activity Report - ${formatDate(yesterday)}`,
           html: activityHTML,
@@ -403,7 +403,7 @@ function buildActivityEmailHTML(
                   ? formatTime(log.logoutAt)
                   : "Still Online";
                 return `
-              <div class="activity-item">
+              <div class="activity-item login-item">
                 <strong>Login:</strong> <span class="time-badge">${loginTime}</span>
                 <strong>Logout:</strong> <span class="time-badge">${logoutTime}</span>
                 ${log.device ? `<br><small>Device: ${log.device}</small>` : ""}
@@ -451,19 +451,18 @@ function buildActivityEmailHTML(
               <div class="activity-item comment-item">
                 <strong>${comment.task.title}</strong><br>
                 <p>${comment.content}</p>
-<small>
-  {comment.startTime && (
-    <>
-      Start Time: ${formatTime(comment.startTime)}
-      <br />
-    </>
-  )}
-  {comment.endTime && (
-    <>
-      End Time: ${formatTime(comment.endTime)}
-    </>
-  )}
-</small>
+                <small>
+                  ${
+                    comment.startTime
+                      ? `Start Time: ${formatTime(comment.startTime)}<br>`
+                      : ""
+                  }
+                  ${
+                    comment.endTime
+                      ? `End Time: ${formatTime(comment.endTime)}`
+                      : ""
+                  }
+                </small>
               </div>
             `;
               })
@@ -484,6 +483,17 @@ function buildActivityEmailHTML(
           `
               : ""
           }
+
+          <div class="section" style="margin-top:30px;">
+            <hr style="border:none; border-top:1px solid #ddd; margin-bottom:15px;" />
+            <p style="font-size:12px; font-style:italic; color:#555; line-height:1.6;">
+              Please note that the above records reflect the activities undertaken by you on the specified date. 
+              You are requested to ensure that all your daily interactions and work activities are properly logged 
+              in the system for accurate documentation. Daily reports are regularly reviewed and form the basis 
+              for performance evaluation, promotions, bonuses, salary increments, and continuous assessment.
+            </p>
+          </div>
+
         </div>
       </body>
     </html>

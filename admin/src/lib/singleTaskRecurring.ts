@@ -1,5 +1,6 @@
 import prisma from "@/lib/prisma";
 import { createTransporter } from "./email";
+import { format } from "date-fns";
 
 // Calculate next due date based on recurring months
 export function calculateNextDueDate(
@@ -251,7 +252,6 @@ export async function sendActivityEmailsToAgents() {
     });
 
     if (!agents.length) {
-      console.log("No active agents found to send activity emails");
       return;
     }
 
@@ -350,6 +350,7 @@ function formatTime(date: Date | null): string {
     hour: "2-digit",
     minute: "2-digit",
     hour12: true,
+    timeZone: "Asia/Kolkata",
   });
 }
 
@@ -387,7 +388,7 @@ function buildActivityEmailHTML(
         <div class="container">
           <div class="header">
             <h2>Daily Activity Report</h2>
-            <p><strong>Agent:</strong> ${agentName}</p>
+            <p><strong>Professional:</strong> ${agentName}</p>
             <p><strong>Date:</strong> ${dateStr}</p>
           </div>
 
@@ -398,9 +399,9 @@ function buildActivityEmailHTML(
             <div class="section-title">Login/Logout History</div>
             ${loginHistory
               .map((log) => {
-                const loginTime = formatTime(log.loginAt);
+                const loginTime = format(new Date(log.loginAt), "h:mm a");
                 const logoutTime = log.logoutAt
-                  ? formatTime(log.logoutAt)
+                  ? format(new Date(log.logoutAt), "h:mm a")
                   : "Still Online";
                 return `
               <div class="activity-item login-item">
@@ -454,12 +455,12 @@ function buildActivityEmailHTML(
                 <small>
                   ${
                     comment.startTime
-                      ? `Start Time: ${formatTime(comment.startTime)}<br>`
+                      ? `Start Time: ${format(new Date(comment.startTime), "h:mm a")}<br>`
                       : ""
                   }
                   ${
                     comment.endTime
-                      ? `End Time: ${formatTime(comment.endTime)}`
+                      ? `End Time: ${format(new Date(comment.endTime), "h:mm a")}`
                       : ""
                   }
                 </small>

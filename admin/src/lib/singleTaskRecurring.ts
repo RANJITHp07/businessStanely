@@ -399,9 +399,9 @@ function buildActivityEmailHTML(
             <div class="section-title">Login/Logout History</div>
             ${loginHistory
               .map((log) => {
-                const loginTime = format(new Date(log.loginAt), "h:mm a");
+                const loginTime = formatTime(log.loginAt);
                 const logoutTime = log.logoutAt
-                  ? format(new Date(log.logoutAt), "h:mm a")
+                  ? formatTime(log.logoutAt)
                   : "Still Online";
                 return `
               <div class="activity-item login-item">
@@ -455,12 +455,12 @@ function buildActivityEmailHTML(
                 <small>
                   ${
                     comment.startTime
-                      ? `Start Time: ${format(new Date(comment.startTime), "h:mm a")}<br>`
+                      ? `Start Time: ${formatTime(comment.startTime)}<br>`
                       : ""
                   }
                   ${
                     comment.endTime
-                      ? `End Time: ${format(new Date(comment.endTime), "h:mm a")}`
+                      ? `End Time: ${formatTime(comment.endTime)}`
                       : ""
                   }
                 </small>

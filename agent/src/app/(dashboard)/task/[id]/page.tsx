@@ -278,7 +278,6 @@ export default function TaskDetails() {
           setTotalTimeLogged(total);
         }
       } catch (error) {
-        console.error("Error fetching task:", error);
         setError("Failed to load task details");
       } finally {
         setLoading(false);

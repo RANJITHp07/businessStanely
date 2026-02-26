@@ -93,7 +93,7 @@ export default function TaskForm({ id }: TaskFormProps) {
   const [formData, setFormData] = useState({
     title: "",
     clientId: "",
-    priority: "",
+    priority: "medium",
     assignedToId: "",
     description: "",
     categoryId: "",
@@ -1496,7 +1496,7 @@ export default function TaskForm({ id }: TaskFormProps) {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Users className="h-5 w-5" />
-                Priority, Assignment & Schedule
+                Assignment & Schedule
               </CardTitle>
               <CardDescription>
                 Set task priority, assign to an agent, and set completion date
@@ -1504,7 +1504,7 @@ export default function TaskForm({ id }: TaskFormProps) {
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
+                {/* <div className="space-y-2">
                   <Label htmlFor="priority">Task Priority *</Label>
                   <Select
                     value={formData.priority}
@@ -1529,7 +1529,7 @@ export default function TaskForm({ id }: TaskFormProps) {
                   {formData.priority && (
                     <div className="mt-2">{getPriorityBadge(formData.priority)}</div>
                   )}
-                </div>
+                </div> */}
 
                 <div className="space-y-2">
                   <Label htmlFor="assigned-agent">Assign Task To *</Label>

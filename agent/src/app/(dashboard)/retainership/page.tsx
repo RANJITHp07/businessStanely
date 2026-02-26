@@ -258,12 +258,12 @@ export default function RetainershipTable() {
                             Manage and organize your task retainerships
                         </p>
                     </div>
-                    <Link href="/retainership/create" className="flex justify-end">
+                    {/* <Link href="/retainership/create" className="flex justify-end">
                         <Button className="mt-[20px] md:mt-none bg-[#003459] hover:bg-[#003459] text-white rounded-lg px-4 py-2 flex items-center gap-2 cursor-pointer shadow-none hover:shadow-md transition-shadow duration-300">
                             <Plus className="h-4 w-4" />
                             Create Retainership
                         </Button>
-                    </Link>
+                    </Link> */}
                 </div>
 
                 <Card>

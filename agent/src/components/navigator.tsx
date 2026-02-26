@@ -6,8 +6,6 @@ import {
     BreadcrumbList,
     BreadcrumbItem,
     BreadcrumbSeparator,
-    BreadcrumbLink,
-    BreadcrumbPage,
 } from '@/components/ui/breadcrumb'
 import { Button } from '@/components/ui/button'
 import React, { useState } from 'react'
@@ -22,29 +20,41 @@ export default function Navigator() {
     const [addEntryDialogOpen, setAddEntryDialogOpen] = useState(false)
 
     return (
-        <div className="hidden md:flex items-center justify-between container  mx-auto ">
-            {/* Breadcrumbs */}
+        <div className="hidden md:flex items-center justify-between container mx-auto">
+
             <Breadcrumb className="flex-1">
                 <BreadcrumbList>
                     <BreadcrumbItem>
-                        <BreadcrumbLink href="/">Dashboard</BreadcrumbLink>
+                        <span
+                            className="cursor-pointer hover:underline"
+                            onClick={() => router.push("/dashboard")}
+                        >
+                            Dashboard
+                        </span>
                     </BreadcrumbItem>
 
                     {segments.map((segment, index) => {
-                        const href = '/' + segments.slice(0, index + 1).join('/')
                         const isLast = index === segments.length - 1
+
                         const label = decodeURIComponent(segment)
                             .replace(/-/g, ' ')
                             .replace(/\b\w/g, (c) => c.toUpperCase())
 
                         return (
-                            <React.Fragment key={href}>
+                            <React.Fragment key={index}>
                                 <BreadcrumbSeparator />
                                 <BreadcrumbItem>
                                     {isLast ? (
-                                        <span className="font-medium">{label}</span>
+                                        <span className="font-medium">
+                                            {label}
+                                        </span>
                                     ) : (
-                                        <BreadcrumbLink href={href}>{label}</BreadcrumbLink>
+                                        <span
+                                            className="cursor-pointer hover:underline"
+                                            onClick={() => router.back()}
+                                        >
+                                            {label}
+                                        </span>
                                     )}
                                 </BreadcrumbItem>
                             </React.Fragment>
@@ -53,19 +63,18 @@ export default function Navigator() {
                 </BreadcrumbList>
             </Breadcrumb>
 
-            {/* Right-side buttons */}
             <div className="absolute right-6 flex items-center gap-2">
                 {agent?.agentRole === "Execution Agent" ? (
                     <>
                         <Button size="sm" onClick={() => router.push("/task/create")}>
-                            Create Task
+                            Add Normal Task
                         </Button>
                         <Button size="sm" onClick={() => router.push("/task_category/create")}>
                             Create Service
                         </Button>
-                        <Button size="sm" onClick={() => router.push("/retainership/create")}>
+                        {/* <Button size="sm" onClick={() => router.push("/retainership/create")}>
                             Create Retainership
-                        </Button>
+                        </Button> */}
                         <Button size="sm" onClick={() => setAddEntryDialogOpen(true)}>
                             Add Time Entry
                         </Button>
@@ -84,16 +93,13 @@ export default function Navigator() {
                 )}
             </div>
 
-            {/* Add Entry Dialog */}
             <AddEntryDialog
                 open={addEntryDialogOpen}
                 onOpenChange={setAddEntryDialogOpen}
                 onAddEntry={() => {
-                    // Handle entry added if needed
                     setAddEntryDialogOpen(false)
                 }}
             />
-        </div>
-
+        </div >
     )
 }

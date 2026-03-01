@@ -52,7 +52,7 @@ import type { Prospect } from "@/types"
 import { toast } from "react-toastify"
 import { cn } from "@/lib/utils"
 
-const statuses = ["New", "In Progress"]
+const statuses = ["New", "In Progress", "Career", "Relevant but not Now", "Not Relevant"]
 const engagementStatuses = ["To Be Contacted", "Follow Up", "Missed Out"]
 
 export default function ProspectsTable() {
@@ -70,6 +70,7 @@ export default function ProspectsTable() {
     const [dateType, setDateType] = useState<string>("")
     const [startDate, setStartDate] = useState("")
     const [endDate, setEndDate] = useState("")
+    const [selectedAssignedId, setSelectedAssignedId] = useState<string>("")
 
     // Delete handler
     const handleDelete = async (id: string) => {
@@ -92,17 +93,19 @@ export default function ProspectsTable() {
     useEffect(() => {
         const statusParam = searchParams?.get("status")
         const engagementStatusParam = searchParams?.get("engagementStatus")
+        const assignedIdParam = searchParams?.get("assignedId")
         if (statusParam) {
             setSelectedStatuses([statusParam])
         }
         if (engagementStatusParam) {
             setSelectedEngagementStatus([engagementStatusParam])
         }
-    }, [searchParams])
+        if (assignedIdParam) {
+            setSelectedAssignedId(assignedIdParam)
+        }
 
-    useEffect(() => {
         setLoading(true);
-        fetch('/api/prospects')
+        fetch(`/api/prospects?assignedAgentId=${assignedIdParam || ""}`)
             .then(res => res.json())
             .then(data => {
                 if (data.prospects) {
@@ -116,7 +119,8 @@ export default function ProspectsTable() {
                 setProspects([]);
                 setLoading(false);
             });
-    }, []);
+    }, [searchParams])
+
 
     const filteredProspects = prospects.filter((prospect) => {
         const matchesSearch =

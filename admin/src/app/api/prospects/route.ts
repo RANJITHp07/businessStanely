@@ -8,10 +8,43 @@ export async function GET(req: NextRequest) {
     if (!agent) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
     const where: Record<string, unknown> = {
       archived: false,
       status: { not: "opportunity" },
     };
+
+    const { searchParams } = new URL(req.url);
+    const assignedAgentId = searchParams.get("assignedAgentId");
+
+    console.log("Assigned Agent ID:", assignedAgentId);
+
+    let assignedAgent = null;
+
+    if (assignedAgentId) {
+      assignedAgent = await prisma.agent.findUnique({
+        where: { id: assignedAgentId },
+      });
+
+      if (!assignedAgent) {
+        return NextResponse.json(
+          { error: "Assigned agent not found" },
+          { status: 404 },
+        );
+      }
+
+      if (assignedAgent.agentType === "Lead Maker") {
+        where.createdByAgentId = assignedAgentId;
+      } else if (
+        assignedAgent.agentType === "Client Advisor" ||
+        assignedAgent.agentType === "Client Manager"
+      ) {
+        if (assignedAgentId) {
+          where.assignedAgentId = assignedAgentId;
+        }
+      }
+    }
+
     const prospects = await prisma.prospect.findMany({
       where,
       include: {
@@ -21,6 +54,7 @@ export async function GET(req: NextRequest) {
       },
       orderBy: { createdAt: "desc" },
     });
+
     return NextResponse.json({ prospects });
   } catch (error) {
     console.log(error);

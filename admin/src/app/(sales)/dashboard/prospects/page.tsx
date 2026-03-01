@@ -85,7 +85,7 @@ const formatDate = (dateString: string | undefined) => {
     })
 }
 
-function ProspectTable({ label, prospects, statusFilter }: { label: string; prospects: any[]; statusFilter: string }) {
+export function ProspectTable({ label, prospects, statusFilter, assignedId }: { label: string; prospects: any[]; statusFilter: string; assignedId?: string }) {
 
     const labelColor = (() => {
         const l = label.toLowerCase()
@@ -247,7 +247,7 @@ function ProspectTable({ label, prospects, statusFilter }: { label: string; pros
                     {prospects.length > 0 && (
                         <div className="border-t border-slate-100 p-4 bg-slate-50/30">
                             <a
-                                href={`/dashboard/prospects/table?status=${statusFilter}`}
+                                href={`/dashboard/prospects/table?status=${statusFilter}${assignedId ? `&assignedId=${assignedId}` : ""}`}
                                 className="flex items-center justify-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors"
                             >
                                 View All {label}
@@ -258,7 +258,7 @@ function ProspectTable({ label, prospects, statusFilter }: { label: string; pros
 
                 </CardContent>
             </Card>
-        </div>
+        </div >
     )
 }
 
@@ -964,12 +964,36 @@ export default function ProspectDashboard() {
                         </div>
                         <h2 className="text-xl font-bold text-slate-800">Active Prospects</h2>
                     </div>
+                    <ProspectTable
+                        label="New Prospects"
+                        prospects={prospects.filter((p) => p.status === "New").slice(0, 5)}
+                        statusFilter="New"
+                    />
 
-                    <ProspectTable label="New Prospects" prospects={prospects.filter((prospect) => prospect.status == "New").slice(0, 5)} statusFilter="New" />
                     <ProspectTable
                         label="In Progress Prospects"
-                        prospects={prospects.filter((prospect) => prospect.status == "In Progress").slice(0, 5)}
+                        prospects={prospects.filter((p) => p.status === "In Progress").slice(0, 5)}
                         statusFilter="In Progress"
+                    />
+
+                    <ProspectTable
+                        label="Relevant but not Now Prospects"
+                        prospects={prospects
+                            .filter((p) => p.status === "Relevant but not Now")
+                            .slice(0, 5)}
+                        statusFilter="Relevant but not Now"
+                    />
+
+                    <ProspectTable
+                        label="Career Prospects"
+                        prospects={prospects.filter((p) => p.status === "Career").slice(0, 5)}
+                        statusFilter="Career"
+                    />
+
+                    <ProspectTable
+                        label="Not Relevant Prospects"
+                        prospects={prospects.filter((p) => p.status === "Not Relevant").slice(0, 5)}
+                        statusFilter="Not Relevant"
                     />
                 </div>
 

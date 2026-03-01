@@ -347,7 +347,7 @@ export default function AgentsTable() {
                                             return (
                                                 <TableRow
                                                     key={agent.id}
-                                                    onClick={() => router.push(`/agent/${agent.id}?tab=tasks`)}
+                                                    onClick={() => router.push(`/agent/${agent.id}?tab=leads`)}
                                                     className="cursor-pointer hover:bg-muted/50"
                                                 >
                                                     <TableCell>
@@ -459,7 +459,7 @@ export default function AgentsTable() {
                                             return (
                                                 <TableRow
                                                     key={agent.id}
-                                                    onClick={() => router.push(`/agent/${agent.id}?tab=tasks`)}
+                                                    onClick={() => router.push(`/agent/${agent.id}?tab=leads`)}
                                                     className="cursor-pointer hover:bg-muted/50"
                                                 >
                                                     <TableCell>

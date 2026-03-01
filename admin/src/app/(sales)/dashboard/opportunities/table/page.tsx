@@ -92,17 +92,16 @@ export default function ProspectsTable() {
     useEffect(() => {
         const statusParam = searchParams?.get("status")
         const engagementStatusParam = searchParams?.get("engagementStatus")
+        const assignedId = searchParams?.get("assignedId")
         if (statusParam) {
             setSelectedStatuses([statusParam])
         }
         if (engagementStatusParam) {
             setSelectedEngagementStatus([engagementStatusParam])
         }
-    }, [searchParams])
 
-    useEffect(() => {
         setLoading(true);
-        fetch('/api/opportunities')
+        fetch(`/api/opportunities?assignedAgentId=${assignedId || ""}`)
             .then(res => res.json())
             .then(data => {
                 if (data.opportunities) {
@@ -116,7 +115,9 @@ export default function ProspectsTable() {
                 setProspects([]);
                 setLoading(false);
             });
-    }, []);
+    }, [searchParams])
+
+
 
     const filteredProspects = prospects.filter((prospect) => {
         const matchesSearch =

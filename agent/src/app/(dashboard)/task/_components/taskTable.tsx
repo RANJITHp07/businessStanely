@@ -172,12 +172,11 @@ export default function TasksTable() {
 
   // Filter tasks based on search and filters only (backend already filters approved tasks)
   const filteredTasks = (tasks || []).filter((task) => {
+    console.log(task.client)
     const matchesSearch =
       task.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (task.client &&
-        (task.client.clientType === "individual"
-          ? `${task.client.firstName} ${task.client.lastName}`
-          : task.client.organizationName
+        (task.client.name
         )
           ?.toLowerCase()
           .includes(searchTerm.toLowerCase())) ||

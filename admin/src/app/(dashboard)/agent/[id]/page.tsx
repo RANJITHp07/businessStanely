@@ -57,6 +57,9 @@ import {
 import { Agent, Task } from "@/types";
 import Link from "next/link";
 import { fetchWithAuth } from "@/lib/fetchWithAuth";
+import { ProspectTable } from "@/app/(sales)/dashboard/prospects/page";
+import { ProspectsTable } from "@/app/(sales)/dashboard/opportunities/page";
+
 
 interface AgentActivity {
   taskId: string;
@@ -120,6 +123,8 @@ export default function AgentDetails() {
   const id = params.id as string;
   const [agent, setAgent] = useState<Agent | null>(null);
   const [agentTasks, setAgentTasks] = useState<Task[]>([]);
+  const [agentLeads, setAgentLeads] = useState<Task[]>([]);
+  const [agentOpportunities, setAgentOpportunities] = useState<Task[]>([]);
   const [teamMembers, setTeamMembers] = useState<Agent[]>([]);
   const [loading, setLoading] = useState(true);
   const [tasksLoading, setTasksLoading] = useState(true);
@@ -163,6 +168,9 @@ export default function AgentDetails() {
         if (response.ok) {
           const data = await response.json();
           setAgent(data);
+          data?.agentRole === "Execution Agent"
+            ? fetchAgentTasks()
+            : (fetchAgentLeads(), fetchAgentOpportunity());
           // Set team members from the agent's subordinates
           if (data.subordinates) {
             setTeamMembers(data.subordinates);
@@ -175,6 +183,7 @@ export default function AgentDetails() {
         notFound();
       } finally {
         setLoading(false);
+        setTasksLoading(false);
       }
     };
 
@@ -187,6 +196,35 @@ export default function AgentDetails() {
         }
       } catch (error) {
         console.error("Error fetching agent tasks:", error);
+      } finally {
+        setTasksLoading(false);
+      }
+    };
+
+    const fetchAgentLeads = async () => {
+      try {
+        const response = await fetch(`/api/prospects?assignedAgentId=${id}`);
+        if (response.ok) {
+          const data = await response.json();
+          console.log(data)
+          setAgentLeads(data.prospects);
+        }
+      } catch (error) {
+        console.error("Error fetching agent leads:", error);
+      } finally {
+        setTasksLoading(false);
+      }
+    };
+
+    const fetchAgentOpportunity = async () => {
+      try {
+        const response = await fetch(`/api/opportunities?assignedAgentId=${id}`);
+        if (response.ok) {
+          const data = await response.json();
+          setAgentOpportunities(data.opportunities);
+        }
+      } catch (error) {
+        console.error("Error fetching agent opportunities:", error);
       } finally {
         setTasksLoading(false);
       }
@@ -232,7 +270,6 @@ export default function AgentDetails() {
     };
 
     fetchAgent();
-    fetchAgentTasks();
     fetchAgentActivities();
     fetchServiceRecords();
   }, [id]);
@@ -536,17 +573,36 @@ export default function AgentDetails() {
         }}
         className="space-y-6"
       >
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className={`grid w-full ${agent.agentRole === "Execution Agent" ? "grid-cols-5" : "grid-cols-6"}`}>
           <TabsTrigger value="details" className="flex items-center gap-2">
             <User className="h-4 w-4 hidden md:block" />
             <p className="text-[10px] md:text-[12px]">Agent Details</p>
           </TabsTrigger>
-          <TabsTrigger value="tasks" className="flex items-center gap-2">
-            <FileText className="h-4 w-4 hidden md:block" />
-            <p className="text-[10px] md:text-[12px]">
-              Tasks ({agentTasks.length})
-            </p>
-          </TabsTrigger>
+          {
+            agent && agent.agentRole === "Execution Agent" ?
+              <TabsTrigger value="tasks" className="flex items-center gap-2">
+                <FileText className="h-4 w-4 hidden md:block" />
+                <p className="text-[10px] md:text-[12px]">
+                  Tasks ({agentTasks.length})
+                </p>
+              </TabsTrigger>
+              :
+              <>
+                <TabsTrigger value="leads" className="flex items-center gap-2">
+                  <FileText className="h-4 w-4 hidden md:block" />
+                  <p className="text-[10px] md:text-[12px]">
+                    Leads ({agentLeads.length})
+                  </p>
+                </TabsTrigger>
+                <TabsTrigger value="opportunity" className="flex items-center gap-2">
+                  <FileText className="h-4 w-4 hidden md:block" />
+                  <p className="text-[10px] md:text-[12px]">
+                    Opportunity ({agentOpportunities.length})
+                  </p>
+                </TabsTrigger>
+              </>
+          }
+
           <TabsTrigger value="team" className="flex items-center gap-2">
             <Users className="h-4 w-4 hidden md:block" />
             <p className="text-[10px] md:text-[12px]">
@@ -719,53 +775,169 @@ export default function AgentDetails() {
         </TabsContent>
 
         {/* Tasks Tab */}
-        <TabsContent value="tasks" className="space-y-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-xl font-semibold">Task Management</h2>
-              <p className="text-muted-foreground text-sm">
-                Manage and track tasks assigned to {agent.name}
-              </p>
-            </div>
-          </div>
+        {
+          agent.agentRole == "Execution Agent" ?
+            <TabsContent value="tasks" className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-xl font-semibold">Task Management</h2>
+                  <p className="text-muted-foreground text-sm">
+                    Manage and track tasks assigned to {agent.name}
+                  </p>
+                </div>
+              </div>
 
-          {tasksLoading ? (
-            <div className="flex justify-center items-center py-16 text-muted-foreground">
-              <Clock className="h-6 w-6 animate-spin mr-2" /> Loading tasks...
-            </div>
-          ) : agentTasks.length === 0 ? (
-            <Card>
-              <CardContent className="text-center py-8">
-                <p className="text-muted-foreground">
-                  No tasks assigned to this agent.
-                </p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="space-y-[40px]">
-              <SectionTable
-                label="New Task"
-                tasks={agentTasks.filter((t) => ["todo"].includes(statusKey(t.status))).slice(0, 3)}
-                agentId={id}
-              />
-              <SectionTable
-                label="In Progress"
-                tasks={agentTasks.filter((t) => ["inprogress"].includes(statusKey(t.status))).slice(0, 3)}
-                agentId={id}
-              />
-              <SectionTable
-                label="Completed"
-                tasks={agentTasks.filter((t) => ["completed"].includes(statusKey(t.status))).slice(0, 3)}
-                agentId={id}
-              />
-              <SectionTable
-                label="Hold"
-                tasks={agentTasks.filter((t) => ["hold"].includes(statusKey(t.status))).slice(0, 3)}
-                agentId={id}
-              />
-            </div>
-          )}
-        </TabsContent>
+              {tasksLoading ? (
+                <div className="flex justify-center items-center py-16 text-muted-foreground">
+                  <Clock className="h-6 w-6 animate-spin mr-2" /> Loading tasks...
+                </div>
+              ) : agentTasks.length === 0 ? (
+                <Card>
+                  <CardContent className="text-center py-8">
+                    <p className="text-muted-foreground">
+                      No tasks assigned to this agent.
+                    </p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="space-y-[40px]">
+                  <SectionTable
+                    label="New Task"
+                    tasks={agentTasks.filter((t) => ["todo"].includes(statusKey(t.status))).slice(0, 3)}
+                    agentId={id}
+                  />
+                  <SectionTable
+                    label="In Progress"
+                    tasks={agentTasks.filter((t) => ["inprogress"].includes(statusKey(t.status))).slice(0, 3)}
+                    agentId={id}
+                  />
+                  <SectionTable
+                    label="Completed"
+                    tasks={agentTasks.filter((t) => ["completed"].includes(statusKey(t.status))).slice(0, 3)}
+                    agentId={id}
+                  />
+                  <SectionTable
+                    label="Hold"
+                    tasks={agentTasks.filter((t) => ["hold"].includes(statusKey(t.status))).slice(0, 3)}
+                    agentId={id}
+                  />
+                </div>
+              )}
+            </TabsContent>
+            :
+            <>
+              <TabsContent value="leads" className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-xl font-semibold">Leads Management</h2>
+                    <p className="text-muted-foreground text-sm">
+                      Manage and track leads assigned to {agent.name}
+                    </p>
+                  </div>
+                </div>
+
+                {tasksLoading ? (
+                  <div className="flex justify-center items-center py-16 text-muted-foreground">
+                    <Clock className="h-6 w-6 animate-spin mr-2" /> Loading leads...
+                  </div>
+                ) : agentLeads.length === 0 ? (
+                  <Card>
+                    <CardContent className="text-center py-8">
+                      <p className="text-muted-foreground">
+                        No leads assigned to this agent.
+                      </p>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <div className="space-y-[40px]">
+                    <ProspectTable
+                      label="New Prospects"
+                      prospects={agentLeads.filter((p) => p.status === "New").slice(0, 5)}
+                      statusFilter="New"
+                      assignedId={id}
+                    />
+
+                    <ProspectTable
+                      label="In Progress Prospects"
+                      prospects={agentLeads.filter((p) => p.status === "In Progress").slice(0, 5)}
+                      statusFilter="In Progress"
+                      assignedId={id}
+
+                    />
+
+                    <ProspectTable
+                      label="Relevant but not Now Prospects"
+                      prospects={agentLeads
+                        .filter((p) => p.status === "Relevant but not Now")
+                        .slice(0, 5)}
+                      statusFilter="Relevant but not Now"
+                      assignedId={id}
+
+                    />
+
+                    <ProspectTable
+                      label="Career Prospects"
+                      prospects={agentLeads.filter((p) => p.status === "Career").slice(0, 5)}
+                      statusFilter="Career"
+                      assignedId={id}
+
+                    />
+
+                    <ProspectTable
+                      label="Not Relevant Prospects"
+                      prospects={agentLeads.filter((p) => p.status === "Not Relevant").slice(0, 5)}
+                      statusFilter="Not Relevant"
+                      assignedId={id}
+
+                    />
+                  </div>
+                )}
+              </TabsContent>
+              <TabsContent value="opportunity" className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-xl font-semibold">Opportunity Management</h2>
+                    <p className="text-muted-foreground text-sm">
+                      Manage and track opportunity assigned to {agent.name}
+                    </p>
+                  </div>
+                </div>
+
+                {tasksLoading ? (
+                  <div className="flex justify-center items-center py-16 text-muted-foreground">
+                    <Clock className="h-6 w-6 animate-spin mr-2" /> Loading opportunities...
+                  </div>
+                ) : agentOpportunities.length === 0 ? (
+                  <Card>
+                    <CardContent className="text-center py-8">
+                      <p className="text-muted-foreground">
+                        No opportunities assigned to this agent.
+                      </p>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <div className="space-y-[40px]">
+                    <ProspectsTable label="New Opportunity" prospects={agentOpportunities.filter((prospect) => prospect.status == "New Opportunity").slice(0, 5)} statusFilter="New Opportunity" assignedId={id} />
+
+                    <ProspectsTable label="Proposal Issued" prospects={agentOpportunities.filter((prospect) => prospect.status == "Proposal Issued").slice(0, 5)} statusFilter="Proposal Issued" assignedId={id} />
+                    <ProspectsTable
+                      label="Closed as Won Prospects"
+                      prospects={agentOpportunities.filter((prospect) => prospect.status == "Closed as Won").slice(0, 5)}
+                      statusFilter="Closed as Won Prospects"
+                      assignedId={id}
+                    />
+                    <ProspectsTable
+                      label="Closed as Loss Prospects"
+                      prospects={agentOpportunities.filter((prospect) => prospect.status == "Closed as Loss").slice(0, 5)}
+                      statusFilter="Closed as Loss Prospects"
+                      assignedId={id}
+                    />
+                  </div>
+                )}
+              </TabsContent>
+            </>
+        }
+
 
         {/* Team Tab */}
         <TabsContent value="team" className="space-y-6">
@@ -881,10 +1053,10 @@ export default function AgentDetails() {
               )}
             </CardContent>
           </Card>
-        </TabsContent>
+        </TabsContent >
 
         {/* Activities Tab */}
-        <TabsContent value="activities" className="space-y-6">
+        < TabsContent value="activities" className="space-y-6" >
           <Card>
             <CardHeader>
               <CardTitle>Agent Activities</CardTitle>
@@ -952,10 +1124,10 @@ export default function AgentDetails() {
               )}
             </CardContent>
           </Card>
-        </TabsContent>
+        </TabsContent >
 
         {/* Service Records Tab */}
-        <TabsContent value="service-records" className="space-y-6">
+        < TabsContent value="service-records" className="space-y-6" >
           <Card>
             <CardHeader>
               <CardTitle>Service Records</CardTitle>
@@ -1044,51 +1216,53 @@ export default function AgentDetails() {
               )}
             </CardContent>
           </Card>
-        </TabsContent>
-      </Tabs>
+        </TabsContent >
+      </Tabs >
 
       {/* AlertDialog for Delete Confirmation */}
-      {taskToDelete && (
-        <AlertDialog open={!!taskToDelete} onOpenChange={() => setTaskToDelete(null)}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-              <AlertDialogDescription>
-                This action cannot be undone. This will permanently delete the task &quot;{taskToDelete?.title}&quot;.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel onClick={() => setTaskToDelete(null)}>Cancel</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={async () => {
-                  if (!taskToDelete) return; // Ensure taskToDelete is not null
-                  setIsDeleting(true);
-                  try {
-                    const response = await fetch(`/api/tasks/${taskToDelete.id}`, {
-                      method: "DELETE",
-                    });
-                    if (response.ok) {
-                      setAgentTasks((prevTasks) => prevTasks.filter((t) => t.id !== taskToDelete.id));
-                      router.push(`/agent/${id}?tab=tasks`); // Redirect back to tasks tab
-                    } else {
-                      alert("Failed to delete the task. Please try again.");
+      {
+        taskToDelete && (
+          <AlertDialog open={!!taskToDelete} onOpenChange={() => setTaskToDelete(null)}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This action cannot be undone. This will permanently delete the task &quot;{taskToDelete?.title}&quot;.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel onClick={() => setTaskToDelete(null)}>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={async () => {
+                    if (!taskToDelete) return; // Ensure taskToDelete is not null
+                    setIsDeleting(true);
+                    try {
+                      const response = await fetch(`/api/tasks/${taskToDelete.id}`, {
+                        method: "DELETE",
+                      });
+                      if (response.ok) {
+                        setAgentTasks((prevTasks) => prevTasks.filter((t) => t.id !== taskToDelete.id));
+                        router.push(`/agent/${id}?tab=tasks`); // Redirect back to tasks tab
+                      } else {
+                        alert("Failed to delete the task. Please try again.");
+                      }
+                    } catch (error) {
+                      console.error("Error deleting task:", error);
+                      alert("An error occurred while deleting the task.");
+                    } finally {
+                      setIsDeleting(false);
+                      setTaskToDelete(null);
                     }
-                  } catch (error) {
-                    console.error("Error deleting task:", error);
-                    alert("An error occurred while deleting the task.");
-                  } finally {
-                    setIsDeleting(false);
-                    setTaskToDelete(null);
-                  }
-                }}
-                disabled={isDeleting}
-              >
-                {isDeleting ? "Deleting..." : "Delete"}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      )}
-    </div>
+                  }}
+                  disabled={isDeleting}
+                >
+                  {isDeleting ? "Deleting..." : "Delete"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        )
+      }
+    </div >
   );
 }

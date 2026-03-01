@@ -342,7 +342,6 @@ export default function TaskDetails() {
         // Check for both "user" and "agent" keys to support both admin and agent logins
         const userStr =
           localStorage.getItem("user") || localStorage.getItem("agent");
-        console.log("Raw user/agent string from localStorage:", userStr);
         if (userStr) {
           try {
             const userData = JSON.parse(userStr);

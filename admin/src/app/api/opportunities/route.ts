@@ -9,6 +9,34 @@ export async function GET(req: NextRequest) {
     if (!agent) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    const assignedAgentId = req.nextUrl.searchParams.get("assignedAgentId");
+
+    let assignedAgent = null;
+    let where: any = {};
+
+    if (assignedAgentId) {
+      assignedAgent = await prisma.agent.findUnique({
+        where: { id: assignedAgentId },
+      });
+
+      if (!assignedAgent) {
+        return NextResponse.json(
+          { error: "Assigned agent not found" },
+          { status: 404 },
+        );
+      }
+
+      if (assignedAgent.agentType === "Lead Maker") {
+        where.prospect = { createdByAgentId: agent.id };
+      } else if (
+        assignedAgent.agentType === "Client Advisor" ||
+        assignedAgent.agentType === "Client Manager"
+      ) {
+        if (assignedAgentId) {
+          where.prospect = { assignedAgentId: assignedAgentId };
+        }
+      }
+    }
     // MongoDB does not support relation filtering in Prisma, so filter in-memory
     const allOpportunities = await prisma.opportunity.findMany({
       include: {
@@ -22,7 +50,7 @@ export async function GET(req: NextRequest) {
   } catch (error) {
     return NextResponse.json(
       { error: "Failed to fetch opportunities" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

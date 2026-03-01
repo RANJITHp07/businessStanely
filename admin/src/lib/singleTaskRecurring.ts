@@ -461,7 +461,7 @@ function buildActivityEmailHTML(
                   ${
                     comment.endTime
                       ? `End Time: ${formatTime(comment.endTime)}`
-                      : ""
+                        : ""
                   }
                 </small>
               </div>

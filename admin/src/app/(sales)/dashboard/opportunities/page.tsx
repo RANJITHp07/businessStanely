@@ -65,7 +65,7 @@ const formatDate = (dateString: string | undefined) => {
     })
 }
 
-function ProspectsTable({ label, prospects, statusFilter }: { label: string; prospects: any[]; statusFilter: string }) {
+export function ProspectsTable({ label, prospects, statusFilter, assignedId }: { label: string; prospects: any[]; statusFilter: string, assignedId?: string }) {
 
     const labelColor = (() => {
         const l = label.toLowerCase()
@@ -115,7 +115,7 @@ function ProspectsTable({ label, prospects, statusFilter }: { label: string; pro
                 <CardContent className="p-0">
                     {prospects.length === 0 ? (
                         <div className="py-8 text-center text-slate-500 text-sm font-medium">
-                            No prospect found
+                            No opportunities found
                         </div>
                     ) : (
                         <>
@@ -227,7 +227,7 @@ function ProspectsTable({ label, prospects, statusFilter }: { label: string; pro
                     {prospects.length > 0 && (
                         <div className="border-t border-slate-100 p-4 bg-slate-50/30">
                             <a
-                                href={`/dashboard/opportunities/table?status=${statusFilter}`}
+                                href={`/dashboard/opportunities/table?status=${statusFilter}${assignedId ? `&assignedId=${assignedId}` : ""}`}
                                 className="flex items-center justify-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors"
                             >
                                 View All {label}
@@ -784,6 +784,8 @@ export default function ProspectDashboard() {
                         </div>
                         <h2 className="text-xl font-bold text-slate-800">Active Lead</h2>
                     </div>
+
+                    <ProspectsTable label="New Opportunity" prospects={prospects.filter((prospect) => prospect.status == "New Opportunity").slice(0, 5)} statusFilter="New Opportunity" />
 
                     <ProspectsTable label="Proposal Issued" prospects={prospects.filter((prospect) => prospect.status == "Proposal Issued").slice(0, 5)} statusFilter="Proposal Issued" />
                     <ProspectsTable

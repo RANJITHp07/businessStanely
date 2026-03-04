@@ -66,7 +66,7 @@ const allItems: MenuItem[] = [
   { title: "Opportunities Dashboard", url: "/dashboard/opportunities", icon: ClipboardList },
   { title: "Opportunities", url: "/dashboard/opportunities/tables", icon: ClipboardList },
   { title: "Execution Agent", url: "/agent", icon: UserRoundPen },
-  { title: "Advisor Agent", url: "/dashboard/agent", icon: UserRoundPen },
+  { title: "Client Advisor", url: "/dashboard/agent", icon: UserRoundPen },
   { title: "Client", url: "/client", icon: UserSearch },
   { title: "Task", url: "/my-task", icon: ClipboardCheck },
   { title: "Timesheet", url: "/timesheet", icon: Calendar },

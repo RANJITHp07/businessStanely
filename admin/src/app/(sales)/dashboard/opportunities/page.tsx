@@ -659,6 +659,54 @@ export default function ProspectDashboard() {
                     </Card>
                 </div>
 
+                {/* Date-wise Lead Tracking Section */}
+                <div className="space-y-4">
+                    <div className="flex items-center gap-2 mb-4">
+                        <div className="h-8 w-8 rounded-lg bg-slate-200 flex items-center justify-center">
+                            <Calendar className="h-4 w-4 text-slate-700" />
+                        </div>
+                        <h2 className="text-xl font-bold text-slate-800">Date-wise Lead Tracking</h2>
+                    </div>
+
+                    <div className="grid gap-4 md:grid-cols-2">
+                        {/* Leads To Be Contacted */}
+
+                        {/* Leads Contacted */}
+                        <Card className="border border-sky-200 bg-sky-50/50 rounded-xl shadow-sm overflow-hidden hover:shadow-md transition-shadow">
+                            <div className="h-1.5 bg-sky-300" />
+                            <CardHeader className="pb-3">
+                                <div className="flex items-center justify-between">
+                                    <CardTitle className="text-sm font-semibold text-slate-700">Follow Up Required</CardTitle>
+                                    <div className="h-10 w-10 rounded-xl bg-sky-100 flex items-center justify-center">
+                                        <UserPlus className="h-5 w-5 text-sky-600" />
+                                    </div>
+                                </div>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="text-4xl font-bold text-sky-600 mb-2">{(statusCategoryData.find((status: any) => status.status == "Follow Up")?.count || 0)}</div>
+                                <p className="text-sm ">Successfully reached out</p>
+                            </CardContent>
+                        </Card>
+
+                        {/* Leads Missed Out */}
+                        <Card className="border border-rose-200 bg-rose-50/50 rounded-xl shadow-sm overflow-hidden hover:shadow-md transition-shadow">
+                            <div className="h-1.5 bg-rose-300" />
+                            <CardHeader className="pb-3">
+                                <div className="flex items-center justify-between">
+                                    <CardTitle className="text-sm font-semibold text-slate-700">Leads Missed Out</CardTitle>
+                                    <div className="h-10 w-10 rounded-xl bg-rose-100 flex items-center justify-center">
+                                        <Activity className="h-5 w-5 text-rose-600" />
+                                    </div>
+                                </div>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="text-4xl font-bold text-rose-600 mb-2">{statusCategoryData.find((status: any) => status.status == "Missed")?.count || 0}</div>
+                                <p className="text-sm ">Requires attention</p>
+                            </CardContent>
+                        </Card>
+                    </div>
+                </div>
+
                 {/* Charts Section */}
                 <div className="grid gap-4 md:grid-cols-2">
                     {/* Lead Source Chart */}
@@ -728,64 +776,17 @@ export default function ProspectDashboard() {
                     </Card>
                 </div>
 
-                {/* Date-wise Lead Tracking Section */}
-                <div className="space-y-4">
-                    <div className="flex items-center gap-2 mb-4">
-                        <div className="h-8 w-8 rounded-lg bg-slate-200 flex items-center justify-center">
-                            <Calendar className="h-4 w-4 text-slate-700" />
-                        </div>
-                        <h2 className="text-xl font-bold text-slate-800">Date-wise Lead Tracking</h2>
-                    </div>
-
-                    <div className="grid gap-4 md:grid-cols-2">
-                        {/* Leads To Be Contacted */}
-
-                        {/* Leads Contacted */}
-                        <Card className="border border-sky-200 bg-sky-50/50 rounded-xl shadow-sm overflow-hidden hover:shadow-md transition-shadow">
-                            <div className="h-1.5 bg-sky-300" />
-                            <CardHeader className="pb-3">
-                                <div className="flex items-center justify-between">
-                                    <CardTitle className="text-sm font-semibold text-slate-700">Follow Up Required</CardTitle>
-                                    <div className="h-10 w-10 rounded-xl bg-sky-100 flex items-center justify-center">
-                                        <UserPlus className="h-5 w-5 text-sky-600" />
-                                    </div>
-                                </div>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="text-4xl font-bold text-sky-600 mb-2">{(statusCategoryData.find((status: any) => status.status == "Follow Up")?.count || 0)}</div>
-                                <p className="text-sm ">Successfully reached out</p>
-                            </CardContent>
-                        </Card>
-
-                        {/* Leads Missed Out */}
-                        <Card className="border border-rose-200 bg-rose-50/50 rounded-xl shadow-sm overflow-hidden hover:shadow-md transition-shadow">
-                            <div className="h-1.5 bg-rose-300" />
-                            <CardHeader className="pb-3">
-                                <div className="flex items-center justify-between">
-                                    <CardTitle className="text-sm font-semibold text-slate-700">Leads Missed Out</CardTitle>
-                                    <div className="h-10 w-10 rounded-xl bg-rose-100 flex items-center justify-center">
-                                        <Activity className="h-5 w-5 text-rose-600" />
-                                    </div>
-                                </div>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="text-4xl font-bold text-rose-600 mb-2">{statusCategoryData.find((status: any) => status.status == "Missed")?.count || 0}</div>
-                                <p className="text-sm ">Requires attention</p>
-                            </CardContent>
-                        </Card>
-                    </div>
-                </div>
 
                 {/* Prospects Tables */}
-                <div className="space-y-6">
-                    <div className="flex items-center gap-2">
+                {/* <div className="space-y-6"> */}
+                {/* <div className="flex items-center gap-2">
                         <div className="h-8 w-8 rounded-lg bg-slate-200 flex items-center justify-center">
                             <Users className="h-4 w-4 text-slate-700" />
                         </div>
                         <h2 className="text-xl font-bold text-slate-800">Active Lead</h2>
-                    </div>
+                    </div> */}
 
-                    <ProspectsTable label="New Opportunity" prospects={prospects.filter((prospect) => prospect.status == "New Opportunity").slice(0, 5)} statusFilter="New Opportunity" />
+                {/* <ProspectsTable label="New Opportunity" prospects={prospects.filter((prospect) => prospect.status == "New Opportunity").slice(0, 5)} statusFilter="New Opportunity" />
 
                     <ProspectsTable label="Proposal Issued" prospects={prospects.filter((prospect) => prospect.status == "Proposal Issued").slice(0, 5)} statusFilter="Proposal Issued" />
                     <ProspectsTable
@@ -797,18 +798,18 @@ export default function ProspectDashboard() {
                         label="Closed as Loss Prospects"
                         prospects={prospects.filter((prospect) => prospect.status == "Closed as Loss").slice(0, 5)}
                         statusFilter="Closed as Loss Prospects"
-                    />
-                </div>
+                    /> */}
+                {/* </div> */}
 
                 {/* Segregation Tables */}
-                <div className="space-y-6">
-                    <div className="flex items-center gap-2">
+                {/* <div className="space-y-6"> */}
+                {/* <div className="flex items-center gap-2">
                         <div className="h-8 w-8 rounded-lg bg-slate-200 flex items-center justify-center">
                             <Calendar className="h-4 w-4 text-slate-700" />
                         </div>
                         <h2 className="text-xl font-bold text-slate-800">Lead Segregation</h2>
-                    </div>
-                    <SegregationTable
+                    </div> */}
+                {/* <SegregationTable
                         label="Follow Up"
                         leads={prospects
                             .filter((prospect: any) => {
@@ -859,9 +860,9 @@ export default function ProspectDashboard() {
                             .slice(0, 5)}
                         statusFilter="Missed Out"
                         dateLabel="Missed Date"
-                    />
-                </div>
+                    /> */}
+                {/* </div> */}
             </div>
-        </div>
+        </div >
     )
 }

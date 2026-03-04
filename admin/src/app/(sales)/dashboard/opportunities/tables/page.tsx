@@ -2,7 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Users, UserPlus, Calendar, TrendingUp, ArrowRight, Activity, BarChart3, Loader2, Eye, Plus } from "lucide-react"
+import { Users, UserPlus, Calendar, TrendingUp, ArrowRight, Activity, BarChart3, Loader2, Eye } from "lucide-react"
 import {
     PieChart,
     Pie,
@@ -28,48 +28,28 @@ import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
-import { Checkbox } from "@/components/ui/checkbox"
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
 
-const statusColors = {
-    New: "bg-emerald-50 text-emerald-700 border-emerald-200",
-    "In Progress": "bg-blue-50 text-blue-700 border-blue-200",
-    Contacted: "bg-sky-50 text-sky-700 border-sky-200",
-    Missed: "bg-rose-50 text-rose-700 border-rose-200",
-}
 
 function getStatusBadge(status: string) {
     const s = status.toLowerCase()
-    if (s === "new")
+    if (s === "closed as won")
         return (
             <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200">
-                New
+                Closed as Won
             </Badge>
         )
-    if (s === "in progress")
+    if (s === "proposal issued")
         return (
             <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                In Progress
+                Proposal Issued
             </Badge>
         )
-    if (s === "contacted")
-        return (
-            <Badge variant="outline" className="bg-sky-50 text-sky-700 border-sky-200">
-                Contacted
-            </Badge>
-        )
-    if (s === "missed" || s === "missed out")
+    if (s === "closed as loss")
         return (
             <Badge variant="outline" className="bg-rose-50 text-rose-700 border-rose-200">
-                Missed
-            </Badge>
-        )
-    if (s === "to be contacted")
-        return (
-            <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200">
-                To Be Contacted
+                Closed as Loss
             </Badge>
         )
     return <Badge variant="outline">{status}</Badge>
@@ -85,27 +65,27 @@ const formatDate = (dateString: string | undefined) => {
     })
 }
 
-export function ProspectTable({ label, prospects, statusFilter, assignedId }: { label: string; prospects: any[]; statusFilter: string; assignedId?: string }) {
+export function ProspectsTable({ label, prospects, statusFilter, assignedId }: { label: string; prospects: any[]; statusFilter: string, assignedId?: string }) {
 
     const labelColor = (() => {
         const l = label.toLowerCase()
-        if (l.includes("progress")) return "text-purple-600"
-        if (l.includes("new")) return "text-emerald-600"
-        return "text-slate-700"
+        if (l.includes("proposal issued")) return "text-purple-600"
+        if (l.includes("closed as won")) return "text-emerald-600"
+        return "text-red-700"
     })()
 
     const bgClass = (() => {
         const l = label.toLowerCase()
-        if (l.includes("progress")) return "bg-purple-50"
-        if (l.includes("new")) return "bg-emerald-50"
-        return "bg-slate-50"
+        if (l.includes("proposal issued")) return "bg-purple-50"
+        if (l.includes("closed as won")) return "bg-emerald-50"
+        return "bg-red-50"
     })()
 
     const borderClass = (() => {
         const l = label.toLowerCase()
-        if (l.includes("progress")) return "border-purple-100"
-        if (l.includes("new")) return "border-emerald-100"
-        return "border-slate-200"
+        if (l.includes("proposal issued")) return "border-purple-100"
+        if (l.includes("closed as won")) return "border-emerald-100"
+        return "border-red-200"
     })()
 
     return (
@@ -135,7 +115,7 @@ export function ProspectTable({ label, prospects, statusFilter, assignedId }: { 
                 <CardContent className="p-0">
                     {prospects.length === 0 ? (
                         <div className="py-8 text-center text-slate-500 text-sm font-medium">
-                            No prospect found
+                            No opportunities found
                         </div>
                     ) : (
                         <>
@@ -180,12 +160,12 @@ export function ProspectTable({ label, prospects, statusFilter, assignedId }: { 
                                                 <td className="py-3 px-4">
                                                     <div className="flex items-center gap-2">
                                                         <div className="h-7 w-7 rounded-full bg-gradient-to-br from-blue-100 to-purple-100 flex items-center justify-center text-xs font-semibold text-slate-700">
-                                                            {prospect?.assignedAgent?.name
+                                                            {prospect?.prospect?.assignedAgent?.name
                                                                 .split(" ")
                                                                 .map((n: string) => n[0])
                                                                 .join("")}
                                                         </div>
-                                                        <span className="text-sm text-slate-700">{prospect?.assignedAgent?.name}</span>
+                                                        <span className="text-sm text-slate-700">{prospect?.prospect?.assignedAgent?.name}</span>
                                                     </div>
                                                 </td>
                                                 <td className="py-3 px-4">
@@ -196,14 +176,14 @@ export function ProspectTable({ label, prospects, statusFilter, assignedId }: { 
                                                         <Tooltip>
                                                             <TooltipTrigger asChild>
                                                                 <Link
-                                                                    href={`/dashboard/prospects/${prospect.id}`}
+                                                                    href={`/dashboard/opportunities/${prospect.id}`}
                                                                     className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-muted"
                                                                     aria-label="View prospect details"
                                                                 >
                                                                     <Eye className="h-4 w-4" />
                                                                 </Link>
                                                             </TooltipTrigger>
-                                                            <TooltipContent sideOffset={6}>View prospects with this status</TooltipContent>
+                                                            <TooltipContent sideOffset={6}>View opportunities with this status</TooltipContent>
                                                         </Tooltip>
                                                     </TooltipProvider>
                                                 </td>
@@ -247,7 +227,7 @@ export function ProspectTable({ label, prospects, statusFilter, assignedId }: { 
                     {prospects.length > 0 && (
                         <div className="border-t border-slate-100 p-4 bg-slate-50/30">
                             <a
-                                href={`/dashboard/prospects/table?status=${statusFilter}${assignedId ? `&assignedId=${assignedId}` : ""}`}
+                                href={`/dashboard/opportunities/table?status=${statusFilter}${assignedId ? `&assignedId=${assignedId}` : ""}`}
                                 className="flex items-center justify-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors"
                             >
                                 View All {label}
@@ -258,7 +238,7 @@ export function ProspectTable({ label, prospects, statusFilter, assignedId }: { 
 
                 </CardContent>
             </Card>
-        </div >
+        </div>
     )
 }
 
@@ -275,15 +255,14 @@ function SegregationTable({
 }) {
     const labelColor = (() => {
         const l = label.toLowerCase()
-        if (l.includes("contacted") && !l.includes("missed")) return "text-sky-600"
-        if (l.includes("be contacted")) return "text-amber-600"
+        if (l.includes("follow up") && !l.includes("missed")) return "text-sky-600"
         if (l.includes("missed")) return "text-rose-600"
         return "text-blue-600"
     })()
 
     const bgClass = (() => {
         const l = label.toLowerCase()
-        if (l.includes("contacted") && !l.includes("missed")) return "bg-sky-50"
+        if (l.includes("follow up") && !l.includes("missed")) return "bg-sky-50"
         if (l.includes("be contacted")) return "bg-amber-50"
         if (l.includes("missed")) return "bg-rose-50"
         return "bg-blue-50"
@@ -291,7 +270,7 @@ function SegregationTable({
 
     const borderClass = (() => {
         const l = label.toLowerCase()
-        if (l.includes("contacted") && !l.includes("missed")) return "border-sky-100"
+        if (l.includes("follow up") && !l.includes("missed")) return "border-sky-100"
         if (l.includes("be contacted")) return "border-amber-100"
         if (l.includes("missed")) return "border-rose-100"
         return "border-blue-100"
@@ -378,13 +357,13 @@ function SegregationTable({
                                                 <td className="py-3 px-4">
                                                     <div className="flex items-center gap-2">
                                                         <div className="h-7 w-7 rounded-full bg-gradient-to-br from-blue-100 to-purple-100 flex items-center justify-center text-xs font-semibold text-slate-700">
-                                                            {lead?.assignedAgent?.name
+                                                            {lead?.prospect?.assignedAgent?.name
                                                                 .split(" ")
                                                                 .map((n: string) => n[0])
                                                                 .join("")}
                                                         </div>
                                                         <span className="text-sm text-slate-700">
-                                                            {lead?.assignedAgent?.name}
+                                                            {lead?.prospect?.assignedAgent?.name}
                                                         </span>
                                                     </div>
                                                 </td>
@@ -469,7 +448,7 @@ function SegregationTable({
                             {leads.length > 0 && (
                                 <div className="border-t border-slate-100 p-4 bg-slate-50/30">
                                     <a
-                                        href={`/dashboard/prospects/table?engagementStatus=${statusFilter}`}
+                                        href={`/dashboard/opportunities/table?engagementStatus=${statusFilter}`}
                                         className="flex items-center justify-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors"
                                     >
                                         View All {label}
@@ -487,74 +466,25 @@ function SegregationTable({
 
 
 export default function ProspectDashboard() {
-    const router = useRouter()
     const [prospects, setProspects] = useState<any>([])
     const [loading, setLoading] = useState(false)
     const [leadSources, setLeadSources] = useState<any>([])
     const [statusCategoryData, setStatusCategoryData] = useState<any>([])
-    const [open, setOpen] = useState(false)
-    const [prospectsPerAgent, setProspectsPerAgent] = useState<number>(1)
-    const [isSubmitting, setIsSubmitting] = useState(false)
-    const [agents, setAgents] = useState<any>([])
-    const [selectedAgents, setSelectedAgents] = useState<string[]>([])
-    const [agentSearchQuery, setAgentSearchQuery] = useState<string>("")
-
-    const handleConfirm = async () => {
-        if (!prospectsPerAgent || prospectsPerAgent < 1) return
-
-        try {
-            setIsSubmitting(true)
-
-            await fetch("/api/prospectAssignmentSetting", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    prospectsPerAgent,
-                    selectedAgentIds: selectedAgents,
-                }),
-            })
-
-            setOpen(false)
-        } catch (error) {
-            console.error("Failed to save setting")
-        } finally {
-            setIsSubmitting(false)
-            setOpen(false)
-        }
-    }
-
-    const handleAgentToggle = (agentId: string) => {
-        setSelectedAgents((prev) =>
-            prev.includes(agentId)
-                ? prev.filter((id) => id !== agentId)
-                : [...prev, agentId]
-        )
-    }
 
     useEffect(() => {
         setLoading(true)
 
         Promise.all([
-            fetch("/api/prospects").then(res => res.json()),
+            fetch("/api/opportunities").then(res => res.json()),
             fetch("/api/lead_source").then(res => res.json()),
-            fetch("/api/prospectAssignmentSetting").then((res) => res.json()),
-            fetch("/api/agents").then((res) => res.json()),
         ])
-            .then(([prospectsRes, leadSourceRes, assignmentSettingRes, agentsRes]) => {
-                const prospects = Array.isArray(prospectsRes?.prospects)
-                    ? prospectsRes.prospects.filter((p: any) => !p.archived)
+            .then(([prospectsRes, leadSourceRes]) => {
+                const prospects = Array.isArray(prospectsRes?.opportunities)
+                    ? prospectsRes.opportunities.filter((p: any) => !p.archived)
                     : []
 
                 setProspects(prospects)
 
-                /* Set agents */
-                const agentsList = Array.isArray(agentsRes) ? agentsRes : []
-                setAgents(agentsList.filter((agent) => agent.agentRole == "Advisor Agent"))
-                setSelectedAgents(
-                    agentsList?.filter(
-                        (agent) => agent.agentRole === "Advisor Agent" && agent.autoAssign
-                    ).map((agent) => agent.id) || []
-                );
                 /* ---------------- LEAD SOURCE DATA ---------------- */
                 const leadSourceColors = [
                     "#3b82f6",
@@ -569,7 +499,7 @@ export default function ProspectDashboard() {
                     ? leadSourceRes.map((source: any, index: number) => ({
                         name: source.name,
                         value: prospects.filter(
-                            (p: any) => p.leadSourceId === source.id
+                            (p: any) => p.prospect.leadSourceId === source.id
                         ).length,
                         color: leadSourceColors[index % leadSourceColors.length],
                     }))
@@ -577,9 +507,6 @@ export default function ProspectDashboard() {
 
                 setLeadSources(leadSourceChartData)
 
-                if (assignmentSettingRes?.prospectsPerAgent) {
-                    setProspectsPerAgent(assignmentSettingRes.prospectsPerAgent)
-                }
 
                 /* ---------------- STATUS CATEGORY DATA ---------------- */
                 const today = new Date()
@@ -587,11 +514,11 @@ export default function ProspectDashboard() {
                 const statusCounts = {
                     "Follow Up": 0,
                     Missed: 0,
-                    "To Be Contacted": 0,
                 }
 
                 prospects.forEach((p: any) => {
-                    const assignedAgentId = p.assignedAgentId
+                    const assignedAgentId = p.prospect.assignedAgentId
+                    console.log(p)
                     const agentComments = Array.isArray(p.comments)
                         ? p.comments
                             .filter((c: any) => c.authorId === assignedAgentId)
@@ -610,21 +537,17 @@ export default function ProspectDashboard() {
                             if (followUpDate > lastCommentDate) statusCounts["Follow Up"]++
                             else statusCounts.Missed++
                         }
-                    } else {
-                        statusCounts["To Be Contacted"]++
                     }
                 })
 
                 const statusCategoryData = [
                     { status: "Follow Up", count: statusCounts["Follow Up"], color: "#f87171" },
                     { status: "Missed", count: statusCounts.Missed, color: "#ef4444" },
-                    { status: "To Be Contacted", count: statusCounts["To Be Contacted"], color: "#10b981" },
                 ]
 
                 setStatusCategoryData(statusCategoryData)
             })
             .catch((err) => {
-                console.error(err)
                 setProspects([])
                 setLeadSources([])
                 setStatusCategoryData([])
@@ -647,125 +570,19 @@ export default function ProspectDashboard() {
                 {/* Header */}
                 <div className="flex items-center justify-between mb-6">
                     <div>
-                        <h1 className="text-3xl font-bold text-slate-800 mb-1">Lead Reports Dashboard</h1>
-                        <p className="">Track and manage your sales prospects</p>
+                        <h1 className="text-3xl font-bold text-slate-800 mb-1">Opportunity Reports Dashboard</h1>
+                        <p className="">Track and manage your sales opportunities</p>
                     </div>
-                    <div className="flex flex-col md:flex-row md:items-center gap-4">
-                        <Button onClick={() => router.push("/dashboard/prospects/add")} >
-                            <Plus className="h-4 w-4" />
-                            Create Lead
-                        </Button>
-                        <Button onClick={() => setOpen(true)}>Set Leads per Agent</Button>
-                    </div>
-
-
-                    <Dialog open={open} onOpenChange={setOpen}>
-                        <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
-                            <DialogHeader>
-                                <DialogTitle>Assign Lead Automatically</DialogTitle>
-                                <DialogDescription>
-                                    Decide how many leads each agent should be assigned automatically, and select which agents will participate.
-                                </DialogDescription>
-                            </DialogHeader>
-
-                            <div className="space-y-6">
-                                {/* Input Field */}
-                                <div>
-                                    <Label htmlFor="prospectsPerAgent" className="text-sm font-medium text-slate-700">
-                                        Leads per Agent
-                                    </Label>
-                                    <Input
-                                        id="prospectsPerAgent"
-                                        type="number"
-                                        min={1}
-                                        defaultValue={1}
-                                        value={prospectsPerAgent}
-                                        onChange={(e) => setProspectsPerAgent(Number(e.target.value))}
-                                        className="mt-2"
-                                    />
-                                    <p className="mt-2 text-xs text-slate-500">
-                                        This number decides how many prospects each agent should be automatically assigned.
-                                    </p>
-                                </div>
-
-                                {/* Agents List */}
-                                <div>
-                                    <Label className="text-sm font-medium text-slate-700 mb-3 block">
-                                        Select Agents ({selectedAgents.length} selected)
-                                    </Label>
-
-                                    {/* Search Input */}
-                                    <Input
-                                        type="text"
-                                        placeholder="Search agents by name or role..."
-                                        value={agentSearchQuery}
-                                        onChange={(e) => setAgentSearchQuery(e.target.value)}
-                                        className="mb-3"
-                                    />
-
-                                    {/* Agents List */}
-                                    <div className="border border-slate-200 rounded-lg p-4 space-y-3 bg-slate-50/50 max-h-96 overflow-y-auto">
-                                        {agents.filter((agent: any) =>
-                                            agent.name.toLowerCase().includes(agentSearchQuery.toLowerCase()) ||
-                                            (agent.role && agent.role.toLowerCase().includes(agentSearchQuery.toLowerCase()))
-                                        ).length === 0 ? (
-                                            <p className="text-sm text-slate-500 text-center py-8">
-                                                {agents.length === 0 ? "No agents available" : "No agents match your search"}
-                                            </p>
-                                        ) : (
-                                            agents
-                                                .filter((agent: any) =>
-                                                    agent.name.toLowerCase().includes(agentSearchQuery.toLowerCase()) ||
-                                                    (agent.role && agent.role.toLowerCase().includes(agentSearchQuery.toLowerCase()))
-                                                )
-                                                .map((agent: any) => (
-                                                    <div
-                                                        key={agent.id}
-                                                        className="flex items-center gap-3 p-2 rounded-md hover:bg-slate-100/80 transition-colors cursor-pointer"
-                                                        onClick={() => handleAgentToggle(agent.id)}
-                                                    >
-                                                        <Checkbox
-                                                            id={`agent-${agent.id}`}
-                                                            checked={selectedAgents.includes(agent.id)}
-                                                            onCheckedChange={() => handleAgentToggle(agent.id)}
-                                                        />
-                                                        <div className="flex-1">
-                                                            <Label
-                                                                htmlFor={`agent-${agent.id}`}
-                                                                className="text-sm font-medium text-slate-800 cursor-pointer"
-                                                            >
-                                                                {agent.name}
-                                                            </Label>
-                                                            <p className="text-xs text-slate-500">{agent.agentType || "Agent"}</p>
-                                                        </div>
-                                                    </div>
-                                                ))
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Actions */}
-                            <DialogFooter className="flex justify-end gap-2 pt-4">
-                                <Button disabled={isSubmitting} variant="outline" onClick={() => setOpen(false)}>
-                                    Cancel
-                                </Button>
-                                <Button disabled={isSubmitting} onClick={handleConfirm}>
-                                    {isSubmitting ? "Processing..." : "Confirm"}
-                                </Button>
-                            </DialogFooter>
-                        </DialogContent>
-                    </Dialog>
                 </div>
 
                 {/* Stats Cards */}
-                <div className="grid gap-4 md:grid-cols-3">
+                <div className="grid gap-4 md:grid-cols-4">
                     {/* Total Prospects */}
                     <Card className="border border-blue-200 bg-blue-50/50 rounded-xl shadow-sm overflow-hidden">
                         <div className="h-1.5 bg-blue-300" />
                         <CardHeader className="pb-2">
                             <div className="flex items-center justify-between">
-                                <CardTitle className="text-sm font-medium text-slate-700">Total Prospects</CardTitle>
+                                <CardTitle className="text-sm font-medium text-slate-700">Total Opportunities</CardTitle>
                                 <div className="h-10 w-10 rounded-xl bg-blue-100 flex items-center justify-center">
                                     <Users className="h-5 w-5 text-blue-600" />
                                 </div>
@@ -781,12 +598,30 @@ export default function ProspectDashboard() {
                         </CardContent>
                     </Card>
 
-                    {/* New Prospects */}
+                    <Card className="border border-purple-200 bg-purple-50/50 rounded-xl shadow-sm overflow-hidden">
+                        <div className="h-1.5 bg-purple-300" />
+                        <CardHeader className="pb-2">
+                            <div className="flex items-center justify-between">
+                                <CardTitle className="text-sm font-medium text-slate-700">Proposal Issued</CardTitle>
+                                <div className="h-10 w-10 rounded-xl bg-purple-100 flex items-center justify-center">
+                                    <UserPlus className="h-5 w-5 text-purple-600" />
+                                </div>
+                            </div>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="space-y-2">
+                                <div className="text-3xl font-bold text-slate-800">{prospects.filter((prospect: any) => prospect.status == "Proposal Issued")?.length}</div>
+                                <div className="w-full bg-purple-200 h-1.5 rounded-full overflow-hidden">
+                                    <div className="bg-purple-500 h-full" style={{ width: "60%" }} />
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
                     <Card className="border border-emerald-200 bg-emerald-50/50 rounded-xl shadow-sm overflow-hidden">
                         <div className="h-1.5 bg-emerald-300" />
                         <CardHeader className="pb-2">
                             <div className="flex items-center justify-between">
-                                <CardTitle className="text-sm font-medium text-slate-700">New Prospects</CardTitle>
+                                <CardTitle className="text-sm font-medium text-slate-700">Closed As Won</CardTitle>
                                 <div className="h-10 w-10 rounded-xl bg-emerald-100 flex items-center justify-center">
                                     <UserPlus className="h-5 w-5 text-emerald-600" />
                                 </div>
@@ -794,7 +629,7 @@ export default function ProspectDashboard() {
                         </CardHeader>
                         <CardContent>
                             <div className="space-y-2">
-                                <div className="text-3xl font-bold text-slate-800">{prospects.filter((prospect: any) => prospect.status == "New")?.length}</div>
+                                <div className="text-3xl font-bold text-slate-800">{prospects.filter((prospect: any) => prospect.status == "Closed as Won")?.length}</div>
                                 <div className="w-full bg-emerald-200 h-1.5 rounded-full overflow-hidden">
                                     <div className="bg-emerald-500 h-full" style={{ width: "60%" }} />
                                 </div>
@@ -803,94 +638,31 @@ export default function ProspectDashboard() {
                     </Card>
 
                     {/* In Progress */}
-                    <Card className="border border-purple-200 bg-purple-50/50 rounded-xl shadow-sm overflow-hidden">
-                        <div className="h-1.5 bg-purple-300" />
+                    <Card className="border border-red-200 bg-red-50/50 rounded-xl shadow-sm overflow-hidden">
+                        <div className="h-1.5 bg-red-300" />
                         <CardHeader className="pb-2">
                             <div className="flex items-center justify-between">
-                                <CardTitle className="text-sm font-medium text-slate-700">In Progress</CardTitle>
-                                <div className="h-10 w-10 rounded-xl bg-purple-100 flex items-center justify-center">
-                                    <Activity className="h-5 w-5 text-purple-600" />
+                                <CardTitle className="text-sm font-medium text-red-700">Closed As Loss</CardTitle>
+                                <div className="h-10 w-10 rounded-xl bg-red-100 flex items-center justify-center">
+                                    <Activity className="h-5 w-5 text-red-600" />
                                 </div>
                             </div>
                         </CardHeader>
                         <CardContent>
                             <div className="space-y-2">
-                                <div className="text-3xl font-bold text-slate-800">{prospects.filter((prospect: any) => prospect.status == "In Progress")?.length}</div>
-                                <div className="w-full bg-purple-200 h-1.5 rounded-full overflow-hidden">
-                                    <div className="bg-purple-500 h-full" style={{ width: "45%" }} />
+                                <div className="text-3xl font-bold text-slate-800">{prospects.filter((prospect: any) => prospect.status == "Closed as Loss")?.length}</div>
+                                <div className="w-full bg-red-200 h-1.5 rounded-full overflow-hidden">
+                                    <div className="bg-red-500 h-full" style={{ width: "45%" }} />
                                 </div>
                             </div>
                         </CardContent>
                     </Card>
                 </div>
 
-                {/* Date-wise Lead Tracking Section */}
-                <div className="space-y-4">
-                    <div className="flex items-center gap-2 mb-4">
-                        <div className="h-8 w-8 rounded-lg bg-slate-200 flex items-center justify-center">
-                            <Calendar className="h-4 w-4 text-slate-700" />
-                        </div>
-                        <h2 className="text-xl font-bold text-slate-800">Date-wise Lead Tracking</h2>
-                    </div>
-
-                    <div className="grid gap-4 md:grid-cols-3">
-                        {/* Leads To Be Contacted */}
-                        <Card className="border border-amber-200 bg-amber-50/50 rounded-xl shadow-sm overflow-hidden hover:shadow-md transition-shadow">
-                            <div className="h-1.5 bg-amber-300" />
-                            <CardHeader className="pb-3">
-                                <div className="flex items-center justify-between">
-                                    <CardTitle className="text-sm font-semibold text-slate-700">Leads To Be Contacted</CardTitle>
-                                    <div className="h-10 w-10 rounded-xl bg-amber-100 flex items-center justify-center">
-                                        <Calendar className="h-5 w-5 text-amber-600" />
-                                    </div>
-                                </div>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="text-4xl font-bold text-amber-600 mb-2">{(statusCategoryData.find((status: any) => status.status == "To Be Contacted")?.count || 0)}</div>
-                                <p className="text-sm ">Scheduled for follow-up</p>
-                            </CardContent>
-                        </Card>
-
-                        {/* Leads Contacted */}
-                        <Card className="border border-sky-200 bg-sky-50/50 rounded-xl shadow-sm overflow-hidden hover:shadow-md transition-shadow">
-                            <div className="h-1.5 bg-sky-300" />
-                            <CardHeader className="pb-3">
-                                <div className="flex items-center justify-between">
-                                    <CardTitle className="text-sm font-semibold text-slate-700">Follow Up Required</CardTitle>
-                                    <div className="h-10 w-10 rounded-xl bg-sky-100 flex items-center justify-center">
-                                        <UserPlus className="h-5 w-5 text-sky-600" />
-                                    </div>
-                                </div>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="text-4xl font-bold text-sky-600 mb-2">{(statusCategoryData.find((status: any) => status.status == "Follow Up")?.count || 0)}</div>
-                                <p className="text-sm ">Successfully reached out</p>
-                            </CardContent>
-                        </Card>
-
-                        {/* Leads Missed Out */}
-                        <Card className="border border-rose-200 bg-rose-50/50 rounded-xl shadow-sm overflow-hidden hover:shadow-md transition-shadow">
-                            <div className="h-1.5 bg-rose-300" />
-                            <CardHeader className="pb-3">
-                                <div className="flex items-center justify-between">
-                                    <CardTitle className="text-sm font-semibold text-slate-700">Leads Missed Out</CardTitle>
-                                    <div className="h-10 w-10 rounded-xl bg-rose-100 flex items-center justify-center">
-                                        <Activity className="h-5 w-5 text-rose-600" />
-                                    </div>
-                                </div>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="text-4xl font-bold text-rose-600 mb-2">{statusCategoryData.find((status: any) => status.status == "Missed")?.count || 0}</div>
-                                <p className="text-sm ">Requires attention</p>
-                            </CardContent>
-                        </Card>
-                    </div>
-                </div>
-
                 {/* Charts Section */}
                 <div className="grid gap-4 md:grid-cols-2">
                     {/* Lead Source Chart */}
-                    <Card className="border border-slate-200 bg-slate-50/80 rounded-xl shadow-sm">
+                    {/* <Card className="border border-slate-200 bg-slate-50/80 rounded-xl shadow-sm">
                         <CardHeader className="bg-blue-50/50 border-b border-blue-100">
                             <div className="flex items-center gap-2">
                                 <div className="h-8 w-8 rounded-lg bg-blue-100 flex items-center justify-center">
@@ -930,10 +702,10 @@ export default function ProspectDashboard() {
                                 ))}
                             </div>
                         </CardContent>
-                    </Card>
+                    </Card> */}
 
                     {/* Status Breakdown Chart */}
-                    <Card className="border border-slate-200 bg-slate-50/80 rounded-xl shadow-sm">
+                    {/* <Card className="border border-slate-200 bg-slate-50/80 rounded-xl shadow-sm">
                         <CardHeader className="bg-purple-50/50 border-b border-purple-100">
                             <div className="flex items-center gap-2">
                                 <div className="h-8 w-8 rounded-lg bg-purple-100 flex items-center justify-center">
@@ -953,84 +725,99 @@ export default function ProspectDashboard() {
                                 </BarChart>
                             </ResponsiveContainer>
                         </CardContent>
-                    </Card>
+                    </Card> */}
                 </div>
 
+                {/* Date-wise Lead Tracking Section */}
+                {/* <div className="space-y-4"> */}
+                {/* <div className="flex items-center gap-2 mb-4">
+                        <div className="h-8 w-8 rounded-lg bg-slate-200 flex items-center justify-center">
+                            <Calendar className="h-4 w-4 text-slate-700" />
+                        </div>
+                        <h2 className="text-xl font-bold text-slate-800">Date-wise Lead Tracking</h2>
+                    </div> */}
+
+                {/* <div className="grid gap-4 md:grid-cols-2"> */}
+                {/* Leads To Be Contacted */}
+
+                {/* Leads Contacted */}
+                {/* <Card className="border border-sky-200 bg-sky-50/50 rounded-xl shadow-sm overflow-hidden hover:shadow-md transition-shadow">
+                            <div className="h-1.5 bg-sky-300" />
+                            <CardHeader className="pb-3">
+                                <div className="flex items-center justify-between">
+                                    <CardTitle className="text-sm font-semibold text-slate-700">Follow Up Required</CardTitle>
+                                    <div className="h-10 w-10 rounded-xl bg-sky-100 flex items-center justify-center">
+                                        <UserPlus className="h-5 w-5 text-sky-600" />
+                                    </div>
+                                </div>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="text-4xl font-bold text-sky-600 mb-2">{(statusCategoryData.find((status: any) => status.status == "Follow Up")?.count || 0)}</div>
+                                <p className="text-sm ">Successfully reached out</p>
+                            </CardContent>
+                        </Card> */}
+
+                {/* Leads Missed Out */}
+                {/* <Card className="border border-rose-200 bg-rose-50/50 rounded-xl shadow-sm overflow-hidden hover:shadow-md transition-shadow">
+                            <div className="h-1.5 bg-rose-300" />
+                            <CardHeader className="pb-3">
+                                <div className="flex items-center justify-between">
+                                    <CardTitle className="text-sm font-semibold text-slate-700">Leads Missed Out</CardTitle>
+                                    <div className="h-10 w-10 rounded-xl bg-rose-100 flex items-center justify-center">
+                                        <Activity className="h-5 w-5 text-rose-600" />
+                                    </div>
+                                </div>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="text-4xl font-bold text-rose-600 mb-2">{statusCategoryData.find((status: any) => status.status == "Missed")?.count || 0}</div>
+                                <p className="text-sm ">Requires attention</p>
+                            </CardContent>
+                        </Card> */}
+                {/* </div> */}
+                {/* </div> */}
 
                 {/* Prospects Tables */}
-                {/* <div className="space-y-6">
+                <div className="space-y-6">
                     <div className="flex items-center gap-2">
                         <div className="h-8 w-8 rounded-lg bg-slate-200 flex items-center justify-center">
                             <Users className="h-4 w-4 text-slate-700" />
                         </div>
-                        <h2 className="text-xl font-bold text-slate-800">Active Prospects</h2>
+                        <h2 className="text-xl font-bold text-slate-800">Active Lead</h2>
                     </div>
-                    <ProspectTable
-                        label="New Prospects"
-                        prospects={prospects.filter((p) => p.status === "New").slice(0, 5)}
-                        statusFilter="New"
-                    />
 
-                    <ProspectTable
-                        label="In Progress Prospects"
-                        prospects={prospects.filter((p) => p.status === "In Progress").slice(0, 5)}
-                        statusFilter="In Progress"
-                    />
+                    <ProspectsTable label="New Opportunity" prospects={prospects.filter((prospect) => prospect.status == "New Opportunity").slice(0, 5)} statusFilter="New Opportunity" />
 
-                    <ProspectTable
-                        label="Relevant but not Now Prospects"
-                        prospects={prospects
-                            .filter((p) => p.status === "Relevant but not Now")
-                            .slice(0, 5)}
-                        statusFilter="Relevant but not Now"
+                    <ProspectsTable label="Proposal Issued" prospects={prospects.filter((prospect) => prospect.status == "Proposal Issued").slice(0, 5)} statusFilter="Proposal Issued" />
+                    <ProspectsTable
+                        label="Closed as Won Prospects"
+                        prospects={prospects.filter((prospect) => prospect.status == "Closed as Won").slice(0, 5)}
+                        statusFilter="Closed as Won Prospects"
                     />
-
-                    <ProspectTable
-                        label="Career Prospects"
-                        prospects={prospects.filter((p) => p.status === "Career").slice(0, 5)}
-                        statusFilter="Career"
+                    <ProspectsTable
+                        label="Closed as Loss Prospects"
+                        prospects={prospects.filter((prospect) => prospect.status == "Closed as Loss").slice(0, 5)}
+                        statusFilter="Closed as Loss Prospects"
                     />
-
-                    <ProspectTable
-                        label="Not Relevant Prospects"
-                        prospects={prospects.filter((p) => p.status === "Not Relevant").slice(0, 5)}
-                        statusFilter="Not Relevant"
-                    />
-                </div> */}
+                </div>
 
                 {/* Segregation Tables */}
-                {/* <div className="space-y-6">
+                <div className="space-y-6">
                     <div className="flex items-center gap-2">
                         <div className="h-8 w-8 rounded-lg bg-slate-200 flex items-center justify-center">
                             <Calendar className="h-4 w-4 text-slate-700" />
                         </div>
                         <h2 className="text-xl font-bold text-slate-800">Lead Segregation</h2>
                     </div>
-
-                    <SegregationTable
-                        label="Leads To Be Contacted"
-                        leads={prospects
-                            .filter(
-                                (prospect) =>
-                                    Array.isArray(prospect.comments) &&
-                                    prospect.comments.length === 0
-                            )
-                            .sort(
-                                (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-                            )
-                            .slice(0, 5)}
-                        statusFilter="To Be Contacted"
-                        dateLabel="Scheduled Date"
-                    />
                     <SegregationTable
                         label="Follow Up"
                         leads={prospects
                             .filter((prospect: any) => {
+                                if (prospect.status != "Proposal Issued") return false; // only consider Proposal Issued prospects`
                                 if (!prospect.nextFollowUp) return false; // no follow-up, skip
 
                                 // get comments by assigned agent
                                 const agentComments = (prospect.comments || [])
-                                    .filter(c => c.authorId === prospect.assignedAgentId)
+                                    .filter(c => c.authorId === prospect.prospect.assignedAgentId)
                                     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
                                 const lastCommentDate = agentComments[0] ? new Date(agentComments[0].createdAt) : null;
@@ -1051,11 +838,12 @@ export default function ProspectDashboard() {
                         label="Leads Missed Out"
                         leads={prospects
                             .filter((prospect: any) => {
+                                if (prospect.status != "Proposal Issued") return false;
                                 if (!prospect.nextFollowUp) return false; // no follow-up, skip
 
                                 // get comments by assigned agent
                                 const agentComments = (prospect.comments || [])
-                                    .filter(c => c.authorId === prospect.assignedAgentId)
+                                    .filter(c => c.authorId === prospect.prospect.assignedAgentId)
                                     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
                                 const lastCommentDate = agentComments[0] ? new Date(agentComments[0].createdAt) : null;
@@ -1072,8 +860,8 @@ export default function ProspectDashboard() {
                         statusFilter="Missed Out"
                         dateLabel="Missed Date"
                     />
-                </div> */}
-            </div >
+                </div>
+            </div>
         </div >
     )
 }

@@ -60,9 +60,11 @@ type MenuItem = {
 };
 
 const allItems: MenuItem[] = [
-  { title: "Dashboard", icon: Home, url: "/" },
-  { title: "Leads", url: "/dashboard/prospects", icon: UserSearch },
-  { title: "Opportunities", url: "/dashboard/opportunities", icon: ClipboardList },
+  { title: "Execution Dashboard", icon: Home, url: "/" },
+  { title: "Leads Dashboard", url: "/dashboard/prospects", icon: UserSearch },
+  { title: "Leads", url: "/dashboard/prospects/tables", icon: UserSearch },
+  { title: "Opportunities Dashboard", url: "/dashboard/opportunities", icon: ClipboardList },
+  { title: "Opportunities", url: "/dashboard/opportunities/tables", icon: ClipboardList },
   { title: "Execution Agent", url: "/agent", icon: UserRoundPen },
   { title: "Advisor Agent", url: "/dashboard/agent", icon: UserRoundPen },
   { title: "Client", url: "/client", icon: UserSearch },
@@ -78,10 +80,10 @@ const allItems: MenuItem[] = [
 
 // Split items into two panels
 const agentPanelItems = allItems.filter(
-  (item) => !["Leads", "Advisor Agent", "Opportunities", "Lead Source", "Settings"].includes(item.title)
+  (item) => !["Leads", "Advisor Agent", "Opportunities Dashboard", "Leads Dashboard", "Opportunities", "Lead Source", "Settings"].includes(item.title)
 );
 const salesPanelItems = allItems.filter((item) =>
-  ["Advisor Agent", "Leads", "Opportunities", "Lead Source"].includes(item.title)
+  ["Advisor Agent", "Leads", "Opportunities", "Opportunities Dashboard", "Leads Dashboard", "Lead Source"].includes(item.title)
 );
 
 const settingsPanelItems = allItems.filter((item) => item.title === "Settings");

@@ -825,7 +825,7 @@ export default function ProspectDashboard() {
                 </div>
 
                 {/* Date-wise Lead Tracking Section */}
-                <div className="space-y-4">
+                {/* <div className="space-y-4">
                     <div className="flex items-center gap-2 mb-4">
                         <div className="h-8 w-8 rounded-lg bg-slate-200 flex items-center justify-center">
                             <Calendar className="h-4 w-4 text-slate-700" />
@@ -834,7 +834,6 @@ export default function ProspectDashboard() {
                     </div>
 
                     <div className="grid gap-4 md:grid-cols-3">
-                        {/* Leads To Be Contacted */}
                         <Card className="border border-amber-200 bg-amber-50/50 rounded-xl shadow-sm overflow-hidden hover:shadow-md transition-shadow">
                             <div className="h-1.5 bg-amber-300" />
                             <CardHeader className="pb-3">
@@ -851,7 +850,6 @@ export default function ProspectDashboard() {
                             </CardContent>
                         </Card>
 
-                        {/* Leads Contacted */}
                         <Card className="border border-sky-200 bg-sky-50/50 rounded-xl shadow-sm overflow-hidden hover:shadow-md transition-shadow">
                             <div className="h-1.5 bg-sky-300" />
                             <CardHeader className="pb-3">
@@ -868,7 +866,6 @@ export default function ProspectDashboard() {
                             </CardContent>
                         </Card>
 
-                        {/* Leads Missed Out */}
                         <Card className="border border-rose-200 bg-rose-50/50 rounded-xl shadow-sm overflow-hidden hover:shadow-md transition-shadow">
                             <div className="h-1.5 bg-rose-300" />
                             <CardHeader className="pb-3">
@@ -885,11 +882,10 @@ export default function ProspectDashboard() {
                             </CardContent>
                         </Card>
                     </div>
-                </div>
+                </div> */}
 
                 {/* Charts Section */}
-                <div className="grid gap-4 md:grid-cols-2">
-                    {/* Lead Source Chart */}
+                {/* <div className="grid gap-4 md:grid-cols-2">
                     <Card className="border border-slate-200 bg-slate-50/80 rounded-xl shadow-sm">
                         <CardHeader className="bg-blue-50/50 border-b border-blue-100">
                             <div className="flex items-center gap-2">
@@ -932,7 +928,6 @@ export default function ProspectDashboard() {
                         </CardContent>
                     </Card>
 
-                    {/* Status Breakdown Chart */}
                     <Card className="border border-slate-200 bg-slate-50/80 rounded-xl shadow-sm">
                         <CardHeader className="bg-purple-50/50 border-b border-purple-100">
                             <div className="flex items-center gap-2">
@@ -954,11 +949,11 @@ export default function ProspectDashboard() {
                             </ResponsiveContainer>
                         </CardContent>
                     </Card>
-                </div>
+                </div> */}
 
 
                 {/* Prospects Tables */}
-                {/* <div className="space-y-6">
+                <div className="space-y-6">
                     <div className="flex items-center gap-2">
                         <div className="h-8 w-8 rounded-lg bg-slate-200 flex items-center justify-center">
                             <Users className="h-4 w-4 text-slate-700" />
@@ -996,10 +991,10 @@ export default function ProspectDashboard() {
                         prospects={prospects.filter((p) => p.status === "Not Relevant").slice(0, 5)}
                         statusFilter="Not Relevant"
                     />
-                </div> */}
+                </div>
 
                 {/* Segregation Tables */}
-                {/* <div className="space-y-6">
+                <div className="space-y-6">
                     <div className="flex items-center gap-2">
                         <div className="h-8 w-8 rounded-lg bg-slate-200 flex items-center justify-center">
                             <Calendar className="h-4 w-4 text-slate-700" />
@@ -1072,7 +1067,7 @@ export default function ProspectDashboard() {
                         statusFilter="Missed Out"
                         dateLabel="Missed Date"
                     />
-                </div> */}
+                </div>
             </div >
         </div >
     )

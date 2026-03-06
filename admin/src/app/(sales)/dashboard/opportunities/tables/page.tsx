@@ -30,6 +30,7 @@ import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 
 
 function getStatusBadge(status: string) {
@@ -66,6 +67,8 @@ const formatDate = (dateString: string | undefined) => {
 }
 
 export function ProspectsTable({ label, prospects, statusFilter, assignedId }: { label: string; prospects: any[]; statusFilter: string, assignedId?: string }) {
+
+    const router = useRouter()
 
     const labelColor = (() => {
         const l = label.toLowerCase()
@@ -146,7 +149,9 @@ export function ProspectsTable({ label, prospects, statusFilter, assignedId }: {
                                     </thead>
                                     <tbody className="divide-y divide-slate-100">
                                         {prospects.map((prospect) => (
-                                            <tr key={prospect.id} className="hover:bg-slate-50/50 transition-colors">
+                                            <tr key={prospect.id} className="hover:bg-slate-50/50 transition-colors cursor-pointer"
+                                                onClick={() => router.push(`/dashboard/prospects/${prospect?.id}`)}
+                                            >
                                                 <td className="py-3 px-4">
                                                     <div>
                                                         <p className="text-sm font-medium text-slate-800">{prospect.name}</p>
@@ -253,6 +258,7 @@ function SegregationTable({
     statusFilter: string
     dateLabel: string
 }) {
+    const router = useRouter()
     const labelColor = (() => {
         const l = label.toLowerCase()
         if (l.includes("follow up") && !l.includes("missed")) return "text-sky-600"
@@ -336,7 +342,8 @@ function SegregationTable({
                                         {leads.map((lead) => (
                                             <tr
                                                 key={lead.id}
-                                                className="hover:bg-slate-50/50 transition-colors"
+                                                className="hover:bg-slate-50/50 transition-colors cursor-pointer"
+                                                onClick={() => router.push(`/dashboard/prospects/${lead?.id}`)}
                                             >
                                                 <td className="py-3 px-4">
                                                     <div>

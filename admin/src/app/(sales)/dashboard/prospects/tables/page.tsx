@@ -87,6 +87,7 @@ const formatDate = (dateString: string | undefined) => {
 
 export function ProspectTable({ label, prospects, statusFilter, assignedId }: { label: string; prospects: any[]; statusFilter: string; assignedId?: string }) {
 
+    const router = useRouter()
     const labelColor = (() => {
         const l = label.toLowerCase()
         if (l.includes("progress")) return "text-purple-600"
@@ -164,9 +165,10 @@ export function ProspectTable({ label, prospects, statusFilter, assignedId }: { 
                                             </th>
                                         </tr>
                                     </thead>
-                                    <tbody className="divide-y divide-slate-100">
+                                    <tbody className="divide-y divide-slate-100 ">
                                         {prospects.map((prospect) => (
-                                            <tr key={prospect.id} className="hover:bg-slate-50/50 transition-colors">
+                                            <tr key={prospect.id} className="hover:bg-slate-50/50 transition-colors cursor-pointer"
+                                                onClick={() => router.push(`/dashboard/prospects/${prospect.id}`)} >
                                                 <td className="py-3 px-4">
                                                     <div>
                                                         <p className="text-sm font-medium text-slate-800">{prospect.name}</p>
@@ -273,6 +275,7 @@ function SegregationTable({
     statusFilter: string
     dateLabel: string
 }) {
+    const router = useRouter()
     const labelColor = (() => {
         const l = label.toLowerCase()
         if (l.includes("contacted") && !l.includes("missed")) return "text-sky-600"
@@ -357,7 +360,8 @@ function SegregationTable({
                                         {leads.map((lead) => (
                                             <tr
                                                 key={lead.id}
-                                                className="hover:bg-slate-50/50 transition-colors"
+                                                className="hover:bg-slate-50/50 transition-colors cursor-pointer"
+                                                onClick={() => router.push(`/dashboard/prospects/${lead?.id}`)}
                                             >
                                                 <td className="py-3 px-4">
                                                     <div>

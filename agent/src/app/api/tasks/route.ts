@@ -34,15 +34,6 @@ export async function GET(req: NextRequest) {
     const retainershipTasks = searchParams.get("retainershipTasks");
     if (categoryId) {
       where = { categoryId };
-    } else if (assignedToId) {
-      where = {
-        assignedToId: agent.id,
-        AND: [
-          {
-            OR: [{ category: null }, { category: { status: "approved" } }],
-          },
-        ],
-      };
     } else if (trigger === "true") {
       where = {
         assignedToId: agent.id,
@@ -70,11 +61,11 @@ export async function GET(req: NextRequest) {
       where = {
         assignedToId: agent.id,
         OR: [
-          // {
-          //   retainershipId: {
-          //     not: null,
-          //   },
-          // },
+          {
+            retainershipId: {
+              not: null,
+            },
+          },
           {
             legislationId: {
               not: null,
@@ -110,7 +101,6 @@ export async function GET(req: NextRequest) {
       where.priority = priority;
     }
 
-    console.log(where);
     // Fetch all tasks (no pagination)
     const tasks = await prisma.task.findMany({
       where: {

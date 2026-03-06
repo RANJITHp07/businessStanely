@@ -969,8 +969,114 @@ export default function TaskDetails() {
                     </SelectContent>
                   </Select>
                 </div>
+                <div className="space-y-2 relative">
+                  <div className="flex items-center gap-3">
+                    <span className="font-medium">
+                      {task.assignedTo?.name || "Unassigned"}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowAssignSearch(!showAssignSearch)}
+                    >
+                      <Users className="h-4 w-4 mr-2" />
+                      Reassign
+                    </Button>
+                  </div>
+
+                  {showAssignSearch && (
+                    <div className="mt-3 p-3 border rounded-lg bg-gray-50 absolute w-96">
+                      <div className="relative mb-3">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                        <Input
+                          placeholder="Search team members..."
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                          className="pl-10"
+                        />
+                      </div>
+                      <div className="space-y-2 max-h-40 overflow-y-auto">
+                        {filteredMembers.map((member) => (
+                          <div
+                            key={member.id}
+                            className="flex items-center justify-between p-2 hover:bg-white rounded cursor-pointer"
+                            onClick={() => assignTask(member.id)}
+                          >
+                            <div className="flex items-center gap-2">
+                              <Avatar className="h-6 w-6">
+                                {member.photo ? (
+                                  <AvatarImage src={member.photo} />
+                                ) : null}
+                                <AvatarFallback className="text-xs">
+                                  {member.name
+                                    .split(" ")
+                                    .map((n) => n[0])
+                                    .join("")}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div>
+                                <div className="text-sm font-medium">
+                                  {member.name}
+                                </div>
+                                {/* No role field, so nothing here */}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
                 <div className="text-xs text-muted-foreground md:ml-auto">
                   Last updated: {formatDateTime(task.updatedAt)}
+                </div>
+              </div>
+              <div className="flex items-center gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="status">Status</Label>
+                  <Select
+                    value={task.status}
+                    onValueChange={handleStatusChange}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="To Do">To Do</SelectItem>
+                      <SelectItem value="In Progress">
+                        In Progress
+                      </SelectItem>
+                      <SelectItem value="Hold">Hold</SelectItem>
+                      <SelectItem value="Abandoned">Abandoned</SelectItem>
+                      <SelectItem value="Completed">Completed</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <div className="space-y-2 items-center w-96">
+                    <Label htmlFor="progress">
+                      Progress ({task.progress}%)
+                    </Label>
+                    <Input
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      min="0"
+                      max="100"
+                      value={progressInput || "0"}
+                      placeholder=""
+                      onChange={handleProgressInputChange}
+                      onBlur={handleProgressInputBlur}
+                      onKeyDown={handleProgressInputKeyDown}
+                      className="w-full"
+                    />
+                    {/* <div className="w-96 flex flex-col gap-2">
+                      <Label htmlFor="progress">
+                        Progress ({task.progress}%)
+                      </Label>
+                      <Progress value={task.progress} className="w-ful" />
+                    </div> */}
+                  </div>
                 </div>
               </div>
             </div>
@@ -1008,118 +1114,6 @@ export default function TaskDetails() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2 space-y-6">
               {/* Task Management */}
-              <Card>
-                <CardHeader>
-                  <CardTitle>Task Management</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  {/* Status and Progress */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="status">Status</Label>
-                      <Select
-                        value={task.status}
-                        onValueChange={handleStatusChange}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="To Do">To Do</SelectItem>
-                          <SelectItem value="In Progress">
-                            In Progress
-                          </SelectItem>
-                          <SelectItem value="Hold">Hold</SelectItem>
-                          <SelectItem value="Abandoned">Abandoned</SelectItem>
-                          <SelectItem value="Completed">Completed</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="progress">
-                        Progress ({task.progress}%)
-                      </Label>
-                      <div className="space-y-2">
-                        <Progress value={task.progress} className="w-full" />
-                        <Input
-                          type="text"
-                          inputMode="numeric"
-                          pattern="[0-9]*"
-                          min="0"
-                          max="100"
-                          value={progressInput}
-                          placeholder=""
-                          onChange={handleProgressInputChange}
-                          onBlur={handleProgressInputBlur}
-                          onKeyDown={handleProgressInputKeyDown}
-                          className="w-full"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                  {/* Assignment */}
-                  <div className="space-y-2">
-                    <Label>Ownership to</Label>
-                    <div className="flex items-center gap-3">
-                      <span className="font-medium">
-                        {task.assignedTo?.name || "Unassigned"}
-                      </span>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setShowAssignSearch(!showAssignSearch)}
-                      >
-                        <Users className="h-4 w-4 mr-2" />
-                        Reassign
-                      </Button>
-                    </div>
-
-                    {showAssignSearch && (
-                      <div className="mt-3 p-3 border rounded-lg bg-gray-50">
-                        <div className="relative mb-3">
-                          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                          <Input
-                            placeholder="Search team members..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="pl-10"
-                          />
-                        </div>
-                        <div className="space-y-2 max-h-40 overflow-y-auto">
-                          {filteredMembers.map((member) => (
-                            <div
-                              key={member.id}
-                              className="flex items-center justify-between p-2 hover:bg-white rounded cursor-pointer"
-                              onClick={() => assignTask(member.id)}
-                            >
-                              <div className="flex items-center gap-2">
-                                <Avatar className="h-6 w-6">
-                                  {member.photo ? (
-                                    <AvatarImage src={member.photo} />
-                                  ) : null}
-                                  <AvatarFallback className="text-xs">
-                                    {member.name
-                                      .split(" ")
-                                      .map((n) => n[0])
-                                      .join("")}
-                                  </AvatarFallback>
-                                </Avatar>
-                                <div>
-                                  <div className="text-sm font-medium">
-                                    {member.name}
-                                  </div>
-                                  {/* No role field, so nothing here */}
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-
               <Card>
                 <CardHeader>
                   <CardTitle>Task Information</CardTitle>

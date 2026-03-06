@@ -1789,7 +1789,7 @@ export default function TaskForm({ id }: TaskFormProps) {
                             ?.agentType
                         }
                       </p>
-                      {dueDate && (
+                      {dueDate && formData.active && (
                         <p className="text-sm text-green-600">
                           Due: {format(dueDate, "EEEE, MMMM do, yyyy")}
                         </p>

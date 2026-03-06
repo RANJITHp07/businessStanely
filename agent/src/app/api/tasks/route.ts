@@ -13,6 +13,7 @@ interface TaskWithAdditionalFields {
 export async function GET(req: NextRequest) {
   try {
     const agent = await getCurrentAgent(req);
+    console.log(agent);
 
     if (!agent) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -95,12 +96,11 @@ export async function GET(req: NextRequest) {
           {
             OR: [{ category: null }, { category: { status: "approved" } }],
           },
-          // {
-          //   legislationId: {
-          //     equals: null,
-          //     isSet: true,
-          //   },
-          // },
+          {
+            legislationId: {
+              equals: null,
+            },
+          },
         ],
       };
     }
@@ -115,7 +115,10 @@ export async function GET(req: NextRequest) {
 
     // Fetch all tasks (no pagination)
     const tasks = await prisma.task.findMany({
-      where: { ...where, active: true },
+      where: {
+        ...where,
+        ...(trigger === "true" ? { active: true } : { active: false }),
+      },
       include: {
         legislation: true,
         client: {

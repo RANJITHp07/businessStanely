@@ -18,81 +18,77 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Get URL search params for filtering
     const { searchParams } = new URL(req.url);
 
     const status = searchParams.get("status");
     const priority = searchParams.get("priority");
     const categoryId = searchParams.get("categoryId");
     const trigger = searchParams.get("trigger");
-
-    // If categoryId is present, return all tasks for that category (regardless of assignment)
-    // If assignedToId is present, return all tasks for that agent
-    // Otherwise, only show tasks Ownership to this agent
-    let where: Prisma.TaskWhereInput;
-    const assignedToId = searchParams.get("assignedToId");
     const retainershipTasks = searchParams.get("retainershipTasks");
+
+    let where: Prisma.TaskWhereInput = {};
+
+    // CATEGORY FILTER
     if (categoryId) {
       where = { categoryId };
-    } else if (trigger === "true") {
+    }
+
+    // TRIGGER TASKS
+    else if (trigger === "true") {
       where = {
         assignedToId: agent.id,
         active: false,
-        OR: [
-          {
-            retainershipId: {
-              not: null,
-            },
-          },
-          {
-            legislationId: {
-              not: null,
-            },
-          },
-        ],
+        legislationId: { not: null },
 
-        AND: [
-          {
-            OR: [{ category: null }, { category: { status: "approved" } }],
-          },
-        ],
-      };
-    } else if (retainershipTasks === "true") {
-      where = {
-        assignedToId: agent.id,
-        OR: [
-          {
-            retainershipId: {
-              not: null,
-            },
-          },
-          {
-            legislationId: {
-              not: null,
-            },
-          },
-        ],
-
-        AND: [
-          {
-            OR: [{ category: null }, { category: { status: "approved" } }],
-          },
-        ],
-      };
-    } else {
-      where = {
-        assignedToId: agent.id,
-        legislationId: {
-          equals: null,
-        },
-        AND: [
-          {
-            OR: [{ category: null }, { category: { status: "approved" } }],
-          },
-        ],
+        // OR: [
+        //   { retainershipId: { not: null } },
+        //   { legislationId: { not: null } },
+        // ],
+        // AND: [
+        //   {
+        //     OR: [
+        //       { categoryId: null },
+        //       { category: { is: { status: "approved" } } },
+        //     ],
+        //   },
+        // ],
       };
     }
 
+    // RETAINERSHIP TASKS
+    else if (retainershipTasks === "true") {
+      where = {
+        assignedToId: agent.id,
+        legislationId: { not: null },
+        // OR: [
+        //   { retainershipId: { not: null } },
+        //   { legislationId: { not: null } },
+        // ],
+        // AND: [
+        //   {
+        //     OR: [
+        //       { categoryId: null },
+        //       { category: { is: { status: "approved" } } },
+        //     ],
+        //   },
+        // ],
+      };
+    }
+
+    // DEFAULT TASKS
+    else {
+      where = {
+        assignedToId: agent.id,
+        legislation: null,
+        // category: {
+        //   is: {
+        //     status: "approved",
+        //   },
+        // },
+      };
+    }
+
+    // OPTIONAL FILTERS
     if (status) {
       where.status = status;
     }
@@ -101,7 +97,6 @@ export async function GET(req: NextRequest) {
       where.priority = priority;
     }
 
-    // Fetch all tasks (no pagination)
     const tasks = await prisma.task.findMany({
       where: {
         ...where,
@@ -137,7 +132,6 @@ export async function GET(req: NextRequest) {
       },
     });
 
-    // Format tasks for frontend
     const formattedTasks = tasks.map((task) => ({
       id: task.id,
       title: task.title,
@@ -169,8 +163,10 @@ export async function GET(req: NextRequest) {
       recentComments: task.comments,
       followUpDuration: task.followUpDuration,
       statusCheckDuration: task.statusCheckDuration,
-      legislation: task?.legislation,
+      legislation: task.legislation,
     }));
+
+    console.log(formattedTasks.length, tasks.length);
 
     return NextResponse.json({
       tasks: formattedTasks,

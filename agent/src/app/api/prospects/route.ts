@@ -40,14 +40,14 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    // 1️⃣ Get current agent
     const agent = await getCurrentAgent(req);
+
     if (!agent) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // 2️⃣ Parse request body
     const body = await req.json();
+
     const {
       name,
       email,
@@ -69,7 +69,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Name is required" }, { status: 400 });
     }
 
-    // 3️⃣ Validate role-based assignment
     if (
       (agent.agentType === "Client Advisor" ||
         agent.agentType === "Client Manager") &&
@@ -83,68 +82,84 @@ export async function POST(req: NextRequest) {
 
     let finalAssignedAgentId = assignedAgentId;
 
-    // 4️⃣ Auto-assign using batch round-robin
     if (!assignedAgentId) {
-      // Fetch assignment setting
       const assignmentSetting =
         await prisma.prospectAssignmentSetting.findFirst();
       const prospectsPerAgent = assignmentSetting?.prospectsPerAgent ?? 1;
 
-      // Eligible agents
-      const eligibleAgents = await prisma.agent.findMany({
-        where: {
-          agentType: { in: ["Client Manager", "Client Advisor"] },
-          status: "active",
-          autoAssign: true,
-          id: { not: agent.id },
-        },
-        orderBy: { createdAt: "asc" },
-        select: { id: true },
+      // 1️⃣ Fetch clientAdvisorIds linked to this Lead Maker
+      const leadMaker = await prisma.agent.findUnique({
+        where: { id: agent.id },
+        select: { clientAdvisorIds: true },
       });
 
-      if (eligibleAgents.length > 0) {
-        // Get last prospect assigned to eligible agents
-        const lastProspect = await prisma.prospect.findFirst({
+      let eligibleAgents;
+
+      if (leadMaker?.clientAdvisorIds?.length) {
+        // 2️⃣ Use mapped advisors
+        eligibleAgents = await prisma.agent.findMany({
           where: {
-            assignedAgentId: { in: eligibleAgents.map((a) => a.id) },
+            id: { in: leadMaker.clientAdvisorIds },
+            status: "active",
+            autoAssign: true,
           },
+          orderBy: { createdAt: "asc" },
+          select: { id: true },
+        });
+      }
+
+      // 3️⃣ Fallback: pick from all active client advisors
+      if (!eligibleAgents?.length) {
+        eligibleAgents = await prisma.agent.findMany({
+          where: {
+            agentType: "Client Advisor",
+            status: "active",
+            autoAssign: true,
+          },
+          orderBy: { createdAt: "asc" },
+          select: { id: true },
+        });
+      }
+
+      if (!eligibleAgents.length) {
+        return NextResponse.json(
+          { error: "No eligible client advisors available for assignment." },
+          { status: 400 },
+        );
+      }
+
+      // 4️⃣ Round-robin assignment
+      const lastProspect = await prisma.prospect.findFirst({
+        where: { assignedAgentId: { in: eligibleAgents.map((a) => a.id) } },
+        orderBy: { createdAt: "desc" },
+        select: { assignedAgentId: true },
+      });
+
+      if (!lastProspect) {
+        finalAssignedAgentId = eligibleAgents[0].id;
+      } else {
+        const lastBatch = await prisma.prospect.findMany({
+          where: { assignedAgentId: { in: eligibleAgents.map((a) => a.id) } },
           orderBy: { createdAt: "desc" },
+          take: prospectsPerAgent,
           select: { assignedAgentId: true },
         });
 
-        if (!lastProspect) {
-          // No previous prospects → assign first agent
-          finalAssignedAgentId = eligibleAgents[0].id;
+        let consecutiveCount = 0;
+        for (const p of lastBatch) {
+          if (p.assignedAgentId === lastProspect.assignedAgentId)
+            consecutiveCount++;
+          else break;
+        }
+
+        if (consecutiveCount < prospectsPerAgent) {
+          finalAssignedAgentId = lastProspect.assignedAgentId;
         } else {
-          // Get last batch of assignments to check sequence
-          const lastBatch = await prisma.prospect.findMany({
-            where: {
-              assignedAgentId: { in: eligibleAgents.map((a) => a.id) },
-            },
-            orderBy: { createdAt: "desc" },
-            take: prospectsPerAgent,
-            select: { assignedAgentId: true },
-          });
-
-          // Count consecutive assignments of last agent
-          let consecutiveCount = 0;
-          for (const p of lastBatch) {
-            if (p.assignedAgentId === lastProspect.assignedAgentId)
-              consecutiveCount++;
-            else break; // stop when sequence breaks
-          }
-
-          if (consecutiveCount < prospectsPerAgent) {
-            // Keep same agent
-            finalAssignedAgentId = lastProspect.assignedAgentId;
-          } else {
-            // Move to next agent
-            const lastIndex = eligibleAgents.findIndex(
-              (a) => a.id === lastProspect.assignedAgentId,
-            );
-            const nextIndex = (lastIndex + 1) % eligibleAgents.length;
-            finalAssignedAgentId = eligibleAgents[nextIndex].id;
-          }
+          const lastIndex = eligibleAgents.findIndex(
+            (a) => a.id === lastProspect.assignedAgentId,
+          );
+          const nextIndex = (lastIndex + 1) % eligibleAgents.length;
+          finalAssignedAgentId = eligibleAgents[nextIndex].id;
         }
       }
     }
@@ -158,26 +173,14 @@ export async function POST(req: NextRequest) {
         phoneNumber,
         description,
         address,
-        ...(leadSourceId && {
-          leadSource: {
-            connect: {
-              id: leadSourceId,
-            },
-          },
-        }),
+        ...(leadSourceId && { leadSource: { connect: { id: leadSourceId } } }),
         status: status || "New",
         notes,
         nextFollowUp: nextFollowUp ? new Date(nextFollowUp) : undefined,
-        assignedAgent: {
-          connect: { id: finalAssignedAgentId },
-        },
-        createdByAgent: {
-          connect: { id: agent.id },
-        },
+        assignedAgent: { connect: { id: finalAssignedAgentId } },
+        createdByAgent: { connect: { id: agent.id } },
         amount: typeof amount === "number" ? amount : undefined,
-        ...(service && {
-          service,
-        }),
+        ...(service && { service }),
       },
       include: { createdByAgent: true, assignedAgent: true },
     });

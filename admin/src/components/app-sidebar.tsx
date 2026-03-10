@@ -80,10 +80,10 @@ const allItems: MenuItem[] = [
 
 // Split items into two panels
 const agentPanelItems = allItems.filter(
-  (item) => !["Leads", "Advisor Agent", "Opportunities Dashboard", "Leads Dashboard", "Opportunities", "Lead Source", "Settings"].includes(item.title)
+  (item) => !["Leads", "Advisor Agent", "Opportunities Dashboard", "Client Advisor", "Leads Dashboard", "Opportunities", "Lead Source", "Settings"].includes(item.title)
 );
 const salesPanelItems = allItems.filter((item) =>
-  ["Advisor Agent", "Leads", "Opportunities", "Opportunities Dashboard", "Leads Dashboard", "Lead Source"].includes(item.title)
+  ["Advisor Agent", "Leads", "Opportunities", "Opportunities Dashboard", "Client Advisor", "Leads Dashboard", "Lead Source"].includes(item.title)
 );
 
 const settingsPanelItems = allItems.filter((item) => item.title === "Settings");

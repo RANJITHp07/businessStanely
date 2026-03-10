@@ -9,7 +9,7 @@ model Prospect {
   address        String?
   status        String   @default("New") // e.g., New, Contacted, Qualified, Lost, Converted
   notes         String?
-  nextFollowUp  DateTime?
+  nextFollowUp  DateTime @default(now())
   prevFollowup  DateTime?
   assignedAgentId String? @db.ObjectId
   assignedAgent   Agent?  @relation("AgentAssignedProspects", fields: [assignedAgentId], references: [id])
@@ -141,6 +141,8 @@ model Agent {
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
 
+  clientAdvisorIds String[] @db.ObjectId
+
   // OTP fields for password reset
   resetOtp      String?
   otpExpiry     DateTime?
@@ -262,6 +264,7 @@ model Task {
   // Per-status progress tracking
   statusProgressMap Json?
 }
+
 
 model Legislation {
   id              String   @id @default(auto()) @map("_id") @db.ObjectId

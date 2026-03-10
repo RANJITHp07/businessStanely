@@ -143,6 +143,8 @@ model Agent {
   otpExpiry     DateTime?
   isOtpVerified Boolean   @default(false)
 
+  clientAdvisorIds String[] @db.ObjectId
+
   // Team Management (multiple superiors via join table)
   // For Advisor Agent, agentType can be: "Lead Maker", "Client Advisor", "Client Manager"
   // For Execution Agent, agentType can be: "CEO", "Partner", "Manager", etc. (existing types)

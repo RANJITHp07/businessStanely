@@ -39,6 +39,7 @@
     "next": "^15.3.8",
     "node-cron": "^4.2.1",
     "nodemailer": "^7.0.5",
+    "radix-ui": "^1.4.3",
     "react": "^19.0.0",
     "react-day-picker": "^9.7.0",
     "react-dom": "^19.0.0",

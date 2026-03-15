@@ -35,6 +35,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
         "/timesheet",
         "/task",
         "/setting",
+        "/my-diary",
       ];
 
       // Check if current route is protected
@@ -67,6 +68,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
           "/timesheet",
           "/task",
           "/setting",
+          "/my-diary",
         ];
         const isProtectedRoute = protectedRoutes.some((route) =>
           currentPath.startsWith(route)
@@ -91,8 +93,8 @@ export function AuthGuard({ children }: AuthGuardProps) {
       </div>
     );
   }
-  
-  
+
+
   // Only render children if authenticated (for protected routes)
   if (!isAuthenticated) {
     return null;

@@ -65,6 +65,8 @@ model User {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   comments    Comment[] @relation("UserComments")
+  diaryEntries DiaryEntry[] @relation("UserDiaryEntries")
+  createdQuoteRequests QuoteRequest[] @relation("UserCreatedQuoteRequests")
 
   // Task Category relations
   createdCategories  TaskCategory[] @relation("UserCreatedCategories")
@@ -121,6 +123,18 @@ model Client {
   retainerships Retainership[]
 }
 
+model DiaryEntry {
+  id               String   @id @default(auto()) @map("_id") @db.ObjectId
+  title            String
+  content          String
+  createdByUserId  String?  @db.ObjectId
+  createdByUser    User?    @relation("UserDiaryEntries", fields: [createdByUserId], references: [id])
+  createdByAgentId String?  @db.ObjectId
+  createdByAgent   Agent?   @relation("AgentDiaryEntries", fields: [createdByAgentId], references: [id])
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
 model Agent {
   id                   String    @id @default(auto()) @map("_id") @db.ObjectId
   name                 String
@@ -157,6 +171,7 @@ model Agent {
   assignedTasks Task[]    @relation("AssignedTasks")
   ownerShipTasks Task[]    @relation("OwnerShipTasks")
   comments      Comment[] @relation("CommentAuthor")
+  diaryEntries  DiaryEntry[] @relation("AgentDiaryEntries")
   timeLogs      TimeLog[] @relation("TimeLogAgent")
 
   // TaskCategory agent-created relation
@@ -172,11 +187,35 @@ model Agent {
   assignedProspects Prospect[] @relation("AgentAssignedProspects")
   // Prospects created by this agent
   createdProspects Prospect[] @relation("AgentCreatedProspects")
+  createdQuoteRequests QuoteRequest[] @relation("AgentCreatedQuoteRequests")
+  assignedQuoteRequests QuoteRequest[] @relation("AgentAssignedQuoteRequests")
 
   // Service Records relation
   serviceRecords ServiceRecord[] @relation("AgentServiceRecords")
   loginHistory   LoginHistory[]
   timesheetEntries TimesheetEntry[] @relation("TimesheetEntries")
+}
+
+model QuoteRequest {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+  title String
+  description String?
+  status String @default("Requested") // Requested | Accepted | Rejected
+
+  // Creator can be either admin user or agent.
+  createdByUserId String? @db.ObjectId
+  createdByUser User? @relation("UserCreatedQuoteRequests", fields: [createdByUserId], references: [id])
+
+  createdByAgentId String? @db.ObjectId
+  createdByAgent Agent? @relation("AgentCreatedQuoteRequests", fields: [createdByAgentId], references: [id])
+
+  assignedAgentId String @db.ObjectId
+  assignedAgent Agent @relation("AgentAssignedQuoteRequests", fields: [assignedAgentId], references: [id])
+
+  acceptedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model LoginHistory {

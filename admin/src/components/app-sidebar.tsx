@@ -13,7 +13,8 @@ import {
   ClipboardList,
   CircleFadingPlusIcon,
   ChartLine,
-  Calendar
+  Calendar,
+  FileText
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -72,10 +73,12 @@ const allItems: MenuItem[] = [
   { title: "Timesheet", url: "/timesheet", icon: Calendar },
   { title: "Services", url: "/task_category", icon: Boxes },
   { title: "Retainership", url: "/retainership", icon: Boxes },
+  { title: "Request Quote", url: "/request-quote", icon: FileText },
   { title: "Lead Source", url: "/lead_source", icon: CircleFadingPlusIcon },
   { title: "Admin", url: "/admin", icon: ShieldUser },
   { title: "Settings", url: "/setting", icon: Settings },
   { title: "Deleted Agent", url: "/deleted-agent", icon: UserRoundPen },
+  { title: "My Diary", url: "/my-diary", icon: UserRoundPen },
 ];
 
 // Split items into two panels
@@ -86,7 +89,7 @@ const salesPanelItems = allItems.filter((item) =>
   ["Advisor Agent", "Leads", "Opportunities", "Opportunities Dashboard", "Client Advisor", "Leads Dashboard", "Lead Source"].includes(item.title)
 );
 
-const settingsPanelItems = allItems.filter((item) => item.title === "Settings");
+const settingsPanelItems = allItems.filter((item) => item.title === "Settings" || item.title === "My Diary");
 
 export function AppSidebar() {
   const pathname = usePathname();

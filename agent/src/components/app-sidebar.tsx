@@ -72,9 +72,19 @@ const salesItems = [
     icon: FileText,
   },
   {
+    title: "Request Quote",
+    url: "/request-quote",
+    icon: FileText,
+  },
+  {
     title: "Settings",
     url: "/setting",
     icon: Settings,
+  },
+  {
+    title: "My Diary",
+    url: "/my-diary",
+    icon: UserRoundPen,
   },
 ];
 
@@ -121,9 +131,19 @@ const dashboardItems = [
     icon: Boxes,
   },
   {
+    title: "Request Quote",
+    url: "/request-quote",
+    icon: FileText,
+  },
+  {
     title: "Settings",
     url: "/setting",
     icon: Settings,
+  },
+  {
+    title: "My Diary",
+    url: "/my-diary",
+    icon: UserRoundPen,
   },
 ];
 

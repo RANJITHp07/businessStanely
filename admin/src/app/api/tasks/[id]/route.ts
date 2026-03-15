@@ -123,7 +123,9 @@ export async function PUT(
     }
     if (body.assignedToId) {
       data.assignedTo = { connect: { id: body.assignedToId } };
-      data.ownerShipBy = { connect: { id: body.assignedToId } };
+    }
+    if (body.ownerShipById) {
+      data.ownerShipBy = { connect: { id: body.ownerShipById } };
     }
     if (body.categoryId) {
       data.category = { connect: { id: body.categoryId } };
@@ -136,9 +138,9 @@ export async function PUT(
     if (body.status === "Hold" && currentTask.dueDate) {
       data.holdDate = new Date();
     }
-    if ((body.status = "Completed")) {
+    if (body.status === "Completed") {
       data.lastCompletedDate = new Date();
-    } else {
+    } else if (body.status !== undefined) {
       data.lastCompletedDate = null;
     }
     const updatedTask = await prisma.task.update({

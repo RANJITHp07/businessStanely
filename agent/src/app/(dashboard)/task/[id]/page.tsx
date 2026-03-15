@@ -1332,6 +1332,17 @@ export default function TaskDetails() {
                       </div>
                     </div>
                   }
+                  {task?.triggerDate &&
+                    < div className="flex items-center gap-2">
+                      <Calendar className="h-4 w-4 text-muted-foreground" />
+                      <div>
+                        <div className="text-sm font-medium">{task.active ? "Next" : ""} Trigger Date</div>
+                        <div className="text-sm text-muted-foreground">
+                          {formatDateTime(task?.triggerDate, true)}
+                        </div>
+                      </div>
+                    </div>
+                  }
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-gray-600">
                       Days Remaining

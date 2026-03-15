@@ -46,7 +46,8 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 
 export default function TaskDetails() {
-  const [isReassiging, setIsReassigning] = useState(false)
+  const [isReassigning, setIsReassigning] = useState(false);
+  const [isTransferringOwnership, setIsTransferringOwnership] = useState(false);
   const [taskData, setTaskData] = useState<Task | null>(null);
   const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -66,9 +67,12 @@ export default function TaskDetails() {
   const [totalHours, setTotalHours] = useState<number>(0);
   const [timeLogsLoading, setTimeLogsLoading] = useState(true);
   const [agentSearchQuery, setAgentSearchQuery] = useState("");
+  const [agentOwnershipQuery, setAgentOwnershipQuery] = useState("");
   const [showAgentSuggestions, setShowAgentSuggestions] = useState(false);
+  const [showOwnershipSuggestions, setShowOwnershipSuggestions] = useState(false);
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
-  const [duration, setDuration] = useState(0)
+  const [selectedOwnershipAgentId, setSelectedOwnershipAgentId] = useState<string | null>(null);
+  const [duration, setDuration] = useState(0);
   const [progressInput, setProgressInput] = useState<string>("");
 
   // const [isFromRetainership, setIsFromRetainership] = useState(false);
@@ -83,6 +87,16 @@ export default function TaskDetails() {
       );
     });
   }, [agents, agentSearchQuery]);
+
+  const filteredOwnershipAgents = useMemo(() => {
+    if (!Array.isArray(agents)) return [];
+    return agents.filter((agent) => {
+      return (
+        agent.name.toLowerCase().includes(agentOwnershipQuery.toLowerCase()) ||
+        agent.agentType.toLowerCase().includes(agentOwnershipQuery.toLowerCase())
+      );
+    });
+  }, [agents, agentOwnershipQuery]);
   // Load user data on mount
   useEffect(() => {
     const loadUserData = () => {
@@ -190,11 +204,19 @@ export default function TaskDetails() {
 
   // Set initial agent values when task data loads
   useEffect(() => {
+    if (!taskData) return;
+
     if (taskData?.assignedTo) {
       setAgentSearchQuery(taskData.assignedTo.name);
       setSelectedAgentId(taskData.assignedTo.id);
     }
-  }, [taskData?.assignedTo]);
+
+    const ownershipAgent = (taskData as Task & { ownerShipBy?: Agent }).ownerShipBy;
+    if (ownershipAgent) {
+      setAgentOwnershipQuery(ownershipAgent.name);
+      setSelectedOwnershipAgentId(ownershipAgent.id);
+    }
+  }, [taskData]);
 
   const getPriorityBadge = (priority: string) => {
     const colors = {
@@ -466,7 +488,7 @@ export default function TaskDetails() {
     if (!id) return;
 
     try {
-      setIsReassigning(true)
+      setIsReassigning(true);
       const response = await fetch(`/api/tasks/${id}`, {
         method: "PUT",
         headers: {
@@ -485,7 +507,7 @@ export default function TaskDetails() {
           setTaskData(data.task);
         }
         // Update the search query to show the selected agent's name
-        const selectedAgent = agents.find(a => a.id === agentId);
+        const selectedAgent = agents.find((a) => a.id === agentId);
         if (selectedAgent) {
           setAgentSearchQuery(selectedAgent.name);
         }
@@ -494,8 +516,47 @@ export default function TaskDetails() {
         console.error("Failed to reassign task");
       }
     } catch (error) {
+      console.error("Error reassigning task:", error);
     } finally {
-      setIsReassigning(false)
+      setIsReassigning(false);
+    }
+  };
+
+  const handleTransferOwnership = async (agentId: string) => {
+    if (!id) return;
+
+    try {
+      setIsTransferringOwnership(true);
+      const response = await fetch(`/api/tasks/${id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          ownerShipById: agentId,
+        }),
+      });
+
+      if (response.ok) {
+        const taskResponse = await fetch(`/api/tasks/${id}`);
+        if (taskResponse.ok) {
+          const data = await taskResponse.json();
+          setTaskData(data.task);
+        }
+
+        const selectedAgent = agents.find((a) => a.id === agentId);
+        if (selectedAgent) {
+          setAgentOwnershipQuery(selectedAgent.name);
+          setSelectedOwnershipAgentId(selectedAgent.id);
+        }
+        setShowOwnershipSuggestions(false);
+      } else {
+        console.error("Failed to transfer ownership");
+      }
+    } catch (error) {
+      console.error("Error transferring ownership:", error);
+    } finally {
+      setIsTransferringOwnership(false);
     }
   };
 
@@ -801,132 +862,225 @@ export default function TaskDetails() {
               </div>
 
               {/* Follow-up and Status Check Dropdowns (read-only) */}
-              <div className="flex flex-col md:flex-row md:items-center gap-4 md:gap-6 p-0 md:p-4 bg-muted/30 rounded-lg">
-                <div className="flex items-center space-x-2">
+              <div className="flex gap-2">
+                <div className="space-y-2 w-1/4">
                   <Label htmlFor="follow-up-duration" className="text-sm font-medium cursor-pointer">
                     Follow-up Required
                   </Label>
-                  <select
-                    id="follow-up-duration"
-                    className="w-28 px-2 py-1 border rounded bg-gray-100 text-gray-700 cursor-not-allowed"
+                  <Select
                     value={taskData.followUpDuration || "None"}
-                    disabled
+                    onValueChange={handleFollowUpDurationChange}
                   >
-                    <option value="None">None</option>
-                    <option value="24hr">24 Hours</option>
-                    <option value="48hr">48 Hours</option>
-                    <option value="1w">1 Week</option>
-                  </select>
+                    <SelectTrigger id="follow-up-duration" className="w-full">
+                      <SelectValue placeholder="None" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {durationOptions.map(opt => (
+                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
-                <div className="flex items-center space-x-2">
+                <div className="space-y-2 w-1/4">
                   <Label htmlFor="status-check-duration" className="text-sm font-medium cursor-pointer">
                     Status Check
                   </Label>
-                  <select
-                    id="status-check-duration"
-                    className="w-28 px-2 py-1 border rounded bg-gray-100 text-gray-700 cursor-not-allowed"
+                  <Select
                     value={taskData.statusCheckDuration || "None"}
-                    disabled
+                    onValueChange={handleStatusCheckDurationChange}
                   >
-                    <option value="None">None</option>
-                    <option value="24hr">24 Hours</option>
-                    <option value="48hr">48 Hours</option>
-                    <option value="1w">1 Week</option>
-                  </select>
-                </div>
-                <div className="text-xs text-muted-foreground md:ml-auto">
-                  Last updated: {formatDateTime(taskData.updatedAt, true)}
+                    <SelectTrigger id="status-check-duration" className="w-full">
+                      <SelectValue placeholder="None" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {durationOptions.map(opt => (
+                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="assigned-agent">Assign Task To *</Label>
-                <div className="flex gap-2">
-                  <div className="relative flex-1">
-                    <Input
-                      id="assigned-agent"
-                      type="text"
-                      placeholder="Type to search agents..."
-                      value={agentSearchQuery}
-                      onChange={(e) => {
-                        setAgentSearchQuery(e.target.value);
-                        if (e.target.value.trim()) {
-                          setShowAgentSuggestions(true);
-                        } else {
-                          setShowAgentSuggestions(false);
-                        }
-                      }}
-                      onFocus={() => {
-                        if (agentSearchQuery.trim()) {
-                          setShowAgentSuggestions(true);
-                        }
-                      }}
-                      className="w-full"
-                    // disabled={isFromRetainership} // Disable if form is from retainership
-                    />
+              <div className="flex gap-2 items-center">
+                <div className="space-y-2 w-1/2">
+                  <Label htmlFor="assigned-agent">Transfer Ownership  To *</Label>
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <Input
+                        id="assigned-agent"
+                        type="text"
+                        placeholder="Type to search agents..."
+                        value={agentOwnershipQuery}
+                        onChange={(e) => {
+                          setAgentOwnershipQuery(e.target.value);
+                          if (e.target.value.trim()) {
+                            setShowOwnershipSuggestions(true);
+                          } else {
+                            setShowOwnershipSuggestions(false);
+                          }
+                        }}
+                        onFocus={() => {
+                          if (agentOwnershipQuery.trim()) {
+                            setShowOwnershipSuggestions(true);
+                          }
+                        }}
+                        className="w-full"
+                      // disabled={isFromRetainership} // Disable if form is from retainership
+                      />
 
-                    {showAgentSuggestions &&
-                      agentSearchQuery.trim() &&
-                      filteredAgents.length > 0 && (
-                        <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto">
-                          {filteredAgents.map((agent) => (
-                            <div
-                              key={agent.id}
-                              className="flex items-center gap-2 p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
-                              onClick={() => {
-                                const agentName =
-                                  agent.name.charAt(0).toUpperCase() +
-                                  agent.name.slice(1);
-                                setAgentSearchQuery(agentName);
-                                setSelectedAgentId(agent.id);
-                                setShowAgentSuggestions(false);
-                              }}
-                            >
-                              <Avatar className="h-6 w-6">
-                                <AvatarFallback className="text-xs">
-                                  {agent.name
-                                    .toUpperCase()
-                                    .split(" ")
-                                    .filter((n) => n.length > 0)
-                                    .map((n) => n[0])
-                                    .join("")}
-                                </AvatarFallback>
-                              </Avatar>
-                              <div>
-                                <span className="font-medium">
-                                  {agent.name.charAt(0).toUpperCase() +
-                                    agent.name.slice(1)}
-                                </span>
-                                <span className="text-sm text-muted-foreground ml-2">
-                                  ({agent.agentType})
-                                </span>
+                      {showOwnershipSuggestions &&
+                        agentOwnershipQuery.trim() &&
+                        filteredOwnershipAgents.length > 0 && (
+                          <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto">
+                            {filteredOwnershipAgents.map((agent) => (
+                              <div
+                                key={agent.id}
+                                className="flex items-center gap-2 p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
+                                onClick={() => {
+                                  const agentName =
+                                    agent.name.charAt(0).toUpperCase() +
+                                    agent.name.slice(1);
+                                  setAgentOwnershipQuery(agentName);
+                                  setSelectedOwnershipAgentId(agent.id);
+                                  setShowOwnershipSuggestions(false);
+                                }}
+                              >
+                                <Avatar className="h-6 w-6">
+                                  <AvatarFallback className="text-xs">
+                                    {agent.name
+                                      .toUpperCase()
+                                      .split(" ")
+                                      .filter((n) => n.length > 0)
+                                      .map((n) => n[0])
+                                      .join("")}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <div>
+                                  <span className="font-medium">
+                                    {agent.name.charAt(0).toUpperCase() +
+                                      agent.name.slice(1)}
+                                  </span>
+                                  <span className="text-sm text-muted-foreground ml-2">
+                                    ({agent.agentType})
+                                  </span>
+                                </div>
                               </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
+                            ))}
+                          </div>
+                        )}
 
-                    {showAgentSuggestions &&
-                      agentSearchQuery.trim() &&
-                      filteredAgents.length === 0 && (
-                        <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg p-3">
-                          <span className="text-gray-500">No agents found</span>
-                        </div>
-                      )}
+                      {showOwnershipSuggestions &&
+                        agentOwnershipQuery.trim() &&
+                        filteredOwnershipAgents.length === 0 && (
+                          <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg p-3">
+                            <span className="text-gray-500">No agents found</span>
+                          </div>
+                        )}
+                    </div>
+                    <Button
+                      type="button"
+                      onClick={() => {
+                        if (selectedOwnershipAgentId) {
+                          handleTransferOwnership(selectedOwnershipAgentId);
+                        }
+                      }}
+                      // disabled={!selectedAgentId || isFromRetainership}
+                      disabled={!selectedOwnershipAgentId || isTransferringOwnership}
+                      className="px-4"
+                    >
+                      {isTransferringOwnership ? "Transferring Ownership" : "Transfer Ownership"}
+                    </Button>
                   </div>
-                  <Button
-                    type="button"
-                    onClick={() => {
-                      if (selectedAgentId) {
-                        handleReassign(selectedAgentId);
-                      }
-                    }}
-                    // disabled={!selectedAgentId || isFromRetainership}
-                    disabled={!selectedAgentId || isReassiging}
-                    className="px-4"
-                  >
-                    {isReassiging ? "Reassigning" : "Reassign"}
-                  </Button>
+                </div>
+                <div className="space-y-2 w-1/2">
+                  <Label htmlFor="assigned-agent">Assign Task To *</Label>
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <Input
+                        id="assigned-agent"
+                        type="text"
+                        placeholder="Type to search agents..."
+                        value={agentSearchQuery}
+                        onChange={(e) => {
+                          setAgentSearchQuery(e.target.value);
+                          if (e.target.value.trim()) {
+                            setShowAgentSuggestions(true);
+                          } else {
+                            setShowAgentSuggestions(false);
+                          }
+                        }}
+                        onFocus={() => {
+                          if (agentSearchQuery.trim()) {
+                            setShowAgentSuggestions(true);
+                          }
+                        }}
+                        className="w-full"
+                      // disabled={isFromRetainership} // Disable if form is from retainership
+                      />
+
+                      {showAgentSuggestions &&
+                        agentSearchQuery.trim() &&
+                        filteredAgents.length > 0 && (
+                          <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto">
+                            {filteredAgents.map((agent) => (
+                              <div
+                                key={agent.id}
+                                className="flex items-center gap-2 p-3 hover:bg-gray-50 cursor-pointer border-b border-gray-100 last:border-b-0"
+                                onClick={() => {
+                                  const agentName =
+                                    agent.name.charAt(0).toUpperCase() +
+                                    agent.name.slice(1);
+                                  setAgentSearchQuery(agentName);
+                                  setSelectedAgentId(agent.id);
+                                  setShowAgentSuggestions(false);
+                                }}
+                              >
+                                <Avatar className="h-6 w-6">
+                                  <AvatarFallback className="text-xs">
+                                    {agent.name
+                                      .toUpperCase()
+                                      .split(" ")
+                                      .filter((n) => n.length > 0)
+                                      .map((n) => n[0])
+                                      .join("")}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <div>
+                                  <span className="font-medium">
+                                    {agent.name.charAt(0).toUpperCase() +
+                                      agent.name.slice(1)}
+                                  </span>
+                                  <span className="text-sm text-muted-foreground ml-2">
+                                    ({agent.agentType})
+                                  </span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                      {showAgentSuggestions &&
+                        agentSearchQuery.trim() &&
+                        filteredAgents.length === 0 && (
+                          <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg p-3">
+                            <span className="text-gray-500">No agents found</span>
+                          </div>
+                        )}
+                    </div>
+                    <Button
+                      type="button"
+                      onClick={() => {
+                        if (selectedAgentId) {
+                          handleReassign(selectedAgentId);
+                        }
+                      }}
+                      // disabled={!selectedAgentId || isFromRetainership}
+                      disabled={!selectedAgentId || isReassigning}
+                      className="px-4"
+                    >
+                      {isReassigning ? "Reassigning" : "Reassign"}
+                    </Button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1318,10 +1472,22 @@ export default function TaskDetails() {
                       </div>
                     </div>
                   }
+                  {
+                    taskData?.triggerDate &&
+                    < div className="flex items-center gap-2">
+                      <Calendar className="h-4 w-4 text-muted-foreground" />
+                      <div>
+                        <div className="text-sm font-medium">{taskData.active ? "Next" : ""} Trigger Date</div>
+                        <div className="text-sm text-muted-foreground">
+                          {formatDateTime(taskData?.triggerDate, true)}
+                        </div>
+                      </div>
+                    </div>
+                  }
                 </CardContent>
               </Card>
 
-              <Card>
+              {/* <Card>
                 <CardHeader>
                   <CardTitle>Task Actions</CardTitle>
                 </CardHeader>
@@ -1363,7 +1529,7 @@ export default function TaskDetails() {
                     </Select>
                   </div>
                 </CardContent>
-              </Card>
+              </Card> */}
             </div>
           </div>
         </TabsContent>

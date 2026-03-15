@@ -11,12 +11,48 @@ import { TaskDetailDialog } from "./_component/task-detail-dialog"
 import { AddEntryDialog } from "./_component/add-entry-dialog"
 import type { Task, Comment } from "@/types"
 
-export type TaskStatus = "completed" | "in-progress" | "toDo" | "login" | "logout"
+const IST_TIME_ZONE = "Asia/Kolkata"
+const IST_OFFSET_MINUTES = 330
+
+const getISTDayKey = (date: Date | string) => {
+    const parts = new Intl.DateTimeFormat("en-CA", {
+        timeZone: IST_TIME_ZONE,
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+    }).formatToParts(new Date(date))
+
+    const year = Number(parts.find((part) => part.type === "year")?.value ?? "1970")
+    const month = Number(parts.find((part) => part.type === "month")?.value ?? "1")
+    const day = Number(parts.find((part) => part.type === "day")?.value ?? "1")
+
+    return {
+        key: `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`,
+        year,
+        month,
+        day,
+    }
+}
+
+const getISTStartOfDayISO = (date: Date) => {
+    const { year, month, day } = getISTDayKey(date)
+    const utcMillis = Date.UTC(year, month - 1, day, 0, 0, 0, 0) - IST_OFFSET_MINUTES * 60 * 1000
+    return new Date(utcMillis).toISOString()
+}
+
+const getISTEndOfDayISO = (date: Date) => {
+    const { year, month, day } = getISTDayKey(date)
+    const utcMillis = Date.UTC(year, month - 1, day, 23, 59, 59, 999) - IST_OFFSET_MINUTES * 60 * 1000
+    return new Date(utcMillis).toISOString()
+}
+
+export type TaskStatus = "completed" | "in-progress" | "toDo" | "pending" | "break" | "login" | "logout"
 
 export type TaskColor = "yellow" | "coral" | "blue" | "green"
 
 export interface TimeEntry {
     id: string
+    taskId?: string
     title: string
     description: string
     project: string
@@ -82,7 +118,7 @@ export default function TimesheetPage() {
         fetchUsers();
     }, [agent]);
 
-    const endDate = useMemo(() => addDays(startDate, daysToShow), [startDate, daysToShow])
+    const endDate = useMemo(() => addDays(startDate, daysToShow - 1), [startDate, daysToShow])
 
     // Fetch all tasks for agent and team
     useEffect(() => {
@@ -93,8 +129,8 @@ export default function TimesheetPage() {
                 const userIds = users.map(u => u.id);
                 const params = new URLSearchParams({
                     assignedToIds: userIds.join(","),
-                    startDate: startDate.toISOString(),
-                    endDate: endDate.toISOString(),
+                    startDate: getISTStartOfDayISO(startDate),
+                    endDate: getISTEndOfDayISO(endDate),
                 });
                 const response = await fetch(`/api/timesheet?${params.toString()}`);
                 const data = response.ok ? await response.json() : { timeEntries: [] };
@@ -110,6 +146,10 @@ export default function TimesheetPage() {
 
     // Filter entries by selected users, status, and date
     const filteredEntries = useMemo(() => {
+        const visibleISTDays = new Set(
+            Array.from({ length: daysToShow }, (_, i) => getISTDayKey(addDays(startDate, i)).key),
+        )
+
         return entries.filter((entry) => {
             if (selectedUsers.length > 0 && !selectedUsers.find((u) => u.id === entry.userId)) {
                 return false;
@@ -117,10 +157,8 @@ export default function TimesheetPage() {
             if (selectedStatuses.length > 0 && !selectedStatuses.includes(entry.status)) {
                 return false;
             }
-            const entryDate = new Date(entry.date).getTime();
-            const start = startDate.getTime();
-            const end = addDays(startDate, daysToShow).getTime();
-            if (entryDate < start || entryDate >= end) {
+            const entryISTDay = getISTDayKey(entry.date).key
+            if (!visibleISTDays.has(entryISTDay)) {
                 return false;
             }
             return true;

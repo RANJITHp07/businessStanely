@@ -3,6 +3,8 @@ import { getCurrentAgent } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
 
+const IST_TIME_ZONE = "Asia/Kolkata";
+
 /**
  * TIMESHEET API DOCUMENTATION
  * ============================
@@ -215,6 +217,7 @@ export async function GET(req: NextRequest) {
               hour: "2-digit",
               minute: "2-digit",
               hour12: true,
+              timeZone: IST_TIME_ZONE,
             }),
             endTime: new Date(
               commentDate.getTime() + 60 * 60 * 1000,
@@ -222,6 +225,7 @@ export async function GET(req: NextRequest) {
               hour: "2-digit",
               minute: "2-digit",
               hour12: true,
+              timeZone: IST_TIME_ZONE,
             }),
             status, // ✅ only pending | completed
             type: "task",
@@ -251,11 +255,13 @@ export async function GET(req: NextRequest) {
             hour: "2-digit",
             minute: "2-digit",
             hour12: true,
+            timeZone: IST_TIME_ZONE,
           }),
           endTime: loginDate.toLocaleTimeString("en-US", {
             hour: "2-digit",
             minute: "2-digit",
             hour12: true,
+            timeZone: IST_TIME_ZONE,
           }),
           status: "login", // ✅ login
           type: "login",
@@ -276,11 +282,13 @@ export async function GET(req: NextRequest) {
               hour: "2-digit",
               minute: "2-digit",
               hour12: true,
+              timeZone: IST_TIME_ZONE,
             }),
             endTime: logoutDate.toLocaleTimeString("en-US", {
               hour: "2-digit",
               minute: "2-digit",
               hour12: true,
+              timeZone: IST_TIME_ZONE,
             }),
             status: "logout",
             type: "logout",

@@ -16,6 +16,15 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { TaskStatus, User } from "../page"
 
+const IST_TIME_ZONE = "Asia/Kolkata"
+
+const formatISTShortDate = (date: Date) =>
+  new Intl.DateTimeFormat("en-US", {
+    timeZone: IST_TIME_ZONE,
+    month: "short",
+    day: "numeric",
+  }).format(new Date(date))
+
 interface TimesheetFiltersProps {
   users: User[]
   startDate: Date
@@ -85,7 +94,7 @@ export function TimesheetFilters({
             <PopoverTrigger asChild>
               <Button variant="outline" size="lg" className="h-9 gap-2 bg-transparent">
                 <CalendarIcon className="h-4 w-4" />
-                {format(startDate, "MMM d")}
+                {formatISTShortDate(startDate)}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">
@@ -102,7 +111,7 @@ export function TimesheetFilters({
             <PopoverTrigger asChild>
               <Button variant="outline" size="lg" className="h-9 gap-2 bg-transparent">
                 <CalendarIcon className="h-4 w-4" />
-                {format(endDate, "MMM d")}
+                {formatISTShortDate(endDate)}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">

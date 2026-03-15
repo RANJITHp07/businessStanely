@@ -5,7 +5,7 @@ import { Clock, Calendar, User, Tag, FileText, LogIn, LogOut } from "lucide-reac
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
-import type { TimeEntry } from "@/lib/timesheet-data"
+import type { TimeEntry } from "../page"
 import { useRouter } from "next/navigation"
 
 interface TaskDetailDialogProps {
@@ -20,6 +20,17 @@ const statusColors: Record<string, string> = {
   pending: "bg-amber-100 text-amber-700",
   break: "bg-gray-100 text-gray-700",
 }
+
+const IST_TIME_ZONE = "Asia/Kolkata"
+
+const formatISTLongDate = (date: Date) =>
+  new Intl.DateTimeFormat("en-US", {
+    timeZone: IST_TIME_ZONE,
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  }).format(new Date(date))
 
 export function TaskDetailDialog({ entry, open, onOpenChange }: TaskDetailDialogProps) {
   const router = useRouter()
@@ -63,7 +74,7 @@ export function TaskDetailDialog({ entry, open, onOpenChange }: TaskDetailDialog
 
           <div className="flex items-center gap-2">
             <Calendar className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm">{format(entry.date, "EEEE, MMMM d, yyyy")}</span>
+            <span className="text-sm">{formatISTLongDate(entry.date as Date)} (IST)</span>
           </div>
 
           <div className="flex items-center gap-2">

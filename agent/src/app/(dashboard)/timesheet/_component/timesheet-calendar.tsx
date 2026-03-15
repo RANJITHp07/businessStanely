@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo, useState, useEffect } from "react"
-import { format, addDays, isSameDay } from "date-fns"
+import { addDays } from "date-fns"
 import { LogIn, LogOut } from "lucide-react"
 import { TimeEntry } from "../page"
 
@@ -40,6 +40,49 @@ const timeSlots = [
   "11 PM",
 ];
 
+const IST_TIME_ZONE = "Asia/Kolkata"
+
+const getISTDayKey = (date: Date | string) => {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: IST_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date(date))
+
+  const year = parts.find((part) => part.type === "year")?.value ?? "0000"
+  const month = parts.find((part) => part.type === "month")?.value ?? "01"
+  const day = parts.find((part) => part.type === "day")?.value ?? "01"
+
+  return `${year}-${month}-${day}`
+}
+
+const getISTMinutesFromMidnight = (date: Date) => {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: IST_TIME_ZONE,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(date)
+
+  const hours = Number(parts.find((part) => part.type === "hour")?.value ?? "0")
+  const minutes = Number(parts.find((part) => part.type === "minute")?.value ?? "0")
+
+  return hours * 60 + minutes
+}
+
+const formatISTWeekday = (date: Date) =>
+  new Intl.DateTimeFormat("en-US", {
+    timeZone: IST_TIME_ZONE,
+    weekday: "long",
+  }).format(date)
+
+const formatISTDate = (date: Date) =>
+  new Intl.DateTimeFormat("en-US", {
+    timeZone: IST_TIME_ZONE,
+    day: "numeric",
+  }).format(date)
+
 
 const colorClasses: Record<string, { bg: string; text: string; border: string }> = {
   yellow: {
@@ -48,6 +91,11 @@ const colorClasses: Record<string, { bg: string; text: string; border: string }>
     border: "border",
   },
   toDo: {
+    bg: "bg-yellow-100",
+    text: "text-yellow-900",
+    border: "border border-yellow-400",
+  },
+  pending: {
     bg: "bg-yellow-100",
     text: "text-yellow-900",
     border: "border border-yellow-400",
@@ -61,6 +109,11 @@ const colorClasses: Record<string, { bg: string; text: string; border: string }>
     bg: "bg-green-100",
     text: "text-green-900",
     border: "border border-green-400",
+  },
+  break: {
+    bg: "bg-gray-200",
+    text: "text-gray-900",
+    border: "border border-gray-400",
   },
   login: {
     bg: "bg-green-500",
@@ -110,6 +163,44 @@ function getPositionAndHeight(startTime: string, endTime: string) {
   return { top, height }
 }
 
+type EntryLaneMeta = {
+  laneIndex: number
+  laneCount: number
+}
+
+function buildLoginLogoutLanes(entries: TimeEntry[]) {
+  const groupedByMinute = new Map<number, TimeEntry[]>()
+
+  entries.forEach((entry) => {
+    if (entry.type !== "login" && entry.type !== "logout") return
+
+    const parsed = parseTime(entry.startTime)
+    const minuteKey = parsed.hours * 60 + parsed.minutes
+
+    if (!groupedByMinute.has(minuteKey)) {
+      groupedByMinute.set(minuteKey, [])
+    }
+
+    groupedByMinute.get(minuteKey)!.push(entry)
+  })
+
+  const laneMap = new Map<string, EntryLaneMeta>()
+
+  groupedByMinute.forEach((sameMinuteEntries) => {
+    const sorted = [...sameMinuteEntries].sort((a, b) => {
+      if (a.type === b.type) return a.id.localeCompare(b.id)
+      return a.type === "login" ? -1 : 1
+    })
+
+    const laneCount = sorted.length
+    sorted.forEach((entry, laneIndex) => {
+      laneMap.set(entry.id, { laneIndex, laneCount })
+    })
+  })
+
+  return laneMap
+}
+
 export function TimesheetCalendar({
   entries,
   startDate,
@@ -136,7 +227,7 @@ export function TimesheetCalendar({
       //   return
       // }
 
-      const dayKey = format(new Date(entry.date), "yyyy-MM-dd")
+      const dayKey = getISTDayKey(entry.date)
       if (!map.has(dayKey)) {
         map.set(dayKey, [])
       }
@@ -148,12 +239,11 @@ export function TimesheetCalendar({
 
   // Current time indicator position
   const currentTimePosition = useMemo(() => {
-    const hours = currentTime.getHours()
-    const minutes = currentTime.getMinutes()
-
-    const minutesFrom12AM = hours * 60 + minutes
+    const minutesFrom12AM = getISTMinutesFromMidnight(currentTime)
     return (minutesFrom12AM / 60) * 60
   }, [currentTime])
+
+  const todayISTKey = useMemo(() => getISTDayKey(new Date()), [currentTime])
 
   return (
     <div className="flex-1 overflow-auto">
@@ -161,20 +251,23 @@ export function TimesheetCalendar({
         {/* Header */}
         <div className="sticky top-0 z-10 bg-card border-b border-border">
           <div className="grid" style={{ gridTemplateColumns: `60px repeat(${daysToShow}, 1fr)` }}>
-            <div className="p-3 text-xs text-muted-foreground font-medium border-r border-border">GMT</div>
-            {days.map((day, index) => (
-              <div
-                key={index}
-                className={`p-3 text-center border-r border-border ${isSameDay(day, new Date()) ? "bg-primary/5" : ""}`}
-              >
-                <div className="text-xs text-muted-foreground">{format(day, "EEEE")}</div>
+            <div className="p-3 text-xs text-muted-foreground font-medium border-r border-border">IST</div>
+            {days.map((day, index) => {
+              const isToday = getISTDayKey(day) === todayISTKey
+              return (
                 <div
-                  className={`text-lg font-semibold ${isSameDay(day, new Date()) ? "text-primary" : "text-foreground"}`}
+                  key={index}
+                  className={`p-3 text-center border-r border-border ${isToday ? "bg-primary/5" : ""}`}
                 >
-                  {format(day, "d")}
+                  <div className="text-xs text-muted-foreground">{formatISTWeekday(day)}</div>
+                  <div
+                    className={`text-lg font-semibold ${isToday ? "text-primary" : "text-foreground"}`}
+                  >
+                    {formatISTDate(day)}
+                  </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </div>
 
@@ -192,9 +285,10 @@ export function TimesheetCalendar({
 
             {/* Day Columns */}
             {days.map((day, dayIndex) => {
-              const dayKey = format(day, "yyyy-MM-dd")
+              const dayKey = getISTDayKey(day)
               const dayEntries = entriesByDay.get(dayKey) || []
-              const isToday = isSameDay(day, new Date())
+              const isToday = dayKey === todayISTKey
+              const loginLogoutLanes = buildLoginLogoutLanes(dayEntries)
 
               return (
                 <div key={dayIndex} className={`relative border-r border-border ${isToday ? "bg-primary/5" : ""}`}>
@@ -219,16 +313,29 @@ export function TimesheetCalendar({
                     const { top, height } = getPositionAndHeight(entry.startTime, entry.endTime)
                     const colors = colorClasses[entry.status] || colorClasses.default
                     const isLoginLogout = entry.type === "login" || entry.type === "logout"
+                    const lane = loginLogoutLanes.get(entry.id)
+
+                    const laneStyle = isLoginLogout && lane
+                      ? {
+                        left: `calc(${(lane.laneIndex * 100) / lane.laneCount}% + 4px)`,
+                        width: `calc(${100 / lane.laneCount}% - 8px)`,
+                      }
+                      : {
+                        left: "4px",
+                        right: "4px",
+                      }
 
 
                     return (
                       <div
                         key={entry.id}
-                        className={`absolute left-1 right-1 rounded-lg p-2 cursor-pointer transition-all hover:scale-[1.02] hover:shadow-lg overflow-hidden ${colors.bg} ${colors.text} ${colors.border}`}
+                        className={`absolute rounded-lg p-2 cursor-pointer transition-all hover:scale-[1.02] hover:shadow-lg overflow-hidden ${colors.bg} ${colors.text} ${colors.border}`}
                         style={{
+                          ...laneStyle,
                           top: `${top}px`,
                           height: isLoginLogout ? "28px" : `${height}px`,
                           minHeight: isLoginLogout ? "28px" : "40px",
+                          zIndex: isLoginLogout ? 30 : 10,
                         }}
                         onClick={() => onEntryClick(entry)}
                       >

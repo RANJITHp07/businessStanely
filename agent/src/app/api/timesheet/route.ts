@@ -115,6 +115,16 @@ export async function GET(req: NextRequest) {
           {
             OR: [{ category: null }, { category: { status: "approved" } }],
           },
+          {
+            comments: {
+              some: {
+                startTime: {
+                  gte: startDate,
+                  lte: endDate,
+                },
+              },
+            },
+          },
         ],
       };
     } else {
@@ -124,10 +134,19 @@ export async function GET(req: NextRequest) {
           {
             OR: [{ category: null }, { category: { status: "approved" } }],
           },
+          {
+            comments: {
+              some: {
+                startTime: {
+                  gte: startDate,
+                  lte: endDate,
+                },
+              },
+            },
+          },
         ],
       };
     }
-
     // ✅ FETCH BOTH TOGETHER
     const [tasks, loginHistory, timesheetEntries] = await Promise.all([
       prisma.task.findMany({
@@ -161,7 +180,25 @@ export async function GET(req: NextRequest) {
 
       prisma.loginHistory.findMany({
         where: {
-          agentId: agent.id,
+          agentId: {
+            in: assignedToIdsParam
+              ? assignedToIdsParam.split(",").map((id) => id.trim())
+              : [agent.id],
+          },
+          OR: [
+            {
+              loginAt: {
+                gte: startDate,
+                lte: endDate,
+              },
+            },
+            {
+              logoutAt: {
+                gte: startDate,
+                lte: endDate,
+              },
+            },
+          ],
         },
         orderBy: {
           loginAt: "desc",
@@ -170,7 +207,15 @@ export async function GET(req: NextRequest) {
 
       prisma.timesheetEntry.findMany({
         where: {
-          agentId: assignedToIdsParam ? undefined : agent.id,
+          agentId: {
+            in: assignedToIdsParam
+              ? assignedToIdsParam.split(",").map((id) => id.trim())
+              : [agent.id],
+          },
+          date: {
+            gte: startDate,
+            lte: endDate,
+          },
         },
         include: {
           agent: {
@@ -199,42 +244,39 @@ export async function GET(req: NextRequest) {
 
       task.comments.forEach((comment) => {
         const commentDate = new Date(comment.startTime!);
+        const status = task.status?.toLowerCase();
 
-        if (commentDate >= startDate && commentDate <= endDate) {
-          const status = task.status?.toLowerCase();
-
-          timeEntries.push({
-            id: `task-${entryId++}`,
-            taskId: task.id,
-            title: task.title,
-            description: comment.content || "",
-            project:
-              task.client?.firstName ||
-              task.client?.organizationName ||
-              "Project",
-            date: new Date(commentDate),
-            startTime: commentDate.toLocaleTimeString("en-US", {
-              hour: "2-digit",
-              minute: "2-digit",
-              hour12: true,
-              timeZone: IST_TIME_ZONE,
-            }),
-            endTime: new Date(
-              commentDate.getTime() + 60 * 60 * 1000,
-            ).toLocaleTimeString("en-US", {
-              hour: "2-digit",
-              minute: "2-digit",
-              hour12: true,
-              timeZone: IST_TIME_ZONE,
-            }),
-            status, // ✅ only pending | completed
-            type: "task",
-            userId,
-            userName,
-            commentAuthor: comment.agent?.name || "Unknown",
-            commentId: comment.id,
-          });
-        }
+        timeEntries.push({
+          id: `task-${entryId++}`,
+          taskId: task.id,
+          title: task.title,
+          description: comment.content || "",
+          project:
+            task.client?.firstName ||
+            task.client?.organizationName ||
+            "Project",
+          date: new Date(commentDate),
+          startTime: commentDate.toLocaleTimeString("en-US", {
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: true,
+            timeZone: IST_TIME_ZONE,
+          }),
+          endTime: new Date(
+            commentDate.getTime() + 60 * 60 * 1000,
+          ).toLocaleTimeString("en-US", {
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: true,
+            timeZone: IST_TIME_ZONE,
+          }),
+          status, // ✅ only pending | completed
+          type: "task",
+          userId,
+          userName,
+          commentAuthor: comment.agent?.name || "Unknown",
+          commentId: comment.id,
+        });
       });
     });
 
@@ -244,56 +286,52 @@ export async function GET(req: NextRequest) {
     loginHistory.forEach((log) => {
       const loginDate = new Date(log.loginAt);
 
-      if (loginDate >= startDate && loginDate <= endDate) {
-        timeEntries.push({
-          id: `login-${log.id}`,
-          title: "Login",
-          project: "System",
-          date: new Date(loginDate),
-          userId: log.agentId,
-          startTime: loginDate.toLocaleTimeString("en-US", {
-            hour: "2-digit",
-            minute: "2-digit",
-            hour12: true,
-            timeZone: IST_TIME_ZONE,
-          }),
-          endTime: loginDate.toLocaleTimeString("en-US", {
-            hour: "2-digit",
-            minute: "2-digit",
-            hour12: true,
-            timeZone: IST_TIME_ZONE,
-          }),
-          status: "login", // ✅ login
-          type: "login",
-        });
-      }
+      timeEntries.push({
+        id: `login-${log.id}`,
+        title: "Login",
+        project: "System",
+        date: new Date(loginDate),
+        userId: log.agentId,
+        startTime: loginDate.toLocaleTimeString("en-US", {
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: true,
+          timeZone: IST_TIME_ZONE,
+        }),
+        endTime: loginDate.toLocaleTimeString("en-US", {
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: true,
+          timeZone: IST_TIME_ZONE,
+        }),
+        status: "login", // ✅ login
+        type: "login",
+      });
 
       if (log.logoutAt) {
         const logoutDate = new Date(log.logoutAt);
 
-        if (logoutDate >= startDate && logoutDate <= endDate) {
-          timeEntries.push({
-            id: `logout-${log.id}`,
-            title: "Logout",
-            project: "System",
-            userId: log.agentId,
-            date: logoutDate,
-            startTime: logoutDate.toLocaleTimeString("en-US", {
-              hour: "2-digit",
-              minute: "2-digit",
-              hour12: true,
-              timeZone: IST_TIME_ZONE,
-            }),
-            endTime: logoutDate.toLocaleTimeString("en-US", {
-              hour: "2-digit",
-              minute: "2-digit",
-              hour12: true,
-              timeZone: IST_TIME_ZONE,
-            }),
-            status: "logout",
-            type: "logout",
-          });
-        }
+        timeEntries.push({
+          id: `logout-${log.id}`,
+          title: "Logout",
+          project: "System",
+          userId: log.agentId,
+          date: logoutDate,
+          startTime: logoutDate.toLocaleTimeString("en-US", {
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: true,
+            timeZone: IST_TIME_ZONE,
+          }),
+          endTime: logoutDate.toLocaleTimeString("en-US", {
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: true,
+            timeZone: IST_TIME_ZONE,
+          }),
+          status: "logout",
+          type: "logout",
+        });
       }
     });
 
@@ -303,23 +341,21 @@ export async function GET(req: NextRequest) {
     timesheetEntries.forEach((entry) => {
       const entryDate = new Date(entry.date);
 
-      if (entryDate >= startDate && entryDate <= endDate) {
-        timeEntries.push({
-          id: entry.id,
-          title: entry.title,
-          description: entry.description || "",
-          project: entry.project || "Project",
-          projectCode: entry.projectCode || "",
-          date: entryDate,
-          startTime: entry.startTime,
-          endTime: entry.endTime,
-          status: entry.status,
-          type: entry.type,
-          color: entry.color,
-          userId: entry.agentId,
-          userName: entry.agent?.name || "Unknown",
-        });
-      }
+      timeEntries.push({
+        id: entry.id,
+        title: entry.title,
+        description: entry.description || "",
+        project: entry.project || "Project",
+        projectCode: entry.projectCode || "",
+        date: entryDate,
+        startTime: entry.startTime,
+        endTime: entry.endTime,
+        status: entry.status,
+        type: entry.type,
+        color: entry.color,
+        userId: entry.agentId,
+        userName: entry.agent?.name || "Unknown",
+      });
     });
 
     // --------------------------

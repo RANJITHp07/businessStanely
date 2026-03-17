@@ -126,7 +126,7 @@ export default function TimesheetPage() {
             if (!agent || users.length === 0) return;
             try {
                 // Fetch tasks for all user ids (agent + team) from new timesheet API
-                const userIds = users.map(u => u.id);
+                const userIds = selectedUsers.map(u => u.id);
                 const params = new URLSearchParams({
                     assignedToIds: userIds.join(","),
                     startDate: getISTStartOfDayISO(startDate),
@@ -135,34 +135,17 @@ export default function TimesheetPage() {
                 const response = await fetch(`/api/timesheet?${params.toString()}`);
                 const data = response.ok ? await response.json() : { timeEntries: [] };
 
-
                 setEntries(data.timeEntries || []);
             } catch (error) {
                 setEntries([]);
             }
         };
         fetchTimesheetData();
-    }, [agent, users, startDate, endDate]);
+    }, [agent, selectedUsers, startDate, endDate]);
 
     // Filter entries by selected users, status, and date
     const filteredEntries = useMemo(() => {
-        const visibleISTDays = new Set(
-            Array.from({ length: daysToShow }, (_, i) => getISTDayKey(addDays(startDate, i)).key),
-        )
-
-        return entries.filter((entry) => {
-            if (selectedUsers.length > 0 && !selectedUsers.find((u) => u.id === entry.userId)) {
-                return false;
-            }
-            if (selectedStatuses.length > 0 && !selectedStatuses.includes(entry.status)) {
-                return false;
-            }
-            const entryISTDay = getISTDayKey(entry.date).key
-            if (!visibleISTDays.has(entryISTDay)) {
-                return false;
-            }
-            return true;
-        });
+        return entries
     }, [entries, selectedUsers, selectedStatuses, startDate, daysToShow])
 
 

@@ -77,14 +77,14 @@ const salesItems = [
     icon: FileText,
   },
   {
-    title: "Settings",
-    url: "/setting",
-    icon: Settings,
-  },
-  {
     title: "My Diary",
     url: "/my-diary",
     icon: UserRoundPen,
+  },
+  {
+    title: "Settings",
+    url: "/setting",
+    icon: Settings,
   },
 ];
 
@@ -136,15 +136,15 @@ const dashboardItems = [
     icon: FileText,
   },
   {
-    title: "Settings",
-    url: "/setting",
-    icon: Settings,
-  },
-  {
     title: "My Diary",
     url: "/my-diary",
     icon: UserRoundPen,
   },
+  {
+    title: "Settings",
+    url: "/setting",
+    icon: Settings,
+  }
 ];
 
 export function AppSidebar() {

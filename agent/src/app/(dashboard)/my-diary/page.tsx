@@ -39,6 +39,15 @@ export default function DiaryPage() {
     const [draftTitle, setDraftTitle] = useState("");
     const [draftHtml, setDraftHtml] = useState("");
     const [isLoading, setIsLoading] = useState(true);
+    const [activeFormats, setActiveFormats] = useState({
+        bold: false,
+        italic: false,
+        underline: false,
+        unorderedList: false,
+        orderedList: false,
+        h1: false,
+        h2: false,
+    });
 
     const editorRef = useRef<HTMLDivElement>(null);
 
@@ -47,6 +56,51 @@ export default function DiaryPage() {
             editorRef.current.innerHTML = html;
         }
     };
+
+    const resetActiveFormats = () => {
+        setActiveFormats({
+            bold: false,
+            italic: false,
+            underline: false,
+            unorderedList: false,
+            orderedList: false,
+            h1: false,
+            h2: false,
+        });
+    };
+
+    const updateActiveFormats = () => {
+        if (!editorRef.current) return;
+
+        const selection = document.getSelection();
+        if (!selection || selection.rangeCount === 0) {
+            resetActiveFormats();
+            return;
+        }
+
+        const anchorNode = selection.anchorNode;
+        if (!anchorNode || !editorRef.current.contains(anchorNode)) {
+            resetActiveFormats();
+            return;
+        }
+
+        const formatBlockValue = String(document.queryCommandValue("formatBlock") || "")
+            .replace(/[<>]/g, "")
+            .toLowerCase();
+
+        setActiveFormats({
+            bold: document.queryCommandState("bold"),
+            italic: document.queryCommandState("italic"),
+            underline: document.queryCommandState("underline"),
+            unorderedList: document.queryCommandState("insertUnorderedList"),
+            orderedList: document.queryCommandState("insertOrderedList"),
+            h1: formatBlockValue === "h1",
+            h2: formatBlockValue === "h2",
+        });
+    };
+
+    const toolbarButtonClass = (isActive: boolean) =>
+        isActive ? "bg-primary text-primary-foreground hover:bg-primary/90" : "";
 
     const fetchNotes = async () => {
         try {
@@ -94,6 +148,18 @@ export default function DiaryPage() {
         fetchNotes();
     }, []);
 
+    useEffect(() => {
+        const handleSelectionChange = () => {
+            updateActiveFormats();
+        };
+
+        document.addEventListener("selectionchange", handleSelectionChange);
+
+        return () => {
+            document.removeEventListener("selectionchange", handleSelectionChange);
+        };
+    }, []);
+
     const loadNote = (note: DiaryNote) => {
         setSelectedNoteId(note.id);
         setDraftTitle(note.title);
@@ -116,12 +182,14 @@ export default function DiaryPage() {
         document.execCommand(command, false, value);
 
         setDraftHtml(editorRef.current.innerHTML);
+        updateActiveFormats();
     };
 
     const handleEditorInput = () => {
         if (!editorRef.current) return;
 
         setDraftHtml(editorRef.current.innerHTML);
+        updateActiveFormats();
     };
 
     const handleSave = async () => {
@@ -267,6 +335,7 @@ export default function DiaryPage() {
                         size="sm"
                         variant="outline"
                         onClick={() => runEditorCommand("bold")}
+                        className={toolbarButtonClass(activeFormats.bold)}
                     >
                         <Bold className="h-4 w-4" />
                     </Button>
@@ -275,6 +344,7 @@ export default function DiaryPage() {
                         size="sm"
                         variant="outline"
                         onClick={() => runEditorCommand("italic")}
+                        className={toolbarButtonClass(activeFormats.italic)}
                     >
                         <Italic className="h-4 w-4" />
                     </Button>
@@ -283,6 +353,7 @@ export default function DiaryPage() {
                         size="sm"
                         variant="outline"
                         onClick={() => runEditorCommand("underline")}
+                        className={toolbarButtonClass(activeFormats.underline)}
                     >
                         <Underline className="h-4 w-4" />
                     </Button>
@@ -291,6 +362,7 @@ export default function DiaryPage() {
                         size="sm"
                         variant="outline"
                         onClick={() => runEditorCommand("insertUnorderedList")}
+                        className={toolbarButtonClass(activeFormats.unorderedList)}
                     >
                         <List className="h-4 w-4" />
                     </Button>
@@ -299,6 +371,7 @@ export default function DiaryPage() {
                         size="sm"
                         variant="outline"
                         onClick={() => runEditorCommand("insertOrderedList")}
+                        className={toolbarButtonClass(activeFormats.orderedList)}
                     >
                         <ListOrdered className="h-4 w-4" />
                     </Button>
@@ -307,6 +380,7 @@ export default function DiaryPage() {
                         size="sm"
                         variant="outline"
                         onClick={() => runEditorCommand("formatBlock", "<h1>")}
+                        className={toolbarButtonClass(activeFormats.h1)}
                     >
                         <Heading1 className="h-4 w-4" />
                     </Button>
@@ -315,6 +389,7 @@ export default function DiaryPage() {
                         size="sm"
                         variant="outline"
                         onClick={() => runEditorCommand("formatBlock", "<h2>")}
+                        className={toolbarButtonClass(activeFormats.h2)}
                     >
                         <Heading2 className="h-4 w-4" />
                     </Button>

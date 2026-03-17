@@ -76,14 +76,14 @@ const allItems: MenuItem[] = [
   { title: "Request Quote", url: "/request-quote", icon: FileText },
   { title: "Lead Source", url: "/lead_source", icon: CircleFadingPlusIcon },
   { title: "Admin", url: "/admin", icon: ShieldUser },
+  { title: "My Diary", url: "/my-diary", icon: UserRoundPen },
   { title: "Settings", url: "/setting", icon: Settings },
   { title: "Deleted Agent", url: "/deleted-agent", icon: UserRoundPen },
-  { title: "My Diary", url: "/my-diary", icon: UserRoundPen },
 ];
 
 // Split items into two panels
 const agentPanelItems = allItems.filter(
-  (item) => !["Leads", "Advisor Agent", "Opportunities Dashboard", "Client Advisor", "Leads Dashboard", "Opportunities", "Lead Source", "Settings"].includes(item.title)
+  (item) => !["Leads", "Advisor Agent", "Opportunities Dashboard", "Client Advisor", "Leads Dashboard", "Opportunities", "Lead Source", "My Diary", "Settings"].includes(item.title)
 );
 const salesPanelItems = allItems.filter((item) =>
   ["Advisor Agent", "Leads", "Opportunities", "Opportunities Dashboard", "Client Advisor", "Leads Dashboard", "Lead Source"].includes(item.title)

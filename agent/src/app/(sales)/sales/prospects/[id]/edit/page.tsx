@@ -21,6 +21,7 @@ import type { CountryData } from "react-phone-input-2"
 import PhoneInput from "react-phone-input-2"
 import "react-phone-input-2/lib/style.css"
 import { Badge } from "@/components/ui/badge"
+import { uploadFileToS3Direct } from "@/lib/directUpload"
 
 
 export default function EditProspectPage() {
@@ -137,17 +138,13 @@ export default function EditProspectPage() {
     const searchQuery = searchParams.get("opportunities") || "";
     let quote = null;
     if (file) {
-      const formData = new FormData();
-      formData.append("file", file);
-
-      const uploadResponse = await fetch("/api/upload", {
-        method: "POST",
-        body: formData,
-      });
-
-      if (uploadResponse.ok) {
-        const uploadResult = await uploadResponse.json();
+      try {
+        const uploadResult = await uploadFileToS3Direct(file);
         quote = uploadResult.url
+      } catch (error) {
+        console.error("Failed to upload file", error)
+        toast.error("Failed to upload quote file")
+        return;
       }
     }
     const payload = {

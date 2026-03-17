@@ -1,14 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { uploadToS3 } from "@/lib/aws";
+import { getPresignedUploadUrl } from "@/lib/aws";
+
+type UploadRequest = {
+  fileName?: string;
+  fileSize?: number;
+  contentType?: string;
+};
 
 export async function POST(request: NextRequest) {
   try {
-    const data = await request.formData();
-    const file: File | null = data.get("file") as unknown as File;
+    const body = (await request.json()) as UploadRequest;
+    const fileName = body.fileName?.trim();
+    const fileSize = body.fileSize;
+    const contentType = body.contentType;
 
-    if (!file) {
-      return NextResponse.json({ error: "No file received." }, { status: 400 });
+    if (!fileName || !contentType || typeof fileSize !== "number") {
+      return NextResponse.json(
+        { error: "Invalid upload payload" },
+        { status: 400 },
+      );
     }
 
     const allowedTypes = [
@@ -24,44 +35,34 @@ export async function POST(request: NextRequest) {
       "audio/webm",
       "audio/mp4",
     ];
-    if (!allowedTypes.includes(file.type)) {
+
+    if (!allowedTypes.includes(contentType)) {
       return NextResponse.json(
         { error: "File type not allowed" },
         { status: 400 },
       );
     }
 
-    const maxSize = 10 * 1024 * 1024; // 10MB
-    if (file.size > maxSize) {
+    const maxSize = 50 * 1024 * 1024; // 50MB
+    if (fileSize > maxSize) {
       return NextResponse.json(
-        { error: "File size too large (max 10MB)" },
+        { error: "File size too large (max 50MB)" },
         { status: 400 },
       );
     }
 
-    const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
+    const safeFileName = fileName.replace(/[^a-zA-Z0-9.-]/g, "_");
+    const key = `uploads/${Date.now()}_${safeFileName}`;
+    const uploadUrl = await getPresignedUploadUrl(key, contentType);
 
-    const originalName = file.name.replace(/[^a-zA-Z0-9.-]/g, "_");
-
-    try {
-      const s3Key = await uploadToS3(buffer, originalName, file.type);
-
-      return NextResponse.json({
-        message: "File uploaded successfully",
-        filename: originalName,
-        originalName: file.name,
-        size: file.size,
-        type: file.type,
-        url: s3Key, // Store the S3 key instead of full URL
-      });
-    } catch (error) {
-      console.error("Error uploading to S3:", error);
-      return NextResponse.json(
-        { error: "Failed to upload file to S3." },
-        { status: 500 },
-      );
-    }
+    return NextResponse.json({
+      uploadUrl,
+      url: key,
+      filename: safeFileName,
+      originalName: fileName,
+      size: fileSize,
+      type: contentType,
+    });
   } catch (error) {
     console.error("Upload error:", error);
     return NextResponse.json({ error: "File upload failed." }, { status: 500 });

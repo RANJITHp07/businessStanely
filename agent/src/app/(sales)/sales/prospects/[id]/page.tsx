@@ -4,6 +4,7 @@ import type React from "react"
 
 import { useState, useEffect, use } from "react"
 import { useRouter } from "next/navigation"
+import Image from "next/image"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -21,16 +22,17 @@ import {
     Loader2,
     Send,
     Paperclip,
-    X,
     MessageSquare,
     Clock,
     CalendarIcon,
 } from "lucide-react"
 import Link from "next/link"
 import { Separator } from "@/components/ui/separator"
+import { Progress } from "@/components/ui/progress"
 import { cn } from "@/lib/utils"
 import { useAgentContext } from "@/lib/agent-context"
 import { normalizePhoneNumber } from "@/lib/normalizePhoneNumber"
+import { uploadFileToS3Direct } from "@/lib/directUpload"
 
 interface Prospect {
     id: string;
@@ -71,9 +73,19 @@ interface Comment {
     user?: { username?: string };
     attachmentName?: string;
     attachmentUrl?: string;
+    attachmentType?: string;
+    attachmentSize?: number;
 }
 
 export default function ProspectDetailPage({ params }: { params: Promise<{ id: string }> }) {
+    const MANAGEMENT_BASE_URL = "https://management.legalstanley.com";
+
+    const getAttachmentUrl = (url?: string) => {
+        if (!url) return "";
+        if (url.startsWith("http://") || url.startsWith("https://")) return url;
+        return `${MANAGEMENT_BASE_URL}${url.startsWith("/") ? url : `/${url}`}`;
+    };
+
     const resolvedParams = use(params)
     const router = useRouter()
     const agent = useAgentContext()
@@ -81,7 +93,10 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
     const [comments, setComments] = useState<Comment[]>([])
     const [loading, setLoading] = useState(true)
     const [newComment, setNewComment] = useState("")
-    const [attachments, setAttachments] = useState<File[]>([])
+    const [selectedFile, setSelectedFile] = useState<File | null>(null)
+    const [uploadPercent, setUploadPercent] = useState(0)
+    const [uploadMessage, setUploadMessage] = useState("")
+    const [uploadError, setUploadError] = useState<string | null>(null)
     const [submitting, setSubmitting] = useState(false)
     const [nextFollowUpDate, setNextFollowUpDate] = useState<Date | undefined>(undefined)
     const [opprunity, setOppurtunity] = useState(false)
@@ -162,40 +177,42 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
     }
 
     const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files) {
-            setAttachments([...attachments, ...Array.from(e.target.files)])
+        const file = e.target.files?.[0]
+        if (file) {
+            setSelectedFile(file)
+            setUploadPercent(0)
+            setUploadMessage("")
+            setUploadError(null)
         }
-    }
-
-    const removeAttachment = (index: number) => {
-        setAttachments(attachments.filter((_, i) => i !== index))
     }
 
     const isCommentDisabled = prospect?.archived || prospect?.status === "Converted" || prospect?.status === "Opportunity";
     const handleSubmitComment = async () => {
-        if (!newComment.trim() && attachments.length === 0) return;
+        if (!newComment.trim() && !selectedFile) return;
         setSubmitting(true);
+        setUploadError(null);
         try {
             let attachmentData = {}
-            if (attachments && attachments.length > 0) {
-                const formData = new FormData();
-                formData.append("file", attachments[0]);
-
-                const uploadResponse = await fetch("/api/upload", {
-                    method: "POST",
-                    body: formData,
-                });
-
-                if (uploadResponse.ok) {
-                    const uploadResult = await uploadResponse.json();
+            if (selectedFile) {
+                try {
+                    const uploadResult = await uploadFileToS3Direct(selectedFile, {
+                        onProgress: (progress) => {
+                            setUploadPercent(progress.percent)
+                            setUploadMessage(progress.message)
+                        },
+                    });
                     attachmentData = {
                         attachmentName: uploadResult.originalName,
                         attachmentSize: uploadResult.size,
                         attachmentType: uploadResult.type,
                         attachmentUrl: uploadResult.url,
                     };
-                } else {
+                } catch (error) {
                     console.error("Failed to upload file", error)
+                    setUploadError(
+                        error instanceof Error ? error.message : "Upload failed. Please retry.",
+                    )
+                    setSubmitting(false)
                     return;
                 }
             }
@@ -217,7 +234,10 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
                 const { comment } = await res.json();
                 setComments([comment, ...comments]);
                 setNewComment("");
-                setAttachments([]);
+                setSelectedFile(null);
+                setUploadPercent(0)
+                setUploadMessage("")
+                setUploadError(null)
             }
         } catch {
             // Handle error
@@ -432,25 +452,96 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
                                                 </div>
                                             </div>
                                             <p className="text-sm leading-relaxed">{comment.content}</p>
-                                            {comment.attachmentUrl && (
-                                                <div className="flex flex-wrap gap-2 pt-2">
-                                                    {comment.attachmentUrl.match(/\.(mp3|wav|ogg)$/i) ? (
-                                                        <div className="flex flex-col gap-1 px-2 py-1 bg-muted rounded-md text-sm w-full">
-                                                            <audio controls className="w-full">
-                                                                <source src={"https://management.legalstanley.com/" + comment.attachmentUrl} />
-                                                                Your browser does not support the audio element.
-                                                            </audio>
+                                            {comment.attachmentName && (
+                                                <div className="mt-2">
+                                                    {/* Check if attachment is an image */}
+                                                    {comment.attachmentType?.startsWith("image/") &&
+                                                        comment.attachmentUrl ? (
+                                                        <div className="space-y-2">
+                                                            {/* Image preview */}
+                                                            <div className="relative inline-block">
+                                                                {/* Use regular img for local URLs, Image for external URLs */}
+                                                                {comment.attachmentUrl.startsWith(
+                                                                    "http"
+                                                                ) ? (
+                                                                    <Image
+                                                                        src={getAttachmentUrl(comment.attachmentUrl)}
+                                                                        alt={comment.attachmentName}
+                                                                        width={300}
+                                                                        height={200}
+                                                                        className="max-w-xs max-h-48 rounded-lg border shadow-sm cursor-pointer hover:shadow-md transition-shadow object-cover"
+                                                                        onClick={() =>
+                                                                            window.open(
+                                                                                getAttachmentUrl(comment.attachmentUrl),
+                                                                                "_blank"
+                                                                            )
+                                                                        }
+                                                                    />
+                                                                ) : (
+                                                                    <Image
+                                                                        src={getAttachmentUrl(comment.attachmentUrl)}
+                                                                        alt={comment.attachmentName}
+                                                                        width={300}
+                                                                        height={200}
+                                                                        className="max-w-xs max-h-48 rounded-lg border shadow-sm cursor-pointer hover:shadow-md transition-shadow object-cover"
+                                                                        onClick={() =>
+                                                                            window.open(
+                                                                                getAttachmentUrl(comment.attachmentUrl),
+                                                                                "_blank"
+                                                                            )
+                                                                        }
+                                                                        unoptimized={true}
+                                                                    />
+                                                                )}
+                                                            </div>
+                                                            {/* Image file info */}
+                                                            <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted p-2 rounded border">
+                                                                <Paperclip className="h-3 w-3" />
+                                                                <span className="font-medium">
+                                                                    {comment.attachmentName}
+                                                                </span>
+                                                                <span>
+                                                                    (
+                                                                    {(comment.attachmentSize! / 1024).toFixed(
+                                                                        1
+                                                                    )}{" "}
+                                                                    KB)
+                                                                </span>
+                                                                <a
+                                                                    href={getAttachmentUrl(comment.attachmentUrl)}
+                                                                    className="text-blue-600 hover:text-blue-800 underline ml-auto"
+                                                                    target="_blank"
+                                                                    rel="noopener noreferrer"
+                                                                >
+                                                                    Download
+                                                                </a>
+                                                            </div>
                                                         </div>
                                                     ) : (
-                                                        <a
-                                                            href={comment.attachmentUrl}
-                                                            className="flex items-center gap-2 px-3 py-1.5 bg-muted rounded-md text-sm hover:bg-muted/80 transition-colors"
-                                                            target="_blank"
-                                                            rel="noopener noreferrer"
-                                                        >
+                                                        /* Non-image file attachment */
+                                                        <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted p-2 rounded border">
                                                             <Paperclip className="h-3 w-3" />
-                                                            {comment.attachmentName}
-                                                        </a>
+                                                            <span className="font-medium">
+                                                                {comment.attachmentName}
+                                                            </span>
+                                                            <span>
+                                                                (
+                                                                {(comment.attachmentSize! / 1024).toFixed(
+                                                                    1
+                                                                )}{" "}
+                                                                KB)
+                                                            </span>
+                                                            {comment.attachmentUrl && (
+                                                                <a
+                                                                    href={getAttachmentUrl(comment.attachmentUrl)}
+                                                                    className="text-blue-600 hover:text-blue-800 underline ml-auto"
+                                                                    target="_blank"
+                                                                    rel="noopener noreferrer"
+                                                                >
+                                                                    Download
+                                                                </a>
+                                                            )}
+                                                        </div>
                                                     )}
                                                 </div>
                                             )}
@@ -471,51 +562,73 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
                                     rows={4}
                                 />
 
-                                {attachments.length > 0 && (
-                                    <div className="flex flex-wrap gap-2">
-                                        {attachments.map((file, index) => (
-                                            <div key={index} className="flex items-center gap-2 px-3 py-1.5 bg-muted rounded-md text-sm">
-                                                <Paperclip className="h-3 w-3" />
-                                                <span className="max-w-[200px] truncate">{file.name}</span>
-                                                <button
-                                                    onClick={() => removeAttachment(index)}
-                                                    className="ml-1 hover:text-destructive transition-colors"
-                                                >
-                                                    <X className="h-3 w-3" />
-                                                </button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-
-                                <div className="flex items-center gap-2">
-                                    <Button onClick={handleSubmitComment} disabled={submitting || isCommentDisabled} className="gap-2">
-                                        {submitting ? (
-                                            <>
-                                                <Loader2 className="h-4 w-4 animate-spin" />
-                                                Submitting...
-                                            </>
-                                        ) : (
-                                            <>
-                                                <Send className="h-4 w-4" />
-                                                Add Interaction
-                                            </>
-                                        )}
-                                    </Button>
-                                    <div>
-                                        <input type="file" id="file-upload" className="hidden" onChange={handleFileSelect} disabled={isCommentDisabled} />
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        <input
+                                            type="file"
+                                            id="file-upload"
+                                            className="hidden"
+                                            onChange={handleFileSelect}
+                                            disabled={isCommentDisabled}
+                                            accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png"
+                                        />
                                         <Button
                                             type="button"
                                             variant="outline"
+                                            size="sm"
                                             onClick={() => !isCommentDisabled && document.getElementById("file-upload")?.click()}
-                                            className="gap-2"
                                             disabled={isCommentDisabled}
                                         >
-                                            <Paperclip className="h-4 w-4" />
-                                            Attach Files
+                                            <Paperclip className="h-4 w-4 mr-2" />
+                                            Attach File
                                         </Button>
+                                        {selectedFile && (
+                                            <div className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
+                                                {selectedFile.name}
+                                                <button
+                                                    onClick={() => {
+                                                        setSelectedFile(null)
+                                                        setUploadPercent(0)
+                                                        setUploadMessage("")
+                                                        setUploadError(null)
+                                                    }}
+                                                    className="ml-2 text-red-500 hover:text-red-700"
+                                                    disabled={isCommentDisabled}
+                                                >
+                                                    x
+                                                </button>
+                                            </div>
+                                        )}
                                     </div>
+                                    <Button
+                                        type="button"
+                                        onClick={handleSubmitComment}
+                                        disabled={submitting || isCommentDisabled || (!newComment.trim() && !selectedFile)}
+                                    >
+                                        <Send className="h-4 w-4 mr-2" />
+                                        {submitting ? "Submitting..." : "Add Interaction"}
+                                    </Button>
                                 </div>
+                                {selectedFile && (submitting || uploadPercent > 0 || uploadError) && (
+                                    <div className="space-y-2">
+                                        <Progress value={uploadPercent} className="h-2" />
+                                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                                            <span>{uploadError || uploadMessage || "Ready to upload"}</span>
+                                            <span>{uploadPercent}%</span>
+                                        </div>
+                                        {uploadError && (
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={handleSubmitComment}
+                                                disabled={submitting || isCommentDisabled || (!newComment.trim() && !selectedFile)}
+                                            >
+                                                Retry Upload
+                                            </Button>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                         </CardContent>
                     </Card>

@@ -44,8 +44,17 @@ import { useParams } from "next/navigation";
 import Image from "next/image";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
+import { uploadFileToS3Direct } from "@/lib/directUpload";
 
 export default function TaskDetails() {
+  const MANAGEMENT_BASE_URL = "https://management.legalstanley.com";
+
+  const getAttachmentUrl = (url?: string) => {
+    if (!url) return "";
+    if (url.startsWith("http://") || url.startsWith("https://")) return url;
+    return `${MANAGEMENT_BASE_URL}${url.startsWith("/") ? url : `/${url}`}`;
+  };
+
   const [isReassigning, setIsReassigning] = useState(false);
   const [isTransferringOwnership, setIsTransferringOwnership] = useState(false);
   const [taskData, setTaskData] = useState<Task | null>(null);
@@ -56,6 +65,9 @@ export default function TaskDetails() {
   const [newComment, setNewComment] = useState("");
   const [submittingComment, setSubmittingComment] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploadPercent, setUploadPercent] = useState(0);
+  const [uploadMessage, setUploadMessage] = useState("");
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [currentUser, setCurrentUser] = useState<{
     username: string;
     id: string;
@@ -333,6 +345,9 @@ export default function TaskDetails() {
     const file = event.target.files?.[0];
     if (file) {
       setSelectedFile(file);
+      setUploadPercent(0);
+      setUploadMessage("");
+      setUploadError(null);
     }
   };
 
@@ -353,6 +368,7 @@ export default function TaskDetails() {
     if (!taskData) return;
 
     setSubmittingComment(true);
+    setUploadError(null);
     try {
       // Debug: Log current user state
       console.log("Current user state:", currentUser);
@@ -390,24 +406,24 @@ export default function TaskDetails() {
       let attachmentData = {};
 
       if (selectedFile) {
-        const formData = new FormData();
-        formData.append("file", selectedFile);
-
-        const uploadResponse = await fetch("/api/upload", {
-          method: "POST",
-          body: formData,
-        });
-
-        if (uploadResponse.ok) {
-          const uploadResult = await uploadResponse.json();
+        try {
+          const uploadResult = await uploadFileToS3Direct(selectedFile, {
+            onProgress: (progress) => {
+              setUploadPercent(progress.percent);
+              setUploadMessage(progress.message);
+            },
+          });
           attachmentData = {
             attachmentName: uploadResult.originalName,
             attachmentSize: uploadResult.size,
             attachmentType: uploadResult.type,
             attachmentUrl: uploadResult.url,
           };
-        } else {
-          console.error("Failed to upload file");
+        } catch (error) {
+          console.error("Failed to upload file", error);
+          setUploadError(
+            error instanceof Error ? error.message : "Upload failed. Please retry.",
+          );
           setSubmittingComment(false);
           return;
         }
@@ -448,6 +464,9 @@ export default function TaskDetails() {
         setComments((prev) => [newCommentData, ...prev]);
         setNewComment("");
         setSelectedFile(null);
+        setUploadPercent(0);
+        setUploadMessage("");
+        setUploadError(null);
         setCommentDate(new Date()); // Reset to current date
         setStartTime("");
         setEndTime("");
@@ -1668,7 +1687,12 @@ export default function TaskDetails() {
                           <div className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
                             {selectedFile.name}
                             <button
-                              onClick={() => setSelectedFile(null)}
+                              onClick={() => {
+                                setSelectedFile(null);
+                                setUploadPercent(0);
+                                setUploadMessage("");
+                                setUploadError(null);
+                              }}
                               className="ml-2 text-red-500 hover:text-red-700"
                             >
                               ×
@@ -1685,6 +1709,26 @@ export default function TaskDetails() {
                         {submittingComment ? "Adding..." : "Add Comment"}
                       </Button>
                     </div>
+                    {selectedFile && (submittingComment || uploadPercent > 0 || uploadError) && (
+                      <div className="space-y-2">
+                        <Progress value={uploadPercent} className="h-2" />
+                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                          <span>{uploadError || uploadMessage || "Ready to upload"}</span>
+                          <span>{uploadPercent}%</span>
+                        </div>
+                        {uploadError && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={handleAddComment}
+                            disabled={submittingComment || !newComment.trim() || !commentDate || !startTime || !endTime}
+                          >
+                            Retry Upload
+                          </Button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1774,36 +1818,28 @@ export default function TaskDetails() {
                                       "http"
                                     ) ? (
                                       <Image
-                                        src={comment.attachmentUrl}
+                                        src={getAttachmentUrl(comment.attachmentUrl)}
                                         alt={comment.attachmentName}
                                         width={300}
                                         height={200}
                                         className="max-w-xs max-h-48 rounded-lg border shadow-sm cursor-pointer hover:shadow-md transition-shadow object-cover"
                                         onClick={() =>
                                           window.open(
-                                            comment.attachmentUrl,
+                                            getAttachmentUrl(comment.attachmentUrl),
                                             "_blank"
                                           )
                                         }
                                       />
                                     ) : (
                                       <Image
-                                        src={
-                                          comment.attachmentUrl?.startsWith("/")
-                                            ? comment.attachmentUrl
-                                            : `/${comment.attachmentUrl}`
-                                        }
+                                        src={getAttachmentUrl(comment.attachmentUrl)}
                                         alt={comment.attachmentName}
                                         width={300}
                                         height={200}
                                         className="max-w-xs max-h-48 rounded-lg border shadow-sm cursor-pointer hover:shadow-md transition-shadow object-cover"
                                         onClick={() =>
                                           window.open(
-                                            comment.attachmentUrl?.startsWith(
-                                              "/"
-                                            )
-                                              ? comment.attachmentUrl
-                                              : `/${comment.attachmentUrl}`,
+                                            getAttachmentUrl(comment.attachmentUrl),
                                             "_blank"
                                           )
                                         }
@@ -1825,12 +1861,16 @@ export default function TaskDetails() {
                                       KB)
                                     </span>
                                     <a
-                                      href={
-                                        comment.attachmentUrl?.startsWith("/")
-                                          ? comment.attachmentUrl
-                                          : `/${comment.attachmentUrl}`
-                                      }
+                                      href={getAttachmentUrl(comment.attachmentUrl)}
                                       className="text-blue-600 hover:text-blue-800 underline ml-auto"
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                    >
+                                      View
+                                    </a>
+                                    <a
+                                      href={getAttachmentUrl(comment.attachmentUrl)}
+                                      className="text-blue-600 hover:text-blue-800 underline"
                                       target="_blank"
                                       rel="noopener noreferrer"
                                     >
@@ -1853,18 +1893,24 @@ export default function TaskDetails() {
                                     KB)
                                   </span>
                                   {comment.attachmentUrl && (
-                                    <a
-                                      href={
-                                        comment.attachmentUrl?.startsWith("/")
-                                          ? comment.attachmentUrl
-                                          : `/${comment.attachmentUrl}`
-                                      }
-                                      className="text-blue-600 hover:text-blue-800 underline ml-auto"
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                    >
-                                      Download
-                                    </a>
+                                    <div className="ml-auto flex items-center gap-2">
+                                      <a
+                                        href={getAttachmentUrl(comment.attachmentUrl)}
+                                        className="text-blue-600 hover:text-blue-800 underline"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                      >
+                                        View
+                                      </a>
+                                      <a
+                                        href={getAttachmentUrl(comment.attachmentUrl)}
+                                        className="text-blue-600 hover:text-blue-800 underline"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                      >
+                                        Download
+                                      </a>
+                                    </div>
                                   )}
                                 </div>
                               )}

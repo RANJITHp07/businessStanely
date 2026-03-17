@@ -19,7 +19,6 @@ import {
     Loader2,
     Send,
     Paperclip,
-    X,
     MessageSquare,
     Clock,
     CalendarIcon,
@@ -30,6 +29,9 @@ import { cn } from "@/lib/utils"
 import { useAgentContext } from "@/lib/agent-context"
 import { normalizePhoneNumber } from "@/lib/normalizePhoneNumber"
 import { Input } from "@/components/ui/input"
+import { uploadFileToS3Direct } from "@/lib/directUpload"
+import { Progress } from "@/components/ui/progress"
+import { Checkbox } from "@/components/ui/checkbox"
 
 interface oppurtunities {
     id: string
@@ -56,6 +58,14 @@ interface oppurtunities {
     };
 }
 
+const MANAGEMENT_BASE_URL = "https://management.legalstanley.com"
+
+const getAttachmentUrl = (url?: string) => {
+    if (!url) return ""
+    if (url.startsWith("http://") || url.startsWith("https://")) return url
+    return `${MANAGEMENT_BASE_URL}${url.startsWith("/") ? url : `/${url}`}`
+}
+
 export default function OppurtunitiesDetailPage() {
     const agent = useAgentContext()
     const [oppurtunities, setoppurtunities] = useState<oppurtunities | null>(null)
@@ -65,6 +75,11 @@ export default function OppurtunitiesDetailPage() {
         createdAt: string;
         agent?: { name?: string };
         user?: { username?: string };
+        commentDate?: string;
+        startTime?: string;
+        endTime?: string;
+        attachmentType?: string;
+        attachmentSize?: number;
         attachmentName?: string;
         attachmentUrl?: string;
     }
@@ -72,11 +87,17 @@ export default function OppurtunitiesDetailPage() {
     const [comments, setComments] = useState<Comment[]>([])
     const [loading, setLoading] = useState(true)
     const [newComment, setNewComment] = useState("")
-    const [attachments, setAttachments] = useState<File[]>([])
+    const [selectedFile, setSelectedFile] = useState<File | null>(null)
+    const [uploadPercent, setUploadPercent] = useState(0)
+    const [uploadMessage, setUploadMessage] = useState("")
+    const [uploadError, setUploadError] = useState<string | null>(null)
     const [submitting, setSubmitting] = useState(false)
     const [nextFollowUpDate, setNextFollowUpDate] = useState<Date | undefined>(undefined)
+    const [commentDate, setCommentDate] = useState<Date | undefined>(new Date())
+    const [startTime, setStartTime] = useState("")
+    const [endTime, setEndTime] = useState("")
+    const [duration, setDuration] = useState(0)
     const fileRef = React.useRef<HTMLInputElement | null>(null)
-    const [file, setFile] = React.useState<File | null>(null)
 
 
     // Use useParams from next/navigation for dynamic route params in client components
@@ -133,29 +154,20 @@ export default function OppurtunitiesDetailPage() {
         }
     }
 
-    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files) {
-            setAttachments([...attachments, ...Array.from(e.target.files)])
+    const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0]
+        if (file) {
+            setSelectedFile(file)
+            setUploadPercent(0)
+            setUploadMessage("")
+            setUploadError(null)
         }
-    }
-
-    const removeAttachment = (index: number) => {
-        setAttachments(attachments.filter((_, i) => i !== index))
     }
 
     const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files?.length) {
-            const formData = new FormData();
-            formData.append("file", e.target.files[0]);
-
-            const uploadResponse = await fetch("/api/upload", {
-                method: "POST",
-                body: formData,
-            });
-
-            if (uploadResponse.ok) {
-                const uploadResult = await uploadResponse.json();
-                let quote = uploadResult.url
+            try {
+                const uploadResult = await uploadFileToS3Direct(e.target.files[0]);
                 console.log("hiii", uploadResult)
                 setoppurtunities({ ...oppurtunities, status: "Proposal Issued", quote: uploadResult.url! })
                 const res = await fetch(`/api/opportunities/${oppurtunities?.id}`, {
@@ -167,55 +179,100 @@ export default function OppurtunitiesDetailPage() {
                     console.error("Failed to update status");
                     return;
                 }
-                setFile(e.target.files[0])
+            } catch (error) {
+                console.error("Failed to upload file", error)
+                return;
             }
-        } else {
-            setFile(null)
         }
     }
 
+    const getNowTime = () => {
+        const d = new Date()
+        return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`
+    }
+
+    const timeToMinutes = (time: string) => {
+        const [h, m] = time.split(":").map(Number)
+        return h * 60 + m
+    }
+
+    const addMinutes = (time: string, mins: number) => {
+        const [h, m] = time.split(":").map(Number)
+        const d = new Date()
+        d.setHours(h, m + mins)
+        return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`
+    }
+
+    const get12HourFormat = (isoDateTime?: string): string => {
+        if (!isoDateTime) return ""
+        const date = new Date(isoDateTime)
+        if (isNaN(date.getTime())) return ""
+        return date.toLocaleTimeString("en-US", {
+            hour: "numeric",
+            minute: "2-digit",
+            hour12: true,
+        })
+    }
+
     const handleSubmitComment = async () => {
-        if (!newComment.trim() && attachments.length === 0) return;
+        if (!newComment.trim() || !commentDate || !startTime || !endTime) return;
         setSubmitting(true);
+        setUploadError(null)
         try {
             let attachmentData = {}
-            if (attachments && attachments.length > 0) {
-                const formData = new FormData();
-                formData.append("file", attachments[0]);
-
-                const uploadResponse = await fetch("/api/upload", {
-                    method: "POST",
-                    body: formData,
-                });
-
-                if (uploadResponse.ok) {
-                    const uploadResult = await uploadResponse.json();
+            if (selectedFile) {
+                try {
+                    const uploadResult = await uploadFileToS3Direct(selectedFile, {
+                        onProgress: (progress) => {
+                            setUploadPercent(progress.percent)
+                            setUploadMessage(progress.message)
+                        },
+                    });
                     attachmentData = {
                         attachmentName: uploadResult.originalName,
                         attachmentSize: uploadResult.size,
                         attachmentType: uploadResult.type,
                         attachmentUrl: uploadResult.url,
                     };
-                } else {
+                } catch (error) {
                     console.error("Failed to upload file", error)
+                    setUploadError(error instanceof Error ? error.message : "Upload failed. Please retry.")
+                    setSubmitting(false)
                     return;
                 }
             }
-            // TODO: Replace with actual user context
+
+            const startDateTime = new Date(commentDate)
+            const [startHour, startMinute] = startTime.split(":").map(Number)
+            startDateTime.setHours(startHour, startMinute, 0)
+
+            const endDateTime = new Date(commentDate)
+            const [endHour, endMinute] = endTime.split(":").map(Number)
+            endDateTime.setHours(endHour, endMinute, 0)
+
             const res = await fetch(`/api/opportunities/${opportunityId}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     content: newComment,
+                    commentDate: commentDate.toISOString(),
+                    startTime: startDateTime.toISOString(),
+                    endTime: endDateTime.toISOString(),
                     ...attachmentData
-                    // Attachments logic can be expanded here
                 }),
             });
             if (res.ok) {
                 const { comment } = await res.json();
                 setComments([comment, ...comments]);
                 setNewComment("");
-                setAttachments([]);
+                setSelectedFile(null)
+                setUploadPercent(0)
+                setUploadMessage("")
+                setUploadError(null)
+                setCommentDate(new Date())
+                setStartTime("")
+                setEndTime("")
+                setDuration(0)
             }
         } catch {
             // Handle error
@@ -423,18 +480,58 @@ export default function OppurtunitiesDetailPage() {
                                                 </div>
                                             </div>
                                             <p className="text-sm leading-relaxed">{comment.content}</p>
+                                            {(comment.commentDate || comment.startTime || comment.endTime) && (
+                                                <div className="bg-gradient-to-r from-blue-50 to-blue-100 border border-blue-200 p-3 rounded-lg mt-3 mb-3">
+                                                    <div className="flex flex-wrap items-center gap-6 text-blue-900">
+                                                        {comment.commentDate && (
+                                                            <div className="flex items-center gap-3">
+                                                                <div className="bg-blue-500 rounded-full p-1.5">
+                                                                    <Calendar className="h-3.5 w-3.5 text-white" />
+                                                                </div>
+                                                                <div className="flex flex-col">
+                                                                    <span className="text-xs font-medium uppercase tracking-wide text-blue-700">Work Date</span>
+                                                                    <span className="text-sm font-semibold">{formatDate(comment.commentDate)}</span>
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                        {comment.startTime && comment.endTime && (
+                                                            <div className="flex items-center gap-3">
+                                                                <div className="bg-blue-500 rounded-full p-1.5">
+                                                                    <Clock className="h-3.5 w-3.5 text-white" />
+                                                                </div>
+                                                                <div className="flex flex-col">
+                                                                    <span className="text-xs font-medium uppercase tracking-wide text-blue-700">Duration</span>
+                                                                    <span className="text-sm font-semibold">
+                                                                        {get12HourFormat(comment.startTime)} - {get12HourFormat(comment.endTime)}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            )}
                                             {comment.attachmentUrl && (
                                                 <div className="flex flex-wrap gap-2 pt-2">
-                                                    {comment.attachmentUrl.match(/\.(mp3|wav|ogg)$/i) ? (
+                                                    {comment.attachmentType?.startsWith("image/") ? (
+                                                        <a
+                                                            href={getAttachmentUrl(comment.attachmentUrl)}
+                                                            className="flex items-center gap-2 px-3 py-1.5 bg-muted rounded-md text-sm hover:bg-muted/80 transition-colors"
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                        >
+                                                            <Paperclip className="h-3 w-3" />
+                                                            {comment.attachmentName}
+                                                        </a>
+                                                    ) : comment.attachmentUrl.match(/\.(mp3|wav|ogg)$/i) ? (
                                                         <div className="flex flex-col gap-1 px-2 py-1 bg-muted rounded-md text-sm w-full">
                                                             <audio controls className="w-full">
-                                                                <source src={"https://management.legalstanley.com/" + comment.attachmentUrl} />
+                                                                <source src={getAttachmentUrl(comment.attachmentUrl)} />
                                                                 Your browser does not support the audio element.
                                                             </audio>
                                                         </div>
                                                     ) : (
                                                         <a
-                                                            href={comment.attachmentUrl}
+                                                            href={getAttachmentUrl(comment.attachmentUrl)}
                                                             className="flex items-center gap-2 px-3 py-1.5 bg-muted rounded-md text-sm hover:bg-muted/80 transition-colors"
                                                             target="_blank"
                                                             rel="noopener noreferrer"
@@ -463,25 +560,101 @@ export default function OppurtunitiesDetailPage() {
                                     rows={4}
                                 />
 
-                                {attachments.length > 0 && (
-                                    <div className="flex flex-wrap gap-2">
-                                        {attachments.map((file, index) => (
-                                            <div key={index} className="flex items-center gap-2 px-3 py-1.5 bg-muted rounded-md text-sm">
-                                                <Paperclip className="h-3 w-3" />
-                                                <span className="max-w-[200px] truncate">{file.name}</span>
-                                                <button
-                                                    onClick={() => removeAttachment(index)}
-                                                    className="ml-1 hover:text-destructive transition-colors"
-                                                >
-                                                    <X className="h-3 w-3" />
-                                                </button>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-muted/50 p-4 rounded-lg">
+                                    <div className="space-y-2">
+                                        <Label className="text-sm">Work Date</Label>
+                                        <Popover>
+                                            <PopoverTrigger asChild>
+                                                <Button variant="outline" className="w-full justify-start text-left font-normal">
+                                                    <Calendar className="mr-2 h-4 w-4" />
+                                                    {commentDate ? commentDate.toLocaleDateString("en-US", {
+                                                        month: "short",
+                                                        day: "2-digit",
+                                                        year: "numeric",
+                                                    }) : "Pick a date"}
+                                                </Button>
+                                            </PopoverTrigger>
+                                            <PopoverContent className="w-auto p-0" align="start">
+                                                <CalendarComponent
+                                                    mode="single"
+                                                    selected={commentDate}
+                                                    onSelect={setCommentDate}
+                                                    disabled={(date) => date > new Date()}
+                                                    initialFocus
+                                                />
+                                            </PopoverContent>
+                                        </Popover>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <Label className="text-sm">Start Time</Label>
+                                        <div className="flex gap-2 items-center">
+                                            <Input
+                                                type="time"
+                                                value={startTime}
+                                                onChange={(e) => {
+                                                    const value = e.target.value
+                                                    setStartTime(value)
+                                                    if (duration > 0 && value) {
+                                                        setEndTime(addMinutes(value, duration))
+                                                    }
+                                                }}
+                                            />
+                                            <div className="flex items-center gap-1">
+                                                <Checkbox onCheckedChange={(v) => v && setStartTime(getNowTime())} />
+                                                <span className="text-xs">Now</span>
                                             </div>
-                                        ))}
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <Label className="text-sm">Duration (minutes)</Label>
+                                        <Input
+                                            type="number"
+                                            min={1}
+                                            value={duration}
+                                            onChange={(e) => {
+                                                const mins = Number(e.target.value)
+                                                setDuration(mins)
+                                                if (startTime && mins) {
+                                                    setEndTime(addMinutes(startTime, mins))
+                                                }
+                                            }}
+                                        />
+                                    </div>
+
+                                    <div className="space-y-2 md:col-span-3">
+                                        <Label className="text-sm">End Time</Label>
+                                        <Input type="text" value={endTime} readOnly />
+                                        {startTime && endTime && timeToMinutes(endTime) <= timeToMinutes(startTime) && (
+                                            <p className="text-xs text-destructive">End time must be greater than start time</p>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {selectedFile && (
+                                    <div className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded w-fit">
+                                        {selectedFile.name}
+                                        <button
+                                            onClick={() => {
+                                                setSelectedFile(null)
+                                                setUploadPercent(0)
+                                                setUploadMessage("")
+                                                setUploadError(null)
+                                            }}
+                                            className="ml-2 text-red-500 hover:text-red-700"
+                                        >
+                                            x
+                                        </button>
                                     </div>
                                 )}
 
                                 <div className="flex items-center gap-2">
-                                    <Button onClick={handleSubmitComment} disabled={submitting} className="gap-2">
+                                    <Button
+                                        onClick={handleSubmitComment}
+                                        disabled={!newComment.trim() || submitting || !commentDate || !startTime || !endTime}
+                                        className="gap-2"
+                                    >
                                         {submitting ? (
                                             <>
                                                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -495,7 +668,13 @@ export default function OppurtunitiesDetailPage() {
                                         )}
                                     </Button>
                                     <div>
-                                        <input type="file" id="file-upload" className="hidden" onChange={handleFileSelect} />
+                                        <input
+                                            type="file"
+                                            id="file-upload"
+                                            className="hidden"
+                                            onChange={handleFileSelect}
+                                            accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png"
+                                        />
                                         <Button
                                             type="button"
                                             variant="outline"
@@ -503,10 +682,30 @@ export default function OppurtunitiesDetailPage() {
                                             className="gap-2"
                                         >
                                             <Paperclip className="h-4 w-4" />
-                                            Attach Files
+                                            Attach File
                                         </Button>
                                     </div>
                                 </div>
+                                {selectedFile && (submitting || uploadPercent > 0 || uploadError) && (
+                                    <div className="space-y-2">
+                                        <Progress value={uploadPercent} className="h-2" />
+                                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                                            <span>{uploadError || uploadMessage || "Ready to upload"}</span>
+                                            <span>{uploadPercent}%</span>
+                                        </div>
+                                        {uploadError && (
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={handleSubmitComment}
+                                                disabled={submitting || !newComment.trim() || !commentDate || !startTime || !endTime}
+                                            >
+                                                Retry Upload
+                                            </Button>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                         </CardContent>
                     </Card>

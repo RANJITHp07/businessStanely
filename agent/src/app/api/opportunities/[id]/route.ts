@@ -129,6 +129,9 @@ export async function POST(
       attachmentUrl,
       attachmentSize,
       attachmentType,
+      commentDate,
+      startTime,
+      endTime,
     } = body;
     if (!content) {
       return NextResponse.json(
@@ -143,6 +146,9 @@ export async function POST(
         attachmentUrl,
         attachmentSize,
         attachmentType,
+        commentDate: commentDate ? new Date(commentDate) : null,
+        startTime: startTime ? new Date(startTime) : null,
+        endTime: endTime ? new Date(endTime) : null,
         authorId: agent.id,
         authorType: "AGENT",
         opportunityId: id,

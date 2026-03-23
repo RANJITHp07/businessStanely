@@ -26,6 +26,13 @@ import { Upload, X, User, FileText, Users } from "lucide-react";
 import { toast } from "react-toastify";
 import { Agent } from "@/types";
 import { useRouter, useSearchParams } from "next/navigation";
+import {
+  ADVISOR_AGENT_ROLE,
+  EXECUTION_AGENT_ROLE,
+  EXECUTION_AND_ADVISOR_AGENT_ROLE,
+  hasAdvisorRole,
+  hasExecutionRole,
+} from "@/lib/agentRole";
 
 const executionAgentTypes = [
   "Owner",
@@ -44,14 +51,17 @@ const advisorAgentTypes = [
   "Client Advisor",
   "Client Manager",
 ];
-// Get agent types based on selected role
-const getAgentTypesForRole = (role: string) => {
-  if (role === "Advisor Agent") return advisorAgentTypes;
-  return executionAgentTypes;
-};
+
+const isExecutionType = (type?: string | null) =>
+  !!type && executionAgentTypes.includes(type);
+
+const isAdvisorType = (type?: string | null) =>
+  !!type && advisorAgentTypes.includes(type);
+
 const agentRoles = [
-  "Execution Agent",
-  "Advisor Agent",
+  EXECUTION_AGENT_ROLE,
+  ADVISOR_AGENT_ROLE,
+  EXECUTION_AND_ADVISOR_AGENT_ROLE,
 ];
 
 // Define agent hierarchy - each agent can manage agents below them in the hierarchy
@@ -170,6 +180,9 @@ export default function AgentForm({ agent }: AgentFormProps) {
   const [selectedSubordinates, setSelectedSubordinates] = useState<string[]>(
     agent?.subordinates ? agent.subordinates.map((sub) => sub.id) : []
   );
+  const [selectedAdvisorSubordinates, setSelectedAdvisorSubordinates] = useState<string[]>(
+    agent?.advisorSubordinates ? agent.advisorSubordinates.map((sub) => sub.id) : []
+  );
   const [photoPreview, setPhotoPreview] = useState<string | null>(
     agent?.photo || null
   );
@@ -183,24 +196,37 @@ export default function AgentForm({ agent }: AgentFormProps) {
     secondaryPhoneNumber: string;
     agentRole: string;
     agentType: string;
+    executionAgentType: string;
+    advisorAgentType: string;
     barAssociationId: string;
     jurisdiction: string;
     autoAssign?: boolean
   };
   const searchParams = useSearchParams();
   const agentRole = searchParams.get("agentRole");
+
+  const initialExecutionType =
+    agent?.executionAgentType ||
+    (isExecutionType(agent?.agentType) ? agent?.agentType : "");
+  const initialAdvisorType =
+    agent?.advisorAgentType ||
+    (isAdvisorType(agent?.agentType) ? agent?.agentType : "");
+
   const [formData, setFormData] = useState<AgentFormData>({
     name: agent?.name || "",
     email: agent?.email || "",
     phoneNumber: agent?.phoneNumber || "",
     secondaryPhoneNumber: agent?.secondaryPhoneNumber || "",
-    agentRole: agentRole || agent?.agentRole || "Execution Agent",
+    agentRole: agentRole || agent?.agentRole || EXECUTION_AGENT_ROLE,
     agentType: agent?.agentType || "",
+    executionAgentType: initialExecutionType || "",
+    advisorAgentType: initialAdvisorType || "",
     barAssociationId: agent?.barAssociationId || "",
     jurisdiction: agent?.jurisdiction || "",
     autoAssign: agent?.autoAssign || true
   });
   const [agentSearch, setAgentSearch] = useState("");
+  const [advisorAgentSearch, setAdvisorAgentSearch] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false)
   const router = useRouter();
 
@@ -219,6 +245,9 @@ export default function AgentForm({ agent }: AgentFormProps) {
           if (!agent || a.id !== agent.id) {
             if (Array.isArray(a.subordinates)) {
               subordinateIds.push(...a.subordinates.map((s: Agent) => s.id));
+            }
+            if (Array.isArray(a.advisorSubordinates)) {
+              subordinateIds.push(...a.advisorSubordinates.map((s: Agent) => s.id));
             }
           }
         });
@@ -245,12 +274,68 @@ export default function AgentForm({ agent }: AgentFormProps) {
     }
   }, [agent?.subordinates]);
 
+  useEffect(() => {
+    if (agent?.advisorSubordinates) {
+      setSelectedAdvisorSubordinates(
+        agent.advisorSubordinates.map((sub) => sub.id)
+      );
+    } else {
+      setSelectedAdvisorSubordinates([]);
+    }
+  }, [agent?.advisorSubordinates]);
+
+  const selectedExecutionType =
+    formData.agentRole === EXECUTION_AND_ADVISOR_AGENT_ROLE
+      ? formData.executionAgentType
+      : hasAdvisorRole(formData.agentRole)
+        ? ""
+        : formData.agentType;
+
+  const selectedAdvisorType =
+    formData.agentRole === EXECUTION_AND_ADVISOR_AGENT_ROLE
+      ? formData.advisorAgentType
+      : hasAdvisorRole(formData.agentRole)
+        ? formData.agentType
+        : "";
+
+  const managementAgentType = selectedAdvisorType || selectedExecutionType || "";
+
+  const handleAgentRoleChange = (role: string) => {
+    setFormData((prev) => {
+      if (role === EXECUTION_AND_ADVISOR_AGENT_ROLE) {
+        return {
+          ...prev,
+          agentRole: role,
+          agentType: prev.executionAgentType || prev.agentType,
+          executionAgentType: prev.executionAgentType || (isExecutionType(prev.agentType) ? prev.agentType : ""),
+          advisorAgentType: prev.advisorAgentType || (isAdvisorType(prev.agentType) ? prev.agentType : ""),
+        };
+      }
+
+      if (role === ADVISOR_AGENT_ROLE) {
+        const nextAdvisorType = prev.advisorAgentType || (isAdvisorType(prev.agentType) ? prev.agentType : "");
+        return {
+          ...prev,
+          agentRole: role,
+          agentType: nextAdvisorType,
+        };
+      }
+
+      const nextExecutionType = prev.executionAgentType || (isExecutionType(prev.agentType) ? prev.agentType : "");
+      return {
+        ...prev,
+        agentRole: role,
+        agentType: nextExecutionType,
+      };
+    });
+  };
+
 
   // Get available agents based on selected agent type hierarchy
   const getAvailableAgents = () => {
-    if (!formData.agentType) return [];
+    if (!selectedExecutionType) return [];
 
-    const allowedTypes = agentHierarchy[formData.agentType] || [];
+    const allowedTypes = agentHierarchy[selectedExecutionType] || [];
     return allAgents.filter((existingAgent) => {
       // Exclude current agent being edited
       if (agent && existingAgent.id === agent.id) return false;
@@ -314,6 +399,16 @@ export default function AgentForm({ agent }: AgentFormProps) {
     }
   };
 
+  const handleAdvisorSubordinateChange = (agentId: string, checked: boolean) => {
+    if (checked) {
+      setSelectedAdvisorSubordinates([...selectedAdvisorSubordinates, agentId]);
+    } else {
+      setSelectedAdvisorSubordinates(
+        selectedAdvisorSubordinates.filter((id) => id !== agentId)
+      );
+    }
+  };
+
   const handlePhotoUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
@@ -346,8 +441,20 @@ export default function AgentForm({ agent }: AgentFormProps) {
     const url = agent ? `/api/agents/${agent.id}` : "/api/agents";
     const method = agent ? "PUT" : "POST";
 
+    if (formData.agentRole === EXECUTION_AND_ADVISOR_AGENT_ROLE) {
+      if (!formData.executionAgentType || !formData.advisorAgentType) {
+        toast.error("Please select both Execution Agent Type and Advisor Agent Type.");
+        return;
+      }
+    }
+
     try {
       setIsSubmitting(true)
+      const payloadAgentType =
+        formData.agentRole === EXECUTION_AND_ADVISOR_AGENT_ROLE
+          ? formData.executionAgentType
+          : formData.agentType;
+
       const response = await fetch(url, {
         method: method,
         headers: {
@@ -355,8 +462,10 @@ export default function AgentForm({ agent }: AgentFormProps) {
         },
         body: JSON.stringify({
           ...formData,
+          agentType: payloadAgentType,
           specializations: selectedSpecializations,
           subordinates: selectedSubordinates,
+          advisorSubordinates: selectedAdvisorSubordinates,
           photo: photoPreview,
         }),
       });
@@ -443,8 +552,8 @@ export default function AgentForm({ agent }: AgentFormProps) {
               <div className="space-y-2">
                 <Label htmlFor="agent-role">Agent Role *</Label>
                 <Select
-                  value={formData.agentRole || "Execution Agent"}
-                  onValueChange={(value) => handleInputChange("agentRole", value)}
+                  value={formData.agentRole || EXECUTION_AGENT_ROLE}
+                  onValueChange={handleAgentRoleChange}
                 >
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Select agent role" />
@@ -525,27 +634,82 @@ export default function AgentForm({ agent }: AgentFormProps) {
           <CardContent className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="agent-type">Agent Type *</Label>
-                <Select
-                  value={formData.agentType}
-                  onValueChange={(value) => handleInputChange("agentType", value)}
-                  disabled={!formData.agentRole}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select agent type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {getAgentTypesForRole(formData.agentRole).map((type) => (
-                      <SelectItem key={type} value={type}>
-                        {type}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {formData.agentRole === EXECUTION_AND_ADVISOR_AGENT_ROLE ? (
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="execution-agent-type">Execution Agent Type *</Label>
+                      <Select
+                        value={formData.executionAgentType}
+                        onValueChange={(value) => {
+                          setFormData((prev) => ({
+                            ...prev,
+                            executionAgentType: value,
+                            agentType: value,
+                          }));
+                        }}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Select execution agent type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {executionAgentTypes.map((type) => (
+                            <SelectItem key={type} value={type}>
+                              {type}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="advisor-agent-type">Advisor Agent Type *</Label>
+                      <Select
+                        value={formData.advisorAgentType}
+                        onValueChange={(value) =>
+                          setFormData((prev) => ({
+                            ...prev,
+                            advisorAgentType: value,
+                          }))
+                        }
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="Select advisor agent type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {advisorAgentTypes.map((type) => (
+                            <SelectItem key={type} value={type}>
+                              {type}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <Label htmlFor="agent-type">Agent Type *</Label>
+                    <Select
+                      value={formData.agentType}
+                      onValueChange={(value) => handleInputChange("agentType", value)}
+                      disabled={!formData.agentRole}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Select agent type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(hasAdvisorRole(formData.agentRole)
+                          ? advisorAgentTypes
+                          : executionAgentTypes).map((type) => (
+                            <SelectItem key={type} value={type}>
+                              {type}
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  </>
+                )}
 
-                {
-                  formData.agentRole === "Advisor Agent" && formData.agentType && formData.agentType != "Lead Maker" &&
-                  < div className="flex items-center">
+                {hasAdvisorRole(formData.agentRole) && selectedAdvisorType && selectedAdvisorType !== "Lead Maker" && (
+                  <div className="flex items-center">
                     <input
                       type="checkbox"
                       id="auto-assign"
@@ -562,7 +726,7 @@ export default function AgentForm({ agent }: AgentFormProps) {
                       If this checkbox is selected, the prospect will be automatically assigned to this agent.
                     </Label>
                   </div>
-                }
+                )}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="jurisdiction">Jurisdiction *</Label>
@@ -674,172 +838,268 @@ export default function AgentForm({ agent }: AgentFormProps) {
             </CardTitle>
             <CardDescription>
               Assign agents to work under this agent.
-              {formData.agentType && (
+              {formData.agentRole !== EXECUTION_AND_ADVISOR_AGENT_ROLE &&
+                managementAgentType && (
+                  <div className="mt-2 text-sm text-blue-600">
+                    As a <strong>{managementAgentType}</strong>, you can manage:{" "}
+                    {agentHierarchy[managementAgentType]?.join(", ") ||
+                      "No subordinates available"}
+                  </div>
+                )}
+              {formData.agentRole === EXECUTION_AND_ADVISOR_AGENT_ROLE && (
                 <div className="mt-2 text-sm text-blue-600">
-                  As a <strong>{formData.agentType}</strong>, you can manage:{" "}
-                  {agentHierarchy[formData.agentType]?.join(", ") ||
-                    "No subordinates available"}
+                  Configure both Execution Team and Advisor Team assignments.
                 </div>
               )}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            {/* Advisor Agent hierarchy logic */}
-            {formData.agentRole === "Advisor Agent" ? (
-              formData.agentType === "Client Manager" ? (
-                <>
-                  {/* Search Input for Client Advisor */}
-                  <div className="space-y-2">
-                    <Label htmlFor="agent-search">Search Client Advisors</Label>
-                    <Input
-                      id="agent-search"
-                      placeholder="Search by name or email..."
-                      value={agentSearch}
-                      onChange={(e) => setAgentSearch(e.target.value)}
-                      className="max-w-md"
-                    />
+            {hasExecutionRole(formData.agentRole) && (
+              <div className="space-y-4 border rounded-lg p-4">
+                <Label className="text-base font-semibold">Execution Team</Label>
+                {!selectedExecutionType && (
+                  <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <p className="text-sm text-yellow-800">
+                      Please select an Execution Agent Type first.
+                    </p>
                   </div>
-                  {/* Selected Client Advisors */}
-                  {selectedSubordinates.length > 0 && (
-                    <div className="space-y-3">
-                      <Label>
-                        Selected Client Advisors ({selectedSubordinates.length})
-                      </Label>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        {selectedSubordinates.map((agentId) => {
-                          const selectedAgent = allAgents.find(
-                            (a) => a.id === agentId && a.agentType === "Client Advisor"
-                          );
-                          return selectedAgent ? (
-                            <div
-                              key={selectedAgent.id}
-                              className="flex items-center justify-between p-3 bg-blue-50 border border-blue-200 rounded-lg"
-                            >
-                              <div className="flex items-center space-x-3">
-                                <Avatar className="h-8 w-8">
-                                  <AvatarImage src={selectedAgent.photo || ""} />
-                                  <AvatarFallback className="bg-blue-100 text-blue-600">
-                                    {selectedAgent.name.split(" ").map((n) => n[0]).join("")}
-                                  </AvatarFallback>
-                                </Avatar>
-                                <div>
-                                  <p className="font-medium text-blue-900">{selectedAgent.name}</p>
-                                  <p className="text-sm text-blue-600">{selectedAgent.agentType}</p>
-                                </div>
-                              </div>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleSubordinateChange(selectedAgent.id, false)}
-                                className="text-blue-600 hover:text-blue-800 hover:bg-blue-100"
-                              >
-                                <X className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          ) : null;
-                        })}
-                      </div>
+                )}
+                {selectedExecutionType &&
+                  agentHierarchy[selectedExecutionType]?.length === 0 && (
+                    <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
+                      <p className="text-sm text-gray-600">
+                        As an <strong>{selectedExecutionType}</strong>, you cannot
+                        manage any execution subordinates.
+                      </p>
                     </div>
                   )}
-                  {/* Available Client Advisors */}
-                  <div className="space-y-3">
-                    <Label>Available Client Advisors</Label>
-                    {loading ? (
-                      <div className="text-center py-4">
-                        <p className="text-sm text-muted-foreground">Loading agents...</p>
+                {selectedExecutionType &&
+                  agentHierarchy[selectedExecutionType]?.length > 0 && (
+                    <>
+                      <div className="space-y-2">
+                        <Label htmlFor="execution-agent-search">
+                          Search Execution Agents
+                        </Label>
+                        <Input
+                          id="execution-agent-search"
+                          placeholder="Search by name, type, or email..."
+                          value={agentSearch}
+                          onChange={(e) => setAgentSearch(e.target.value)}
+                          className="max-w-md"
+                        />
                       </div>
-                    ) : (
-                      <div className="space-y-2 max-h-64 overflow-y-auto">
-                        {allAgents
-                          .filter((a) => a.agentType === "Client Advisor" && (a.name.toLowerCase().includes(agentSearch.toLowerCase()) || a.email.toLowerCase().includes(agentSearch.toLowerCase())))
-                          .map((availableAgent) => (
-                            <div
-                              key={availableAgent.id}
-                              className={`flex items-center justify-between p-3 border rounded-lg transition-colors ${selectedSubordinates.includes(availableAgent.id)
-                                ? "bg-gray-50 border-gray-300"
-                                : "hover:bg-gray-50"
-                                }`}
-                            >
-                              <div className="flex items-center space-x-3">
-                                <Checkbox
-                                  id={availableAgent.id}
-                                  checked={selectedSubordinates.includes(availableAgent.id)}
-                                  onCheckedChange={(checked) => handleSubordinateChange(availableAgent.id, checked as boolean)}
-                                />
-                                <Avatar className="h-8 w-8">
-                                  <AvatarImage src={availableAgent.photo || ""} />
-                                  <AvatarFallback>{availableAgent.name.split(" ").map((n) => n[0]).join("")}</AvatarFallback>
-                                </Avatar>
-                                <div>
-                                  <Label htmlFor={availableAgent.id} className="font-medium cursor-pointer">{availableAgent.name}</Label>
-                                  <p className="text-sm text-muted-foreground">{availableAgent.agentType} • {availableAgent.email}</p>
+
+                      {selectedSubordinates.length > 0 && (
+                        <div className="space-y-3">
+                          <Label>
+                            Selected Execution Agents ({selectedSubordinates.length})
+                          </Label>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            {selectedSubordinates.map((agentId) => {
+                              const selectedAgent = allAgents.find(
+                                (a) => a.id === agentId,
+                              );
+                              return selectedAgent ? (
+                                <div
+                                  key={selectedAgent.id}
+                                  className="flex items-center justify-between p-3 bg-blue-50 border border-blue-200 rounded-lg"
+                                >
+                                  <div className="flex items-center space-x-3">
+                                    <Avatar className="h-8 w-8">
+                                      <AvatarImage src={selectedAgent.photo || ""} />
+                                      <AvatarFallback className="bg-blue-100 text-blue-600">
+                                        {selectedAgent.name
+                                          .split(" ")
+                                          .map((n) => n[0])
+                                          .join("")}
+                                      </AvatarFallback>
+                                    </Avatar>
+                                    <div>
+                                      <p className="font-medium text-blue-900">
+                                        {selectedAgent.name}
+                                      </p>
+                                      <p className="text-sm text-blue-600">
+                                        {selectedAgent.agentType}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() =>
+                                      handleSubordinateChange(selectedAgent.id, false)
+                                    }
+                                    className="text-blue-600 hover:text-blue-800 hover:bg-blue-100"
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </Button>
                                 </div>
+                              ) : null;
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="space-y-3">
+                        <Label>Available Execution Agents</Label>
+                        {loading ? (
+                          <div className="text-center py-4">
+                            <p className="text-sm text-muted-foreground">
+                              Loading agents...
+                            </p>
+                          </div>
+                        ) : filteredAgents.length === 0 ? (
+                          <p className="text-sm text-muted-foreground py-4 text-center">
+                            {agentSearch
+                              ? "No agents found matching your search."
+                              : getAvailableAgents().length === 0
+                                ? "No agents available for this hierarchy level."
+                                : "No agents available."}
+                          </p>
+                        ) : (
+                          <div className="space-y-2 max-h-64 overflow-y-auto">
+                            {filteredAgents.map((availableAgent) => (
+                              <div
+                                key={availableAgent.id}
+                                className={`flex items-center justify-between p-3 border rounded-lg transition-colors ${selectedSubordinates.includes(availableAgent.id)
+                                  ? "bg-gray-50 border-gray-300"
+                                  : "hover:bg-gray-50"
+                                  }`}
+                              >
+                                <div className="flex items-center space-x-3">
+                                  <Checkbox
+                                    id={availableAgent.id}
+                                    checked={selectedSubordinates.includes(
+                                      availableAgent.id,
+                                    )}
+                                    onCheckedChange={(checked) =>
+                                      handleSubordinateChange(
+                                        availableAgent.id,
+                                        checked as boolean,
+                                      )
+                                    }
+                                  />
+                                  <Avatar className="h-8 w-8">
+                                    <AvatarImage src={availableAgent.photo || ""} />
+                                    <AvatarFallback>
+                                      {availableAgent.name
+                                        .split(" ")
+                                        .map((n) => n[0])
+                                        .join("")}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                  <div>
+                                    <Label
+                                      htmlFor={availableAgent.id}
+                                      className="font-medium cursor-pointer"
+                                    >
+                                      {availableAgent.name}
+                                    </Label>
+                                    <p className="text-sm text-muted-foreground">
+                                      {availableAgent.agentType} • {availableAgent.email}
+                                    </p>
+                                  </div>
+                                </div>
+                                {selectedSubordinates.includes(availableAgent.id) && (
+                                  <Badge
+                                    variant="secondary"
+                                    className="bg-blue-100 text-blue-800"
+                                  >
+                                    Selected
+                                  </Badge>
+                                )}
                               </div>
-                              {selectedSubordinates.includes(availableAgent.id) && (
-                                <Badge variant="secondary" className="bg-blue-100 text-blue-800">Selected</Badge>
-                              )}
-                            </div>
-                          ))}
+                            ))}
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                </>
-              ) : (
-                <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
-                  <p className="text-sm text-gray-600">
-                    As an <strong>{formData.agentType}</strong>, you cannot manage any subordinates.
-                  </p>
-                </div>
-              )
-            ) : (
-              // ...existing code for Execution Agent team management...
-              <>
-                {!formData.agentType && (
+                    </>
+                  )}
+              </div>
+            )}
+
+            {hasAdvisorRole(formData.agentRole) && (
+              <div className="space-y-4 border rounded-lg p-4">
+                <Label className="text-base font-semibold">Advisor Team</Label>
+                {!selectedAdvisorType && (
                   <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                    <p className="text-sm text-yellow-800">Please select an Agent Type first to see available team members.</p>
+                    <p className="text-sm text-yellow-800">
+                      Please select an Advisor Agent Type first.
+                    </p>
                   </div>
                 )}
-                {formData.agentType && agentHierarchy[formData.agentType]?.length === 0 && (
+                {selectedAdvisorType && selectedAdvisorType !== "Client Manager" && (
                   <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
-                    <p className="text-sm text-gray-600">As an <strong>{formData.agentType}</strong>, you cannot manage any subordinates.</p>
+                    <p className="text-sm text-gray-600">
+                      As an <strong>{selectedAdvisorType}</strong>, you cannot
+                      manage advisor subordinates.
+                    </p>
                   </div>
                 )}
-                {formData.agentType && agentHierarchy[formData.agentType]?.length > 0 && (
+
+                {selectedAdvisorType === "Client Manager" && (
                   <>
-                    {/* Search Input */}
                     <div className="space-y-2">
-                      <Label htmlFor="agent-search">Search Agents</Label>
+                      <Label htmlFor="advisor-agent-search">
+                        Search Client Advisors
+                      </Label>
                       <Input
-                        id="agent-search"
-                        placeholder="Search by name, type, or email..."
-                        value={agentSearch}
-                        onChange={(e) => setAgentSearch(e.target.value)}
+                        id="advisor-agent-search"
+                        placeholder="Search by name or email..."
+                        value={advisorAgentSearch}
+                        onChange={(e) => setAdvisorAgentSearch(e.target.value)}
                         className="max-w-md"
                       />
                     </div>
-                    {/* Selected Agents Display */}
-                    {selectedSubordinates.length > 0 && (
+
+                    {selectedAdvisorSubordinates.length > 0 && (
                       <div className="space-y-3">
                         <Label>
-                          Selected Agents ({selectedSubordinates.length})
+                          Selected Client Advisors ({selectedAdvisorSubordinates.length})
                         </Label>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                          {selectedSubordinates.map((agentId) => {
-                            const selectedAgent = allAgents.find((a) => a.id === agentId);
+                          {selectedAdvisorSubordinates.map((agentId) => {
+                            const selectedAgent = allAgents.find(
+                              (a) =>
+                                a.id === agentId && a.agentType === "Client Advisor",
+                            );
                             return selectedAgent ? (
-                              <div key={selectedAgent.id} className="flex items-center justify-between p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                              <div
+                                key={selectedAgent.id}
+                                className="flex items-center justify-between p-3 bg-blue-50 border border-blue-200 rounded-lg"
+                              >
                                 <div className="flex items-center space-x-3">
                                   <Avatar className="h-8 w-8">
                                     <AvatarImage src={selectedAgent.photo || ""} />
-                                    <AvatarFallback className="bg-blue-100 text-blue-600">{selectedAgent.name.split(" ").map((n) => n[0]).join("")}</AvatarFallback>
+                                    <AvatarFallback className="bg-blue-100 text-blue-600">
+                                      {selectedAgent.name
+                                        .split(" ")
+                                        .map((n) => n[0])
+                                        .join("")}
+                                    </AvatarFallback>
                                   </Avatar>
                                   <div>
-                                    <p className="font-medium text-blue-900">{selectedAgent.name}</p>
-                                    <p className="text-sm text-blue-600">{selectedAgent.agentType}</p>
+                                    <p className="font-medium text-blue-900">
+                                      {selectedAgent.name}
+                                    </p>
+                                    <p className="text-sm text-blue-600">
+                                      {selectedAgent.agentType}
+                                    </p>
                                   </div>
                                 </div>
-                                <Button type="button" variant="ghost" size="sm" onClick={() => handleSubordinateChange(selectedAgent.id, false)} className="text-blue-600 hover:text-blue-800 hover:bg-blue-100">
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() =>
+                                    handleAdvisorSubordinateChange(
+                                      selectedAgent.id,
+                                      false,
+                                    )
+                                  }
+                                  className="text-blue-600 hover:text-blue-800 hover:bg-blue-100"
+                                >
                                   <X className="h-4 w-4" />
                                 </Button>
                               </div>
@@ -848,45 +1108,91 @@ export default function AgentForm({ agent }: AgentFormProps) {
                         </div>
                       </div>
                     )}
-                    {/* Available Agents */}
+
                     <div className="space-y-3">
-                      <Label>Available Agents</Label>
+                      <Label>Available Client Advisors</Label>
                       {loading ? (
                         <div className="text-center py-4">
-                          <p className="text-sm text-muted-foreground">Loading agents...</p>
+                          <p className="text-sm text-muted-foreground">
+                            Loading agents...
+                          </p>
                         </div>
-                      ) : filteredAgents.length === 0 ? (
-                        <p className="text-sm text-muted-foreground py-4 text-center">
-                          {agentSearch
-                            ? "No agents found matching your search."
-                            : getAvailableAgents().length === 0
-                              ? "No agents available for this hierarchy level."
-                              : "No agents available."}
-                        </p>
                       ) : (
                         <div className="space-y-2 max-h-64 overflow-y-auto">
-                          {filteredAgents.map((availableAgent) => (
-                            <div key={availableAgent.id} className={`flex items-center justify-between p-3 border rounded-lg transition-colors ${selectedSubordinates.includes(availableAgent.id) ? "bg-gray-50 border-gray-300" : "hover:bg-gray-50"}`}>
-                              <div className="flex items-center space-x-3">
-                                <Checkbox id={availableAgent.id} checked={selectedSubordinates.includes(availableAgent.id)} onCheckedChange={(checked) => handleSubordinateChange(availableAgent.id, checked as boolean)} />
-                                <Avatar className="h-8 w-8">
-                                  <AvatarImage src={availableAgent.photo || ""} />
-                                  <AvatarFallback>{availableAgent.name.split(" ").map((n) => n[0]).join("")}</AvatarFallback>
-                                </Avatar>
-                                <div>
-                                  <Label htmlFor={availableAgent.id} className="font-medium cursor-pointer">{availableAgent.name}</Label>
-                                  <p className="text-sm text-muted-foreground">{availableAgent.agentType} • {availableAgent.email}</p>
+                          {allAgents
+                            .filter(
+                              (a) =>
+                                a.agentType === "Client Advisor" &&
+                                !selectedSubordinates.includes(a.id) &&
+                                (a.name
+                                  .toLowerCase()
+                                  .includes(advisorAgentSearch.toLowerCase()) ||
+                                  a.email
+                                    .toLowerCase()
+                                    .includes(advisorAgentSearch.toLowerCase())),
+                            )
+                            .map((availableAgent) => (
+                              <div
+                                key={availableAgent.id}
+                                className={`flex items-center justify-between p-3 border rounded-lg transition-colors ${selectedAdvisorSubordinates.includes(
+                                  availableAgent.id,
+                                )
+                                  ? "bg-gray-50 border-gray-300"
+                                  : "hover:bg-gray-50"
+                                  }`}
+                              >
+                                <div className="flex items-center space-x-3">
+                                  <Checkbox
+                                    id={`advisor-${availableAgent.id}`}
+                                    checked={selectedAdvisorSubordinates.includes(
+                                      availableAgent.id,
+                                    )}
+                                    onCheckedChange={(checked) =>
+                                      handleAdvisorSubordinateChange(
+                                        availableAgent.id,
+                                        checked as boolean,
+                                      )
+                                    }
+                                  />
+                                  <Avatar className="h-8 w-8">
+                                    <AvatarImage src={availableAgent.photo || ""} />
+                                    <AvatarFallback>
+                                      {availableAgent.name
+                                        .split(" ")
+                                        .map((n) => n[0])
+                                        .join("")}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                  <div>
+                                    <Label
+                                      htmlFor={`advisor-${availableAgent.id}`}
+                                      className="font-medium cursor-pointer"
+                                    >
+                                      {availableAgent.name}
+                                    </Label>
+                                    <p className="text-sm text-muted-foreground">
+                                      {availableAgent.agentType} • {availableAgent.email}
+                                    </p>
+                                  </div>
                                 </div>
+                                {selectedAdvisorSubordinates.includes(
+                                  availableAgent.id,
+                                ) && (
+                                    <Badge
+                                      variant="secondary"
+                                      className="bg-blue-100 text-blue-800"
+                                    >
+                                      Selected
+                                    </Badge>
+                                  )}
                               </div>
-                              {selectedSubordinates.includes(availableAgent.id) && (<Badge variant="secondary" className="bg-blue-100 text-blue-800">Selected</Badge>)}
-                            </div>
-                          ))}
+                            ))}
                         </div>
                       )}
                     </div>
                   </>
                 )}
-              </>
+              </div>
             )}
           </CardContent>
         </Card>

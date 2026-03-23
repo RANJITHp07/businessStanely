@@ -85,6 +85,7 @@ const agentTypes = [
 const jurisdictions = ["All Jurisdictions", "India", "USA", "UAE", "Others"];
 
 import { Agent } from "@/types";
+import { hasAdvisorRole } from "@/lib/agentRole";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -131,7 +132,7 @@ function ClientAdvisorsModal({ leadMaker, open, onOpenChange }: ClientAdvisorsMo
             if (allRes.ok) {
                 const allData = await allRes.json();
                 setAllAdvisors(
-                    allData.filter((a: Agent) => a.agentType !== "Lead Maker" && a.agentRole === "Advisor Agent")
+                    allData.filter((a: Agent) => a.agentType !== "Lead Maker" && hasAdvisorRole(a.agentRole))
                 );
             }
         } catch (err) {
@@ -412,7 +413,7 @@ export default function AgentsTable() {
                 const response = await fetchWithAuth("/api/agents");
                 if (response.ok) {
                     const data = await response.json();
-                    setAgents(data.filter((agent: Agent) => agent.agentRole === "Advisor Agent"));
+                    setAgents(data.filter((agent: Agent) => hasAdvisorRole(agent.agentRole)));
                 } else {
                     console.error("Failed to fetch agents");
                 }

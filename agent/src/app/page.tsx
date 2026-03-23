@@ -2,38 +2,41 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { hasAdvisorRole, hasExecutionRole } from "@/lib/agentRole";
 
 export default function RootPage() {
   const router = useRouter();
 
-useEffect(() => {
-  const token = localStorage.getItem("token");
-  if (!token) {
-    router.replace("/login");
-    return;
-  }
-  // Fetch agent info from API or decode token (if agentRole is in token)
-  fetch("/api/auth/me", {
-    headers: { Authorization: `Bearer ${token}` },
-  })
-    .then((res) => res.json())
-    .then((data) => {
-      const agent = data.agent;
-      if (agent) {
-        localStorage.setItem("agent", JSON.stringify(agent));
-      }
-      if (!agent || !agent.agentRole) {
-        router.replace("/dashboard"); // fallback
-      } else if (agent.agentRole === "Advisor Agent") {
-        router.replace("/sales/dashboard");
-      } else {
-        router.replace("/dashboard");
-      }
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      router.replace("/login");
+      return;
+    }
+    // Fetch agent info from API or decode token (if agentRole is in token)
+    fetch("/api/auth/me", {
+      headers: { Authorization: `Bearer ${token}` },
     })
-    .catch(() => {
-      router.replace("/dashboard");
-    });
-}, [router]);
+      .then((res) => res.json())
+      .then((data) => {
+        const agent = data.agent;
+        if (agent) {
+          localStorage.setItem("agent", JSON.stringify(agent));
+        }
+        if (!agent || !agent.agentRole) {
+          router.replace("/dashboard"); // fallback
+        } else if (hasAdvisorRole(agent.agentRole) && !hasExecutionRole(agent.agentRole)) {
+          // Pure advisor agent goes to sales dashboard
+          router.replace("/sales/dashboard");
+        } else {
+          // Execution Agent and Execution & Advisor Agent both go to main dashboard
+          router.replace("/dashboard");
+        }
+      })
+      .catch(() => {
+        router.replace("/dashboard");
+      });
+  }, [router]);
 
   return (
     <div className="flex flex-col items-center w-full justify-center min-h-screen bg-white">

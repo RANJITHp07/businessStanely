@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import Link from "next/link"
 import { normalizePhoneNumber } from "@/lib/normalizePhoneNumber"
+import { getAdvisorAgentType, isClientManager } from "@/lib/agentType"
 
 interface Opportunity {
     id: string
@@ -89,10 +90,11 @@ export default function OpportunitiesTable() {
     // Client-side role-based filtering
     const filteredOpportunities = opportunities.filter((opportunity: any) => {
         if (!agent) return false;
+        const advisorType = getAdvisorAgentType(agent);
         // If the API already filters, this is a safeguard for extra safety
-        if (agent.agentType === "Lead Maker") {
+        if (advisorType === "Lead Maker") {
             if (opportunity.prospect?.createdByAgentId !== agent.id) return false;
-        } else if (agent.agentType === "Client Advisor" || agent.agentType === "Client Manager") {
+        } else if (advisorType === "Client Advisor" || advisorType === "Client Manager") {
             if (opportunity.prospect?.assignedAgentId !== agent.id) return false;
         }
         const matchesSearch =
@@ -346,7 +348,7 @@ export default function OpportunitiesTable() {
                                                                     Edit
                                                                 </DropdownMenuItem>
                                                                 {
-                                                                    agent?.agentType == "Client Manager" &&
+                                                                    isClientManager(agent) &&
                                                                     <>
                                                                         <DropdownMenuSeparator />
                                                                         <DropdownMenuItem className="text-destructive">

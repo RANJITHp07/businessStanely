@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getCurrentAgent } from "@/lib/auth";
+import { hasAdvisorRole } from "@/lib/agentRole";
 
 const includeConfig = {
   createdByUser: {
@@ -40,7 +41,7 @@ export async function PATCH(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    if (agent.agentRole !== "Advisor Agent") {
+    if (!hasAdvisorRole(agent.agentRole)) {
       return NextResponse.json(
         { error: "Only advisor agents can reject quote requests" },
         { status: 403 },

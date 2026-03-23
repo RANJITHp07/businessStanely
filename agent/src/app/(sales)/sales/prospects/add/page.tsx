@@ -20,6 +20,8 @@ import type { CountryData } from "react-phone-input-2"
 import PhoneInput from "react-phone-input-2"
 import "react-phone-input-2/lib/style.css"
 import { Badge } from "@/components/ui/badge"
+import { hasAdvisorRole } from "@/lib/agentRole"
+import { getAdvisorAgentType, isClientAdvisorOrManager, isLeadMaker } from "@/lib/agentType"
 
 type LeadSource = {
     id: string
@@ -28,6 +30,7 @@ type LeadSource = {
 
 export default function NewProspectPage() {
     const agent = useAgentContext()
+    const advisorType = getAdvisorAgentType(agent)
     const router = useRouter()
     const [open, setOpen] = useState(false)
     const [assignedTo, setAssignedTo] = useState("")
@@ -56,7 +59,7 @@ export default function NewProspectPage() {
         e.preventDefault()
         setAssignTouched(true)
         // For Client Advisor/Manager, assignedTo is required
-        if ((agent?.agentType === "Client Advisor" || agent?.agentType === "Client Manager") && !assignedTo) {
+        if (isClientAdvisorOrManager(agent) && !assignedTo) {
             toast.error("Please assign this prospect to yourself or another agent.")
             return
         }
@@ -98,7 +101,8 @@ export default function NewProspectPage() {
             const agentRes = await fetch("/api/agents/me")
             if (!agentRes.ok) return setTeamMembers([])
             const agent = await agentRes.json()
-            if (agent.agentRole === "Advisor Agent" && agent.agentType === "Client Manager") {
+            const apiAdvisorType = getAdvisorAgentType(agent)
+            if (hasAdvisorRole(agent.agentRole) && apiAdvisorType === "Client Manager") {
                 // Fetch subordinates
                 const subRes = await fetch("/api/agents/me/subordinates")
                 if (subRes.ok) {
@@ -110,11 +114,11 @@ export default function NewProspectPage() {
             // Fallback: fetch all agents
             const allRes = await fetch("/api/agents")
             if (allRes.ok) {
-                if (agent.agentRole === "Advisor Agent" && agent.agentType === "Lead Maker") {
+                if (hasAdvisorRole(agent.agentRole) && apiAdvisorType === "Lead Maker") {
                     const allAgentsData = await allRes.json();
 
                     const filteredAgents = Array.isArray(allAgentsData)
-                        ? allAgentsData.filter((agent) => agent.agentRole === "Advisor Agent")
+                        ? allAgentsData.filter((agent) => hasAdvisorRole(agent.agentRole))
                         : [];
 
                     setTeamMembers(filteredAgents);
@@ -135,7 +139,7 @@ export default function NewProspectPage() {
 
     // Always show self as first option in teamMembersWithSelf, marked as (You), and remove duplicates
     let teamMembersWithSelf = teamMembers
-    if (agent && (agent.agentType === "Client Advisor" || agent.agentType === "Client Manager")) {
+    if (isClientAdvisorOrManager(agent)) {
         // Remove any existing entry for self
         const filtered = teamMembers.filter((m) => m.id !== agent.id)
         teamMembersWithSelf = [{ id: agent.id, name: agent.name + " (You)", email: agent.email }, ...filtered]
@@ -373,7 +377,7 @@ export default function NewProspectPage() {
                     </Card>
 
                     {
-                        agent && !(agent.agentRole === "Advisor Agent" && agent.agentType === "Lead Maker") &&
+                        agent && !(hasAdvisorRole(agent.agentRole) && isLeadMaker(agent)) &&
                         <Card>
                             <CardHeader>
                                 <div className="flex items-center gap-2">
@@ -410,7 +414,7 @@ export default function NewProspectPage() {
                                 <div className="space-y-2">
                                     <Label htmlFor="assign">
                                         Assign To
-                                        {(agent?.agentType === "Client Advisor" || agent?.agentType === "Client Manager") && (
+                                        {isClientAdvisorOrManager(agent) && (
                                             <span className="text-destructive">*</span>
                                         )}
                                     </Label>
@@ -424,7 +428,7 @@ export default function NewProspectPage() {
                                                 className={cn(
                                                     "w-full justify-between font-normal bg-transparent",
                                                     assignTouched &&
-                                                    (agent?.agentType === "Client Advisor" || agent?.agentType === "Client Manager") &&
+                                                    isClientAdvisorOrManager(agent) &&
                                                     !assignedTo &&
                                                     "border-red-500",
                                                 )}

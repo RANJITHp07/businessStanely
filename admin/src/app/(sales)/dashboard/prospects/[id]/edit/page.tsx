@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils"
 import type { Agent, Prospect } from "@/types"
 import { Skeleton } from "@/components/ui/skeleton"
 import { toast } from "react-toastify"
+import { hasAdvisorRole } from "@/lib/agentRole"
 
 
 export default function EditProspectPage() {
@@ -75,7 +76,7 @@ export default function EditProspectPage() {
         // 4️⃣ Determine team members
         let teamMembersList: any[] = [];
 
-        teamMembersList = allAgentsData.filter((a: any) => a.agentRole === "Advisor Agent");
+        teamMembersList = allAgentsData.filter((a: any) => hasAdvisorRole(a.agentRole));
 
         setTeamMembers(teamMembersList);
       } catch (err) {

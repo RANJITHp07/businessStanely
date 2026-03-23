@@ -10,6 +10,8 @@ import {
 import { Button } from '@/components/ui/button'
 import React, { useState } from 'react'
 import { useAgentContext } from '@/lib/agent-context'
+import { hasExecutionRole, hasAdvisorRole, EXECUTION_AND_ADVISOR_AGENT_ROLE } from '@/lib/agentRole'
+import { isLeadMaker } from '@/lib/agentType'
 import { AddEntryDialog } from '@/app/(dashboard)/timesheet/_component/add-entry-dialog'
 
 export default function Navigator() {
@@ -64,7 +66,7 @@ export default function Navigator() {
             </Breadcrumb>
 
             <div className="absolute right-6 flex items-center gap-2">
-                {agent?.agentRole === "Execution Agent" ? (
+                {hasExecutionRole(agent?.agentRole) && (
                     <>
                         <Button size="sm" onClick={() => router.push("/task/create")}>
                             Add Normal Task
@@ -72,19 +74,17 @@ export default function Navigator() {
                         <Button size="sm" onClick={() => router.push("/task_category/create")}>
                             Create Service
                         </Button>
-                        {/* <Button size="sm" onClick={() => router.push("/retainership/create")}>
-                            Create Retainership
-                        </Button> */}
                         <Button size="sm" onClick={() => setAddEntryDialogOpen(true)}>
                             Add Time Entry
                         </Button>
                     </>
-                ) : (
+                )}
+                {hasAdvisorRole(agent?.agentRole) && (
                     <>
                         <Button size="sm" onClick={() => router.push("/sales/prospects/add")}>
                             Create Lead
                         </Button>
-                        {agent?.agentType !== "Lead Maker" && (
+                        {agent?.agentRole !== EXECUTION_AND_ADVISOR_AGENT_ROLE && !isLeadMaker(agent) && (
                             <Button size="sm" onClick={() => router.push("/sales/calendar")}>
                                 View Calendar
                             </Button>

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentAdmin } from "@/lib/auth";
 import prisma from "@/lib/prisma";
+import { hasExecutionRole } from "@/lib/agentRole";
 
 export async function GET(req: NextRequest) {
   try {
@@ -25,8 +26,8 @@ export async function GET(req: NextRequest) {
     });
 
     // Filter for execution role agents only
-    const executionAgents = allAgents.filter(
-      (a) => a.agentRole === "Execution Agent",
+    const executionAgents = allAgents.filter((a) =>
+      hasExecutionRole(a.agentRole),
     );
 
     // Fetch full data for execution agents using their IDs

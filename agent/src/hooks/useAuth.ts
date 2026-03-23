@@ -8,7 +8,9 @@ interface Agent {
   name: string;
   email: string;
   agentType: string;
-  agentRole: 'Execution Agent' | 'Advisor Agent';
+  executionAgentType?: string | null;
+  advisorAgentType?: string | null;
+  agentRole: "Execution Agent" | "Advisor Agent" | "Execution & Advisor Agent";
   phoneNumber: string;
   jurisdiction: string;
   specializations: string[];
@@ -56,10 +58,10 @@ export function useAuth() {
         console.error("Error parsing stored agent data:", error);
         localStorage.removeItem("agent");
         localStorage.removeItem("token");
-        setAuthState(prev => ({ ...prev, isLoading: false }));
+        setAuthState((prev) => ({ ...prev, isLoading: false }));
       }
     } else {
-      setAuthState(prev => ({ ...prev, isLoading: false }));
+      setAuthState((prev) => ({ ...prev, isLoading: false }));
     }
   }, []);
 
@@ -94,7 +96,7 @@ export function useAuth() {
             error: data.error || "Invalid credentials",
           };
         }
-        
+
         // For other errors (500, 429, etc.), throw the error
         throw new Error(data.error || "Login failed");
       }
@@ -113,28 +115,27 @@ export function useAuth() {
       return { success: true, data };
     } catch (error) {
       console.error("Login error:", error);
-      
+
       // Provide user-friendly error messages
       let errorMessage = "Login failed. Please try again.";
-      
+
       if (error instanceof Error) {
         if (error.message.includes("Failed to fetch")) {
-          errorMessage = "Network error. Please check your connection and try again.";
+          errorMessage =
+            "Network error. Please check your connection and try again.";
         } else if (error.message.includes("Unexpected end of JSON input")) {
           errorMessage = "Server error. Please try again later.";
         } else {
           errorMessage = error.message;
         }
       }
-      
+
       return {
         success: false,
         error: errorMessage,
       };
     }
   };
-
-
 
   const logout = async () => {
     try {
@@ -159,7 +160,11 @@ export function useAuth() {
     router.push("/login");
   };
 
-  const forgotPassword = async (email: string, action: string, additionalData?: ForgotPasswordData) => {
+  const forgotPassword = async (
+    email: string,
+    action: string,
+    additionalData?: ForgotPasswordData,
+  ) => {
     try {
       const response = await fetch("/api/auth/forgot-password", {
         method: "POST",
@@ -194,7 +199,7 @@ export function useAuth() {
 
       if (response.ok) {
         const data = await response.json();
-        setAuthState(prev => ({
+        setAuthState((prev) => ({
           ...prev,
           agent: data.agent,
           isAuthenticated: true,
@@ -216,7 +221,8 @@ export function useAuth() {
       console.error("Fetch profile error:", error);
       return {
         success: false,
-        error: error instanceof Error ? error.message : "Failed to fetch profile",
+        error:
+          error instanceof Error ? error.message : "Failed to fetch profile",
       };
     }
   };

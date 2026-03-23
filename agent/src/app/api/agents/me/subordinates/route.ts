@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getCurrentAgent } from "@/lib/auth";
+import { hasAdvisorRole } from "@/lib/agentRole";
+import { getAdvisorAgentType } from "@/lib/agentType";
 
 export async function GET(req: NextRequest) {
   const agent = await getCurrentAgent(req);
@@ -9,8 +11,8 @@ export async function GET(req: NextRequest) {
   }
   // Only allow for Client Manager
   if (
-    agent.agentRole !== "Advisor Agent" ||
-    agent.agentType !== "Client Manager"
+    !hasAdvisorRole(agent.agentRole) ||
+    getAdvisorAgentType(agent) !== "Client Manager"
   ) {
     return NextResponse.json([]);
   }

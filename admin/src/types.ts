@@ -21,45 +21,19 @@ export interface Agent {
   phoneNumber: string;
   secondaryPhoneNumber: string | null;
   agentType: string;
-  agentRole: "Execution Agent" | "Advisor Agent";
+  executionAgentType?: string | null;
+  advisorAgentType?: string | null;
+  agentRole: "Execution Agent" | "Advisor Agent" | "Execution & Advisor Agent";
   barAssociationId: string;
   jurisdiction: string;
   specializations: string[];
-  // For Advisor Agent, agentType can be: 'Lead Maker', 'Client Advisor', 'Client Manager'
-  // For Execution Agent, agentType can be: 'CEO', 'Partner', 'Manager', etc.
   photo: string | null;
   superior: Agent | null;
   subordinates: Agent[];
+  advisorSubordinates?: Agent[];
   autoAssign?: boolean;
   status: string;
 }
-
-// export interface Client {
-//   id: string;
-//   clientType: string;
-//   email: string;
-//   phoneNumber: string;
-//   secondaryPhoneNumber: string | null;
-//   address: string | null;
-//   preferredCommunication: string | null;
-//   notes: string | null;
-//   firstName: string | null;
-//   lastName: string | null;
-//   gender: string | null;
-//   dateOfBirth: string | null;
-//   idProofType: string | null;
-//   idProofNumber: string | null;
-//   organizationName: string | null;
-//   registrationNumber: string | null;
-//   entityType: string | null;
-//   incorporationDate: string | null;
-//   gstNumber: string | null;
-//   authorizedPersonName: string | null;
-//   designation: string | null;
-//   contactEmail: string | null;
-//   taskCount?: number;
-// }
-
 export interface Task {
   id: string;
   title: string;

@@ -34,6 +34,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, FileText, Filter, Plus, RefreshCcw, Search, Send } from "lucide-react";
 import { toast } from "react-toastify";
+import { hasAdvisorRole } from "@/lib/agentRole";
 
 type AgentOption = {
     id: string;
@@ -83,7 +84,7 @@ export default function RequestQuotePage() {
     const [selectedQuote, setSelectedQuote] = useState<QuoteRequest | null>(null);
 
     const advisorAgents = useMemo(
-        () => agents.filter((agent) => (agent.agentRole || agent.agentType || "").trim().toLowerCase() === "advisor agent"),
+        () => agents.filter((agent) => hasAdvisorRole(agent.agentRole || "")),
         [agents],
     );
 

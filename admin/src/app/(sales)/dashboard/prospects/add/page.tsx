@@ -15,6 +15,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { CalendarIcon, Check, Mail, Phone, MapPin, Banknote, FileText, UserPlus, Bell } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { toast } from "react-toastify"
+import { hasAdvisorRole } from "@/lib/agentRole"
 
 type LeadSource = {
     id: string
@@ -86,7 +87,7 @@ export default function NewProspectPage() {
                 const allAgentsData = await allRes.json();
 
                 const filteredAgents = Array.isArray(allAgentsData)
-                    ? allAgentsData.filter((agent) => agent.agentRole === "Advisor Agent" && agent.agentType !== "Lead Maker")
+                    ? allAgentsData.filter((agent) => hasAdvisorRole(agent.agentRole) && agent.agentType !== "Lead Maker")
                     : [];
 
                 setTeamMembers(filteredAgents);

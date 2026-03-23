@@ -33,6 +33,7 @@ import {
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/useAuth";
+import { hasAdvisorRole, hasExecutionRole } from "@/lib/agentRole";
 import {
     ChevronLeft,
     ChevronRight,
@@ -97,11 +98,11 @@ export default function RequestQuotePage() {
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(10);
 
-    const isExecutionAgent = agent?.agentRole === "Execution Agent";
-    const isAdvisorAgent = agent?.agentRole === "Advisor Agent";
+    const isExecutionAgent = hasExecutionRole(agent?.agentRole);
+    const isAdvisorAgent = hasAdvisorRole(agent?.agentRole);
 
     const advisorAgents = useMemo(
-        () => agents.filter((item) => item.agentRole === "Advisor Agent"),
+        () => agents.filter((item) => hasAdvisorRole(item.agentRole)),
         [agents],
     );
 

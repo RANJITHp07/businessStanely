@@ -32,6 +32,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { hasAdvisorRole } from "@/lib/agentRole"
 
 const statusColors = {
     New: "bg-emerald-50 text-emerald-700 border-emerald-200",
@@ -551,10 +552,10 @@ export default function ProspectDashboard() {
 
                 /* Set agents */
                 const agentsList = Array.isArray(agentsRes) ? agentsRes : []
-                setAgents(agentsList.filter((agent) => agent.agentRole == "Advisor Agent"))
+                setAgents(agentsList.filter((agent) => hasAdvisorRole(agent.agentRole)))
                 setSelectedAgents(
                     agentsList?.filter(
-                        (agent) => agent.agentRole === "Advisor Agent" && agent.autoAssign
+                        (agent) => hasAdvisorRole(agent.agentRole) && agent.autoAssign
                     ).map((agent) => agent.id) || []
                 );
                 /* ---------------- LEAD SOURCE DATA ---------------- */

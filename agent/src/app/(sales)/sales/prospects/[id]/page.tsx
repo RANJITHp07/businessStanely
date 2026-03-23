@@ -33,6 +33,8 @@ import { cn } from "@/lib/utils"
 import { useAgentContext } from "@/lib/agent-context"
 import { normalizePhoneNumber } from "@/lib/normalizePhoneNumber"
 import { uploadFileToS3Direct } from "@/lib/directUpload"
+import { hasAdvisorRole } from "@/lib/agentRole"
+import { isLeadMaker } from "@/lib/agentType"
 
 interface Prospect {
     id: string;
@@ -303,7 +305,7 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
                                                     "w-full justify-start text-left font-normal",
                                                     !nextFollowUpDate && "text-muted-foreground",
                                                 )}
-                                                disabled={Boolean(agent && agent.agentRole === "Advisor Agent" && agent.agentType === "Lead Maker")}
+                                                disabled={Boolean(agent && hasAdvisorRole(agent.agentRole) && isLeadMaker(agent))}
                                             >
                                                 <CalendarIcon className="mr-2 h-4 w-4" />
                                                 {nextFollowUpDate ? (
@@ -336,7 +338,7 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
                                     <div className="flex flex-col gap-1">
                                         <p className="text-sm text-muted-foreground mb-1">Status</p>
                                         <Select
-                                            disabled={Boolean(agent && agent.agentRole === "Advisor Agent" && agent.agentType === "Lead Maker")}
+                                            disabled={Boolean(agent && hasAdvisorRole(agent.agentRole) && isLeadMaker(agent))}
                                             value={prospect.status} onValueChange={handleStatusChange}>
                                             <SelectTrigger className="w-[180px]">
                                                 <SelectValue />

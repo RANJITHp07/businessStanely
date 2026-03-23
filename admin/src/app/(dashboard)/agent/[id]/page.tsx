@@ -57,6 +57,7 @@ import {
 import { Agent, Task } from "@/types";
 import Link from "next/link";
 import { fetchWithAuth } from "@/lib/fetchWithAuth";
+import { hasExecutionRole } from "@/lib/agentRole";
 import { ProspectTable } from "@/app/(sales)/dashboard/prospects/page";
 import { ProspectsTable } from "@/app/(sales)/dashboard/opportunities/page";
 
@@ -168,7 +169,7 @@ export default function AgentDetails() {
         if (response.ok) {
           const data = await response.json();
           setAgent(data);
-          data?.agentRole === "Execution Agent"
+          hasExecutionRole(data?.agentRole)
             ? fetchAgentTasks()
             : (fetchAgentLeads(), fetchAgentOpportunity());
           // Set team members from the agent's subordinates
@@ -573,13 +574,13 @@ export default function AgentDetails() {
         }}
         className="space-y-6"
       >
-        <TabsList className={`grid w-full ${agent.agentRole === "Execution Agent" ? "grid-cols-5" : "grid-cols-6"}`}>
+        <TabsList className={`grid w-full ${hasExecutionRole(agent.agentRole) ? "grid-cols-5" : "grid-cols-6"}`}>
           <TabsTrigger value="details" className="flex items-center gap-2">
             <User className="h-4 w-4 hidden md:block" />
             <p className="text-[10px] md:text-[12px]">Agent Details</p>
           </TabsTrigger>
           {
-            agent && agent.agentRole === "Execution Agent" ?
+            agent && hasExecutionRole(agent.agentRole) ?
               <TabsTrigger value="tasks" className="flex items-center gap-2">
                 <FileText className="h-4 w-4 hidden md:block" />
                 <p className="text-[10px] md:text-[12px]">
@@ -776,7 +777,7 @@ export default function AgentDetails() {
 
         {/* Tasks Tab */}
         {
-          agent.agentRole == "Execution Agent" ?
+          hasExecutionRole(agent.agentRole) ?
             <TabsContent value="tasks" className="space-y-6">
               <div className="flex items-center justify-between">
                 <div>

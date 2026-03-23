@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 // import { getCurrentAgent } from "@/lib/auth";
+import { getAdvisorAgentType } from "@/lib/agentType";
 
 // GET: List all prospects (optionally filter by assignedAgentId)
 import { getCurrentAgent } from "@/lib/auth";
@@ -15,11 +16,12 @@ export async function GET(req: NextRequest) {
       archived: false,
       status: { not: "opportunity" },
     };
-    if (agent.agentType === "Lead Maker") {
+    const advisorType = getAdvisorAgentType(agent);
+    if (advisorType === "Lead Maker") {
       where.createdByAgentId = agent.id;
     } else if (
-      agent.agentType === "Client Advisor" ||
-      agent.agentType === "Client Manager"
+      advisorType === "Client Advisor" ||
+      advisorType === "Client Manager"
     ) {
       where.assignedAgentId = agent.id;
     }
@@ -47,6 +49,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
+    const advisorType = getAdvisorAgentType(agent);
 
     const {
       name,
@@ -70,8 +73,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (
-      (agent.agentType === "Client Advisor" ||
-        agent.agentType === "Client Manager") &&
+      (advisorType === "Client Advisor" || advisorType === "Client Manager") &&
       !assignedAgentId
     ) {
       return NextResponse.json(

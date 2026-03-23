@@ -7,7 +7,9 @@ export interface AgentJWTPayload {
   name: string;
   email: string;
   agentType: string;
-  agentRole: "Execution Agent" | "Advisor Agent";
+  executionAgentType?: string | null;
+  advisorAgentType?: string | null;
+  agentRole: "Execution Agent" | "Advisor Agent" | "Execution & Advisor Agent";
   sessionToken?: string;
 }
 
@@ -42,6 +44,8 @@ export async function getCurrentAgent(req: NextRequest) {
         name: true,
         email: true,
         agentType: true,
+        executionAgentType: true,
+        advisorAgentType: true,
         agentRole: true,
         status: true,
         phoneNumber: true,

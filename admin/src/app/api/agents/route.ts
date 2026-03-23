@@ -4,6 +4,12 @@ import bcrypt from "bcryptjs";
 import prisma from "@/lib/prisma";
 import { uploadToS3 } from "@/lib/aws";
 import { sendAgentInviteEmail } from "@/lib/email";
+import {
+  ADVISOR_AGENT_ROLE,
+  EXECUTION_AGENT_ROLE,
+  hasAdvisorRole,
+  hasExecutionRole,
+} from "@/lib/agentRole";
 
 export async function POST(req: NextRequest) {
   try {
@@ -12,10 +18,13 @@ export async function POST(req: NextRequest) {
       specializations,
       superiors,
       subordinates,
+      advisorSubordinates,
       photo,
       password: providedPassword,
       agentRole,
       agentType,
+      executionAgentType,
+      advisorAgentType,
       autoAssign,
       ...agentData
     } = body;
@@ -51,23 +60,71 @@ export async function POST(req: NextRequest) {
       delete agentData.subordinates;
     }
     // Validate agentRole and agentType
-    const finalAgentType = agentType;
-    if (agentRole === "Advisor Agent") {
-      // Only allow advisor agent types
-      const advisorTypes = ["Lead Maker", "Client Advisor", "Client Manager"];
-      if (!advisorTypes.includes(agentType)) {
-        return NextResponse.json(
-          { error: "Invalid agent type for Advisor Agent." },
-          { status: 400 },
-        );
-      }
+    const finalAgentRole = agentRole || EXECUTION_AGENT_ROLE;
+    const advisorTypes = ["Lead Maker", "Client Advisor", "Client Manager"];
+    const executionTypes = [
+      "Owner",
+      "Partner",
+      "CEO",
+      "Senior Manager",
+      "Manager",
+      "Senior Executive",
+      "Executive",
+      "Junior Executive",
+      "Trainee",
+      "Intern",
+    ];
+    const resolvedExecutionType =
+      finalAgentRole === EXECUTION_AGENT_ROLE
+        ? agentType || executionAgentType
+        : finalAgentRole === ADVISOR_AGENT_ROLE
+          ? null
+          : executionAgentType;
+
+    const resolvedAdvisorType =
+      finalAgentRole === ADVISOR_AGENT_ROLE
+        ? agentType || advisorAgentType
+        : finalAgentRole === EXECUTION_AGENT_ROLE
+          ? null
+          : advisorAgentType;
+
+    const isValidExecution =
+      !hasExecutionRole(finalAgentRole) ||
+      (!!resolvedExecutionType &&
+        executionTypes.includes(resolvedExecutionType));
+    const isValidAdvisor =
+      !hasAdvisorRole(finalAgentRole) ||
+      (!!resolvedAdvisorType && advisorTypes.includes(resolvedAdvisorType));
+
+    if (!isValidExecution || !isValidAdvisor) {
+      const roleLabel =
+        finalAgentRole === ADVISOR_AGENT_ROLE
+          ? "Advisor Agent"
+          : finalAgentRole === EXECUTION_AGENT_ROLE
+            ? "Execution Agent"
+            : "Execution & Advisor Agent";
+      return NextResponse.json(
+        {
+          error:
+            finalAgentRole === "Execution & Advisor Agent"
+              ? "Please select both Execution Agent Type and Advisor Agent Type."
+              : `Invalid agent type for ${roleLabel}.`,
+        },
+        { status: 400 },
+      );
     }
-    // For Execution Agent, keep previous logic (no restriction)
+
+    const finalAgentType =
+      finalAgentRole === ADVISOR_AGENT_ROLE
+        ? (resolvedAdvisorType as string)
+        : (resolvedExecutionType as string);
 
     const data: Prisma.AgentCreateInput = {
       ...agentData,
-      agentRole: agentRole || "Execution Agent",
+      agentRole: finalAgentRole,
       agentType: finalAgentType,
+      executionAgentType: resolvedExecutionType,
+      advisorAgentType: resolvedAdvisorType,
       password: hashedPassword,
       photo: photoS3Key,
       status: "active",
@@ -93,12 +150,34 @@ export async function POST(req: NextRequest) {
         })),
       });
     }
+    const executionTeamSubordinates = Array.isArray(subordinates)
+      ? subordinates
+      : [];
+    const advisorTeamSubordinates = Array.isArray(advisorSubordinates)
+      ? advisorSubordinates
+      : [];
+
     // If subordinates are provided, create AgentSuperior links (agent is superior)
-    if (subordinates?.length) {
+    if (executionTeamSubordinates.length) {
       await prisma.agentSuperior.createMany({
-        data: subordinates.map((subordinateId: string) => ({
+        data: executionTeamSubordinates.map((subordinateId: string) => ({
           superiorId: newAgent.id,
           subordinateId,
+          teamType: hasAdvisorRole(finalAgentRole)
+            ? hasExecutionRole(finalAgentRole)
+              ? "execution"
+              : "advisor"
+            : "execution",
+        })),
+      });
+    }
+
+    if (advisorTeamSubordinates.length) {
+      await prisma.agentSuperior.createMany({
+        data: advisorTeamSubordinates.map((subordinateId: string) => ({
+          superiorId: newAgent.id,
+          subordinateId,
+          teamType: "advisor",
         })),
       });
     }
@@ -112,10 +191,18 @@ export async function POST(req: NextRequest) {
       where: { superiorId: newAgent.id },
       include: { subordinate: true },
     });
+    const executionSubordinates = subordinatesLinks
+      .filter((link) => link.teamType !== "advisor")
+      .map((link) => link.subordinate);
+    const advisorSubordinatesList = subordinatesLinks
+      .filter((link) => link.teamType === "advisor")
+      .map((link) => link.subordinate);
+
     const agentWithLinks = {
       ...newAgent,
       superiors: superiorsLinks.map((link) => link.superior),
-      subordinates: subordinatesLinks.map((link) => link.subordinate),
+      subordinates: executionSubordinates,
+      advisorSubordinates: advisorSubordinatesList,
     };
 
     // Send email with credentials to the agent
@@ -168,7 +255,18 @@ export async function GET(req: NextRequest) {
         createdAt: "desc",
       },
     });
-    return NextResponse.json(agents);
+    const mappedAgents = agents.map((agent) => ({
+      ...agent,
+      superiors: agent.superiorsLinks.map((link) => link.superior),
+      subordinates: agent.subordinatesLinks
+        .filter((link) => link.teamType !== "advisor")
+        .map((link) => link.subordinate),
+      advisorSubordinates: agent.subordinatesLinks
+        .filter((link) => link.teamType === "advisor")
+        .map((link) => link.subordinate),
+    }));
+
+    return NextResponse.json(mappedAgents);
   } catch (error) {
     console.error("Error fetching agents:", error);
     return NextResponse.json(

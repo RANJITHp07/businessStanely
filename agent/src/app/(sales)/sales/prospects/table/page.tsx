@@ -4,6 +4,7 @@ import { useAgentContext } from "@/lib/agent-context"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
+import { getAdvisorAgentType, isClientManager } from "@/lib/agentType";
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import {
@@ -108,10 +109,11 @@ export default function ProspectsTable() {
 
     const filteredProspects = prospects.filter((prospect) => {
         if (!agent) return false;
+        const advisorType = getAdvisorAgentType(agent);
         // Lead Maker: only created prospects
-        if (agent.agentType === "Lead Maker") {
+        if (advisorType === "Lead Maker") {
             if (prospect.createdByAgentId !== agent.id) return false;
-        } else if (agent.agentType === "Client Advisor" || agent.agentType === "Client Manager") {
+        } else if (advisorType === "Client Advisor" || advisorType === "Client Manager") {
             if (prospect.assignedAgentId !== agent.id) return false;
         }
         const matchesSearch =
@@ -334,7 +336,7 @@ export default function ProspectsTable() {
                                                                     Edit
                                                                 </DropdownMenuItem>
                                                                 {
-                                                                    agent?.agentType == "Client Manager" &&
+                                                                    isClientManager(agent) &&
                                                                     <>
                                                                         <DropdownMenuSeparator />
                                                                         <DropdownMenuItem className="text-destructive" onClick={() => setSourceToDelete(prospect)} disabled={deletingId === prospect.id}>

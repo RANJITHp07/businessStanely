@@ -80,6 +80,7 @@ const agentTypes = [
 const jurisdictions = ["All Jurisdictions", "India", "USA", "UAE", "Others"];
 
 import { Agent } from "@/types";
+import { hasExecutionRole } from "@/lib/agentRole";
 
 export default function AgentsTable() {
     const router = useRouter();
@@ -98,7 +99,7 @@ export default function AgentsTable() {
                 const response = await fetchWithAuth("/api/agents?status=inactive");
                 if (response.ok) {
                     const data = await response.json();
-                    setAgents(data.filter((agent: Agent) => agent.agentRole === "Execution Agent"));
+                    setAgents(data.filter((agent: Agent) => hasExecutionRole(agent.agentRole)));
                 } else {
                     console.error("Failed to fetch agents");
                 }

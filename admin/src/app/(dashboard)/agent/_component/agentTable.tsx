@@ -81,6 +81,7 @@ const jurisdictions = ["All Jurisdictions", "India", "USA", "UAE", "Others"];
 
 import { Agent } from "@/types";
 import { toast } from "react-toastify";
+import { hasExecutionRole } from "@/lib/agentRole";
 
 export default function AgentsTable() {
   const router = useRouter();
@@ -104,7 +105,7 @@ export default function AgentsTable() {
         const response = await fetchWithAuth("/api/agents");
         if (response.ok) {
           const data = await response.json();
-          setAgents(data.filter((agent: Agent) => agent?.agentRole !== "Advisor Agent" && agent.status == "active"));
+          setAgents(data.filter((agent: Agent) => hasExecutionRole(agent?.agentRole) && agent.status == "active"));
         } else {
           console.error("Failed to fetch agents");
         }

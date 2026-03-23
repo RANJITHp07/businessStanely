@@ -32,6 +32,8 @@ import { Input } from "@/components/ui/input"
 import { uploadFileToS3Direct } from "@/lib/directUpload"
 import { Progress } from "@/components/ui/progress"
 import { Checkbox } from "@/components/ui/checkbox"
+import { hasAdvisorRole } from "@/lib/agentRole"
+import { isLeadMaker } from "@/lib/agentType"
 
 interface oppurtunities {
     id: string
@@ -339,7 +341,7 @@ export default function OppurtunitiesDetailPage() {
                                                     "w-full justify-start text-left font-normal",
                                                     !nextFollowUpDate && "text-muted-foreground",
                                                 )}
-                                                disabled={Boolean(agent && agent.agentRole === "Advisor Agent" && agent.agentType === "Lead Maker")}
+                                                disabled={Boolean(agent && hasAdvisorRole(agent.agentRole) && isLeadMaker(agent))}
                                             >
                                                 <CalendarIcon className="mr-2 h-4 w-4" />
                                                 {nextFollowUpDate ? (
@@ -372,7 +374,7 @@ export default function OppurtunitiesDetailPage() {
                                     <div className="flex flex-col gap-1">
                                         <p className="text-sm text-muted-foreground mb-1">Status</p>
                                         <Select
-                                            disabled={Boolean(agent && agent.agentRole === "Advisor Agent" && agent.agentType === "Lead Maker")}
+                                            disabled={Boolean(agent && hasAdvisorRole(agent.agentRole) && isLeadMaker(agent))}
                                             value={oppurtunities.status} onValueChange={handleStatusChange}>
                                             <SelectTrigger className="w-[180px]">
                                                 <SelectValue />

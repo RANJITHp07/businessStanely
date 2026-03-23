@@ -40,6 +40,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import Image from "next/image";
 import Logo from "./../../public/Logo.jpg";
+import { hasAdvisorRole, hasExecutionRole, EXECUTION_AND_ADVISOR_AGENT_ROLE } from "@/lib/agentRole";
+import { getAdvisorAgentType } from "@/lib/agentType";
 const salesItems = [
   {
     title: "Sales Dashboard",
@@ -158,13 +160,19 @@ export function AppSidebar() {
       if (agentLS) {
         const agentObj = JSON.parse(agentLS);
         agentRole = agentObj.agentRole;
-        agentType = agentObj.agentType;
+        agentType = getAdvisorAgentType(agentObj) || agentObj.agentType;
       }
     } catch { }
   }
 
   let items = dashboardItems;
-  if (agentRole === "Advisor Agent") {
+  let secondaryItems: typeof salesItems | null = null;
+
+  if (agentRole === EXECUTION_AND_ADVISOR_AGENT_ROLE) {
+    // Dual-role: show both dashboards
+    items = dashboardItems;
+    secondaryItems = salesItems;
+  } else if (hasAdvisorRole(agentRole)) {
     if (agentType === "Client Advisor" || agentType === "Client Manager") {
       items = salesItems;
     } else if (agentType === "Lead Maker") {
@@ -220,6 +228,25 @@ export function AppSidebar() {
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
+          {secondaryItems && (
+            <SidebarGroup>
+              <SidebarGroupLabel>Sales</SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  {secondaryItems.map((item) => (
+                    <SidebarMenuItem key={item.title}>
+                      <SidebarMenuButton asChild>
+                        <Link href={item.url}>
+                          <item.icon />
+                          <span className="text-[16px]">{item.title}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ))}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          )}
         </SidebarContent>
 
         <SidebarFooter>

@@ -68,7 +68,9 @@ export interface Agent {
   phoneNumber: string;
   secondaryPhoneNumber: string | null;
   agentType: string;
-  agentRole: "Execution Agent" | "Advisor Agent";
+  executionAgentType?: string | null;
+  advisorAgentType?: string | null;
+  agentRole: "Execution Agent" | "Advisor Agent" | "Execution & Advisor Agent";
   barAssociationId: string;
   jurisdiction: string;
   specializations: string[];

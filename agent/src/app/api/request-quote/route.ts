@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getCurrentAgent } from "@/lib/auth";
+import { hasAdvisorRole, hasExecutionRole } from "@/lib/agentRole";
 
 type AgentSummary = {
   id: string;
@@ -67,10 +68,9 @@ export async function GET(req: NextRequest) {
     }
 
     const quoteRequests = await prisma.quoteRequest.findMany({
-      where:
-        agent.agentRole === "Advisor Agent"
-          ? { assignedAgentId: agent.id }
-          : { createdByAgentId: agent.id },
+      where: hasAdvisorRole(agent.agentRole)
+        ? { assignedAgentId: agent.id }
+        : { createdByAgentId: agent.id },
       include: {
         createdByUser: {
           select: {
@@ -122,7 +122,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    if (agent.agentRole !== "Execution Agent") {
+    if (!hasExecutionRole(agent.agentRole)) {
       return NextResponse.json(
         { error: "Only execution agents can create quote requests" },
         { status: 403 },
@@ -163,7 +163,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (assignedAgent.agentRole !== "Advisor Agent") {
+    if (!hasAdvisorRole(assignedAgent.agentRole)) {
       return NextResponse.json(
         { error: "Quote requests can only be assigned to advisor agents" },
         { status: 400 },

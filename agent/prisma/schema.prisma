@@ -143,6 +143,8 @@ model Agent {
   phoneNumber          String
   secondaryPhoneNumber String?
   agentType            String
+  executionAgentType   String?
+  advisorAgentType     String?
   agentRole            String    @default("Execution Agent") // "Execution Agent" or "Advisor Agent"
   // For Advisor Agent, agentType can be: "Lead Maker", "Client Advisor", "Client Manager"
   // For Execution Agent, agentType can be: "CEO", "Partner", "Manager", etc. (existing types)
@@ -238,11 +240,11 @@ model AgentSuperior {
   id            String @id @default(auto()) @map("_id") @db.ObjectId
   superiorId    String @db.ObjectId
   subordinateId String @db.ObjectId
+  teamType      String? // "execution" | "advisor"
 
   superior      Agent  @relation("AgentSuperiors_superior", fields: [superiorId], references: [id])
   subordinate   Agent  @relation("AgentSuperiors_subordinate", fields: [subordinateId], references: [id])
 }
-
 model Task {
   id               String    @id @default(auto()) @map("_id") @db.ObjectId
   title            String

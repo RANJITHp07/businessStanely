@@ -7,10 +7,7 @@ export async function GET(req: NextRequest) {
     const agent = await getCurrentAgent(req);
 
     if (!agent) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     return NextResponse.json({
@@ -19,6 +16,8 @@ export async function GET(req: NextRequest) {
         name: agent.name,
         email: agent.email,
         agentType: agent.agentType,
+        executionAgentType: agent.executionAgentType,
+        advisorAgentType: agent.advisorAgentType,
         agentRole: agent.agentRole,
         phoneNumber: agent.phoneNumber,
         jurisdiction: agent.jurisdiction,
@@ -31,7 +30,7 @@ export async function GET(req: NextRequest) {
     console.error("Get profile error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -41,10 +40,7 @@ export async function PUT(req: NextRequest) {
     const agent = await getCurrentAgent(req);
 
     if (!agent) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const body = await req.json();
@@ -61,7 +57,7 @@ export async function PUT(req: NextRequest) {
     if (!name || !phoneNumber) {
       return NextResponse.json(
         { error: "Name and phone number are required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -82,6 +78,8 @@ export async function PUT(req: NextRequest) {
         name: true,
         email: true,
         agentType: true,
+        executionAgentType: true,
+        advisorAgentType: true,
         phoneNumber: true,
         secondaryPhoneNumber: true,
         jurisdiction: true,
@@ -99,7 +97,7 @@ export async function PUT(req: NextRequest) {
     console.error("Update profile error:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   } finally {
     await prisma.$disconnect();

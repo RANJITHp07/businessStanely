@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getCurrentAgent } from "@/lib/auth";
+import { getAdvisorAgentType } from "@/lib/agentType";
 
 // GET: List all opportunities from Opportunity model
 export async function GET(req: NextRequest) {
@@ -15,23 +16,24 @@ export async function GET(req: NextRequest) {
       orderBy: { createdAt: "desc" },
     });
     let opportunities = allOpportunities;
-    if (agent.agentType === "Lead Maker") {
+    const advisorType = getAdvisorAgentType(agent);
+    if (advisorType === "Lead Maker") {
       opportunities = allOpportunities.filter(
-        (o) => o.prospect?.createdByAgentId === agent.id
+        (o) => o.prospect?.createdByAgentId === agent.id,
       );
     } else if (
-      agent.agentType === "Client Advisor" ||
-      agent.agentType === "Client Manager"
+      advisorType === "Client Advisor" ||
+      advisorType === "Client Manager"
     ) {
       opportunities = allOpportunities.filter(
-        (o) => o.prospect?.assignedAgentId === agent.id
+        (o) => o.prospect?.assignedAgentId === agent.id,
       );
     }
     return NextResponse.json({ opportunities });
   } catch (error) {
     return NextResponse.json(
       { error: "Failed to fetch opportunities" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

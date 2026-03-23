@@ -22,6 +22,8 @@ import PhoneInput from "react-phone-input-2"
 import "react-phone-input-2/lib/style.css"
 import { Badge } from "@/components/ui/badge"
 import { uploadFileToS3Direct } from "@/lib/directUpload"
+import { hasAdvisorRole } from "@/lib/agentRole"
+import { getAdvisorAgentType, isLeadMaker } from "@/lib/agentType"
 
 
 export default function EditProspectPage() {
@@ -100,14 +102,14 @@ export default function EditProspectPage() {
         // 4️⃣ Determine team members
         let teamMembersList: any[] = [];
 
-        if (agent.agentRole === "Advisor Agent" && agent.agentType === "Client Manager") {
+        if (hasAdvisorRole(agent.agentRole) && getAdvisorAgentType(agent) === "Client Manager") {
           const subRes = await fetch("/api/agents/me/subordinates");
           if (subRes.ok) teamMembersList = await subRes.json();
         }
 
         if (teamMembersList.length === 0 && Array.isArray(allAgentsData)) {
-          if (agent.agentRole === "Advisor Agent" && agent.agentType === "Lead Maker") {
-            teamMembersList = allAgentsData.filter((a: any) => a.agentRole === "Advisor Agent");
+          if (hasAdvisorRole(agent.agentRole) && isLeadMaker(agent)) {
+            teamMembersList = allAgentsData.filter((a: any) => hasAdvisorRole(a.agentRole));
           } else {
             teamMembersList = allAgentsData;
           }
@@ -419,7 +421,7 @@ export default function EditProspectPage() {
           </Card>
 
           {
-            agent && !(agent.agentRole === "Advisor Agent" && agent.agentType === "Lead Maker") &&
+            agent && !(hasAdvisorRole(agent.agentRole) && isLeadMaker(agent)) &&
             <Card>
               <CardHeader>
                 <div className="flex items-center gap-2">

@@ -87,6 +87,13 @@ const jurisdictions = ["All Jurisdictions", "India", "USA", "UAE", "Others"];
 import { Agent } from "@/types";
 import { hasAdvisorRole } from "@/lib/agentRole";
 
+const advisorTypesSet = new Set(["Lead Maker", "Client Advisor", "Client Manager"]);
+
+const getAdvisorType = (agent: Agent): string => {
+    if (agent.advisorAgentType) return agent.advisorAgentType;
+    return advisorTypesSet.has(agent.agentType) ? agent.agentType : "";
+};
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface ClientAdvisor {
@@ -132,7 +139,7 @@ function ClientAdvisorsModal({ leadMaker, open, onOpenChange }: ClientAdvisorsMo
             if (allRes.ok) {
                 const allData = await allRes.json();
                 setAllAdvisors(
-                    allData.filter((a: Agent) => a.agentType !== "Lead Maker" && hasAdvisorRole(a.agentRole))
+                    allData.filter((a: Agent) => getAdvisorType(a) !== "Lead Maker" && hasAdvisorRole(a.agentRole))
                 );
             }
         } catch (err) {
@@ -439,7 +446,7 @@ export default function AgentsTable() {
                 .includes(searchTerm.toLowerCase());
 
         const matchesType =
-            selectedType === "All Types" || agent.agentType === selectedType;
+            selectedType === "All Types" || getAdvisorType(agent) === selectedType;
         const matchesJurisdiction =
             selectedJurisdiction === "All Jurisdictions" ||
             agent.jurisdiction === selectedJurisdiction;
@@ -497,7 +504,7 @@ export default function AgentsTable() {
     };
 
     const getAgentTypeBadge = (agent: Agent) => {
-        const type = agent.agentType;
+        const type = getAdvisorType(agent) || agent.agentType;
         const colors: Record<string, string> = {
             "Senior Partner": "bg-purple-100 text-purple-800",
             Partner: "bg-blue-100 text-blue-800",
@@ -507,7 +514,7 @@ export default function AgentsTable() {
             "Legal Assistant": "bg-gray-100 text-gray-800",
         };
 
-        const isLeadMaker = agent.agentType === "Lead Maker";
+        const isLeadMaker = type === "Lead Maker";
 
         return (
             <Badge
@@ -737,7 +744,7 @@ export default function AgentsTable() {
                                                                 <DropdownMenuContent align="end">
                                                                     <DropdownMenuLabel>Actions</DropdownMenuLabel>
                                                                     <DropdownMenuItem asChild>
-                                                                        <Link href={`/agent/${agent.id}`}>
+                                                                        <Link href={`/agent/${agent.id}?tab=leads`}>
                                                                             <Eye className="mr-2 h-4 w-4" />
                                                                             View Details
                                                                         </Link>
@@ -748,7 +755,7 @@ export default function AgentsTable() {
                                                                             Edit Agent
                                                                         </Link>
                                                                     </DropdownMenuItem>
-                                                                    {agent.agentType === "Lead Maker" && (
+                                                                    {getAdvisorType(agent) === "Lead Maker" && (
                                                                         <>
                                                                             <DropdownMenuSeparator />
                                                                             <DropdownMenuItem
@@ -859,7 +866,7 @@ export default function AgentsTable() {
                                                                 <DropdownMenuContent align="end">
                                                                     <DropdownMenuLabel className="text-xs">Actions</DropdownMenuLabel>
                                                                     <DropdownMenuItem asChild>
-                                                                        <Link href={`/agent/${agent.id}`}>
+                                                                        <Link href={`/agent/${agent.id}?tab=leads`}>
                                                                             <Eye className="mr-2 h-3 w-3" />
                                                                             <span className="text-xs">View Details</span>
                                                                         </Link>
@@ -870,7 +877,7 @@ export default function AgentsTable() {
                                                                             <span className="text-xs">Edit Agent</span>
                                                                         </Link>
                                                                     </DropdownMenuItem>
-                                                                    {agent.agentType === "Lead Maker" && (
+                                                                    {getAdvisorType(agent) === "Lead Maker" && (
                                                                         <>
                                                                             <DropdownMenuSeparator />
                                                                             <DropdownMenuItem

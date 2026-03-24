@@ -349,7 +349,7 @@ export default function TaskForm({ id }: TaskFormProps) {
       try {
         const [clientsRes, teamRes, categoriesRes, selfRes] = await Promise.all([
           fetch("/api/clients"),
-          fetch("/api/team-members"),
+          fetch("/api/team-members?teamType=execution"),
           fetch("/api/task-categories"),
           fetch("/api/agents/me"), // Add endpoint to get current agent
         ]);

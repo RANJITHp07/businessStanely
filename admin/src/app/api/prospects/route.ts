@@ -2,6 +2,18 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getCurrentAdmin } from "@/lib/auth";
 
+function getAssignedAdvisorType(assignedAgent: {
+  agentType?: string | null;
+  advisorAgentType?: string | null;
+  agentRole?: string | null;
+}) {
+  if (assignedAgent.agentRole === "Execution & Advisor Agent") {
+    return assignedAgent.advisorAgentType || assignedAgent.agentType || null;
+  }
+
+  return assignedAgent.agentType || assignedAgent.advisorAgentType || null;
+}
+
 export async function GET(req: NextRequest) {
   try {
     const agent = await getCurrentAdmin(req);
@@ -33,11 +45,13 @@ export async function GET(req: NextRequest) {
         );
       }
 
-      if (assignedAgent.agentType === "Lead Maker") {
+      const advisorType = getAssignedAdvisorType(assignedAgent);
+
+      if (advisorType === "Lead Maker") {
         where.createdByAgentId = assignedAgentId;
       } else if (
-        assignedAgent.agentType === "Client Advisor" ||
-        assignedAgent.agentType === "Client Manager"
+        advisorType === "Client Advisor" ||
+        advisorType === "Client Manager"
       ) {
         if (assignedAgentId) {
           where.assignedAgentId = assignedAgentId;

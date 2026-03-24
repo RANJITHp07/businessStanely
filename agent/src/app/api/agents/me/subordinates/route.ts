@@ -9,6 +9,9 @@ export async function GET(req: NextRequest) {
   if (!agent) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  const teamType = req.nextUrl.searchParams.get("teamType");
+
   // Only allow for Client Manager
   if (
     !hasAdvisorRole(agent.agentRole) ||
@@ -20,6 +23,11 @@ export async function GET(req: NextRequest) {
   const links = await prisma.agentSuperior.findMany({
     where: {
       superiorId: agent.id,
+      ...(teamType === "advisor"
+        ? { teamType: "advisor" }
+        : teamType === "execution"
+          ? { teamType: { not: "advisor" } }
+          : {}),
       subordinate: {
         status: "active",
       },

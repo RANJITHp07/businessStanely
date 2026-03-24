@@ -104,7 +104,7 @@ export default function NewProspectPage() {
             const apiAdvisorType = getAdvisorAgentType(agent)
             if (hasAdvisorRole(agent.agentRole) && apiAdvisorType === "Client Manager") {
                 // Fetch subordinates
-                const subRes = await fetch("/api/agents/me/subordinates")
+                const subRes = await fetch("/api/agents/me/subordinates?teamType=advisor")
                 if (subRes.ok) {
                     const subs = await subRes.json()
                     setTeamMembers(subs)

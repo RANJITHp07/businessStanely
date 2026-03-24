@@ -12,9 +12,9 @@ import {
   FileText,
   Calendar
 } from "lucide-react";
-import { useState } from "react";
-import { useAuth } from "@/hooks/useAuth";
+import { useMemo, useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 import {
   Sidebar,
@@ -26,6 +26,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarFooter,
+  useSidebar,
 } from "@/components/ui/sidebar";
 
 import {
@@ -42,7 +43,14 @@ import Image from "next/image";
 import Logo from "./../../public/Logo.jpg";
 import { hasAdvisorRole, hasExecutionRole, EXECUTION_AND_ADVISOR_AGENT_ROLE } from "@/lib/agentRole";
 import { getAdvisorAgentType } from "@/lib/agentType";
-const salesItems = [
+
+type MenuItem = {
+  title: string;
+  url: string;
+  icon: typeof Home;
+};
+
+const salesItems: MenuItem[] = [
   {
     title: "Sales Dashboard",
     url: "/sales/dashboard",
@@ -69,29 +77,14 @@ const salesItems = [
     icon: UserRoundPen,
   },
   {
-    title: "Service Records",
-    url: "/service-records",
-    icon: FileText,
-  },
-  {
     title: "Request Quote",
     url: "/request-quote",
     icon: FileText,
   },
-  {
-    title: "My Diary",
-    url: "/my-diary",
-    icon: UserRoundPen,
-  },
-  {
-    title: "Settings",
-    url: "/setting",
-    icon: Settings,
-  },
 ];
 
 
-const dashboardItems = [
+const dashboardItems: MenuItem[] = [
   {
     title: "Dashboard",
     url: "/dashboard",
@@ -123,11 +116,6 @@ const dashboardItems = [
     icon: Boxes,
   },
   {
-    title: "Service Records",
-    url: "/service-records",
-    icon: FileText,
-  },
-  {
     title: "Retainership",
     url: "/retainership",
     icon: Boxes,
@@ -135,6 +123,14 @@ const dashboardItems = [
   {
     title: "Request Quote",
     url: "/request-quote",
+    icon: FileText,
+  },
+];
+
+const commonItems: MenuItem[] = [
+  {
+    title: "Service Records",
+    url: "/service-records",
     icon: FileText,
   },
   {
@@ -146,47 +142,75 @@ const dashboardItems = [
     title: "Settings",
     url: "/setting",
     icon: Settings,
-  }
+  },
 ];
 
 export function AppSidebar() {
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
-  // Use agent info from localStorage (set at login/root redirect)
-  let agentRole = null;
-  let agentType = null;
-  if (typeof window !== "undefined") {
+  const pathname = usePathname();
+  const { setOpenMobile, isMobile } = useSidebar();
+
+  const { agentRole, agentType } = useMemo(() => {
+    if (typeof window === "undefined") {
+      return { agentRole: null as string | null, agentType: null as string | null };
+    }
+
     try {
       const agentLS = localStorage.getItem("agent");
-      if (agentLS) {
-        const agentObj = JSON.parse(agentLS);
-        agentRole = agentObj.agentRole;
-        agentType = getAdvisorAgentType(agentObj) || agentObj.agentType;
+      if (!agentLS) {
+        return { agentRole: null as string | null, agentType: null as string | null };
       }
-    } catch { }
-  }
 
-  let items = dashboardItems;
-  let secondaryItems: typeof salesItems | null = null;
-
-  if (agentRole === EXECUTION_AND_ADVISOR_AGENT_ROLE) {
-    // Dual-role: show both dashboards
-    items = dashboardItems;
-    secondaryItems = salesItems;
-  } else if (hasAdvisorRole(agentRole)) {
-    if (agentType === "Client Advisor" || agentType === "Client Manager") {
-      items = salesItems;
-    } else if (agentType === "Lead Maker") {
-      items = salesItems.filter(item => item.title !== "Calendar");
-    } else {
-      items = salesItems;
+      const agentObj = JSON.parse(agentLS);
+      return {
+        agentRole: agentObj.agentRole ?? null,
+        agentType: getAdvisorAgentType(agentObj) || agentObj.agentType || null,
+      };
+    } catch {
+      return { agentRole: null as string | null, agentType: null as string | null };
     }
-  }
+  }, []);
+
+  const isDualRole = agentRole === EXECUTION_AND_ADVISOR_AGENT_ROLE;
+  const showExecutionPanel = hasExecutionRole(agentRole);
+  const showSalesPanel = hasAdvisorRole(agentRole);
+
+  const visibleSalesItems = useMemo(() => {
+    if (agentType === "Lead Maker") {
+      return salesItems.filter((item) => item.title !== "Calendar");
+    }
+
+    return salesItems;
+  }, [agentType]);
+
+  const renderItems = (items: MenuItem[]) =>
+    items.map((item) => {
+      const isActive =
+        pathname === item.url ||
+        (item.url !== "/dashboard" && pathname.startsWith(`${item.url}/`));
+
+      return (
+        <SidebarMenuItem key={item.title}>
+          <SidebarMenuButton asChild>
+            <Link
+              href={item.url}
+              onClick={() => isMobile && setOpenMobile(false)}
+              className={`flex items-center gap-2 ${isActive ? "bg-white text-primary" : "hover:bg-white hover:text-primary"}`}
+            >
+              <item.icon className="w-5 h-5" />
+              <span className="text-[16px]">{item.title}</span>
+            </Link>
+          </SidebarMenuButton>
+        </SidebarMenuItem>
+      );
+    });
 
   const handleLogout = async () => {
     try {
       // Clear localStorage immediately to prevent flash
       localStorage.removeItem("token");
       localStorage.removeItem("user");
+      localStorage.removeItem("agent");
 
       // Call logout API to clear server-side cookie
       await fetch("/api/auth/logout", {
@@ -207,46 +231,50 @@ export function AppSidebar() {
 
   return (
     <>
-      <Sidebar>
+      <Sidebar className="hidden md:flex flex-shrink-0">
         <SidebarContent>
           <SidebarGroup>
             <SidebarGroupLabel className="mt-[10px] ">
               <Image src={Logo} alt="logo" />
             </SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {items.map((item) => (
-                  <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton asChild>
-                      <Link href={item.url}>
-                        <item.icon />
-                        <span className="text-[16px]">{item.title}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
           </SidebarGroup>
-          {secondaryItems && (
+
+          {showExecutionPanel && (
             <SidebarGroup>
-              <SidebarGroupLabel>Sales</SidebarGroupLabel>
+              <SidebarGroupLabel className="text-[16px] mt-[30px] text-white py-5 px-3 -ml-4 rounded-none border-b border-t border-white font-medium">
+                {isDualRole ? "Execution Panel" : "Agent Panel"}
+              </SidebarGroupLabel>
               <SidebarGroupContent>
-                <SidebarMenu>
-                  {secondaryItems.map((item) => (
-                    <SidebarMenuItem key={item.title}>
-                      <SidebarMenuButton asChild>
-                        <Link href={item.url}>
-                          <item.icon />
-                          <span className="text-[16px]">{item.title}</span>
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  ))}
+                <SidebarMenu className="mt-[8px]">
+                  {renderItems(dashboardItems)}
                 </SidebarMenu>
               </SidebarGroupContent>
             </SidebarGroup>
           )}
+
+          {showSalesPanel && (
+            <SidebarGroup>
+              <SidebarGroupLabel className="text-[16px] text-white py-5 px-3 -ml-4 rounded-none border-b border-t border-white font-medium">
+                Sales Panel
+              </SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu className="mt-[8px]">
+                  {renderItems(visibleSalesItems)}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          )}
+
+          <SidebarGroup>
+            <SidebarGroupLabel className="text-[16px] text-white py-5 px-3 -ml-4 rounded-none border-b border-t border-white font-medium">
+              Common
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu className="mt-[8px]">
+                {renderItems(commonItems)}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
         </SidebarContent>
 
         <SidebarFooter>

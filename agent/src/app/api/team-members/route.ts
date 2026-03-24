@@ -8,12 +8,23 @@ export async function GET(req: NextRequest) {
     if (!agent) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    const teamType = new URL(req.url).searchParams.get("teamType");
+
     // Accept agentId as query param, fallback to current agent
     const { searchParams } = new URL(req.url);
     const agentId = searchParams.get("agentId") || agent.id;
+
     // Fetch subordinates using AgentSuperior join table (recommended logic)
     const subordinatesLinks = await prisma.agentSuperior.findMany({
-      where: { superiorId: agentId },
+      where: {
+        superiorId: agentId,
+        ...(teamType === "advisor"
+          ? { teamType: "advisor" }
+          : teamType === "execution"
+            ? { teamType: { not: "advisor" } }
+            : {}),
+      },
       include: {
         subordinate: {
           select: {
@@ -26,6 +37,9 @@ export async function GET(req: NextRequest) {
             specializations: true,
             photo: true,
             status: true,
+            agentRole: true,
+            executionAgentType: true,
+            advisorAgentType: true,
           }
         }
       }

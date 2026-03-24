@@ -2,6 +2,19 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getCurrentAdmin } from "@/lib/auth";
 
+function getAssignedAdvisorType(assignedAgent: {
+  id: string;
+  agentType?: string | null;
+  advisorAgentType?: string | null;
+  agentRole?: string | null;
+}) {
+  if (assignedAgent.agentRole === "Execution & Advisor Agent") {
+    return assignedAgent.advisorAgentType || assignedAgent.agentType || null;
+  }
+
+  return assignedAgent.agentType || assignedAgent.advisorAgentType || null;
+}
+
 // GET: List all opportunities from Opportunity model
 export async function GET(req: NextRequest) {
   try {
@@ -12,7 +25,6 @@ export async function GET(req: NextRequest) {
     const assignedAgentId = req.nextUrl.searchParams.get("assignedAgentId");
 
     let assignedAgent = null;
-    let where: any = {};
 
     if (assignedAgentId) {
       assignedAgent = await prisma.agent.findUnique({
@@ -26,15 +38,14 @@ export async function GET(req: NextRequest) {
         );
       }
 
-      if (assignedAgent.agentType === "Lead Maker") {
-        where.prospect = { createdByAgentId: agent.id };
-      } else if (
-        assignedAgent.agentType === "Client Advisor" ||
-        assignedAgent.agentType === "Client Manager"
+      const advisorType = getAssignedAdvisorType(assignedAgent);
+
+      if (
+        advisorType !== "Client Advisor" &&
+        advisorType !== "Client Manager" &&
+        advisorType !== "Lead Maker"
       ) {
-        if (assignedAgentId) {
-          where.prospect = { assignedAgentId: assignedAgentId };
-        }
+        assignedAgent = null;
       }
     }
     // MongoDB does not support relation filtering in Prisma, so filter in-memory
@@ -46,6 +57,26 @@ export async function GET(req: NextRequest) {
       orderBy: { createdAt: "desc" },
     });
     let opportunities = allOpportunities;
+
+    if (assignedAgentId && assignedAgent) {
+      const advisorType = getAssignedAdvisorType(assignedAgent);
+
+      opportunities = allOpportunities.filter((opportunity) => {
+        if (advisorType === "Lead Maker") {
+          return opportunity.prospect?.createdByAgentId === assignedAgentId;
+        }
+
+        if (
+          advisorType === "Client Advisor" ||
+          advisorType === "Client Manager"
+        ) {
+          return opportunity.prospect?.assignedAgentId === assignedAgentId;
+        }
+
+        return true;
+      });
+    }
+
     return NextResponse.json({ opportunities });
   } catch (error) {
     return NextResponse.json(

@@ -103,7 +103,7 @@ export default function EditProspectPage() {
         let teamMembersList: any[] = [];
 
         if (hasAdvisorRole(agent.agentRole) && getAdvisorAgentType(agent) === "Client Manager") {
-          const subRes = await fetch("/api/agents/me/subordinates");
+          const subRes = await fetch("/api/agents/me/subordinates?teamType=advisor");
           if (subRes.ok) teamMembersList = await subRes.json();
         }
 

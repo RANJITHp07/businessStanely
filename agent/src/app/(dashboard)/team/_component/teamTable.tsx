@@ -38,6 +38,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { hasAdvisorRole, hasExecutionRole } from "@/lib/agentRole";
 // Removed Link import
 // Removed AlertDialog and related imports
 
@@ -65,6 +66,8 @@ export default function TeamsTable() {
     jurisdiction?: string;
     email?: string;
     photo?: string;
+    agentType?: string;
+    agentRole?: string;
   };
   const router = useRouter();
   const [teams, setTeams] = useState<Team[]>([]);
@@ -95,6 +98,18 @@ export default function TeamsTable() {
     };
     fetchTeams();
   }, []);
+
+  const getDefaultTab = (team: Team) => {
+    if (hasExecutionRole(team.agentRole) && hasAdvisorRole(team.agentRole)) {
+      return "tasks";
+    }
+
+    if (hasAdvisorRole(team.agentRole)) {
+      return "leads";
+    }
+
+    return "tasks";
+  };
 
   // Sort function
   const sortTeams = (teams: Team[]) => {
@@ -302,7 +317,7 @@ export default function TeamsTable() {
                         return (
                           <TableRow
                             key={team.id}
-                            onClick={() => router.push(`/team/${team.id}?tab=tasks`)}
+                            onClick={() => router.push(`/team/${team.id}?tab=${getDefaultTab(team)}`)}
                             className="cursor-pointer hover:bg-muted/50"
                           >
                             <TableCell>
@@ -328,7 +343,7 @@ export default function TeamsTable() {
                                 </div>
                               </div>
                             </TableCell>
-                            <TableCell className="text-xs">{team.type}</TableCell>
+                            <TableCell className="text-xs">{team.type || team.agentType}</TableCell>
                             <TableCell>
                               <div className="flex flex-wrap gap-1">
                                 {team.specializations &&
@@ -366,7 +381,7 @@ export default function TeamsTable() {
                                 <DropdownMenuContent align="end">
                                   <DropdownMenuLabel className="text-sm">Actions</DropdownMenuLabel>
                                   <DropdownMenuItem asChild>
-                                    <a href={`/team/${team.id}`} onClick={e => e.stopPropagation()}>
+                                    <a href={`/team/${team.id}?tab=${getDefaultTab(team)}`} onClick={e => e.stopPropagation()}>
                                       <Eye className="mr-2 h-4 w-4" />
                                       View Details
                                     </a>
@@ -408,7 +423,7 @@ export default function TeamsTable() {
                         return (
                           <TableRow
                             key={team.id}
-                            onClick={() => router.push(`/team/${team.id}?tab=tasks`)}
+                            onClick={() => router.push(`/team/${team.id}?tab=${getDefaultTab(team)}`)}
                             className="cursor-pointer hover:bg-muted/50"
                           >
                             <TableCell>

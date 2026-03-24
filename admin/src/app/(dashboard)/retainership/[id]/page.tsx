@@ -37,6 +37,27 @@ import { Textarea } from "@/components/ui/textarea"
 import { fetchWithAuth } from "@/lib/fetchWithAuth"
 import { useRouter } from "next/navigation"
 
+type ClientDiaryEntry = {
+    id: string
+    clientId: string
+    entryDate: string
+    content: string
+    createdAt: string
+    updatedAt: string
+}
+
+const normalizeDiaryEntryDate = (rawDate: string) => {
+    if (!rawDate) return ""
+    const parsed = new Date(rawDate)
+    if (Number.isNaN(parsed.getTime())) return rawDate.slice(0, 10)
+    return parsed.toISOString().slice(0, 10)
+}
+
+const getDiaryPreviewText = (htmlContent: string) => {
+    if (!htmlContent) return ""
+    return htmlContent.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim()
+}
+
 export default function RetainershipDetail({ params }: { params: Promise<{ id: string }> | { id: string } }) {
     // Helper to render the creator label (name + (Owner/Admin/Agent))
     const renderCreatedBy = () => {
@@ -66,6 +87,14 @@ export default function RetainershipDetail({ params }: { params: Promise<{ id: s
     const [agents, setAgents] = useState<any[]>([]);
     const [showModalAgentDropdown, setShowModalAgentDropdown] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false)
+    const [isClientDiaryOpen, setIsClientDiaryOpen] = useState(false)
+    const [selectedDiaryDate, setSelectedDiaryDate] = useState("")
+    const [diaryEntries, setDiaryEntries] = useState<ClientDiaryEntry[]>([])
+    const [isDiaryLoading, setIsDiaryLoading] = useState(false)
+    const [isDiarySubmitting, setIsDiarySubmitting] = useState(false)
+    const [diaryDraft, setDiaryDraft] = useState("")
+    const [diaryEntryDate, setDiaryEntryDate] = useState(() => new Date().toISOString().slice(0, 10))
+    const [editingDiaryEntry, setEditingDiaryEntry] = useState<ClientDiaryEntry | null>(null)
     const [modalFormData, setModalFormData] = useState<any>({
         title: "",
         description: "",
@@ -167,6 +196,121 @@ export default function RetainershipDetail({ params }: { params: Promise<{ id: s
             console.error("Error deleting legislation:", error);
         }
     };
+
+    const fetchDiaryEntries = async (clientId: string, date?: string) => {
+        setIsDiaryLoading(true)
+        try {
+            const query = date ? `?date=${encodeURIComponent(date)}` : ""
+            const response = await fetch(`/api/clients/${clientId}/diary${query}`, {
+                method: "GET",
+                cache: "no-store",
+            })
+
+            if (!response.ok) {
+                setDiaryEntries([])
+                return
+            }
+
+            const data = await response.json()
+            const entries = Array.isArray(data.entries) ? data.entries : []
+            setDiaryEntries(entries)
+        } catch (error) {
+            console.error("Error fetching diary entries:", error)
+            setDiaryEntries([])
+        } finally {
+            setIsDiaryLoading(false)
+        }
+    }
+
+    const openClientDiary = async () => {
+        if (!retainership?.client?.id) return
+        setSelectedDiaryDate("")
+        setDiaryDraft("")
+        setDiaryEntryDate(new Date().toISOString().slice(0, 10))
+        setEditingDiaryEntry(null)
+        setIsClientDiaryOpen(true)
+        await fetchDiaryEntries(retainership.client.id)
+    }
+
+    const handleSaveDiaryEntry = async () => {
+        if (!retainership?.client?.id || !diaryDraft.trim() || !diaryEntryDate) return
+
+        setIsDiarySubmitting(true)
+        try {
+            const isEditing = Boolean(editingDiaryEntry)
+            const response = await fetch(
+                isEditing
+                    ? `/api/clients/${retainership.client.id}/diary/${editingDiaryEntry?.id}`
+                    : `/api/clients/${retainership.client.id}/diary`,
+                {
+                    method: isEditing ? "PUT" : "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({
+                        entryDate: diaryEntryDate,
+                        content: diaryDraft,
+                    }),
+                },
+            )
+
+            if (!response.ok) {
+                throw new Error("Failed to save diary entry")
+            }
+
+            setDiaryDraft("")
+            setDiaryEntryDate(new Date().toISOString().slice(0, 10))
+            setEditingDiaryEntry(null)
+            setSelectedDiaryDate(diaryEntryDate)
+            await fetchDiaryEntries(retainership.client.id, diaryEntryDate)
+            toast.success(isEditing ? "Diary entry updated" : "Diary entry added")
+        } catch (error) {
+            console.error("Error saving diary entry:", error)
+            toast.error("Failed to save diary entry")
+        } finally {
+            setIsDiarySubmitting(false)
+        }
+    }
+
+    const handleEditDiaryEntry = (entry: ClientDiaryEntry) => {
+        setEditingDiaryEntry(entry)
+        setDiaryDraft(entry.content || "")
+        setDiaryEntryDate(normalizeDiaryEntryDate(entry.entryDate))
+    }
+
+    const handleDeleteDiaryEntry = async (entryId: string) => {
+        if (!retainership?.client?.id) return
+
+        setIsDiarySubmitting(true)
+        try {
+            const response = await fetch(`/api/clients/${retainership.client.id}/diary/${entryId}`, {
+                method: "DELETE",
+            })
+
+            if (!response.ok) {
+                throw new Error("Failed to delete diary entry")
+            }
+
+            if (editingDiaryEntry?.id === entryId) {
+                setEditingDiaryEntry(null)
+                setDiaryDraft("")
+                setDiaryEntryDate(new Date().toISOString().slice(0, 10))
+            }
+
+            await fetchDiaryEntries(retainership.client.id, selectedDiaryDate || undefined)
+            toast.success("Diary entry deleted")
+        } catch (error) {
+            console.error("Error deleting diary entry:", error)
+            toast.error("Failed to delete diary entry")
+        } finally {
+            setIsDiarySubmitting(false)
+        }
+    }
+
+    useEffect(() => {
+        if (!isClientDiaryOpen || !retainership?.client?.id) return
+        fetchDiaryEntries(retainership.client.id, selectedDiaryDate || undefined)
+    }, [isClientDiaryOpen, retainership?.client?.id, selectedDiaryDate])
 
     const handleSubmit = async () => {
         try {
@@ -359,10 +503,17 @@ export default function RetainershipDetail({ params }: { params: Promise<{ id: s
                     <div className="lg:col-span-2">
                         <Card>
                             <CardHeader>
-                                <CardTitle className="flex items-center gap-2">
-                                    <FileText className="h-5 w-5" />
-                                    Retainership Details
-                                </CardTitle>
+                                <div className="flex items-center justify-between gap-4">
+                                    <CardTitle className="flex items-center gap-2">
+                                        <FileText className="h-5 w-5" />
+                                        Retainership Details
+                                    </CardTitle>
+                                    {retainership.client?.id && (
+                                        <Button variant="outline" onClick={openClientDiary}>
+                                            Client Diary
+                                        </Button>
+                                    )}
+                                </div>
                             </CardHeader>
                             <CardContent className="space-y-6">
                                 <div className="flex items-start gap-4">
@@ -610,6 +761,141 @@ export default function RetainershipDetail({ params }: { params: Promise<{ id: s
                             {isSubmitting
                                 ? (isEdit ? "Updating.." : "Adding..")
                                 : (isEdit ? "Edit Legislation" : "Add Legislation")}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+            <Dialog open={isClientDiaryOpen} onOpenChange={setIsClientDiaryOpen}>
+                <DialogContent className="sm:max-w-[900px] max-h-[85vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle>Client Diary</DialogTitle>
+                        <DialogDescription>
+                            {retainership.client
+                                ? `Diary for ${retainership.client.organizationName || `${retainership.client.firstName || ""} ${retainership.client.lastName || ""}`.trim()}`
+                                : "Diary entries for this client"}
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="space-y-6">
+                        <div className="flex flex-col md:flex-row gap-4 md:items-end">
+                            <div className="space-y-2 w-full md:w-[220px]">
+                                <Label htmlFor="diary-filter-date">Filter By Date</Label>
+                                <Input
+                                    id="diary-filter-date"
+                                    type="date"
+                                    value={selectedDiaryDate}
+                                    onChange={(e) => setSelectedDiaryDate(e.target.value)}
+                                />
+                            </div>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => setSelectedDiaryDate("")}
+                            >
+                                Clear Filter
+                            </Button>
+                        </div>
+
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>{editingDiaryEntry ? "Update Diary Entry" : "Add Diary Entry"}</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="diary-entry-date">Entry Date</Label>
+                                    <Input
+                                        id="diary-entry-date"
+                                        type="date"
+                                        value={diaryEntryDate}
+                                        onChange={(e) => setDiaryEntryDate(e.target.value)}
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="diary-content">Content</Label>
+                                    <Textarea
+                                        id="diary-content"
+                                        value={diaryDraft}
+                                        onChange={(e) => setDiaryDraft(e.target.value)}
+                                        placeholder="Write a diary note for this client"
+                                        rows={6}
+                                    />
+                                </div>
+                                <div className="flex gap-2 justify-end">
+                                    {editingDiaryEntry && (
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            onClick={() => {
+                                                setEditingDiaryEntry(null)
+                                                setDiaryDraft("")
+                                                setDiaryEntryDate(new Date().toISOString().slice(0, 10))
+                                            }}
+                                        >
+                                            Cancel Edit
+                                        </Button>
+                                    )}
+                                    <Button
+                                        type="button"
+                                        onClick={handleSaveDiaryEntry}
+                                        disabled={isDiarySubmitting || !diaryDraft.trim() || !diaryEntryDate}
+                                    >
+                                        {isDiarySubmitting ? (editingDiaryEntry ? "Updating..." : "Adding...") : (editingDiaryEntry ? "Update Entry" : "Add Entry")}
+                                    </Button>
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Diary Entries</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                {isDiaryLoading ? (
+                                    <div className="space-y-3">
+                                        <Skeleton className="h-16 w-full" />
+                                        <Skeleton className="h-16 w-full" />
+                                    </div>
+                                ) : diaryEntries.length === 0 ? (
+                                    <div className="text-center py-8 text-muted-foreground">
+                                        No diary entries found.
+                                    </div>
+                                ) : (
+                                    <div className="space-y-4">
+                                        {diaryEntries
+                                            .slice()
+                                            .sort((a, b) => +new Date(b.updatedAt) - +new Date(a.updatedAt))
+                                            .map((entry) => (
+                                                <div key={entry.id} className="rounded-lg border p-4 space-y-3">
+                                                    <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
+                                                        <div>
+                                                            <div className="font-medium">{normalizeDiaryEntryDate(entry.entryDate)}</div>
+                                                            <div className="text-sm text-muted-foreground">
+                                                                Updated {new Date(entry.updatedAt).toLocaleString()}
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex gap-2">
+                                                            <Button type="button" variant="outline" size="sm" onClick={() => handleEditDiaryEntry(entry)}>
+                                                                Edit
+                                                            </Button>
+                                                            <Button type="button" variant="destructive" size="sm" onClick={() => handleDeleteDiaryEntry(entry.id)} disabled={isDiarySubmitting}>
+                                                                Delete
+                                                            </Button>
+                                                        </div>
+                                                    </div>
+                                                    <div className="text-sm text-foreground whitespace-pre-wrap break-words">
+                                                        {getDiaryPreviewText(entry.content)}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
+                    </div>
+
+                    <DialogFooter>
+                        <Button type="button" variant="outline" onClick={() => setIsClientDiaryOpen(false)}>
+                            Close
                         </Button>
                     </DialogFooter>
                 </DialogContent>

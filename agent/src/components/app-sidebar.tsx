@@ -52,6 +52,11 @@ type MenuItem = {
 
 const salesItems: MenuItem[] = [
   {
+    title: "Team",
+    url: "/team",
+    icon: UserRoundPen,
+  },
+  {
     title: "Sales Dashboard",
     url: "/sales/dashboard",
     icon: Home,
@@ -176,12 +181,16 @@ export function AppSidebar() {
   const showSalesPanel = hasAdvisorRole(agentRole);
 
   const visibleSalesItems = useMemo(() => {
+    const advisorItems = showExecutionPanel
+      ? salesItems.filter((item) => item.title !== "Team")
+      : salesItems;
+
     if (agentType === "Lead Maker") {
-      return salesItems.filter((item) => item.title !== "Calendar");
+      return advisorItems.filter((item) => item.title !== "Calendar");
     }
 
-    return salesItems;
-  }, [agentType]);
+    return advisorItems;
+  }, [agentType, showExecutionPanel]);
 
   const renderItems = (items: MenuItem[]) =>
     items.map((item) => {

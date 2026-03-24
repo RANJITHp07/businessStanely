@@ -40,13 +40,16 @@ export async function GET(req: NextRequest) {
             agentRole: true,
             executionAgentType: true,
             advisorAgentType: true,
-          }
-        }
-      }
+          },
+        },
+      },
     });
-    const teamMembers = subordinatesLinks.map(link => link.subordinate);
+    const teamMembers = subordinatesLinks.map((link) => link.subordinate);
     return NextResponse.json(teamMembers);
   } catch {
-    return NextResponse.json({ error: "Failed to fetch team members" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to fetch team members" },
+      { status: 500 },
+    );
   }
 }

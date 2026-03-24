@@ -45,14 +45,23 @@ import {
   AlertTriangle,
   TrendingUp,
 } from "lucide-react";
-import { Agent, Task } from "@/types";
+import { Agent, Prospect, Task } from "@/types";
 import Link from "next/link";
+import { hasAdvisorRole, hasExecutionRole } from "@/lib/agentRole";
 
 interface AgentActivity {
   taskId: string;
   taskTitle: string;
   content: string;
   createdAt: string;
+}
+
+interface OpportunityRecord {
+  id: string;
+  status: string;
+  nextFollowUp?: string;
+  createdAt: string;
+  prospect?: Prospect;
 }
 
 function groupActivitiesByDate(activities: AgentActivity[]) {
@@ -90,6 +99,30 @@ function sectionLabelToStatus(label: string) {
   if (l.includes("completed")) return "Completed";
   if (l.includes("hold")) return "Hold";
   return "To Do";
+}
+
+function mergeTeamMembers(agentData: Agent) {
+  const combinedMembers = [
+    ...(agentData.subordinates || []),
+    ...(agentData.advisorSubordinates || []),
+  ];
+
+  return combinedMembers.filter(
+    (member, index, members) =>
+      members.findIndex((candidate) => candidate.id === member.id) === index,
+  );
+}
+
+function getDefaultTabForAgent(agentData: Agent) {
+  if (hasExecutionRole(agentData.agentRole)) {
+    return "tasks";
+  }
+
+  if (hasAdvisorRole(agentData.agentRole)) {
+    return "leads";
+  }
+
+  return "details";
 }
 
 interface SectionTableProps {
@@ -446,13 +479,15 @@ export default function AgentDetails() {
   const id = params.id as string;
   const [agent, setAgent] = useState<Agent | null>(null);
   const [agentTasks, setAgentTasks] = useState<Task[]>([]);
+  const [agentLeads, setAgentLeads] = useState<Prospect[]>([]);
+  const [agentOpportunities, setAgentOpportunities] = useState<OpportunityRecord[]>([]);
   const [teamMembers, setTeamMembers] = useState<Agent[]>([]);
   const [loading, setLoading] = useState(true);
   const [tasksLoading, setTasksLoading] = useState(true);
   const [activities, setActivities] = useState<AgentActivity[]>([]);
   const [activitiesLoading, setActivitiesLoading] = useState(true);
 
-  const [activeTab, setActiveTab] = useState<string>(searchParams.get("tab") || "tasks");
+  const [activeTab, setActiveTab] = useState<string>(searchParams.get("tab") || "details");
 
   // Keep activeTab in sync with the tab query param
   useEffect(() => {
@@ -464,30 +499,73 @@ export default function AgentDetails() {
 
   useEffect(() => {
     if (!id) return;
-    const fetchTeamMemberAndTasks = async () => {
+    const fetchTeamMemberDetails = async () => {
       try {
         const response = await fetch(`/api/team/${id}`);
         if (response.ok) {
           const data = await response.json();
           setAgent(data);
-          // Set team members from the member's subordinates
-          if (data.subordinates) {
-            setTeamMembers(data.subordinates);
+
+          const tabParam = searchParams.get("tab");
+          if (!tabParam) {
+            setActiveTab(getDefaultTabForAgent(data));
           }
-          // Now fetch tasks for this agent with status and assignedToId
-          try {
-            // Default status: To Do (can be changed as needed)
-            const status = "To Do";
-            const tasksResponse = await fetch(`/api/tasks?assignedToId=${id}`);
-            if (tasksResponse.ok) {
-              const tasksData = await tasksResponse.json();
-              setAgentTasks(tasksData.tasks || []);
-            }
-          } catch (error) {
-            console.error("Error fetching team member tasks:", error);
-          } finally {
-            setTasksLoading(false);
+
+          setTeamMembers(mergeTeamMembers(data));
+
+          const requests: Promise<void>[] = [];
+
+          if (hasExecutionRole(data.agentRole)) {
+            requests.push(
+              (async () => {
+                try {
+                  const tasksResponse = await fetch(`/api/tasks?assignedToId=${id}`);
+                  if (tasksResponse.ok) {
+                    const tasksData = await tasksResponse.json();
+                    setAgentTasks(tasksData.tasks || []);
+                  }
+                } catch (error) {
+                  console.error("Error fetching team member tasks:", error);
+                }
+              })(),
+            );
           }
+
+          if (hasAdvisorRole(data.agentRole)) {
+            requests.push(
+              (async () => {
+                try {
+                  const leadsResponse = await fetch(`/api/prospects?assignedAgentId=${id}`);
+                  if (leadsResponse.ok) {
+                    const leadsData = await leadsResponse.json();
+                    setAgentLeads(leadsData.prospects || []);
+                  }
+                } catch (error) {
+                  console.error("Error fetching team member leads:", error);
+                }
+              })(),
+            );
+
+            requests.push(
+              (async () => {
+                try {
+                  const opportunitiesResponse = await fetch(`/api/opportunities?assignedAgentId=${id}`);
+                  if (opportunitiesResponse.ok) {
+                    const opportunitiesData = await opportunitiesResponse.json();
+                    setAgentOpportunities(opportunitiesData.opportunities || []);
+                  }
+                } catch (error) {
+                  console.error("Error fetching team member opportunities:", error);
+                }
+              })(),
+            );
+          }
+
+          if (requests.length > 0) {
+            await Promise.all(requests);
+          }
+
+          setTasksLoading(false);
         } else {
           notFound();
         }
@@ -498,7 +576,8 @@ export default function AgentDetails() {
         setLoading(false);
       }
     };
-    fetchTeamMemberAndTasks();
+
+    fetchTeamMemberDetails();
     // Fetch activities
     const fetchAgentActivities = async () => {
       try {
@@ -514,7 +593,7 @@ export default function AgentDetails() {
       }
     };
     fetchAgentActivities();
-  }, [id]);
+  }, [id, searchParams]);
 
   const getPriorityBadge = (priority: string) => {
     const colors = {
@@ -577,6 +656,9 @@ export default function AgentDetails() {
       Associate: "bg-green-100 text-green-800",
       "Junior Associate": "bg-yellow-100 text-yellow-800",
       Paralegal: "bg-orange-100 text-orange-800",
+      "Lead Maker": "bg-orange-100 text-orange-800",
+      "Client Advisor": "bg-sky-100 text-sky-800",
+      "Client Manager": "bg-indigo-100 text-indigo-800",
     };
 
     return (
@@ -673,6 +755,10 @@ export default function AgentDetails() {
   if (!agent) {
     return notFound();
   }
+
+  const showExecutionTabs = hasExecutionRole(agent.agentRole);
+  const showAdvisorTabs = hasAdvisorRole(agent.agentRole);
+  const tabCount = 3 + (showExecutionTabs ? 1 : 0) + (showAdvisorTabs ? 2 : 0);
 
   return (
     <div className="container mx-auto p-6 max-w-7xl">
@@ -777,23 +863,39 @@ export default function AgentDetails() {
         }}
         className="space-y-6"
       >
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full" style={{ gridTemplateColumns: `repeat(${tabCount}, minmax(0, 1fr))` }}>
           <TabsTrigger value="details" className="flex items-center gap-2">
             <User className="h-4 w-4 hidden md:block" />
             <p className="text-[12px] md:text-[14px]">Agent Details</p>
           </TabsTrigger>
-          <TabsTrigger value="tasks" className="flex items-center gap-2">
-            <FileText className="h-4 w-4 hidden md:block" />
-            <p className="text-[12px] md:text-[14px]">
-              {" "}
-              Tasks ({agentTasks.length}){" "}
-            </p>
-          </TabsTrigger>
+          {showExecutionTabs && (
+            <TabsTrigger value="tasks" className="flex items-center gap-2">
+              <FileText className="h-4 w-4 hidden md:block" />
+              <p className="text-[12px] md:text-[14px]">
+                Tasks ({agentTasks.length})
+              </p>
+            </TabsTrigger>
+          )}
+          {showAdvisorTabs && (
+            <TabsTrigger value="leads" className="flex items-center gap-2">
+              <FileText className="h-4 w-4 hidden md:block" />
+              <p className="text-[12px] md:text-[14px]">
+                Leads ({agentLeads.length})
+              </p>
+            </TabsTrigger>
+          )}
+          {showAdvisorTabs && (
+            <TabsTrigger value="opportunity" className="flex items-center gap-2">
+              <FileText className="h-4 w-4 hidden md:block" />
+              <p className="text-[12px] md:text-[14px]">
+                Opportunity ({agentOpportunities.length})
+              </p>
+            </TabsTrigger>
+          )}
           <TabsTrigger value="team" className="flex items-center gap-2">
             <Users className="h-4 w-4 hidden md:block" />
             <p className="text-[12px] md:text-[14px]">
-              {" "}
-              Team ({teamMembers.length}){" "}
+              Team ({teamMembers.length})
             </p>
           </TabsTrigger>
           <TabsTrigger value="activities" className="flex items-center gap-2">
@@ -957,54 +1059,193 @@ export default function AgentDetails() {
           </div>
         </TabsContent>
 
-        {/* Tasks Tab */}
-        <TabsContent value="tasks" className="space-y-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-xl font-semibold">Task Management</h2>
-              <p className="text-muted-foreground text-sm">
-                Manage and track tasks assigned to {agent.name}
-              </p>
-            </div>
-          </div>
-
-          {tasksLoading ? (
-            <div className="flex justify-center items-center py-16 text-muted-foreground">
-              <Clock className="h-6 w-6 animate-spin mr-2" /> Loading tasks...
-            </div>
-          ) : agentTasks.length === 0 ? (
-            <Card>
-              <CardContent className="text-center py-8">
-                <p className="text-muted-foreground">
-                  No tasks assigned to this agent.
+        {showExecutionTabs && (
+          <TabsContent value="tasks" className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-semibold">Task Management</h2>
+                <p className="text-muted-foreground text-sm">
+                  Manage and track tasks assigned to {agent.name}
                 </p>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="space-y-[40px]">
-              <SectionTable
-                label="New Task"
-                tasks={agentTasks.filter((t) => ["todo"].includes(statusKey(t.status))).slice(0, 3)}
-                agentId={id}
-              />
-              <SectionTable
-                label="In Progress"
-                tasks={agentTasks.filter((t) => ["inprogress"].includes(statusKey(t.status))).slice(0, 3)}
-                agentId={id}
-              />
-              <SectionTable
-                label="Completed"
-                tasks={agentTasks.filter((t) => ["completed"].includes(statusKey(t.status))).slice(0, 3)}
-                agentId={id}
-              />
-              <SectionTable
-                label="Hold"
-                tasks={agentTasks.filter((t) => ["hold"].includes(statusKey(t.status))).slice(0, 3)}
-                agentId={id}
-              />
+              </div>
             </div>
-          )}
-        </TabsContent>
+
+            {tasksLoading ? (
+              <div className="flex justify-center items-center py-16 text-muted-foreground">
+                <Clock className="h-6 w-6 animate-spin mr-2" /> Loading tasks...
+              </div>
+            ) : agentTasks.length === 0 ? (
+              <Card>
+                <CardContent className="text-center py-8">
+                  <p className="text-muted-foreground">
+                    No tasks assigned to this agent.
+                  </p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-[40px]">
+                <SectionTable
+                  label="New Task"
+                  tasks={agentTasks.filter((t) => ["todo"].includes(statusKey(t.status))).slice(0, 3)}
+                  agentId={id}
+                />
+                <SectionTable
+                  label="In Progress"
+                  tasks={agentTasks.filter((t) => ["inprogress"].includes(statusKey(t.status))).slice(0, 3)}
+                  agentId={id}
+                />
+                <SectionTable
+                  label="Completed"
+                  tasks={agentTasks.filter((t) => ["completed"].includes(statusKey(t.status))).slice(0, 3)}
+                  agentId={id}
+                />
+                <SectionTable
+                  label="Hold"
+                  tasks={agentTasks.filter((t) => ["hold"].includes(statusKey(t.status))).slice(0, 3)}
+                  agentId={id}
+                />
+              </div>
+            )}
+          </TabsContent>
+        )}
+
+        {showAdvisorTabs && (
+          <TabsContent value="leads" className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-semibold">Leads Management</h2>
+                <p className="text-muted-foreground text-sm">
+                  Manage and track leads assigned to {agent.name}
+                </p>
+              </div>
+            </div>
+
+            {tasksLoading ? (
+              <div className="flex justify-center items-center py-16 text-muted-foreground">
+                <Clock className="h-6 w-6 animate-spin mr-2" /> Loading leads...
+              </div>
+            ) : agentLeads.length === 0 ? (
+              <Card>
+                <CardContent className="text-center py-8">
+                  <p className="text-muted-foreground">
+                    No leads assigned to this agent.
+                  </p>
+                </CardContent>
+              </Card>
+            ) : (
+              <Card>
+                <CardContent className="p-0">
+                  <div className="rounded-md border overflow-hidden">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Name</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Follow Up</TableHead>
+                          <TableHead>Created</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {agentLeads.map((lead) => (
+                          <TableRow key={lead.id}>
+                            <TableCell>
+                              <div>
+                                <div className="font-medium">{lead.name}</div>
+                                <div className="text-sm text-muted-foreground">{lead.email || lead.phoneNumber || "-"}</div>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline">{lead.status}</Badge>
+                            </TableCell>
+                            <TableCell>{formatDateDMY(lead.nextFollowUp)}</TableCell>
+                            <TableCell>{formatDate(lead.createdAt)}</TableCell>
+                            <TableCell className="text-right">
+                              <Button variant="ghost" size="sm" asChild>
+                                <Link href={`/sales/prospects/${lead.id}`}>
+                                  <Eye className="h-4 w-4" />
+                                </Link>
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+        )}
+
+        {showAdvisorTabs && (
+          <TabsContent value="opportunity" className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-semibold">Opportunity Management</h2>
+                <p className="text-muted-foreground text-sm">
+                  Manage and track opportunities assigned to {agent.name}
+                </p>
+              </div>
+            </div>
+
+            {tasksLoading ? (
+              <div className="flex justify-center items-center py-16 text-muted-foreground">
+                <Clock className="h-6 w-6 animate-spin mr-2" /> Loading opportunities...
+              </div>
+            ) : agentOpportunities.length === 0 ? (
+              <Card>
+                <CardContent className="text-center py-8">
+                  <p className="text-muted-foreground">
+                    No opportunities assigned to this agent.
+                  </p>
+                </CardContent>
+              </Card>
+            ) : (
+              <Card>
+                <CardContent className="p-0">
+                  <div className="rounded-md border overflow-hidden">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Name</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Follow Up</TableHead>
+                          <TableHead>Created</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {agentOpportunities.map((opportunity) => (
+                          <TableRow key={opportunity.id}>
+                            <TableCell>
+                              <div>
+                                <div className="font-medium">{opportunity.prospect?.name || "Unknown"}</div>
+                                <div className="text-sm text-muted-foreground">{opportunity.prospect?.email || opportunity.prospect?.phoneNumber || "-"}</div>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline">{opportunity.status}</Badge>
+                            </TableCell>
+                            <TableCell>{formatDateDMY(opportunity.nextFollowUp)}</TableCell>
+                            <TableCell>{formatDate(opportunity.createdAt)}</TableCell>
+                            <TableCell className="text-right">
+                              <Button variant="ghost" size="sm" asChild>
+                                <Link href={`/sales/opportunites/${opportunity.id}`}>
+                                  <Eye className="h-4 w-4" />
+                                </Link>
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+        )}
 
         {/* Team Tab */}
         <TabsContent value="team" className="space-y-6">
@@ -1012,7 +1253,7 @@ export default function AgentDetails() {
             <CardHeader>
               <CardTitle>Team Members</CardTitle>
               <CardDescription>
-                All subordinates under {agent.name}
+                All team members under {agent.name}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -1084,15 +1325,9 @@ export default function AgentDetails() {
                               <DropdownMenuContent align="end">
                                 <DropdownMenuLabel>Actions</DropdownMenuLabel>
                                 <DropdownMenuItem asChild>
-                                  <Link href={`/agent/${member.id}`}>
+                                  <Link href={`/team/${member.id}?tab=${getDefaultTabForAgent(member)}`}>
                                     <Eye className="mr-2 h-4 w-4" />
                                     View Details
-                                  </Link>
-                                </DropdownMenuItem>
-                                <DropdownMenuItem asChild>
-                                  <Link href={`/agent/${member.id}/edit`}>
-                                    <Edit className="mr-2 h-4 w-4" />
-                                    Edit Agent
                                   </Link>
                                 </DropdownMenuItem>
                               </DropdownMenuContent>

@@ -1,10 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-// import { getCurrentAgent } from "@/lib/auth";
 import { getAdvisorAgentType } from "@/lib/agentType";
+import { getCurrentAgent } from "@/lib/auth";
 
 // GET: List all prospects (optionally filter by assignedAgentId)
-import { getCurrentAgent } from "@/lib/auth";
+function getAssignedAdvisorType(assignedAgent: {
+  agentType?: string | null;
+  advisorAgentType?: string | null;
+  agentRole?: string | null;
+}) {
+  if (assignedAgent.agentRole === "Execution & Advisor Agent") {
+    return assignedAgent.advisorAgentType || assignedAgent.agentType || null;
+  }
+
+  return assignedAgent.agentType || assignedAgent.advisorAgentType || null;
+}
 
 export async function GET(req: NextRequest) {
   try {
@@ -16,15 +26,49 @@ export async function GET(req: NextRequest) {
       archived: false,
       status: { not: "opportunity" },
     };
-    const advisorType = getAdvisorAgentType(agent);
+    const requestedAgentId = req.nextUrl.searchParams.get("assignedAgentId");
+
+    let targetAgent = agent;
+
+    if (requestedAgentId && requestedAgentId !== agent.id) {
+      const superiorLink = await prisma.agentSuperior.findFirst({
+        where: {
+          superiorId: agent.id,
+          subordinateId: requestedAgentId,
+        },
+      });
+
+      if (!superiorLink) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
+
+      const requestedAgent = await prisma.agent.findUnique({
+        where: { id: requestedAgentId },
+      });
+
+      if (!requestedAgent) {
+        return NextResponse.json(
+          { error: "Assigned agent not found" },
+          { status: 404 },
+        );
+      }
+
+      targetAgent = requestedAgent;
+    }
+
+    const advisorType = requestedAgentId
+      ? getAssignedAdvisorType(targetAgent)
+      : getAdvisorAgentType(agent);
+
     if (advisorType === "Lead Maker") {
-      where.createdByAgentId = agent.id;
+      where.createdByAgentId = targetAgent.id;
     } else if (
       advisorType === "Client Advisor" ||
       advisorType === "Client Manager"
     ) {
-      where.assignedAgentId = agent.id;
+      where.assignedAgentId = targetAgent.id;
     }
+
     const prospects = await prisma.prospect.findMany({
       where,
       include: { assignedAgent: true, createdByAgent: true, comments: true },

@@ -859,113 +859,113 @@ export default function AgentDetails() {
         {showAdvisorTabs && (
           <>
             <TabsContent value="leads" className="space-y-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="text-xl font-semibold">Leads Management</h2>
-                    <p className="text-muted-foreground text-sm">
-                      Manage and track leads assigned to {agent.name}
-                    </p>
-                  </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-xl font-semibold">Leads Management</h2>
+                  <p className="text-muted-foreground text-sm">
+                    Manage and track leads assigned to {agent.name}
+                  </p>
                 </div>
+              </div>
 
-                {tasksLoading ? (
-                  <div className="flex justify-center items-center py-16 text-muted-foreground">
-                    <Clock className="h-6 w-6 animate-spin mr-2" /> Loading leads...
-                  </div>
-                ) : agentLeads.length === 0 ? (
-                  <Card>
-                    <CardContent className="text-center py-8">
-                      <p className="text-muted-foreground">
-                        No leads assigned to this agent.
-                      </p>
-                    </CardContent>
-                  </Card>
-                ) : (
-                  <div className="space-y-[40px]">
-                    <ProspectTable
-                      label="New Prospects"
-                      prospects={agentLeads.filter((p) => p.status === "New").slice(0, 5)}
-                      statusFilter="New"
-                      assignedId={id}
-                    />
+              {tasksLoading ? (
+                <div className="flex justify-center items-center py-16 text-muted-foreground">
+                  <Clock className="h-6 w-6 animate-spin mr-2" /> Loading leads...
+                </div>
+              ) : agentLeads.length === 0 ? (
+                <Card>
+                  <CardContent className="text-center py-8">
+                    <p className="text-muted-foreground">
+                      No leads assigned to this agent.
+                    </p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="space-y-[40px]">
+                  <ProspectTable
+                    label="New Prospects"
+                    prospects={agentLeads.filter((p) => p.status === "New").slice(0, 5)}
+                    statusFilter="New"
+                    assignedId={id}
+                  />
 
-                    <ProspectTable
-                      label="In Progress Prospects"
-                      prospects={agentLeads.filter((p) => p.status === "In Progress").slice(0, 5)}
-                      statusFilter="In Progress"
-                      assignedId={id}
+                  <ProspectTable
+                    label="In Progress Prospects"
+                    prospects={agentLeads.filter((p) => p.status === "In Progress").slice(0, 5)}
+                    statusFilter="In Progress"
+                    assignedId={id}
 
-                    />
+                  />
 
-                    <ProspectTable
-                      label="Relevant but not Now Prospects"
-                      prospects={agentLeads
-                        .filter((p) => p.status === "Relevant but not Now")
-                        .slice(0, 5)}
-                      statusFilter="Relevant but not Now"
-                      assignedId={id}
+                  <ProspectTable
+                    label="Relevant but not Now Prospects"
+                    prospects={agentLeads
+                      .filter((p) => p.status === "Relevant but not Now")
+                      .slice(0, 5)}
+                    statusFilter="Relevant but not Now"
+                    assignedId={id}
 
-                    />
+                  />
 
-                    <ProspectTable
-                      label="Career Prospects"
-                      prospects={agentLeads.filter((p) => p.status === "Career").slice(0, 5)}
-                      statusFilter="Career"
-                      assignedId={id}
+                  <ProspectTable
+                    label="Career Prospects"
+                    prospects={agentLeads.filter((p) => p.status === "Career").slice(0, 5)}
+                    statusFilter="Career"
+                    assignedId={id}
 
-                    />
+                  />
 
-                    <ProspectTable
-                      label="Not Relevant Prospects"
-                      prospects={agentLeads.filter((p) => p.status === "Not Relevant").slice(0, 5)}
-                      statusFilter="Not Relevant"
-                      assignedId={id}
+                  <ProspectTable
+                    label="Not Relevant Prospects"
+                    prospects={agentLeads.filter((p) => p.status === "Not Relevant").slice(0, 5)}
+                    statusFilter="Not Relevant"
+                    assignedId={id}
 
-                    />
-                  </div>
-                )}
+                  />
+                </div>
+              )}
             </TabsContent>
             <TabsContent value="opportunity" className="space-y-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="text-xl font-semibold">Opportunity Management</h2>
-                    <p className="text-muted-foreground text-sm">
-                      Manage and track opportunity assigned to {agent.name}
-                    </p>
-                  </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-xl font-semibold">Opportunity Management</h2>
+                  <p className="text-muted-foreground text-sm">
+                    Manage and track opportunity assigned to {agent.name}
+                  </p>
                 </div>
+              </div>
 
-                {tasksLoading ? (
-                  <div className="flex justify-center items-center py-16 text-muted-foreground">
-                    <Clock className="h-6 w-6 animate-spin mr-2" /> Loading opportunities...
-                  </div>
-                ) : agentOpportunities.length === 0 ? (
-                  <Card>
-                    <CardContent className="text-center py-8">
-                      <p className="text-muted-foreground">
-                        No opportunities assigned to this agent.
-                      </p>
-                    </CardContent>
-                  </Card>
-                ) : (
-                  <div className="space-y-[40px]">
-                    <ProspectsTable label="New Opportunity" prospects={agentOpportunities.filter((prospect) => prospect.status == "New Opportunity").slice(0, 5)} statusFilter="New Opportunity" assignedId={id} />
+              {tasksLoading ? (
+                <div className="flex justify-center items-center py-16 text-muted-foreground">
+                  <Clock className="h-6 w-6 animate-spin mr-2" /> Loading opportunities...
+                </div>
+              ) : agentOpportunities.length === 0 ? (
+                <Card>
+                  <CardContent className="text-center py-8">
+                    <p className="text-muted-foreground">
+                      No opportunities assigned to this agent.
+                    </p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="space-y-[40px]">
+                  <ProspectsTable label="New Opportunity" prospects={agentOpportunities.filter((prospect) => prospect.status == "New Opportunity").slice(0, 5)} statusFilter="New Opportunity" assignedId={id} />
 
-                    <ProspectsTable label="Proposal Issued" prospects={agentOpportunities.filter((prospect) => prospect.status == "Proposal Issued").slice(0, 5)} statusFilter="Proposal Issued" assignedId={id} />
-                    <ProspectsTable
-                      label="Closed as Won Prospects"
-                      prospects={agentOpportunities.filter((prospect) => prospect.status == "Closed as Won").slice(0, 5)}
-                      statusFilter="Closed as Won Prospects"
-                      assignedId={id}
-                    />
-                    <ProspectsTable
-                      label="Closed as Loss Prospects"
-                      prospects={agentOpportunities.filter((prospect) => prospect.status == "Closed as Loss").slice(0, 5)}
-                      statusFilter="Closed as Loss Prospects"
-                      assignedId={id}
-                    />
-                  </div>
-                )}
+                  <ProspectsTable label="Proposal Issued" prospects={agentOpportunities.filter((prospect) => prospect.status == "Proposal Issued").slice(0, 5)} statusFilter="Proposal Issued" assignedId={id} />
+                  <ProspectsTable
+                    label="Closed as Won Prospects"
+                    prospects={agentOpportunities.filter((prospect) => prospect.status == "Closed as Won").slice(0, 5)}
+                    statusFilter="Closed as Won Prospects"
+                    assignedId={id}
+                  />
+                  <ProspectsTable
+                    label="Closed as Loss Prospects"
+                    prospects={agentOpportunities.filter((prospect) => prospect.status == "Closed as Loss").slice(0, 5)}
+                    statusFilter="Closed as Loss Prospects"
+                    assignedId={id}
+                  />
+                </div>
+              )}
             </TabsContent>
           </>
         )}

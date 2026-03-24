@@ -77,6 +77,7 @@ export interface Agent {
   photo: string | null;
   superior: Agent | null;
   subordinates: Agent[];
+  advisorSubordinates?: Agent[];
 }
 
 export interface Client {

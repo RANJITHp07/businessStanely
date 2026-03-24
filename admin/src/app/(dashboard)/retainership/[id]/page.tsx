@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef, type ClipboardEvent, type RefObject } from "react"
 import { use } from "react"
 import { toast } from "react-toastify"
 
@@ -25,8 +25,30 @@ import {
     DialogTitle,
     DialogFooter,
 } from "@/components/ui/dialog"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Calendar as CalendarComponent } from "@/components/ui/calendar"
 import { Button } from "@/components/ui/button";
-import { MoreHorizontal, Eye, PlusCircle, Pen, Trash } from "lucide-react";
+import {
+    MoreHorizontal,
+    Eye,
+    Edit,
+    PlusCircle,
+    Pen,
+    Trash,
+    Loader2,
+    Save,
+    Bold,
+    Italic,
+    Underline,
+    List,
+    ListOrdered,
+    Heading1,
+    Heading2,
+    Undo2,
+    Eraser,
+    CalendarIcon,
+    NotebookPen,
+} from "lucide-react";
 
 // Importing Retainership, Task, and UserInfo types from the types file
 import { Retainership } from "@/types";
@@ -35,6 +57,7 @@ import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { fetchWithAuth } from "@/lib/fetchWithAuth"
+import { cn } from "@/lib/utils"
 import { useRouter } from "next/navigation"
 
 type ClientDiaryEntry = {
@@ -46,11 +69,36 @@ type ClientDiaryEntry = {
     updatedAt: string
 }
 
+type LegislationModalFormData = {
+    id?: string
+    title: string
+    description: string
+    assignedAgent: string
+}
+
+const DATE_ONLY_REGEX = /^\d{4}-\d{2}-\d{2}$/
+
 const normalizeDiaryEntryDate = (rawDate: string) => {
-    if (!rawDate) return ""
-    const parsed = new Date(rawDate)
-    if (Number.isNaN(parsed.getTime())) return rawDate.slice(0, 10)
-    return parsed.toISOString().slice(0, 10)
+    const trimmedDate = rawDate.trim()
+    if (!trimmedDate) return ""
+
+    if (DATE_ONLY_REGEX.test(trimmedDate)) {
+        return trimmedDate
+    }
+
+    const parsed = new Date(trimmedDate)
+    if (!Number.isNaN(parsed.getTime())) {
+        return parsed.toISOString().slice(0, 10)
+    }
+
+    return trimmedDate.includes("T") ? trimmedDate.split("T")[0] : trimmedDate
+}
+
+const normalizeDiaryEntries = (entries: ClientDiaryEntry[]) => {
+    return entries.map((entry) => ({
+        ...entry,
+        entryDate: normalizeDiaryEntryDate(entry.entryDate),
+    }))
 }
 
 const getDiaryPreviewText = (htmlContent: string) => {
@@ -92,10 +140,21 @@ export default function RetainershipDetail({ params }: { params: Promise<{ id: s
     const [diaryEntries, setDiaryEntries] = useState<ClientDiaryEntry[]>([])
     const [isDiaryLoading, setIsDiaryLoading] = useState(false)
     const [isDiarySubmitting, setIsDiarySubmitting] = useState(false)
-    const [diaryDraft, setDiaryDraft] = useState("")
-    const [diaryEntryDate, setDiaryEntryDate] = useState(() => new Date().toISOString().slice(0, 10))
-    const [editingDiaryEntry, setEditingDiaryEntry] = useState<ClientDiaryEntry | null>(null)
-    const [modalFormData, setModalFormData] = useState<any>({
+    const [isAddDiaryModalOpen, setIsAddDiaryModalOpen] = useState(false)
+    const [isUpdateDiaryModalOpen, setIsUpdateDiaryModalOpen] = useState(false)
+    const [isViewDiaryModalOpen, setIsViewDiaryModalOpen] = useState(false)
+    const [selectedDiaryEntryForUpdate, setSelectedDiaryEntryForUpdate] = useState<ClientDiaryEntry | null>(null)
+    const [selectedDiaryEntryForView, setSelectedDiaryEntryForView] = useState<ClientDiaryEntry | null>(null)
+    const [addDiaryDraft, setAddDiaryDraft] = useState("")
+    const [addDiaryDate, setAddDiaryDate] = useState<Date | undefined>(new Date())
+    const [updateDiaryDraft, setUpdateDiaryDraft] = useState("")
+    const [updateDiaryDate, setUpdateDiaryDate] = useState<Date | undefined>(new Date())
+    const [isFilterCalendarOpen, setIsFilterCalendarOpen] = useState(false)
+    const [isAddCalendarOpen, setIsAddCalendarOpen] = useState(false)
+    const [isUpdateCalendarOpen, setIsUpdateCalendarOpen] = useState(false)
+    const addDiaryEditorRef = useRef<HTMLDivElement>(null)
+    const updateDiaryEditorRef = useRef<HTMLDivElement>(null)
+    const [modalFormData, setModalFormData] = useState<LegislationModalFormData>({
         title: "",
         description: "",
         assignedAgent: "",
@@ -197,6 +256,25 @@ export default function RetainershipDetail({ params }: { params: Promise<{ id: s
         }
     };
 
+    const formatDateString = (date: Date) => {
+        const year = date.getFullYear()
+        const month = String(date.getMonth() + 1).padStart(2, "0")
+        const day = String(date.getDate()).padStart(2, "0")
+        return `${year}-${month}-${day}`
+    }
+
+    const parseDateString = (dateString: string) => {
+        if (!dateString) return undefined
+        const [year, month, day] = dateString.split("-").map(Number)
+        if (!year || !month || !day) return undefined
+        return new Date(year, month - 1, day)
+    }
+
+    const getClientDisplayName = () => {
+        if (!retainership?.client) return "Unknown client"
+        return retainership.client.organizationName || `${retainership.client.firstName || ""} ${retainership.client.lastName || ""}`.trim()
+    }
+
     const fetchDiaryEntries = async (clientId: string, date?: string) => {
         setIsDiaryLoading(true)
         try {
@@ -207,13 +285,14 @@ export default function RetainershipDetail({ params }: { params: Promise<{ id: s
             })
 
             if (!response.ok) {
+                console.error("Failed to fetch diary entries")
                 setDiaryEntries([])
                 return
             }
 
             const data = await response.json()
             const entries = Array.isArray(data.entries) ? data.entries : []
-            setDiaryEntries(entries)
+            setDiaryEntries(normalizeDiaryEntries(entries))
         } catch (error) {
             console.error("Error fetching diary entries:", error)
             setDiaryEntries([])
@@ -222,95 +301,163 @@ export default function RetainershipDetail({ params }: { params: Promise<{ id: s
         }
     }
 
-    const openClientDiary = async () => {
+    const openClientDiary = () => {
         if (!retainership?.client?.id) return
         setSelectedDiaryDate("")
-        setDiaryDraft("")
-        setDiaryEntryDate(new Date().toISOString().slice(0, 10))
-        setEditingDiaryEntry(null)
+        setAddDiaryDate(new Date())
+        setUpdateDiaryDate(new Date())
+        setAddDiaryDraft("")
+        setUpdateDiaryDraft("")
+        setSelectedDiaryEntryForUpdate(null)
+        setSelectedDiaryEntryForView(null)
         setIsClientDiaryOpen(true)
-        await fetchDiaryEntries(retainership.client.id)
     }
 
-    const handleSaveDiaryEntry = async () => {
-        if (!retainership?.client?.id || !diaryDraft.trim() || !diaryEntryDate) return
+    useEffect(() => {
+        if (!isClientDiaryOpen || !retainership?.client?.id) return;
+        fetchDiaryEntries(retainership.client.id, selectedDiaryDate || undefined)
+    }, [isClientDiaryOpen, retainership?.client?.id, selectedDiaryDate])
+
+    const diaryEntriesForSelection = diaryEntries
+        .filter(
+            (entry) =>
+                entry.clientId === retainership?.client?.id &&
+                (!selectedDiaryDate || normalizeDiaryEntryDate(entry.entryDate) === selectedDiaryDate),
+        )
+        .sort((a, b) => +new Date(b.updatedAt) - +new Date(a.updatedAt))
+
+    const runEditorCommand = (
+        editorRef: RefObject<HTMLDivElement | null>,
+        setDraft: (value: string) => void,
+        command: string,
+        value?: string,
+    ) => {
+        if (!editorRef.current) return
+        editorRef.current.focus()
+        document.execCommand(command, false, value)
+        setDraft(editorRef.current.innerHTML)
+    }
+
+    const handleDiaryEditorInput = (
+        editorRef: RefObject<HTMLDivElement | null>,
+        setDraft: (value: string) => void,
+    ) => {
+        if (!editorRef.current) return
+        setDraft(editorRef.current.innerHTML)
+    }
+
+    const handleDiaryEditorPaste = (event: ClipboardEvent<HTMLDivElement>) => {
+        event.preventDefault()
+        const text = event.clipboardData.getData("text/plain")
+        document.execCommand("insertText", false, text)
+    }
+
+    useEffect(() => {
+        if (!addDiaryEditorRef.current) return
+        if (addDiaryEditorRef.current.innerHTML !== addDiaryDraft) {
+            addDiaryEditorRef.current.innerHTML = addDiaryDraft
+        }
+    }, [addDiaryDraft])
+
+    useEffect(() => {
+        if (!isUpdateDiaryModalOpen) return
+
+        const rafId = requestAnimationFrame(() => {
+            if (!updateDiaryEditorRef.current) return
+            if (updateDiaryEditorRef.current.innerHTML !== updateDiaryDraft) {
+                updateDiaryEditorRef.current.innerHTML = updateDiaryDraft
+            }
+        })
+
+        return () => cancelAnimationFrame(rafId)
+    }, [isUpdateDiaryModalOpen, updateDiaryDraft, selectedDiaryEntryForUpdate?.id])
+
+    const openAddDiaryModal = () => {
+        setAddDiaryDraft("")
+        setAddDiaryDate(new Date())
+        setIsAddDiaryModalOpen(true)
+    }
+
+    const openUpdateDiaryModal = (entry: ClientDiaryEntry) => {
+        setSelectedDiaryEntryForUpdate(entry)
+        setUpdateDiaryDraft(entry.content || "")
+        setUpdateDiaryDate(parseDateString(normalizeDiaryEntryDate(entry.entryDate)))
+        setIsUpdateDiaryModalOpen(true)
+    }
+
+    const openViewDiaryModal = (entry: ClientDiaryEntry) => {
+        setSelectedDiaryEntryForView(entry)
+        setIsViewDiaryModalOpen(true)
+    }
+
+    const handleCreateDiaryEntry = async () => {
+        const normalizedDraft = getDiaryPreviewText(addDiaryDraft)
+        if (!retainership?.client?.id || !normalizedDraft || !addDiaryDate) return
 
         setIsDiarySubmitting(true)
         try {
-            const isEditing = Boolean(editingDiaryEntry)
+            const response = await fetch(`/api/clients/${retainership.client.id}/diary`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                    entryDate: formatDateString(addDiaryDate),
+                    content: addDiaryDraft,
+                }),
+            })
+
+            if (!response.ok) {
+                console.error("Failed to create diary entry")
+                return
+            }
+
+            setAddDiaryDraft("")
+            setSelectedDiaryDate(formatDateString(addDiaryDate))
+            setIsAddDiaryModalOpen(false)
+            await fetchDiaryEntries(retainership.client.id, formatDateString(addDiaryDate))
+        } catch (error) {
+            console.error("Error creating diary entry:", error)
+        } finally {
+            setIsDiarySubmitting(false)
+        }
+    }
+
+    const handleUpdateDiaryEntry = async () => {
+        const normalizedDraft = getDiaryPreviewText(updateDiaryDraft)
+        if (!selectedDiaryEntryForUpdate || !retainership?.client?.id || !normalizedDraft || !updateDiaryDate) return
+
+        setIsDiarySubmitting(true)
+        try {
             const response = await fetch(
-                isEditing
-                    ? `/api/clients/${retainership.client.id}/diary/${editingDiaryEntry?.id}`
-                    : `/api/clients/${retainership.client.id}/diary`,
+                `/api/clients/${retainership.client.id}/diary/${selectedDiaryEntryForUpdate.id}`,
                 {
-                    method: isEditing ? "PUT" : "POST",
+                    method: "PUT",
                     headers: {
                         "Content-Type": "application/json",
                     },
                     body: JSON.stringify({
-                        entryDate: diaryEntryDate,
-                        content: diaryDraft,
+                        entryDate: formatDateString(updateDiaryDate),
+                        content: updateDiaryDraft,
                     }),
                 },
             )
 
             if (!response.ok) {
-                throw new Error("Failed to save diary entry")
+                console.error("Failed to update diary entry")
+                return
             }
 
-            setDiaryDraft("")
-            setDiaryEntryDate(new Date().toISOString().slice(0, 10))
-            setEditingDiaryEntry(null)
-            setSelectedDiaryDate(diaryEntryDate)
-            await fetchDiaryEntries(retainership.client.id, diaryEntryDate)
-            toast.success(isEditing ? "Diary entry updated" : "Diary entry added")
+            setSelectedDiaryDate(formatDateString(updateDiaryDate))
+            setIsUpdateDiaryModalOpen(false)
+            setSelectedDiaryEntryForUpdate(null)
+            await fetchDiaryEntries(retainership.client.id, formatDateString(updateDiaryDate))
         } catch (error) {
-            console.error("Error saving diary entry:", error)
-            toast.error("Failed to save diary entry")
+            console.error("Error updating diary entry:", error)
         } finally {
             setIsDiarySubmitting(false)
         }
     }
-
-    const handleEditDiaryEntry = (entry: ClientDiaryEntry) => {
-        setEditingDiaryEntry(entry)
-        setDiaryDraft(entry.content || "")
-        setDiaryEntryDate(normalizeDiaryEntryDate(entry.entryDate))
-    }
-
-    const handleDeleteDiaryEntry = async (entryId: string) => {
-        if (!retainership?.client?.id) return
-
-        setIsDiarySubmitting(true)
-        try {
-            const response = await fetch(`/api/clients/${retainership.client.id}/diary/${entryId}`, {
-                method: "DELETE",
-            })
-
-            if (!response.ok) {
-                throw new Error("Failed to delete diary entry")
-            }
-
-            if (editingDiaryEntry?.id === entryId) {
-                setEditingDiaryEntry(null)
-                setDiaryDraft("")
-                setDiaryEntryDate(new Date().toISOString().slice(0, 10))
-            }
-
-            await fetchDiaryEntries(retainership.client.id, selectedDiaryDate || undefined)
-            toast.success("Diary entry deleted")
-        } catch (error) {
-            console.error("Error deleting diary entry:", error)
-            toast.error("Failed to delete diary entry")
-        } finally {
-            setIsDiarySubmitting(false)
-        }
-    }
-
-    useEffect(() => {
-        if (!isClientDiaryOpen || !retainership?.client?.id) return
-        fetchDiaryEntries(retainership.client.id, selectedDiaryDate || undefined)
-    }, [isClientDiaryOpen, retainership?.client?.id, selectedDiaryDate])
 
     const handleSubmit = async () => {
         try {
@@ -649,7 +796,7 @@ export default function RetainershipDetail({ params }: { params: Promise<{ id: s
                                                                         id: legislation.id,
                                                                         title: legislation.title,
                                                                         description: legislation.description!,
-                                                                        assignedAgent: legislation.assignedAgent?.name || legislation.assignedAgent,
+                                                                        assignedAgent: legislation.assignedAgent?.name || (typeof legislation.assignedAgent === "string" ? legislation.assignedAgent : ""),
                                                                     })
                                                                     setModalAgentSearch(legislation.assignedAgent?.name || legislation?.assignedAgent! as any)
                                                                     setIsModalOpen(true)
@@ -765,137 +912,413 @@ export default function RetainershipDetail({ params }: { params: Promise<{ id: s
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
-            <Dialog open={isClientDiaryOpen} onOpenChange={setIsClientDiaryOpen}>
-                <DialogContent className="sm:max-w-[900px] max-h-[85vh] overflow-y-auto">
+            <Dialog
+                open={isClientDiaryOpen}
+                onOpenChange={(open) => {
+                    setIsClientDiaryOpen(open)
+                    if (!open) {
+                        setSelectedDiaryDate("")
+                        setSelectedDiaryEntryForUpdate(null)
+                        setSelectedDiaryEntryForView(null)
+                        setAddDiaryDraft("")
+                        setUpdateDiaryDraft("")
+                    }
+                }}
+            >
+                <DialogContent className="w-[90vw] lg:max-w-[90vw] max-h-[90vh] items-start overflow-x-auto p-4 sm:p-6">
                     <DialogHeader>
-                        <DialogTitle>Client Diary</DialogTitle>
+                        <DialogTitle className="flex items-center gap-2">
+                            <NotebookPen className="h-5 w-5" />
+                            Client Diary
+                        </DialogTitle>
                         <DialogDescription>
                             {retainership.client
-                                ? `Diary for ${retainership.client.organizationName || `${retainership.client.firstName || ""} ${retainership.client.lastName || ""}`.trim()}`
-                                : "Diary entries for this client"}
+                                ? `Diary for ${getClientDisplayName()}. Choose Add New or Update Existing.`
+                                : "Select a client to manage diary notes."}
                         </DialogDescription>
                     </DialogHeader>
 
-                    <div className="space-y-6">
-                        <div className="flex flex-col md:flex-row gap-4 md:items-end">
-                            <div className="space-y-2 w-full md:w-[220px]">
-                                <Label htmlFor="diary-filter-date">Filter By Date</Label>
-                                <Input
-                                    id="diary-filter-date"
-                                    type="date"
-                                    value={selectedDiaryDate}
-                                    onChange={(e) => setSelectedDiaryDate(e.target.value)}
-                                />
+                    <div className="h-full min-h-0 border rounded-lg p-4 overflow-auto bg-slate-50/60 space-y-4">
+                        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+                            <div className="space-y-2">
+                                <Label>Filter by date</Label>
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <Popover open={isFilterCalendarOpen} onOpenChange={setIsFilterCalendarOpen}>
+                                        <PopoverTrigger asChild>
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                className={cn(
+                                                    "w-60 justify-start text-left font-normal",
+                                                    !selectedDiaryDate && "text-muted-foreground",
+                                                )}
+                                            >
+                                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                                {selectedDiaryDate
+                                                    ? parseDateString(selectedDiaryDate)?.toLocaleDateString()
+                                                    : "Select filter date"}
+                                            </Button>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-auto p-0" align="start">
+                                            <CalendarComponent
+                                                mode="single"
+                                                selected={selectedDiaryDate ? parseDateString(selectedDiaryDate) : undefined}
+                                                onSelect={(date) => {
+                                                    setSelectedDiaryDate(date ? formatDateString(date) : "")
+                                                    setIsFilterCalendarOpen(false)
+                                                }}
+                                                initialFocus
+                                            />
+                                        </PopoverContent>
+                                    </Popover>
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        onClick={() => setSelectedDiaryDate("")}
+                                        disabled={!selectedDiaryDate}
+                                    >
+                                        All Dates
+                                    </Button>
+                                </div>
+                                <p className="text-xs text-muted-foreground">
+                                    {selectedDiaryDate ? `Showing entries for ${selectedDiaryDate}` : "Showing entries for all dates"}
+                                </p>
                             </div>
-                            <Button
-                                type="button"
-                                variant="outline"
-                                onClick={() => setSelectedDiaryDate("")}
-                            >
-                                Clear Filter
+
+                            <Button type="button" onClick={openAddDiaryModal} className="w-full lg:w-auto" disabled={isDiaryLoading || isDiarySubmitting}>
+                                <PlusCircle className="h-4 w-4 mr-2" />
+                                Add New Entry
                             </Button>
                         </div>
 
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>{editingDiaryEntry ? "Update Diary Entry" : "Add Diary Entry"}</CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="diary-entry-date">Entry Date</Label>
-                                    <Input
-                                        id="diary-entry-date"
-                                        type="date"
-                                        value={diaryEntryDate}
-                                        onChange={(e) => setDiaryEntryDate(e.target.value)}
-                                    />
+                        <div className="space-y-2">
+                            <Label className="text-sm">Entries ({diaryEntriesForSelection.length})</Label>
+                            {isDiaryLoading ? (
+                                <div className="rounded-md border border-dashed p-6 text-sm text-muted-foreground bg-white flex items-center justify-center gap-2">
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                    Loading diary entries...
                                 </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="diary-content">Content</Label>
-                                    <Textarea
-                                        id="diary-content"
-                                        value={diaryDraft}
-                                        onChange={(e) => setDiaryDraft(e.target.value)}
-                                        placeholder="Write a diary note for this client"
-                                        rows={6}
-                                    />
+                            ) : diaryEntriesForSelection.length === 0 ? (
+                                <div className="rounded-md border border-dashed p-3 text-sm text-muted-foreground bg-white">
+                                    {selectedDiaryDate
+                                        ? "No diary entries for selected date. Use Add New Entry to create one."
+                                        : "No diary entries found yet. Use Add New Entry to create your first one."}
                                 </div>
-                                <div className="flex gap-2 justify-end">
-                                    {editingDiaryEntry && (
+                            ) : (
+                                <div className="space-y-2 max-h-[58vh] overflow-auto pr-1">
+                                    {diaryEntriesForSelection.map((entry, index) => (
+                                        <div key={entry.id} className="rounded-md border p-3 bg-white">
+                                            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                                                <div className="min-w-0">
+                                                    <p className="text-xs text-muted-foreground">Date: {normalizeDiaryEntryDate(entry.entryDate)}</p>
+                                                    <p className="text-xs text-muted-foreground">Entry {diaryEntriesForSelection.length - index}</p>
+                                                    <p className="text-xs text-muted-foreground mt-1">
+                                                        Updated: {new Date(entry.updatedAt).toLocaleString()}
+                                                    </p>
+                                                    <p className="text-sm mt-2 line-clamp-3">{getDiaryPreviewText(entry.content)}</p>
+                                                </div>
+                                                <div className="flex w-full sm:w-auto flex-col gap-2">
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        size="sm"
+                                                        className="w-full sm:w-auto"
+                                                        onClick={() => openViewDiaryModal(entry)}
+                                                    >
+                                                        <Eye className="h-4 w-4 mr-2" />
+                                                        View
+                                                    </Button>
+                                                    <Button
+                                                        type="button"
+                                                        variant="outline"
+                                                        size="sm"
+                                                        className="w-full sm:w-auto"
+                                                        disabled={isDiarySubmitting}
+                                                        onClick={() => openUpdateDiaryModal(entry)}
+                                                    >
+                                                        <Edit className="h-4 w-4 mr-2" />
+                                                        Update Existing
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    <DialogFooter className="pt-2">
+                        <Button type="button" variant="outline" onClick={() => setIsClientDiaryOpen(false)}>
+                            Close
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog
+                open={isAddDiaryModalOpen}
+                onOpenChange={(open) => {
+                    setIsAddDiaryModalOpen(open)
+                    if (!open) {
+                        setAddDiaryDraft("")
+                        setAddDiaryDate(new Date())
+                    }
+                }}
+            >
+                <DialogContent className="w-[90vw] lg:max-w-[90vw] max-h-[90vh] overflow-x-auto p-4 sm:p-6">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <PlusCircle className="h-5 w-5" />
+                            Add New Diary Entry
+                        </DialogTitle>
+                        <DialogDescription>
+                            Create a new rich text diary entry.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="flex flex-col min-h-0 h-full gap-3">
+                        <div className="flex flex-wrap items-end gap-3">
+                            <div className="space-y-2">
+                                <Label>Entry Date</Label>
+                                <Popover open={isAddCalendarOpen} onOpenChange={setIsAddCalendarOpen}>
+                                    <PopoverTrigger asChild>
                                         <Button
                                             type="button"
                                             variant="outline"
-                                            onClick={() => {
-                                                setEditingDiaryEntry(null)
-                                                setDiaryDraft("")
-                                                setDiaryEntryDate(new Date().toISOString().slice(0, 10))
-                                            }}
+                                                className={cn(
+                                                "w-60 justify-start text-left font-normal",
+                                                !addDiaryDate && "text-muted-foreground",
+                                            )}
                                         >
-                                            Cancel Edit
+                                            <CalendarIcon className="mr-2 h-4 w-4" />
+                                            {addDiaryDate ? addDiaryDate.toLocaleDateString() : "Select entry date"}
                                         </Button>
-                                    )}
-                                    <Button
-                                        type="button"
-                                        onClick={handleSaveDiaryEntry}
-                                        disabled={isDiarySubmitting || !diaryDraft.trim() || !diaryEntryDate}
-                                    >
-                                        {isDiarySubmitting ? (editingDiaryEntry ? "Updating..." : "Adding...") : (editingDiaryEntry ? "Update Entry" : "Add Entry")}
-                                    </Button>
-                                </div>
-                            </CardContent>
-                        </Card>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-0" align="start">
+                                        <CalendarComponent
+                                            mode="single"
+                                            selected={addDiaryDate}
+                                            onSelect={(date) => {
+                                                setAddDiaryDate(date)
+                                                setIsAddCalendarOpen(false)
+                                            }}
+                                            initialFocus
+                                        />
+                                    </PopoverContent>
+                                </Popover>
+                            </div>
+                        </div>
 
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Diary Entries</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                {isDiaryLoading ? (
-                                    <div className="space-y-3">
-                                        <Skeleton className="h-16 w-full" />
-                                        <Skeleton className="h-16 w-full" />
-                                    </div>
-                                ) : diaryEntries.length === 0 ? (
-                                    <div className="text-center py-8 text-muted-foreground">
-                                        No diary entries found.
-                                    </div>
-                                ) : (
-                                    <div className="space-y-4">
-                                        {diaryEntries
-                                            .slice()
-                                            .sort((a, b) => +new Date(b.updatedAt) - +new Date(a.updatedAt))
-                                            .map((entry) => (
-                                                <div key={entry.id} className="rounded-lg border p-4 space-y-3">
-                                                    <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
-                                                        <div>
-                                                            <div className="font-medium">{normalizeDiaryEntryDate(entry.entryDate)}</div>
-                                                            <div className="text-sm text-muted-foreground">
-                                                                Updated {new Date(entry.updatedAt).toLocaleString()}
-                                                            </div>
-                                                        </div>
-                                                        <div className="flex gap-2">
-                                                            <Button type="button" variant="outline" size="sm" onClick={() => handleEditDiaryEntry(entry)}>
-                                                                Edit
-                                                            </Button>
-                                                            <Button type="button" variant="destructive" size="sm" onClick={() => handleDeleteDiaryEntry(entry.id)} disabled={isDiarySubmitting}>
-                                                                Delete
-                                                            </Button>
-                                                        </div>
-                                                    </div>
-                                                    <div className="text-sm text-foreground whitespace-pre-wrap break-words">
-                                                        {getDiaryPreviewText(entry.content)}
-                                                    </div>
-                                                </div>
-                                            ))}
-                                    </div>
-                                )}
-                            </CardContent>
-                        </Card>
+                        <div className="flex flex-wrap gap-2 rounded-md border p-2 bg-muted/30">
+                            <Button type="button" variant="outline" size="sm" onClick={() => runEditorCommand(addDiaryEditorRef, setAddDiaryDraft, "bold")}>
+                                <Bold className="h-4 w-4" />
+                            </Button>
+                            <Button type="button" variant="outline" size="sm" onClick={() => runEditorCommand(addDiaryEditorRef, setAddDiaryDraft, "italic")}>
+                                <Italic className="h-4 w-4" />
+                            </Button>
+                            <Button type="button" variant="outline" size="sm" onClick={() => runEditorCommand(addDiaryEditorRef, setAddDiaryDraft, "underline")}>
+                                <Underline className="h-4 w-4" />
+                            </Button>
+                            <Button type="button" variant="outline" size="sm" onClick={() => runEditorCommand(addDiaryEditorRef, setAddDiaryDraft, "insertUnorderedList")}>
+                                <List className="h-4 w-4" />
+                            </Button>
+                            <Button type="button" variant="outline" size="sm" onClick={() => runEditorCommand(addDiaryEditorRef, setAddDiaryDraft, "insertOrderedList")}>
+                                <ListOrdered className="h-4 w-4" />
+                            </Button>
+                            <Button type="button" variant="outline" size="sm" onClick={() => runEditorCommand(addDiaryEditorRef, setAddDiaryDraft, "formatBlock", "<h1>")}>
+                                <Heading1 className="h-4 w-4" />
+                            </Button>
+                            <Button type="button" variant="outline" size="sm" onClick={() => runEditorCommand(addDiaryEditorRef, setAddDiaryDraft, "formatBlock", "<h2>")}>
+                                <Heading2 className="h-4 w-4" />
+                            </Button>
+                            <Button type="button" variant="outline" size="sm" onClick={() => runEditorCommand(addDiaryEditorRef, setAddDiaryDraft, "undo")}>
+                                <Undo2 className="h-4 w-4" />
+                            </Button>
+                            <Button type="button" variant="outline" size="sm" onClick={() => runEditorCommand(addDiaryEditorRef, setAddDiaryDraft, "removeFormat")}>
+                                <Eraser className="h-4 w-4" />
+                            </Button>
+                        </div>
+
+                        <div className="relative flex-1 min-h-105 rounded-md border bg-background">
+                            <div
+                                ref={addDiaryEditorRef}
+                                contentEditable
+                                suppressContentEditableWarning
+                                onInput={() => handleDiaryEditorInput(addDiaryEditorRef, setAddDiaryDraft)}
+                                onPaste={handleDiaryEditorPaste}
+                                className="h-full w-full overflow-auto p-4 text-sm leading-7 focus-visible:outline-none"
+                            />
+                            {!getDiaryPreviewText(addDiaryDraft) && (
+                                <p className="pointer-events-none absolute left-4 top-4 text-sm text-muted-foreground">
+                                    Write client diary notes here...
+                                </p>
+                            )}
+                        </div>
                     </div>
 
-                    <DialogFooter>
-                        <Button type="button" variant="outline" onClick={() => setIsClientDiaryOpen(false)}>
+                    <DialogFooter className="pt-2">
+                        <Button type="button" variant="outline" onClick={() => setIsAddDiaryModalOpen(false)} disabled={isDiarySubmitting}>
+                            Cancel
+                        </Button>
+                        <Button type="button" onClick={handleCreateDiaryEntry} disabled={isDiarySubmitting || !getDiaryPreviewText(addDiaryDraft) || !addDiaryDate || !retainership?.client?.id}>
+                            {isDiarySubmitting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+                            {isDiarySubmitting ? "Saving..." : "Save Entry"}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog
+                open={isViewDiaryModalOpen}
+                onOpenChange={(open) => {
+                    setIsViewDiaryModalOpen(open)
+                    if (!open) {
+                        setSelectedDiaryEntryForView(null)
+                    }
+                }}
+            >
+                <DialogContent className="w-[90vw] lg:max-w-[90vw] max-h-[90vh] overflow-x-auto p-4 sm:p-6">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <Eye className="h-5 w-5" />
+                            View Diary Entry
+                        </DialogTitle>
+                        <DialogDescription>
+                            {selectedDiaryEntryForView
+                                ? `Date: ${normalizeDiaryEntryDate(selectedDiaryEntryForView.entryDate)} | Last updated: ${new Date(selectedDiaryEntryForView.updatedAt).toLocaleString()}`
+                                : "Select a diary entry to view details."}
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="min-h-65 max-h-[62vh] overflow-auto rounded-md border bg-background p-4">
+                        {selectedDiaryEntryForView ? (
+                            <div
+                                className="prose prose-sm max-w-none"
+                                dangerouslySetInnerHTML={{ __html: selectedDiaryEntryForView.content || "" }}
+                            />
+                        ) : (
+                            <p className="text-sm text-muted-foreground">No diary entry selected.</p>
+                        )}
+                    </div>
+
+                    <DialogFooter className="pt-2">
+                        <Button type="button" variant="outline" onClick={() => setIsViewDiaryModalOpen(false)}>
                             Close
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog
+                open={isUpdateDiaryModalOpen}
+                onOpenChange={(open) => {
+                    setIsUpdateDiaryModalOpen(open)
+                    if (!open) {
+                        setSelectedDiaryEntryForUpdate(null)
+                        setUpdateDiaryDraft("")
+                        setUpdateDiaryDate(new Date())
+                    }
+                }}
+            >
+                <DialogContent className="w-[90vw] lg:max-w-[90vw] max-h-[90vh] overflow-x-auto p-4 sm:p-6">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <Edit className="h-5 w-5" />
+                            Update Existing Entry
+                        </DialogTitle>
+                        <DialogDescription>
+                            Edit content and date, then save updates.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="flex flex-col min-h-0 h-full gap-3">
+                        <div className="flex flex-wrap items-end gap-3">
+                            <div className="space-y-2">
+                                <Label>Entry Date</Label>
+                                <Popover open={isUpdateCalendarOpen} onOpenChange={setIsUpdateCalendarOpen}>
+                                    <PopoverTrigger asChild>
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            className={cn(
+                                                "w-60 justify-start text-left font-normal",
+                                                !updateDiaryDate && "text-muted-foreground",
+                                            )}
+                                        >
+                                            <CalendarIcon className="mr-2 h-4 w-4" />
+                                            {updateDiaryDate ? updateDiaryDate.toLocaleDateString() : "Select entry date"}
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-0" align="start">
+                                        <CalendarComponent
+                                            mode="single"
+                                            selected={updateDiaryDate}
+                                            onSelect={(date) => {
+                                                setUpdateDiaryDate(date)
+                                                setIsUpdateCalendarOpen(false)
+                                            }}
+                                            initialFocus
+                                        />
+                                    </PopoverContent>
+                                </Popover>
+                            </div>
+                        </div>
+
+                        <div className="flex flex-wrap gap-2 rounded-md border p-2 bg-muted/30">
+                            <Button type="button" variant="outline" size="sm" onClick={() => runEditorCommand(updateDiaryEditorRef, setUpdateDiaryDraft, "bold")}>
+                                <Bold className="h-4 w-4" />
+                            </Button>
+                            <Button type="button" variant="outline" size="sm" onClick={() => runEditorCommand(updateDiaryEditorRef, setUpdateDiaryDraft, "italic")}>
+                                <Italic className="h-4 w-4" />
+                            </Button>
+                            <Button type="button" variant="outline" size="sm" onClick={() => runEditorCommand(updateDiaryEditorRef, setUpdateDiaryDraft, "underline")}>
+                                <Underline className="h-4 w-4" />
+                            </Button>
+                            <Button type="button" variant="outline" size="sm" onClick={() => runEditorCommand(updateDiaryEditorRef, setUpdateDiaryDraft, "insertUnorderedList")}>
+                                <List className="h-4 w-4" />
+                            </Button>
+                            <Button type="button" variant="outline" size="sm" onClick={() => runEditorCommand(updateDiaryEditorRef, setUpdateDiaryDraft, "insertOrderedList")}>
+                                <ListOrdered className="h-4 w-4" />
+                            </Button>
+                            <Button type="button" variant="outline" size="sm" onClick={() => runEditorCommand(updateDiaryEditorRef, setUpdateDiaryDraft, "formatBlock", "<h1>")}>
+                                <Heading1 className="h-4 w-4" />
+                            </Button>
+                            <Button type="button" variant="outline" size="sm" onClick={() => runEditorCommand(updateDiaryEditorRef, setUpdateDiaryDraft, "formatBlock", "<h2>")}>
+                                <Heading2 className="h-4 w-4" />
+                            </Button>
+                            <Button type="button" variant="outline" size="sm" onClick={() => runEditorCommand(updateDiaryEditorRef, setUpdateDiaryDraft, "undo")}>
+                                <Undo2 className="h-4 w-4" />
+                            </Button>
+                            <Button type="button" variant="outline" size="sm" onClick={() => runEditorCommand(updateDiaryEditorRef, setUpdateDiaryDraft, "removeFormat")}>
+                                <Eraser className="h-4 w-4" />
+                            </Button>
+                        </div>
+
+                        <div className="relative flex-1 min-h-105 rounded-md border bg-background">
+                            <div
+                                ref={updateDiaryEditorRef}
+                                contentEditable
+                                suppressContentEditableWarning
+                                onInput={() => handleDiaryEditorInput(updateDiaryEditorRef, setUpdateDiaryDraft)}
+                                onPaste={handleDiaryEditorPaste}
+                                className="h-full w-full overflow-auto p-4 text-sm leading-7 focus-visible:outline-none"
+                            />
+                            {!getDiaryPreviewText(updateDiaryDraft) && (
+                                <p className="pointer-events-none absolute left-4 top-4 text-sm text-muted-foreground">
+                                    Write client diary notes here...
+                                </p>
+                            )}
+                        </div>
+                    </div>
+
+                    <DialogFooter className="pt-2">
+                        <Button type="button" variant="outline" onClick={() => setIsUpdateDiaryModalOpen(false)} disabled={isDiarySubmitting}>
+                            Cancel
+                        </Button>
+                        <Button type="button" onClick={handleUpdateDiaryEntry} disabled={isDiarySubmitting || !getDiaryPreviewText(updateDiaryDraft) || !updateDiaryDate || !selectedDiaryEntryForUpdate}>
+                            {isDiarySubmitting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+                            {isDiarySubmitting ? "Updating..." : "Update Entry"}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

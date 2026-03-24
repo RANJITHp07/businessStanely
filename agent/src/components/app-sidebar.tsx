@@ -192,6 +192,22 @@ export function AppSidebar() {
     return advisorItems;
   }, [agentType, showExecutionPanel]);
 
+  const singleRoleItems = useMemo(() => {
+    if (isDualRole) {
+      return [] as MenuItem[];
+    }
+
+    if (showExecutionPanel) {
+      return [...dashboardItems, ...commonItems];
+    }
+
+    if (showSalesPanel) {
+      return [...visibleSalesItems, ...commonItems];
+    }
+
+    return [...commonItems];
+  }, [isDualRole, showExecutionPanel, showSalesPanel, visibleSalesItems]);
+
   const renderItems = (items: MenuItem[]) =>
     items.map((item) => {
       const isActive =
@@ -248,10 +264,23 @@ export function AppSidebar() {
             </SidebarGroupLabel>
           </SidebarGroup>
 
-          {showExecutionPanel && (
+          {!isDualRole && (
             <SidebarGroup>
               <SidebarGroupLabel className="text-[16px] mt-[30px] text-white py-5 px-3 -ml-4 rounded-none border-b border-t border-white font-medium">
-                {isDualRole ? "Execution Panel" : "Agent Panel"}
+                Sidebar
+              </SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu className="mt-[8px]">
+                  {renderItems(singleRoleItems)}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          )}
+
+          {isDualRole && showExecutionPanel && (
+            <SidebarGroup>
+              <SidebarGroupLabel className="text-[16px] mt-[30px] text-white py-5 px-3 -ml-4 rounded-none border-b border-t border-white font-medium">
+                Execution Panel
               </SidebarGroupLabel>
               <SidebarGroupContent>
                 <SidebarMenu className="mt-[8px]">
@@ -261,7 +290,7 @@ export function AppSidebar() {
             </SidebarGroup>
           )}
 
-          {showSalesPanel && (
+          {isDualRole && showSalesPanel && (
             <SidebarGroup>
               <SidebarGroupLabel className="text-[16px] text-white py-5 px-3 -ml-4 rounded-none border-b border-t border-white font-medium">
                 Sales Panel
@@ -274,16 +303,18 @@ export function AppSidebar() {
             </SidebarGroup>
           )}
 
-          <SidebarGroup>
-            <SidebarGroupLabel className="text-[16px] text-white py-5 px-3 -ml-4 rounded-none border-b border-t border-white font-medium">
-              Common
-            </SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu className="mt-[8px]">
-                {renderItems(commonItems)}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
+          {isDualRole && (
+            <SidebarGroup>
+              <SidebarGroupLabel className="text-[16px] text-white py-5 px-3 -ml-4 rounded-none border-b border-t border-white font-medium">
+                Common
+              </SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu className="mt-[8px]">
+                  {renderItems(commonItems)}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          )}
         </SidebarContent>
 
         <SidebarFooter>

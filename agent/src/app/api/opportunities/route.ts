@@ -54,7 +54,10 @@ export async function GET(req: NextRequest) {
 
     // MongoDB does not support relation filtering in Prisma, so filter in-memory
     const allOpportunities = await prisma.opportunity.findMany({
-      include: { prospect: { include: { assignedAgent: true } }, comments: true },
+      include: {
+        prospect: { include: { assignedAgent: true } },
+        comments: true,
+      },
       orderBy: { createdAt: "desc" },
     });
     let opportunities = allOpportunities;

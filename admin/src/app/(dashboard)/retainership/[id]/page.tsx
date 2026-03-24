@@ -1086,7 +1086,7 @@ export default function RetainershipDetail({ params }: { params: Promise<{ id: s
                                         <Button
                                             type="button"
                                             variant="outline"
-                                                className={cn(
+                                            className={cn(
                                                 "w-60 justify-start text-left font-normal",
                                                 !addDiaryDate && "text-muted-foreground",
                                             )}

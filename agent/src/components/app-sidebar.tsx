@@ -266,11 +266,8 @@ export function AppSidebar() {
 
           {!isDualRole && (
             <SidebarGroup>
-              <SidebarGroupLabel className="text-[16px] mt-[30px] text-white py-5 px-3 -ml-4 rounded-none border-b border-t border-white font-medium">
-                Sidebar
-              </SidebarGroupLabel>
               <SidebarGroupContent>
-                <SidebarMenu className="mt-[8px]">
+                <SidebarMenu className="mt-[30px]">
                   {renderItems(singleRoleItems)}
                 </SidebarMenu>
               </SidebarGroupContent>

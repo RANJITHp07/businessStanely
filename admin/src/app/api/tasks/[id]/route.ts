@@ -92,13 +92,16 @@ export async function PUT(
       "status",
       "priority",
       "dueDate",
+      "triggerDate",
       "progress",
       "followUpRequired",
       "completed",
       "recurring",
+      "recurringType",
       "followUpDuration",
       "statusCheckDuration",
       "statusProgressMap",
+      "active",
     ];
     const data: Record<string, unknown> = {};
     for (const key of allowedFields) {
@@ -109,6 +112,9 @@ export async function PUT(
             recurringValue && recurringValue !== "0"
               ? parseInt(recurringValue)
               : null;
+        } else if (key === "dueDate" || key === "triggerDate") {
+          const dateValue = body[key] as string | null;
+          data[key] = dateValue ? new Date(dateValue) : null;
         } else if (key === "statusProgressMap") {
           data[key] = body[key];
         } else {

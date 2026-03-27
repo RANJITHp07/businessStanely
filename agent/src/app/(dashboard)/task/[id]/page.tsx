@@ -931,17 +931,18 @@ export default function TaskDetails() {
                   </span>
                 </div>
                 <div className="flex items-center gap-2 text-sm">
-                  <span className="inline-flex"><Avatar className="h-4 w-4"><AvatarFallback className="text-xs">{task.assignedTo?.name?.split(" ").map((n) => n[0]).join("") || "U"}</AvatarFallback></Avatar></span>
-                  <span className="text-gray-600">
-                    Asssigned to {task.assignedTo?.name || "Unassigned"}
-                  </span>
-                </div>
-                <div className="flex items-center gap-2 text-sm">
                   <span className="inline-flex"><Avatar className="h-4 w-4"><AvatarFallback className="text-xs">{task.ownerShipBy?.name?.split(" ").map((n) => n[0]).join("") || "U"}</AvatarFallback></Avatar></span>
                   <span className="text-gray-600">
                     Ownership to {task.ownerShipBy?.name || "Unassigned"}
                   </span>
                 </div>
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="inline-flex"><Avatar className="h-4 w-4"><AvatarFallback className="text-xs">{task.assignedTo?.name?.split(" ").map((n) => n[0]).join("") || "U"}</AvatarFallback></Avatar></span>
+                  <span className="text-gray-600">
+                    Asssigned to {task.assignedTo?.name || "Unassigned"}
+                  </span>
+                </div>
+
                 <div className="flex items-center gap-2 text-sm">
                   <CheckCircle className="h-4 w-4 text-gray-500" />
                   <span className="text-gray-600">

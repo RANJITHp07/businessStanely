@@ -20,6 +20,7 @@ export async function GET(req: NextRequest) {
 
     const { searchParams } = new URL(req.url);
 
+    const assignedToId = searchParams.get("assignedToId") || agent.id;
     const status = searchParams.get("status");
     const priority = searchParams.get("priority");
     const categoryId = searchParams.get("categoryId");
@@ -30,13 +31,13 @@ export async function GET(req: NextRequest) {
 
     // CATEGORY FILTER
     if (categoryId) {
-      where = { categoryId };
+      where = { categoryId, assignedToId };
     }
 
     // TRIGGER TASKS
     else if (trigger === "true") {
       where = {
-        assignedToId: agent.id,
+        assignedToId,
         active: false,
         legislationId: { not: null },
 
@@ -58,7 +59,7 @@ export async function GET(req: NextRequest) {
     // RETAINERSHIP TASKS
     else if (retainershipTasks === "true") {
       where = {
-        assignedToId: agent.id,
+        assignedToId,
         legislationId: { not: null },
         // OR: [
         //   { retainershipId: { not: null } },
@@ -78,7 +79,7 @@ export async function GET(req: NextRequest) {
     // DEFAULT TASKS
     else {
       where = {
-        assignedToId: agent.id,
+        assignedToId,
         legislation: null,
         // category: {
         //   is: {

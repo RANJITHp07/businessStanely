@@ -233,8 +233,11 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
                 }),
             });
             if (res.ok) {
-                const { comment } = await res.json();
-                setComments([comment, ...comments]);
+                const { comment, prospectStatus } = await res.json();
+                setComments((prev) => [comment, ...prev]);
+                if (prospectStatus && prospect) {
+                    setProspect({ ...prospect, status: prospectStatus });
+                }
                 setNewComment("");
                 setSelectedFile(null);
                 setUploadPercent(0)

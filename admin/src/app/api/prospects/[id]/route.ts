@@ -174,27 +174,51 @@ export async function POST(
         { status: 400 },
       );
     }
-    const created = await prisma.comment.create({
-      data: {
-        content,
-        attachmentName,
-        attachmentUrl,
-        attachmentSize,
-        attachmentType,
-        authorId: agent.id,
-        authorType: "AGENT",
-        prospectId: id,
-      },
+    const result = await prisma.$transaction(async (tx) => {
+      const [prospect, existingCommentsCount] = await Promise.all([
+        tx.prospect.findUnique({
+          where: { id },
+          select: { status: true },
+        }),
+        tx.comment.count({ where: { prospectId: id } }),
+      ]);
+
+      const newComment = await tx.comment.create({
+        data: {
+          content,
+          attachmentName,
+          attachmentUrl,
+          attachmentSize,
+          attachmentType,
+          authorId: agent.id,
+          authorType: "AGENT",
+          prospectId: id,
+        },
+      });
+
+      if (prospect?.status === "New" && existingCommentsCount === 0) {
+        await tx.prospect.update({
+          where: { id },
+          data: { status: "In Progress" },
+        });
+      }
+
+      const nextStatus =
+        prospect?.status === "New" && existingCommentsCount === 0
+          ? "In Progress"
+          : (prospect?.status ?? null);
+
+      return { newComment, nextStatus };
     });
     // Fetch the comment with agent/user relation for display
     const comment = await prisma.comment.findUnique({
-      where: { id: created.id },
+      where: { id: result.newComment.id },
       include: {
         agent: true,
         user: true,
       },
     });
-    return NextResponse.json({ comment });
+    return NextResponse.json({ comment, prospectStatus: result.nextStatus });
   } catch (error) {
     return NextResponse.json(
       { error: "Failed to add comment", details: error?.message || error },

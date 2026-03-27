@@ -18,14 +18,14 @@ import { Skeleton } from "@/components/ui/skeleton";
 // import { Button } from "@/components/ui/button";
 // import { FileText, MoreHorizontal, Eye, PlusCircle } from "lucide-react";
 
-import { Legislation, Task } from "@/types";
-import { FileText } from "lucide-react";
+import { Task } from "@/types";
+import { Calendar, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export default function LegislationDetail({ params }: { params: Promise<{ id: string }> | { id: string } }) {
   const resolvedParams = params instanceof Promise ? use(params) : params;
 
-  const [legislation, setLegislation] = useState<Legislation | null>(null);
+  const [legislation, setLegislation] = useState<any | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
@@ -55,6 +55,15 @@ export default function LegislationDetail({ params }: { params: Promise<{ id: st
 
     fetchData();
   }, [resolvedParams.id]);
+
+  const formatDate = (dateString?: string) => {
+    if (!dateString) return "N/A";
+    return new Date(dateString).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  };
 
   if (loading) {
     return (
@@ -158,13 +167,14 @@ export default function LegislationDetail({ params }: { params: Promise<{ id: st
                   <TableHead>Task Name</TableHead>
                   <TableHead>Description</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>Last Completion Date</TableHead>
                   {/* <TableHead className="text-right">Actions</TableHead> */}
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {tasks.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
                       No tasks found for this legislation.
                     </TableCell>
                   </TableRow>
@@ -178,6 +188,12 @@ export default function LegislationDetail({ params }: { params: Promise<{ id: st
                       <TableCell className="max-w-xs  truncate">{task.title}</TableCell>
                       <TableCell className="max-w-xs truncate">{task.description}</TableCell>
                       <TableCell >{task.status}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Calendar className="h-4 w-4 text-muted-foreground" />
+                          {formatDate(task.lastCompletedDate)}
+                        </div>
+                      </TableCell>
                       {/* <TableCell className="text-right">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>

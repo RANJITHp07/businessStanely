@@ -678,6 +678,8 @@ export default function TasksTable() {
                     <col className="w-[100px]" />
                     {/* Due Date */}
                     <col className="w-[120px]" />
+                    {/* Last Completion Date */}
+                    <col className="w-[150px]" />
                     {/* Progress */}
                     <col className="w-[100px]" />
                     {/* Actions */}
@@ -690,6 +692,7 @@ export default function TasksTable() {
                       <TableHead>Ownership to</TableHead>
                       <TableHead>Priority</TableHead>
                       <TableHead>Due Date</TableHead>
+                      <TableHead>Last Completion</TableHead>
                       <TableHead>Progress</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
@@ -699,7 +702,7 @@ export default function TasksTable() {
                   <TableBody>
                     {currentTasks.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                        <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                           No tasks found matching your criteria.
                         </TableCell>
                       </TableRow>
@@ -773,6 +776,14 @@ export default function TasksTable() {
                                   Overdue
                                 </Badge>
                               )}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-1">
+                                <Calendar className="h-4 w-4 text-muted-foreground" />
+                                <span>
+                                  {task.lastCompletedDate ? formatDate(task.lastCompletedDate) : "N/A"}
+                                </span>
+                              </div>
                             </TableCell>
                             <TableCell>
                               <div className="space-y-2">

@@ -41,6 +41,8 @@ export interface Task {
   status: string;
   priority: string;
   dueDate?: string;
+  lastCompletedDate?: string;
+  holdDate?: string;
   progress?: number;
   followUpRequired?: boolean;
   followUpDuration?: string; // e.g., '24hr', '48hr', '1w', 'None'

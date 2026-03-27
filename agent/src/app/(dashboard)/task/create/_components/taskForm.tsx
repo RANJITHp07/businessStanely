@@ -347,24 +347,25 @@ export default function TaskForm({ id }: TaskFormProps) {
   useEffect(() => {
     const fetchClientsAndAgents = async () => {
       try {
-        const [clientsRes, teamRes, categoriesRes, selfRes] = await Promise.all([
+        const [clientsRes, execTeamRes, categoriesRes, selfRes] = await Promise.all([
           fetch("/api/clients"),
           fetch("/api/team-members?teamType=execution"),
           fetch("/api/task-categories"),
           fetch("/api/agents/me"), // Add endpoint to get current agent
         ]);
         const clientsData = await clientsRes.json();
-        const teamMembers = await teamRes.json();
+        const executionTeamMembers = execTeamRes.ok ? await execTeamRes.json() : [];
         const categoriesData = await categoriesRes.json();
         let selfAgent = null;
         if (selfRes.ok) {
           selfAgent = await selfRes.json();
         }
         setClients(clientsData);
-        // Add current agent to the team list if not already present
-        let allAgents = teamMembers;
-        if (selfAgent && !teamMembers.some((a: Agent) => a.id === selfAgent.id)) {
-          allAgents = [selfAgent, ...teamMembers];
+        // Use execution team members only.
+        let allAgents = executionTeamMembers;
+        // Add current agent to the team list if not already present.
+        if (selfAgent && !executionTeamMembers.some((a: Agent) => a.id === selfAgent.id)) {
+          allAgents = [selfAgent, ...executionTeamMembers];
         }
         setAgents(allAgents);
         setCategories(categoriesData);
@@ -1541,23 +1542,16 @@ export default function TaskForm({ id }: TaskFormProps) {
                       value={agentSearchQuery}
                       onChange={(e) => {
                         setAgentSearchQuery(e.target.value);
-                        if (e.target.value.trim()) {
-                          setShowAgentSuggestions(true);
-                        } else {
-                          setShowAgentSuggestions(false);
-                        }
+                        setShowAgentSuggestions(true);
                       }}
                       onFocus={() => {
-                        if (agentSearchQuery.trim()) {
-                          setShowAgentSuggestions(true);
-                        }
+                        setShowAgentSuggestions(true);
                       }}
                       className="w-full"
                     // disabled={isFromRetainership} // Disable if form is from retainership
                     />
 
                     {showAgentSuggestions &&
-                      agentSearchQuery.trim() &&
                       filteredAgents.length > 0 && (
                         <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto">
                           {filteredAgents.map((agent) => (
@@ -1598,10 +1592,9 @@ export default function TaskForm({ id }: TaskFormProps) {
                       )}
 
                     {showAgentSuggestions &&
-                      agentSearchQuery.trim() &&
                       filteredAgents.length === 0 && (
                         <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg p-3">
-                          <span className="text-gray-500">No agents found</span>
+                          <span className="text-gray-500">No team members found</span>
                         </div>
                       )}
                   </div>

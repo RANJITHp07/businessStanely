@@ -82,7 +82,11 @@ export default function TasksTable() {
   const updateUrlFilters = (priorities: string[], statuses: string[], followUpDurations: string[], search: string, statusCheckDuration: string[]) => {
     const params = new URLSearchParams();
     const assignedToId = searchParams.get("assignedToId");
+    const retainershipTasks = searchParams.get("retainershipTasks");
+    const trigger = searchParams.get("trigger");
     if (assignedToId) params.set("assignedToId", assignedToId);
+    if (retainershipTasks) params.set("retainershipTasks", retainershipTasks);
+    if (trigger) params.set("trigger", trigger);
     if (search) params.set("search", search);
     if (priorities.length > 0) params.set("priorities", priorities.join(","));
     if (statuses.length > 0) params.set("statuses", statuses.join(","));
@@ -119,11 +123,15 @@ export default function TasksTable() {
         const assignedToId = searchParams.get("assignedToId");
         const status = searchParams.get("status");
         const statuses = searchParams.get("statuses");
+        const retainershipTasks = searchParams.get("retainershipTasks");
+        const trigger = searchParams.get("trigger");
         let url = "/api/tasks";
         const params = [];
         if (assignedToId) params.push(`assignedToId=${encodeURIComponent(assignedToId)}`);
         if (status) params.push(`status=${encodeURIComponent(status)}`);
         if (statuses) params.push(`statuses=${encodeURIComponent(statuses)}`);
+        if (retainershipTasks) params.push(`retainershipTasks=${encodeURIComponent(retainershipTasks)}`);
+        if (trigger) params.push(`trigger=${encodeURIComponent(trigger)}`);
         if (params.length > 0) url += `?${params.join("&")}`;
         const response = await fetchWithAuth(url);
         if (response.ok) {

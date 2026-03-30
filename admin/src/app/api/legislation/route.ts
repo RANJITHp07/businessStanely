@@ -1,9 +1,17 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    const { searchParams } = new URL(req.url);
+    const assignedAgent = searchParams.get("assignedAgent");
+
     const legislations = await prisma.legislation.findMany({
+      where: assignedAgent
+        ? {
+            assignedAgentId: assignedAgent,
+          }
+        : undefined,
       include: {
         assignedAgent: true,
         retainership: {
@@ -11,6 +19,10 @@ export async function GET() {
             client: true,
           },
         },
+        tasks: true,
+      },
+      orderBy: {
+        createdAt: "desc",
       },
     });
 
@@ -19,7 +31,7 @@ export async function GET() {
     console.error("Error fetching legislations:", error);
     return NextResponse.json(
       { error: "Internal Server Error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

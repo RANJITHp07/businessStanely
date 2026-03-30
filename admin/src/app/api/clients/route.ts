@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Prisma } from '@prisma/client';
-import prisma from '@/lib/prisma';
+import { Prisma } from "@prisma/client";
+import prisma from "@/lib/prisma";
 
 export async function POST(req: NextRequest) {
   try {
@@ -8,7 +8,10 @@ export async function POST(req: NextRequest) {
     const { clientType, email, ...clientData } = body;
 
     if (!clientType) {
-      return NextResponse.json({ error: "Client type is required" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Client type is required" },
+        { status: 400 },
+      );
     }
 
     if (!email) {
@@ -20,7 +23,10 @@ export async function POST(req: NextRequest) {
     });
 
     if (existingClient) {
-      return NextResponse.json({ error: "A client with this email already exists" }, { status: 409 });
+      return NextResponse.json(
+        { error: "A client with this email already exists" },
+        { status: 409 },
+      );
     }
 
     const newClient = await prisma.client.create({
@@ -35,19 +41,41 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     console.error("Error creating client:", error);
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
-      if (error.code === 'P2002') {
-        return NextResponse.json({ error: "A client with this email already exists." }, { status: 409 });
+      if (error.code === "P2002") {
+        return NextResponse.json(
+          { error: "A client with this email already exists." },
+          { status: 409 },
+        );
       }
     }
-    return NextResponse.json({ error: "Failed to create client" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to create client" },
+      { status: 500 },
+    );
   }
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    const { searchParams } = new URL(req.url);
+    const assignedToId = searchParams.get("assignedToId");
+
     const clients = await prisma.client.findMany({
+      where: assignedToId
+        ? {
+            retainerships: {
+              some: {
+                legislation: {
+                  some: {
+                    assignedAgentId: assignedToId,
+                  },
+                },
+              },
+            },
+          }
+        : undefined,
       orderBy: {
-        createdAt: 'desc',
+        createdAt: "desc",
       },
       include: {
         tasks: {
@@ -60,17 +88,22 @@ export async function GET() {
     });
 
     // Add a `name` field prioritizing `organizationName` for organizations
-    const clientsWithStatusCounts = clients.map(client => {
+    const clientsWithStatusCounts = clients.map((client) => {
       // Count tasks by status
-      const statusCounts = {};
+      const statusCounts: Record<string, number> = {};
       for (const task of client.tasks) {
         statusCounts[task.status] = (statusCounts[task.status] || 0) + 1;
       }
       // Count retainerships
-      const retainershipCount = client.retainerships ? client.retainerships.length : 0;
+      const retainershipCount = client.retainerships
+        ? client.retainerships.length
+        : 0;
       return {
         ...client,
-        name: client.organizationName || `${client.firstName || ''} ${client.lastName || ''}`.trim() || 'Unknown Name',
+        name:
+          client.organizationName ||
+          `${client.firstName || ""} ${client.lastName || ""}`.trim() ||
+          "Unknown Name",
         statusCounts,
         retainershipCount,
       };
@@ -79,6 +112,9 @@ export async function GET() {
     return NextResponse.json(clientsWithStatusCounts);
   } catch (error) {
     console.error("Error fetching clients:", error);
-    return NextResponse.json({ error: "Failed to fetch clients" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to fetch clients" },
+      { status: 500 },
+    );
   }
 }

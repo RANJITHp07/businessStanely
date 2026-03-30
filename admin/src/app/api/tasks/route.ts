@@ -102,6 +102,8 @@ export async function GET(req: NextRequest) {
     const clientId = searchParams.get("clientId");
     const categoryId = searchParams.get("categoryId");
     const status = searchParams.get("status");
+    const trigger = searchParams.get("trigger");
+    const retainershipTasks = searchParams.get("retainershipTasks");
     // Parse statuses as a comma-separated list
     const statusesParam = searchParams.get("statuses");
     const statusesArray = statusesParam
@@ -127,6 +129,13 @@ export async function GET(req: NextRequest) {
     } else {
       whereClause.active = true;
     }
+    if (trigger === "true") {
+      whereClause.legislationId = { not: null };
+      whereClause.active = false;
+    } else if (retainershipTasks === "true") {
+      whereClause.legislationId = { not: null };
+      whereClause.active = true;
+    }
     if (clientId) {
       whereClause.clientId = clientId;
     }
@@ -142,6 +151,7 @@ export async function GET(req: NextRequest) {
         createdBy: true,
         assignedTo: true,
         category: true,
+        legislation: true,
       },
       orderBy: {
         createdAt: "desc",

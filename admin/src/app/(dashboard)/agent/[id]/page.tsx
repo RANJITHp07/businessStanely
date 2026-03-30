@@ -53,8 +53,11 @@ import {
   Eye,
   Clock,
   TrendingUp,
+  CheckCircle,
+  Building2,
+  PlusCircle,
 } from "lucide-react";
-import { Agent, Task } from "@/types";
+import { Agent, Client, Task } from "@/types";
 import Link from "next/link";
 import { fetchWithAuth } from "@/lib/fetchWithAuth";
 import { hasAdvisorRole, hasExecutionRole } from "@/lib/agentRole";
@@ -87,12 +90,68 @@ interface CurrentUser {
   adminType: "owner" | "admin";
 }
 
+interface AgentLegislation {
+  id: string;
+  title: string;
+  description?: string;
+  assignedAgent?: {
+    id: string;
+    name: string;
+    email: string;
+  };
+  retainership?: {
+    client?: Client | null;
+    clientId?: string;
+  };
+  tasks?: Task[];
+}
+
+interface AgentClient extends Client {
+  retainershipCount?: number;
+  statusCounts?: Record<string, number>;
+}
+
+function parseTaskResponse(data: Task[] | { tasks?: Task[] }) {
+  return Array.isArray(data) ? data : data.tasks || [];
+}
+
+function getClientDisplayName(client?: Client | null) {
+  if (!client) return "N/A";
+  if (client.clientType === "organization") {
+    return client.organizationName || client.name || "N/A";
+  }
+  const fullName = `${client.firstName || ""} ${client.lastName || ""}`.trim();
+  return fullName || client.name || "N/A";
+}
+
+function getClientInitials(client?: Client | null) {
+  if (!client) return "NA";
+  if (client.clientType === "organization") {
+    return (client.organizationName || client.name || "NA")
+      .toUpperCase()
+      .split(" ")
+      .map((part) => part[0])
+      .join("")
+      .slice(0, 2);
+  }
+  return `${client.firstName?.[0] || ""}${client.lastName?.[0] || ""}`.toUpperCase() || "NA";
+}
+
+function getClientTypeBadge(type?: string) {
+  if (type === "organization") {
+    return <Badge className="bg-violet-100 text-violet-800 border-violet-200 border">Organization</Badge>;
+  }
+
+  return <Badge className="bg-blue-100 text-blue-800 border-blue-200 border">Individual</Badge>;
+}
+
 // Helper to normalize status string
 function statusKey(s?: string) {
   const k = (s || "").toLowerCase().replace(/\s+/g, "");
   if (["todo", "pending"].includes(k)) return "todo";
   if (["inprogress", "progress"].includes(k)) return "inprogress";
   if (["completed"].includes(k)) return "completed";
+  if (["hold"].includes(k)) return "hold";
   return k || "todo";
 }
 
@@ -136,12 +195,17 @@ export default function AgentDetails() {
   const id = params.id as string;
   const [agent, setAgent] = useState<Agent | null>(null);
   const [agentTasks, setAgentTasks] = useState<Task[]>([]);
+  const [agentRetainershipTasks, setAgentRetainershipTasks] = useState<Task[]>([]);
+  const [agentTriggerTasks, setAgentTriggerTasks] = useState<Task[]>([]);
+  const [agentLegislations, setAgentLegislations] = useState<AgentLegislation[]>([]);
+  const [agentClients, setAgentClients] = useState<AgentClient[]>([]);
   const [agentLeads, setAgentLeads] = useState<Task[]>([]);
   const [agentOpportunities, setAgentOpportunities] = useState<Task[]>([]);
   const [teamMembers, setTeamMembers] = useState<Agent[]>([]);
   const [loading, setLoading] = useState(true);
   const [tasksLoading, setTasksLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<string>(searchParams.get("tab") || "details");
+  const [taskOverviewTab, setTaskOverviewTab] = useState("standard-tasks");
 
   // Keep activeTab in sync with the tab query param
   useEffect(() => {
@@ -195,7 +259,13 @@ export default function AgentDetails() {
           const dataRequests: Promise<void>[] = [];
 
           if (hasExecutionAccess) {
-            dataRequests.push(fetchAgentTasks());
+            dataRequests.push(
+              fetchAgentTasks(),
+              fetchAgentRetainershipTasks(),
+              fetchAgentTriggerTasks(),
+              fetchAgentLegislations(),
+              fetchAgentClients(),
+            );
           }
 
           if (hasAdvisorAccess) {
@@ -206,8 +276,6 @@ export default function AgentDetails() {
             await Promise.all(dataRequests);
           }
 
-          setTasksLoading(false);
-
           setTeamMembers(mergeTeamMembers(data));
         } else {
           notFound();
@@ -216,6 +284,7 @@ export default function AgentDetails() {
         console.error("Error fetching agent:", error);
         notFound();
       } finally {
+        setTasksLoading(false);
         setLoading(false);
       }
     };
@@ -225,10 +294,77 @@ export default function AgentDetails() {
         const response = await fetch(`/api/tasks?assignedToId=${id}`);
         if (response.ok) {
           const data = await response.json();
-          setAgentTasks(data);
+          setAgentTasks(parseTaskResponse(data));
+        } else {
+          setAgentTasks([]);
         }
       } catch (error) {
         console.error("Error fetching agent tasks:", error);
+        setAgentTasks([]);
+      }
+    };
+
+    const fetchAgentRetainershipTasks = async () => {
+      try {
+        const response = await fetchWithAuth(
+          `/api/tasks?assignedToId=${id}&retainershipTasks=true`,
+        );
+        if (response.ok) {
+          const data = await response.json();
+          setAgentRetainershipTasks(parseTaskResponse(data));
+        } else {
+          setAgentRetainershipTasks([]);
+        }
+      } catch (error) {
+        console.error("Error fetching agent retainership tasks:", error);
+        setAgentRetainershipTasks([]);
+      }
+    };
+
+    const fetchAgentTriggerTasks = async () => {
+      try {
+        const response = await fetchWithAuth(
+          `/api/tasks?assignedToId=${id}&trigger=true`,
+        );
+        if (response.ok) {
+          const data = await response.json();
+          setAgentTriggerTasks(parseTaskResponse(data));
+        } else {
+          setAgentTriggerTasks([]);
+        }
+      } catch (error) {
+        console.error("Error fetching agent trigger tasks:", error);
+        setAgentTriggerTasks([]);
+      }
+    };
+
+    const fetchAgentLegislations = async () => {
+      try {
+        const response = await fetchWithAuth(`/api/legislation?assignedAgent=${id}`);
+        if (response.ok) {
+          const data = await response.json();
+          setAgentLegislations(data || []);
+        } else {
+          setAgentLegislations([]);
+        }
+      } catch (error) {
+        console.error("Error fetching agent legislations:", error);
+        setAgentLegislations([]);
+      }
+    };
+
+    const fetchAgentClients = async () => {
+      try {
+        const response = await fetchWithAuth(`/api/clients?assignedToId=${id}`);
+        if (response.ok) {
+          const data = await response.json();
+          setAgentClients(data || []);
+        } else {
+          setAgentClients([]);
+        }
+      } catch (error) {
+        console.error("Error fetching agent clients:", error);
+        setAgentClients([]);
       }
     };
 
@@ -253,8 +389,6 @@ export default function AgentDetails() {
         }
       } catch (error) {
         console.error("Error fetching agent opportunities:", error);
-      } finally {
-        setTasksLoading(false);
       }
     };
 
@@ -498,6 +632,7 @@ export default function AgentDetails() {
   const showExecutionTabs = hasExecutionRole(agent.agentRole);
   const showAdvisorTabs = hasAdvisorRole(agent.agentRole);
   const tabCount = 4 + (showExecutionTabs ? 1 : 0) + (showAdvisorTabs ? 2 : 0);
+  const standardAgentTasks = agentTasks.filter((task) => !task.legislationId);
 
   return (
     <div className="container mx-auto p-6 max-w-7xl">
@@ -813,7 +948,7 @@ export default function AgentDetails() {
               <div>
                 <h2 className="text-xl font-semibold">Task Management</h2>
                 <p className="text-muted-foreground text-sm">
-                  Manage and track tasks assigned to {agent.name}
+                  Manage and track tasks, legislation, retainership work, future triggers, and retainership clients assigned to {agent.name}
                 </p>
               </div>
             </div>
@@ -822,37 +957,311 @@ export default function AgentDetails() {
               <div className="flex justify-center items-center py-16 text-muted-foreground">
                 <Clock className="h-6 w-6 animate-spin mr-2" /> Loading tasks...
               </div>
-            ) : agentTasks.length === 0 ? (
-              <Card>
-                <CardContent className="text-center py-8">
-                  <p className="text-muted-foreground">
-                    No tasks assigned to this agent.
-                  </p>
-                </CardContent>
-              </Card>
             ) : (
-              <div className="space-y-[40px]">
-                <SectionTable
-                  label="New Task"
-                  tasks={agentTasks.filter((t) => ["todo"].includes(statusKey(t.status))).slice(0, 3)}
-                  agentId={id}
-                />
-                <SectionTable
-                  label="In Progress"
-                  tasks={agentTasks.filter((t) => ["inprogress"].includes(statusKey(t.status))).slice(0, 3)}
-                  agentId={id}
-                />
-                <SectionTable
-                  label="Completed"
-                  tasks={agentTasks.filter((t) => ["completed"].includes(statusKey(t.status))).slice(0, 3)}
-                  agentId={id}
-                />
-                <SectionTable
-                  label="Hold"
-                  tasks={agentTasks.filter((t) => ["hold"].includes(statusKey(t.status))).slice(0, 3)}
-                  agentId={id}
-                />
-              </div>
+              <Tabs value={taskOverviewTab} onValueChange={setTaskOverviewTab} className="space-y-6">
+                <TabsList className="grid h-auto w-full grid-cols-5">
+                  <TabsTrigger value="standard-tasks" className="flex items-center gap-2 px-2 py-3 text-[11px] md:text-sm">
+                    <FileText className="h-4 w-4 hidden md:block" />
+                    Standard Tasks ({standardAgentTasks.length})
+                  </TabsTrigger>
+                  <TabsTrigger value="legislation" className="flex items-center gap-2 px-2 py-3 text-[11px] md:text-sm">
+                    <CheckCircle className="h-4 w-4 hidden md:block" />
+                    Assigned Legislation ({agentLegislations.length})
+                  </TabsTrigger>
+                  <TabsTrigger value="retainership-tasks" className="flex items-center gap-2 px-2 py-3 text-[11px] md:text-sm">
+                    <CheckCircle className="h-4 w-4 hidden md:block" />
+                    Retainership Tasks ({agentRetainershipTasks.length})
+                  </TabsTrigger>
+                  <TabsTrigger value="future-triggers" className="flex items-center gap-2 px-2 py-3 text-[11px] md:text-sm">
+                    <Clock className="h-4 w-4 hidden md:block" />
+                    Future Triggers ({agentTriggerTasks.length})
+                  </TabsTrigger>
+                  <TabsTrigger value="clients" className="flex items-center gap-2 px-2 py-3 text-[11px] md:text-sm">
+                    <Users className="h-4 w-4 hidden md:block" />
+                    Clients ({agentClients.length})
+                  </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="standard-tasks" className="space-y-6">
+                  {standardAgentTasks.length === 0 ? (
+                    <Card>
+                      <CardContent className="text-center py-8 text-muted-foreground">
+                        No standard tasks assigned to this agent.
+                      </CardContent>
+                    </Card>
+                  ) : (
+                    <div className="space-y-[40px]">
+                      <SectionTable
+                        label="New Task"
+                        tasks={standardAgentTasks.filter((task) => statusKey(task.status) === "todo").slice(0, 3)}
+                        agentId={id}
+                      />
+                      <SectionTable
+                        label="In Progress"
+                        tasks={standardAgentTasks.filter((task) => statusKey(task.status) === "inprogress").slice(0, 3)}
+                        agentId={id}
+                      />
+                      <SectionTable
+                        label="Completed"
+                        tasks={standardAgentTasks.filter((task) => statusKey(task.status) === "completed").slice(0, 3)}
+                        agentId={id}
+                      />
+                      <SectionTable
+                        label="Hold"
+                        tasks={standardAgentTasks.filter((task) => statusKey(task.status) === "hold").slice(0, 3)}
+                        agentId={id}
+                      />
+                    </div>
+                  )}
+                </TabsContent>
+
+                <TabsContent value="legislation" className="space-y-6">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <CheckCircle className="h-5 w-5" />
+                        Assigned Legislation ({agentLegislations.length})
+                      </CardTitle>
+                      <CardDescription>
+                        Legislation assigned to {agent.name}, including task health and quick actions.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="rounded-md border">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Client</TableHead>
+                              <TableHead>Legislation</TableHead>
+                              <TableHead>Tasks</TableHead>
+                              <TableHead>Assigned Agent</TableHead>
+                              <TableHead className="text-right">Actions</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {agentLegislations.length === 0 ? (
+                              <TableRow>
+                                <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
+                                  No legislation assigned to this agent.
+                                </TableCell>
+                              </TableRow>
+                            ) : (
+                              agentLegislations.map((legislation) => {
+                                const client = legislation.retainership?.client;
+                                const activeTasks = legislation.tasks?.filter((task) => task.active && statusKey(task.status) !== "completed" && statusKey(task.status) !== "hold") || [];
+                                const overdueTasks = activeTasks.filter((task) => task.dueDate && new Date(task.dueDate) < new Date());
+                                const pendingTriggers = legislation.tasks?.filter((task) => !task.active && statusKey(task.status) !== "completed" && statusKey(task.status) !== "hold") || [];
+
+                                return (
+                                  <TableRow
+                                    key={legislation.id}
+                                    className="cursor-pointer hover:bg-muted/50"
+                                    onClick={() => router.push(`/legislation/${legislation.id}`)}
+                                  >
+                                    <TableCell>
+                                      <div className="flex items-center gap-3">
+                                        <Avatar className="h-10 w-10 flex-shrink-0">
+                                          <AvatarFallback>{getClientInitials(client)}</AvatarFallback>
+                                        </Avatar>
+                                        <div className="min-w-0">
+                                          <div className="truncate font-medium">{getClientDisplayName(client)}</div>
+                                          <div className="truncate text-xs text-muted-foreground">{client?.email || "No email"}</div>
+                                        </div>
+                                      </div>
+                                    </TableCell>
+                                    <TableCell>
+                                      <div className="font-medium">{legislation.title}</div>
+                                      <div className="line-clamp-2 text-xs text-muted-foreground">{legislation.description || "No description"}</div>
+                                    </TableCell>
+                                    <TableCell>
+                                      <div className="flex flex-col gap-2">
+                                        <Badge variant="outline">Total: {legislation.tasks?.length || 0}</Badge>
+                                        <Badge variant="outline">Running: {activeTasks.length}</Badge>
+                                        <Badge variant="outline">Overdue: {overdueTasks.length}</Badge>
+                                        <Badge variant="outline">Pending Triggers: {pendingTriggers.length}</Badge>
+                                      </div>
+                                    </TableCell>
+                                    <TableCell>{legislation.assignedAgent?.name || agent.name}</TableCell>
+                                    <TableCell className="text-right">
+                                      <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                          <Button variant="ghost" className="h-8 w-8 p-0" onClick={(event) => event.stopPropagation()}>
+                                            <span className="sr-only">Open menu</span>
+                                            <MoreHorizontal className="h-4 w-4" />
+                                          </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end">
+                                          <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                          <DropdownMenuItem asChild>
+                                            <Link href={`/legislation/${legislation.id}`} onClick={(event) => event.stopPropagation()}>
+                                              <Eye className="mr-2 h-4 w-4" />
+                                              View Details
+                                            </Link>
+                                          </DropdownMenuItem>
+                                          <DropdownMenuItem asChild>
+                                            <Link
+                                              href={`/task/create?legislationId=${legislation.id}&assignedAgent=${legislation.assignedAgent?.id || id}&client=${legislation.retainership?.clientId || ""}`}
+                                              onClick={(event) => event.stopPropagation()}
+                                            >
+                                              <PlusCircle className="mr-2 h-4 w-4" />
+                                              Create Task
+                                            </Link>
+                                          </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                      </DropdownMenu>
+                                    </TableCell>
+                                  </TableRow>
+                                );
+                              })
+                            )}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+
+                <TabsContent value="retainership-tasks" className="space-y-6">
+                  {agentRetainershipTasks.length === 0 ? (
+                    <Card>
+                      <CardContent className="text-center py-8 text-muted-foreground">
+                        No retainership tasks assigned to this agent.
+                      </CardContent>
+                    </Card>
+                  ) : (
+                    <div className="space-y-[40px]">
+                      <SectionTable
+                        label="New Task"
+                        tasks={agentRetainershipTasks.filter((task) => statusKey(task.status) === "todo").slice(0, 3)}
+                        agentId={id}
+                        retainershipTasks={true}
+                      />
+                      <SectionTable
+                        label="In Progress"
+                        tasks={agentRetainershipTasks.filter((task) => statusKey(task.status) === "inprogress").slice(0, 3)}
+                        agentId={id}
+                        retainershipTasks={true}
+                      />
+                      <SectionTable
+                        label="Completed"
+                        tasks={agentRetainershipTasks.filter((task) => statusKey(task.status) === "completed").slice(0, 3)}
+                        agentId={id}
+                        retainershipTasks={true}
+                      />
+                      <SectionTable
+                        label="Hold"
+                        tasks={agentRetainershipTasks.filter((task) => statusKey(task.status) === "hold").slice(0, 3)}
+                        agentId={id}
+                        retainershipTasks={true}
+                      />
+                    </div>
+                  )}
+                </TabsContent>
+
+                <TabsContent value="future-triggers" className="space-y-6">
+                  {agentTriggerTasks.length === 0 ? (
+                    <Card>
+                      <CardContent className="text-center py-8 text-muted-foreground">
+                        No future-trigger tasks assigned to this agent.
+                      </CardContent>
+                    </Card>
+                  ) : (
+                    <div className="space-y-[40px]">
+                      <SectionTable
+                        label="New Task"
+                        tasks={agentTriggerTasks.filter((task) => statusKey(task.status) === "todo").slice(0, 3)}
+                        agentId={id}
+                        trigger={true}
+                      />
+                      <SectionTable
+                        label="In Progress"
+                        tasks={agentTriggerTasks.filter((task) => statusKey(task.status) === "inprogress").slice(0, 3)}
+                        agentId={id}
+                        trigger={true}
+                      />
+                      <SectionTable
+                        label="Completed"
+                        tasks={agentTriggerTasks.filter((task) => statusKey(task.status) === "completed").slice(0, 3)}
+                        agentId={id}
+                        trigger={true}
+                      />
+                      <SectionTable
+                        label="Hold"
+                        tasks={agentTriggerTasks.filter((task) => statusKey(task.status) === "hold").slice(0, 3)}
+                        agentId={id}
+                        trigger={true}
+                      />
+                    </div>
+                  )}
+                </TabsContent>
+
+                <TabsContent value="clients" className="space-y-6">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Users className="h-5 w-5" />
+                        Retainership Clients ({agentClients.length})
+                      </CardTitle>
+                      <CardDescription>
+                        Clients linked to retainership legislation assigned to {agent.name}.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="rounded-md border">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Client</TableHead>
+                              <TableHead>Type</TableHead>
+                              <TableHead>Contact</TableHead>
+                              <TableHead>Retainerships</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {agentClients.length === 0 ? (
+                              <TableRow>
+                                <TableCell colSpan={4} className="py-8 text-center text-muted-foreground">
+                                  No retainership clients assigned to this agent.
+                                </TableCell>
+                              </TableRow>
+                            ) : (
+                              agentClients.map((client) => (
+                                <TableRow key={client.id}>
+                                  <TableCell>
+                                    <div className="flex items-center gap-3">
+                                      <Avatar className="h-10 w-10 flex-shrink-0">
+                                        <AvatarFallback>
+                                          {client.clientType === "organization" ? (
+                                            <Building2 className="h-4 w-4" />
+                                          ) : (
+                                            getClientInitials(client)
+                                          )}
+                                        </AvatarFallback>
+                                      </Avatar>
+                                      <div className="min-w-0">
+                                        <div className="truncate font-medium">{getClientDisplayName(client)}</div>
+                                        <div className="truncate text-xs text-muted-foreground">{client.authorizedPersonName || client.gender || "No secondary details"}</div>
+                                      </div>
+                                    </div>
+                                  </TableCell>
+                                  <TableCell>{getClientTypeBadge(client.clientType)}</TableCell>
+                                  <TableCell>
+                                    <div className="space-y-1 text-sm">
+                                      <div className="truncate">{client.email || "No email"}</div>
+                                      <div className="truncate text-muted-foreground">{client.phoneNumber || "No phone"}</div>
+                                    </div>
+                                  </TableCell>
+                                  <TableCell>{client.retainershipCount || 0}</TableCell>
+                                </TableRow>
+                              ))
+                            )}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+              </Tabs>
             )}
           </TabsContent>
         )}

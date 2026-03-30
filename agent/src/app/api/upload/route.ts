@@ -29,14 +29,10 @@ export async function POST(request: NextRequest) {
       "image/webp",
       "application/pdf",
       "text/plain",
-      "audio/mpeg",
-      "audio/wav",
-      "audio/ogg",
-      "audio/webm",
-      "audio/mp4",
     ];
 
-    if (!allowedTypes.includes(contentType)) {
+    const isAllowedAudio = contentType.startsWith("audio/");
+    if (!allowedTypes.includes(contentType) && !isAllowedAudio) {
       return NextResponse.json(
         { error: "File type not allowed" },
         { status: 400 },

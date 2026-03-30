@@ -15,11 +15,6 @@ const ALLOWED_TYPES = [
   "image/webp",
   "application/pdf",
   "text/plain",
-  "audio/mpeg",
-  "audio/wav",
-  "audio/ogg",
-  "audio/webm",
-  "audio/mp4",
 ];
 
 const MAX_SIZE = 500 * 1024 * 1024; // 500MB
@@ -40,7 +35,8 @@ export async function POST(request: NextRequest) {
     }
 
     console.log(contentType);
-    if (!ALLOWED_TYPES.includes(contentType)) {
+    const isAllowedAudio = contentType.startsWith("audio/");
+    if (!ALLOWED_TYPES.includes(contentType) && !isAllowedAudio) {
       return NextResponse.json(
         { error: "File type not allowed" },
         { status: 400 },

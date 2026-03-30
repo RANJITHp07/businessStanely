@@ -337,16 +337,18 @@ export default function AgentForm({ agent }: AgentFormProps) {
 
     const allowedTypes = agentHierarchy[selectedExecutionType] || [];
     return allAgents.filter((existingAgent) => {
+
       // Exclude current agent being edited
       if (agent && existingAgent.id === agent.id) return false;
+
 
       // Only show agents that are lower in hierarchy
       if (!allowedTypes.includes(existingAgent.agentType)) return false;
 
       // Prevent agents from being added to multiple teams (unless already subordinate to this agent)
       if (
-        allSubordinateIds.includes(existingAgent.id) &&
-        !(agent?.subordinates?.some((s) => s.id === existingAgent.id))
+
+        agent?.subordinates?.some((s) => s.id === existingAgent.id)
       ) {
         return false;
       }
@@ -355,6 +357,7 @@ export default function AgentForm({ agent }: AgentFormProps) {
     });
   };
 
+  console.log(getAvailableAgents())
   // Filter agents based on search term
   const filteredAgents = getAvailableAgents().filter(
     (existingAgent) =>

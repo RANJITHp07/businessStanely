@@ -25,6 +25,10 @@ export default function DiaryPage() {
     const [draftTitle, setDraftTitle] = useState("")
     const [draftHtml, setDraftHtml] = useState("")
     const [isLoading, setIsLoading] = useState(true)
+    const [autoSaveEnabled, setAutoSaveEnabled] = useState(true)
+    const [isSaving, setIsSaving] = useState(false)
+    const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null)
+    const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
     const editorRef = useRef<HTMLDivElement>(null)
 
@@ -79,21 +83,21 @@ export default function DiaryPage() {
     }, [])
 
     const loadNote = (note: DiaryNote) => {
-
+        if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current)
         setSelectedNoteId(note.id)
         setDraftTitle(note.title)
         setDraftHtml(note.content)
         syncDraftToEditor(note.content)
-
+        setLastSavedAt(null)
     }
 
     const newNote = () => {
-
+        if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current)
         setSelectedNoteId(null)
         setDraftTitle("")
         setDraftHtml("")
         syncDraftToEditor("")
-
+        setLastSavedAt(null)
     }
 
     const runEditorCommand = (command: string, value?: string) => {
@@ -212,6 +216,59 @@ export default function DiaryPage() {
 
     }
 
+    useEffect(() => {
+        if (!autoSaveEnabled) return
+        if (!getPlainText(draftHtml)) return
+
+        if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current)
+
+        autoSaveTimerRef.current = setTimeout(async () => {
+            const text = getPlainText(draftHtml)
+            if (!text) return
+            const title = draftTitle.trim() || text.split(" ").slice(0, 6).join(" ")
+
+            try {
+                setIsSaving(true)
+                if (selectedNoteId) {
+                    const response = await fetch(`/api/my-diary/${selectedNoteId}`, {
+                        method: "PUT",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ title, content: draftHtml }),
+                    })
+                    if (!response.ok) return
+                    const data = await response.json()
+                    const updatedEntry: DiaryNote = data.entry
+                    setNotes((prev) => {
+                        const merged = prev.map((item) => item.id === updatedEntry.id ? updatedEntry : item)
+                        return merged.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+                    })
+                    setDraftTitle(updatedEntry.title)
+                } else {
+                    const response = await fetch("/api/my-diary", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ title, content: draftHtml }),
+                    })
+                    if (!response.ok) return
+                    const data = await response.json()
+                    const createdEntry: DiaryNote = data.entry
+                    setNotes((prev) => [createdEntry, ...prev])
+                    setSelectedNoteId(createdEntry.id)
+                    setDraftTitle(createdEntry.title)
+                }
+                setLastSavedAt(new Date())
+            } catch (error) {
+                console.error("Auto-save failed:", error)
+            } finally {
+                setIsSaving(false)
+            }
+        }, 2000)
+
+        return () => {
+            if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current)
+        }
+    }, [draftHtml, draftTitle, autoSaveEnabled, selectedNoteId])
+
     return (
 
         <div className="h-screen flex bg-white">
@@ -311,6 +368,20 @@ export default function DiaryPage() {
                         <Trash2 className="h-4 w-4 mr-2" />
                         Delete
                     </Button>
+
+                    <Button
+                        size="sm"
+                        variant={autoSaveEnabled ? "default" : "outline"}
+                        onClick={() => setAutoSaveEnabled((prev) => !prev)}
+                    >
+                        Auto-save {autoSaveEnabled ? "On" : "Off"}
+                    </Button>
+
+                    {autoSaveEnabled && (
+                        <span className="text-xs text-muted-foreground self-center">
+                            {isSaving ? "Saving..." : lastSavedAt ? `Saved ${lastSavedAt.toLocaleTimeString()}` : ""}
+                        </span>
+                    )}
 
                 </div>
 

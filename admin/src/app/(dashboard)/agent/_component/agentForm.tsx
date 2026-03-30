@@ -22,7 +22,7 @@ import {
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Upload, X, User, FileText, Users } from "lucide-react";
+import { Upload, X, User, FileText, Users, Search, UserPlus, UserCheck } from "lucide-react";
 import { toast } from "react-toastify";
 import { Agent } from "@/types";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -337,27 +337,18 @@ export default function AgentForm({ agent }: AgentFormProps) {
 
     const allowedTypes = agentHierarchy[selectedExecutionType] || [];
     return allAgents.filter((existingAgent) => {
-
-      // Exclude current agent being edited
       if (agent && existingAgent.id === agent.id) return false;
-
-
-      // Only show agents that are lower in hierarchy
       if (!allowedTypes.includes(existingAgent.agentType)) return false;
-
-      // Prevent agents from being added to multiple teams (unless already subordinate to this agent)
+      // Hide agents assigned to other teams, but keep ones already in THIS form's selection
       if (
-
-        agent?.subordinates?.some((s) => s.id === existingAgent.id)
+        selectedSubordinates.includes(existingAgent.id)
       ) {
         return false;
       }
-
       return true;
     });
   };
 
-  console.log(getAvailableAgents())
   // Filter agents based on search term
   const filteredAgents = getAvailableAgents().filter(
     (existingAgent) =>
@@ -367,6 +358,22 @@ export default function AgentForm({ agent }: AgentFormProps) {
         .includes(agentSearch.toLowerCase()) ||
       existingAgent.email.toLowerCase().includes(agentSearch.toLowerCase())
   );
+
+  const filteredAdvisorAgents = allAgents.filter((existingAgent) => {
+    if (agent && existingAgent.id === agent.id) return false;
+    if (existingAgent.agentType !== "Client Advisor") return false;
+    if (selectedSubordinates.includes(existingAgent.id)) return false;
+    if (
+      allSubordinateIds.includes(existingAgent.id) &&
+      !selectedAdvisorSubordinates.includes(existingAgent.id)
+    ) {
+      return false;
+    }
+    return (
+      existingAgent.name.toLowerCase().includes(advisorAgentSearch.toLowerCase()) ||
+      existingAgent.email.toLowerCase().includes(advisorAgentSearch.toLowerCase())
+    );
+  });
 
   const handleSpecializationChange = (
     specialization: string,
@@ -841,362 +848,297 @@ export default function AgentForm({ agent }: AgentFormProps) {
             </CardTitle>
             <CardDescription>
               Assign agents to work under this agent.
-              {formData.agentRole !== EXECUTION_AND_ADVISOR_AGENT_ROLE &&
-                managementAgentType && (
-                  <div className="mt-2 text-sm text-blue-600">
-                    As a <strong>{managementAgentType}</strong>, you can manage:{" "}
-                    {agentHierarchy[managementAgentType]?.join(", ") ||
-                      "No subordinates available"}
-                  </div>
-                )}
-              {formData.agentRole === EXECUTION_AND_ADVISOR_AGENT_ROLE && (
-                <div className="mt-2 text-sm text-blue-600">
-                  Configure both Execution Team and Advisor Team assignments.
-                </div>
-              )}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
+
+            {/* ── Execution Team ── */}
             {hasExecutionRole(formData.agentRole) && (
-              <div className="space-y-4 border rounded-lg p-4">
-                <Label className="text-base font-semibold">Execution Team</Label>
+              <div className="rounded-xl border overflow-hidden">
+
+                {/* Panel header */}
+                <div className="flex items-center justify-between px-5 py-4 bg-blue-50 border-b">
+                  <div className="flex items-center gap-3">
+                    <div className="h-9 w-9 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
+                      <Users className="h-4 w-4 text-blue-600" />
+                    </div>
+                    <div>
+                      <p className="font-semibold text-sm">Execution Team</p>
+                      {selectedExecutionType && agentHierarchy[selectedExecutionType]?.length > 0 && (
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Can manage: {agentHierarchy[selectedExecutionType]?.join(", ")}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  {selectedSubordinates.length > 0 && (
+                    <Badge className="bg-blue-600 text-white hover:bg-blue-600 shrink-0">
+                      {selectedSubordinates.length} member{selectedSubordinates.length !== 1 ? "s" : ""}
+                    </Badge>
+                  )}
+                </div>
+
+                {/* No type selected */}
                 {!selectedExecutionType && (
-                  <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                    <p className="text-sm text-yellow-800">
-                      Please select an Execution Agent Type first.
+                  <div className="flex flex-col items-center justify-center py-12 text-center px-6">
+                    <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center mb-3">
+                      <Users className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                    <p className="text-sm font-medium">No agent type selected</p>
+                    <p className="text-xs text-muted-foreground mt-1">Select an Execution Agent Type above to build your team</p>
+                  </div>
+                )}
+
+                {/* Cannot manage */}
+                {selectedExecutionType && agentHierarchy[selectedExecutionType]?.length === 0 && (
+                  <div className="flex flex-col items-center justify-center py-12 text-center px-6">
+                    <p className="text-sm text-muted-foreground">
+                      As a <span className="font-medium text-foreground">{selectedExecutionType}</span>, you cannot manage execution subordinates.
                     </p>
                   </div>
                 )}
-                {selectedExecutionType &&
-                  agentHierarchy[selectedExecutionType]?.length === 0 && (
-                    <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
-                      <p className="text-sm text-gray-600">
-                        As an <strong>{selectedExecutionType}</strong>, you cannot
-                        manage any execution subordinates.
-                      </p>
-                    </div>
-                  )}
-                {selectedExecutionType &&
-                  agentHierarchy[selectedExecutionType]?.length > 0 && (
-                    <>
-                      <div className="space-y-2">
-                        <Label htmlFor="execution-agent-search">
-                          Search Execution Agents
-                        </Label>
+
+                {/* Split panel */}
+                {selectedExecutionType && agentHierarchy[selectedExecutionType]?.length > 0 && (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 divide-y lg:divide-y-0 lg:divide-x">
+
+                    {/* Left – Available pool */}
+                    <div className="p-5 space-y-3">
+                      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Available Agents</p>
+                      <div className="relative">
+                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
                         <Input
-                          id="execution-agent-search"
-                          placeholder="Search by name, type, or email..."
+                          placeholder="Search by name, type, or email…"
                           value={agentSearch}
                           onChange={(e) => setAgentSearch(e.target.value)}
-                          className="max-w-md"
+                          className="pl-8 h-9 text-sm"
                         />
                       </div>
-
-                      {selectedSubordinates.length > 0 && (
-                        <div className="space-y-3">
-                          <Label>
-                            Selected Execution Agents ({selectedSubordinates.length})
-                          </Label>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            {selectedSubordinates.map((agentId) => {
-                              const selectedAgent = allAgents.find(
-                                (a) => a.id === agentId,
-                              );
-                              return selectedAgent ? (
-                                <div
-                                  key={selectedAgent.id}
-                                  className="flex items-center justify-between p-3 bg-blue-50 border border-blue-200 rounded-lg"
-                                >
-                                  <div className="flex items-center space-x-3">
-                                    <Avatar className="h-8 w-8">
-                                      <AvatarImage src={selectedAgent.photo || ""} />
-                                      <AvatarFallback className="bg-blue-100 text-blue-600">
-                                        {selectedAgent.name
-                                          .split(" ")
-                                          .map((n) => n[0])
-                                          .join("")}
-                                      </AvatarFallback>
-                                    </Avatar>
-                                    <div>
-                                      <p className="font-medium text-blue-900">
-                                        {selectedAgent.name}
-                                      </p>
-                                      <p className="text-sm text-blue-600">
-                                        {selectedAgent.agentType}
-                                      </p>
-                                    </div>
-                                  </div>
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() =>
-                                      handleSubordinateChange(selectedAgent.id, false)
-                                    }
-                                    className="text-blue-600 hover:text-blue-800 hover:bg-blue-100"
-                                  >
-                                    <X className="h-4 w-4" />
-                                  </Button>
-                                </div>
-                              ) : null;
-                            })}
-                          </div>
-                        </div>
-                      )}
-
-                      <div className="space-y-3">
-                        <Label>Available Execution Agents</Label>
+                      <div className="space-y-1 max-h-72 overflow-y-auto pr-0.5">
                         {loading ? (
-                          <div className="text-center py-4">
-                            <p className="text-sm text-muted-foreground">
-                              Loading agents...
-                            </p>
-                          </div>
+                          <p className="text-xs text-muted-foreground text-center py-8">Loading agents…</p>
                         ) : filteredAgents.length === 0 ? (
-                          <p className="text-sm text-muted-foreground py-4 text-center">
-                            {agentSearch
-                              ? "No agents found matching your search."
-                              : getAvailableAgents().length === 0
-                                ? "No agents available for this hierarchy level."
-                                : "No agents available."}
+                          <p className="text-xs text-muted-foreground text-center py-8">
+                            {agentSearch ? "No agents match your search." : "No agents available for this hierarchy level."}
                           </p>
                         ) : (
-                          <div className="space-y-2 max-h-64 overflow-y-auto">
-                            {filteredAgents.map((availableAgent) => (
-                              <div
-                                key={availableAgent.id}
-                                className={`flex items-center justify-between p-3 border rounded-lg transition-colors ${selectedSubordinates.includes(availableAgent.id)
-                                  ? "bg-gray-50 border-gray-300"
-                                  : "hover:bg-gray-50"
+                          filteredAgents.map((a) => {
+                            const isSelected = selectedSubordinates.includes(a.id)
+                            return (
+                              <button
+                                key={a.id}
+                                type="button"
+                                onClick={() => handleSubordinateChange(a.id, !isSelected)}
+                                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-all group ${isSelected ? "bg-blue-50 ring-1 ring-blue-200" : "hover:bg-muted"
                                   }`}
                               >
-                                <div className="flex items-center space-x-3">
-                                  <Checkbox
-                                    id={availableAgent.id}
-                                    checked={selectedSubordinates.includes(
-                                      availableAgent.id,
-                                    )}
-                                    onCheckedChange={(checked) =>
-                                      handleSubordinateChange(
-                                        availableAgent.id,
-                                        checked as boolean,
-                                      )
-                                    }
-                                  />
-                                  <Avatar className="h-8 w-8">
-                                    <AvatarImage src={availableAgent.photo || ""} />
-                                    <AvatarFallback>
-                                      {availableAgent.name
-                                        .split(" ")
-                                        .map((n) => n[0])
-                                        .join("")}
-                                    </AvatarFallback>
-                                  </Avatar>
-                                  <div>
-                                    <Label
-                                      htmlFor={availableAgent.id}
-                                      className="font-medium cursor-pointer"
-                                    >
-                                      {availableAgent.name}
-                                    </Label>
-                                    <p className="text-sm text-muted-foreground">
-                                      {availableAgent.agentType} • {availableAgent.email}
-                                    </p>
-                                  </div>
+                                <Avatar className="h-8 w-8 shrink-0">
+                                  <AvatarImage src={a.photo || ""} />
+                                  <AvatarFallback className={`text-xs ${isSelected ? "bg-blue-100 text-blue-700" : ""}`}>
+                                    {a.name.split(" ").map((n) => n[0]).join("")}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <div className="flex-1 min-w-0">
+                                  <p className={`text-sm font-medium truncate ${isSelected ? "text-blue-900" : ""}`}>{a.name}</p>
+                                  <p className="text-xs text-muted-foreground truncate">{a.agentType}</p>
                                 </div>
-                                {selectedSubordinates.includes(availableAgent.id) && (
-                                  <Badge
-                                    variant="secondary"
-                                    className="bg-blue-100 text-blue-800"
-                                  >
-                                    Selected
-                                  </Badge>
-                                )}
-                              </div>
-                            ))}
-                          </div>
+                                {isSelected
+                                  ? <UserCheck className="h-4 w-4 text-blue-500 shrink-0" />
+                                  : <UserPlus className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 shrink-0 transition-opacity" />
+                                }
+                              </button>
+                            )
+                          })
                         )}
                       </div>
-                    </>
-                  )}
+                    </div>
+
+                    {/* Right – Current team */}
+                    <div className="p-5 space-y-3 bg-slate-50/60">
+                      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Team Members</p>
+                      <div className="space-y-1 max-h-84 overflow-y-auto pr-0.5">
+                        {selectedSubordinates.length === 0 ? (
+                          <div className="flex flex-col items-center justify-center py-12 text-center">
+                            <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center mb-2">
+                              <Users className="h-4 w-4 text-muted-foreground/50" />
+                            </div>
+                            <p className="text-xs text-muted-foreground">No members yet</p>
+                            <p className="text-xs text-muted-foreground/60 mt-0.5">Click agents on the left to add them</p>
+                          </div>
+                        ) : (
+                          allAgents
+                            .filter((a) => selectedSubordinates.includes(a.id))
+                            .map((a) => (
+                              <div key={a.id} className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-white border border-blue-100 shadow-sm">
+                                <Avatar className="h-8 w-8 shrink-0">
+                                  <AvatarImage src={a.photo || ""} />
+                                  <AvatarFallback className="text-xs bg-blue-100 text-blue-700">
+                                    {a.name.split(" ").map((n) => n[0]).join("")}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium text-blue-900 truncate">{a.name}</p>
+                                  <p className="text-xs text-blue-500 truncate">{a.agentType}</p>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => handleSubordinateChange(a.id, false)}
+                                  className="h-6 w-6 rounded-full flex items-center justify-center hover:bg-red-100 text-muted-foreground hover:text-red-600 transition-colors shrink-0"
+                                >
+                                  <X className="h-3 w-3" />
+                                </button>
+                              </div>
+                            ))
+                        )}
+                      </div>
+                    </div>
+
+                  </div>
+                )}
               </div>
             )}
 
+            {/* ── Advisor Team ── */}
             {hasAdvisorRole(formData.agentRole) && (
-              <div className="space-y-4 border rounded-lg p-4">
-                <Label className="text-base font-semibold">Advisor Team</Label>
+              <div className="rounded-xl border overflow-hidden">
+
+                {/* Panel header */}
+                <div className="flex items-center justify-between px-5 py-4 bg-violet-50 border-b">
+                  <div className="flex items-center gap-3">
+                    <div className="h-9 w-9 rounded-full bg-violet-100 flex items-center justify-center shrink-0">
+                      <Users className="h-4 w-4 text-violet-600" />
+                    </div>
+                    <div>
+                      <p className="font-semibold text-sm">Advisor Team</p>
+                      {selectedAdvisorType === "Client Manager" && (
+                        <p className="text-xs text-muted-foreground mt-0.5">Managing: Client Advisors</p>
+                      )}
+                    </div>
+                  </div>
+                  {selectedAdvisorSubordinates.length > 0 && (
+                    <Badge className="bg-violet-600 text-white hover:bg-violet-600 shrink-0">
+                      {selectedAdvisorSubordinates.length} member{selectedAdvisorSubordinates.length !== 1 ? "s" : ""}
+                    </Badge>
+                  )}
+                </div>
+
                 {!selectedAdvisorType && (
-                  <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                    <p className="text-sm text-yellow-800">
-                      Please select an Advisor Agent Type first.
-                    </p>
+                  <div className="flex flex-col items-center justify-center py-12 text-center px-6">
+                    <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center mb-3">
+                      <Users className="h-5 w-5 text-muted-foreground" />
+                    </div>
+                    <p className="text-sm font-medium">No advisor type selected</p>
+                    <p className="text-xs text-muted-foreground mt-1">Select an Advisor Agent Type above to build your team</p>
                   </div>
                 )}
+
                 {selectedAdvisorType && selectedAdvisorType !== "Client Manager" && (
-                  <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
-                    <p className="text-sm text-gray-600">
-                      As an <strong>{selectedAdvisorType}</strong>, you cannot
-                      manage advisor subordinates.
+                  <div className="flex flex-col items-center justify-center py-12 text-center px-6">
+                    <p className="text-sm text-muted-foreground">
+                      As a <span className="font-medium text-foreground">{selectedAdvisorType}</span>, you cannot manage advisor subordinates.
                     </p>
                   </div>
                 )}
 
                 {selectedAdvisorType === "Client Manager" && (
-                  <>
-                    <div className="space-y-2">
-                      <Label htmlFor="advisor-agent-search">
-                        Search Client Advisors
-                      </Label>
-                      <Input
-                        id="advisor-agent-search"
-                        placeholder="Search by name or email..."
-                        value={advisorAgentSearch}
-                        onChange={(e) => setAdvisorAgentSearch(e.target.value)}
-                        className="max-w-md"
-                      />
-                    </div>
+                  <div className="grid grid-cols-1 lg:grid-cols-2 divide-y lg:divide-y-0 lg:divide-x">
 
-                    {selectedAdvisorSubordinates.length > 0 && (
-                      <div className="space-y-3">
-                        <Label>
-                          Selected Client Advisors ({selectedAdvisorSubordinates.length})
-                        </Label>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                          {selectedAdvisorSubordinates.map((agentId) => {
-                            const selectedAgent = allAgents.find(
-                              (a) =>
-                                a.id === agentId && a.agentType === "Client Advisor",
-                            );
-                            return selectedAgent ? (
-                              <div
-                                key={selectedAgent.id}
-                                className="flex items-center justify-between p-3 bg-blue-50 border border-blue-200 rounded-lg"
-                              >
-                                <div className="flex items-center space-x-3">
-                                  <Avatar className="h-8 w-8">
-                                    <AvatarImage src={selectedAgent.photo || ""} />
-                                    <AvatarFallback className="bg-blue-100 text-blue-600">
-                                      {selectedAgent.name
-                                        .split(" ")
-                                        .map((n) => n[0])
-                                        .join("")}
-                                    </AvatarFallback>
-                                  </Avatar>
-                                  <div>
-                                    <p className="font-medium text-blue-900">
-                                      {selectedAgent.name}
-                                    </p>
-                                    <p className="text-sm text-blue-600">
-                                      {selectedAgent.agentType}
-                                    </p>
-                                  </div>
-                                </div>
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() =>
-                                    handleAdvisorSubordinateChange(
-                                      selectedAgent.id,
-                                      false,
-                                    )
-                                  }
-                                  className="text-blue-600 hover:text-blue-800 hover:bg-blue-100"
-                                >
-                                  <X className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            ) : null;
-                          })}
-                        </div>
+                    {/* Left – Available pool */}
+                    <div className="p-5 space-y-3">
+                      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Available Advisors</p>
+                      <div className="relative">
+                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+                        <Input
+                          placeholder="Search by name or email…"
+                          value={advisorAgentSearch}
+                          onChange={(e) => setAdvisorAgentSearch(e.target.value)}
+                          className="pl-8 h-9 text-sm"
+                        />
                       </div>
-                    )}
-
-                    <div className="space-y-3">
-                      <Label>Available Client Advisors</Label>
-                      {loading ? (
-                        <div className="text-center py-4">
-                          <p className="text-sm text-muted-foreground">
-                            Loading agents...
+                      <div className="space-y-1 max-h-72 overflow-y-auto pr-0.5">
+                        {loading ? (
+                          <p className="text-xs text-muted-foreground text-center py-8">Loading agents…</p>
+                        ) : filteredAdvisorAgents.length === 0 ? (
+                          <p className="text-xs text-muted-foreground text-center py-8">
+                            {advisorAgentSearch ? "No advisors match your search." : "No Client Advisors available."}
                           </p>
-                        </div>
-                      ) : (
-                        <div className="space-y-2 max-h-64 overflow-y-auto">
-                          {allAgents
-                            .filter(
-                              (a) =>
-                                a.agentType === "Client Advisor" &&
-                                !selectedSubordinates.includes(a.id) &&
-                                (a.name
-                                  .toLowerCase()
-                                  .includes(advisorAgentSearch.toLowerCase()) ||
-                                  a.email
-                                    .toLowerCase()
-                                    .includes(advisorAgentSearch.toLowerCase())),
-                            )
-                            .map((availableAgent) => (
-                              <div
-                                key={availableAgent.id}
-                                className={`flex items-center justify-between p-3 border rounded-lg transition-colors ${selectedAdvisorSubordinates.includes(
-                                  availableAgent.id,
-                                )
-                                  ? "bg-gray-50 border-gray-300"
-                                  : "hover:bg-gray-50"
+                        ) : (
+                          filteredAdvisorAgents.map((a) => {
+                            const isSelected = selectedAdvisorSubordinates.includes(a.id)
+                            return (
+                              <button
+                                key={a.id}
+                                type="button"
+                                onClick={() => handleAdvisorSubordinateChange(a.id, !isSelected)}
+                                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left transition-all group ${isSelected ? "bg-violet-50 ring-1 ring-violet-200" : "hover:bg-muted"
                                   }`}
                               >
-                                <div className="flex items-center space-x-3">
-                                  <Checkbox
-                                    id={`advisor-${availableAgent.id}`}
-                                    checked={selectedAdvisorSubordinates.includes(
-                                      availableAgent.id,
-                                    )}
-                                    onCheckedChange={(checked) =>
-                                      handleAdvisorSubordinateChange(
-                                        availableAgent.id,
-                                        checked as boolean,
-                                      )
-                                    }
-                                  />
-                                  <Avatar className="h-8 w-8">
-                                    <AvatarImage src={availableAgent.photo || ""} />
-                                    <AvatarFallback>
-                                      {availableAgent.name
-                                        .split(" ")
-                                        .map((n) => n[0])
-                                        .join("")}
-                                    </AvatarFallback>
-                                  </Avatar>
-                                  <div>
-                                    <Label
-                                      htmlFor={`advisor-${availableAgent.id}`}
-                                      className="font-medium cursor-pointer"
-                                    >
-                                      {availableAgent.name}
-                                    </Label>
-                                    <p className="text-sm text-muted-foreground">
-                                      {availableAgent.agentType} • {availableAgent.email}
-                                    </p>
-                                  </div>
+                                <Avatar className="h-8 w-8 shrink-0">
+                                  <AvatarImage src={a.photo || ""} />
+                                  <AvatarFallback className={`text-xs ${isSelected ? "bg-violet-100 text-violet-700" : ""}`}>
+                                    {a.name.split(" ").map((n) => n[0]).join("")}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <div className="flex-1 min-w-0">
+                                  <p className={`text-sm font-medium truncate ${isSelected ? "text-violet-900" : ""}`}>{a.name}</p>
+                                  <p className="text-xs text-muted-foreground truncate">{a.agentType}</p>
                                 </div>
-                                {selectedAdvisorSubordinates.includes(
-                                  availableAgent.id,
-                                ) && (
-                                    <Badge
-                                      variant="secondary"
-                                      className="bg-blue-100 text-blue-800"
-                                    >
-                                      Selected
-                                    </Badge>
-                                  )}
-                              </div>
-                            ))}
-                        </div>
-                      )}
+                                {isSelected
+                                  ? <UserCheck className="h-4 w-4 text-violet-500 shrink-0" />
+                                  : <UserPlus className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 shrink-0 transition-opacity" />
+                                }
+                              </button>
+                            )
+                          })
+                        )}
+                      </div>
                     </div>
-                  </>
+
+                    {/* Right – Current team */}
+                    <div className="p-5 space-y-3 bg-slate-50/60">
+                      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Team Members</p>
+                      <div className="space-y-1 max-h-84 overflow-y-auto pr-0.5">
+                        {selectedAdvisorSubordinates.length === 0 ? (
+                          <div className="flex flex-col items-center justify-center py-12 text-center">
+                            <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center mb-2">
+                              <Users className="h-4 w-4 text-muted-foreground/50" />
+                            </div>
+                            <p className="text-xs text-muted-foreground">No advisors yet</p>
+                            <p className="text-xs text-muted-foreground/60 mt-0.5">Click advisors on the left to add them</p>
+                          </div>
+                        ) : (
+                          allAgents
+                            .filter((a) => selectedAdvisorSubordinates.includes(a.id))
+                            .map((a) => (
+                              <div key={a.id} className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-white border border-violet-100 shadow-sm">
+                                <Avatar className="h-8 w-8 shrink-0">
+                                  <AvatarImage src={a.photo || ""} />
+                                  <AvatarFallback className="text-xs bg-violet-100 text-violet-700">
+                                    {a.name.split(" ").map((n) => n[0]).join("")}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium text-violet-900 truncate">{a.name}</p>
+                                  <p className="text-xs text-violet-500 truncate">{a.agentType}</p>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => handleAdvisorSubordinateChange(a.id, false)}
+                                  className="h-6 w-6 rounded-full flex items-center justify-center hover:bg-red-100 text-muted-foreground hover:text-red-600 transition-colors shrink-0"
+                                >
+                                  <X className="h-3 w-3" />
+                                </button>
+                              </div>
+                            ))
+                        )}
+                      </div>
+                    </div>
+
+                  </div>
                 )}
               </div>
             )}
+
           </CardContent>
         </Card>
 

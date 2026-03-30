@@ -194,10 +194,14 @@ export async function PATCH(req: NextRequest) {
     const body = await req.json();
     const {
       id,
+      title,
+      description,
       status,
       assignedAgentId,
     }: {
       id?: string;
+      title?: string;
+      description?: string;
       status?: "Requested" | "Accepted" | "Rejected";
       assignedAgentId?: string;
     } = body;
@@ -210,11 +214,27 @@ export async function PATCH(req: NextRequest) {
     }
 
     const updateData: {
+      title?: string;
+      description?: string;
       status?: string;
       assignedAgent?: { connect: { id: string } };
       acceptedByAgent?: { disconnect: boolean };
       acceptedAt?: Date | null;
     } = {};
+
+    if (typeof title !== "undefined") {
+      if (!title.trim()) {
+        return NextResponse.json(
+          { error: "Title is required" },
+          { status: 400 },
+        );
+      }
+      updateData.title = title.trim();
+    }
+
+    if (typeof description !== "undefined") {
+      updateData.description = description.trim();
+    }
 
     if (status) {
       updateData.status = status;

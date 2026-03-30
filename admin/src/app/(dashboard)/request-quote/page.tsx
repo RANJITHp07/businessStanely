@@ -36,6 +36,14 @@ import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, FileText, Filte
 import { toast } from "react-toastify";
 import { hasAdvisorRole } from "@/lib/agentRole";
 
+const getStatusBadgeClass = (status?: string) =>
+    `${status === "Accepted"
+        ? "bg-green-100 text-green-800 border-green-200"
+        : status === "Rejected"
+            ? "bg-red-100 text-red-800 border-red-200"
+            : "bg-blue-100 text-blue-800 border-blue-200"
+    } border`;
+
 type AgentOption = {
     id: string;
     name: string;
@@ -82,6 +90,14 @@ export default function RequestQuotePage() {
     const [showModalAgentDropdown, setShowModalAgentDropdown] = useState(false);
     const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
     const [selectedQuote, setSelectedQuote] = useState<QuoteRequest | null>(null);
+    const [detailsMode, setDetailsMode] = useState<"view" | "edit">("view");
+    const [editingQuoteTitle, setEditingQuoteTitle] = useState("");
+    const [editingQuoteDescription, setEditingQuoteDescription] = useState("");
+    const [editingQuoteStatus, setEditingQuoteStatus] = useState("Requested");
+    const [editingAssignedAgentId, setEditingAssignedAgentId] = useState("");
+    const [detailsAgentSearch, setDetailsAgentSearch] = useState("");
+    const [showDetailsAgentDropdown, setShowDetailsAgentDropdown] = useState(false);
+    const [updatingQuote, setUpdatingQuote] = useState(false);
 
     const advisorAgents = useMemo(
         () => agents.filter((agent) => hasAdvisorRole(agent.agentRole || "")),
@@ -110,6 +126,20 @@ export default function RequestQuotePage() {
         () => advisorAgents.find((agent) => agent.id === assignedAgentId) || null,
         [advisorAgents, assignedAgentId],
     );
+
+    const selectedDetailsAgent = useMemo(
+        () => advisorAgents.find((agent) => agent.id === editingAssignedAgentId) || null,
+        [advisorAgents, editingAssignedAgentId],
+    );
+
+    const filteredAdvisorAgentsForDetails = useMemo(() => {
+        const query = detailsAgentSearch.trim().toLowerCase();
+        if (!query) return [];
+        return advisorAgents.filter((agent) =>
+            agent.name.toLowerCase().includes(query) ||
+            agent.email.toLowerCase().includes(query),
+        );
+    }, [advisorAgents, detailsAgentSearch]);
 
     const filteredQuotes = useMemo(() => {
         return quotes.filter((quote) => {
@@ -284,9 +314,81 @@ export default function RequestQuotePage() {
         setShowModalAgentDropdown(false);
     };
 
-    const openQuoteDetails = (quote: QuoteRequest) => {
+    const openQuoteDetails = (quote: QuoteRequest, mode: "view" | "edit" = "view") => {
         setSelectedQuote(quote);
+        setDetailsMode(mode);
+        setEditingQuoteTitle(quote.title);
+        setEditingQuoteDescription(quote.description || "");
+        setEditingQuoteStatus(quote.status || "Requested");
+        setEditingAssignedAgentId(quote.assignedTo?.id || "");
+        setDetailsAgentSearch(quote.assignedTo?.name || "");
+        setShowDetailsAgentDropdown(false);
         setIsDetailsModalOpen(true);
+    };
+
+    const handleDetailsAgentSelect = (agent: AgentOption) => {
+        setEditingAssignedAgentId(agent.id);
+        setDetailsAgentSearch(agent.name);
+        setShowDetailsAgentDropdown(false);
+    };
+
+    const handleUpdateQuote = async () => {
+        if (!selectedQuote) return;
+
+        if (!editingQuoteTitle.trim()) {
+            toast.error("Title is required");
+            return;
+        }
+
+        if (!editingAssignedAgentId) {
+            toast.error("Please select an advisor agent");
+            return;
+        }
+
+        setUpdatingQuote(true);
+        try {
+            const response = await fetch("/api/request-quote", {
+                method: "PATCH",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                credentials: "include",
+                body: JSON.stringify({
+                    id: selectedQuote.id,
+                    title: editingQuoteTitle,
+                    description: editingQuoteDescription,
+                    status: editingQuoteStatus,
+                    assignedAgentId: editingAssignedAgentId,
+                }),
+            });
+
+            const data = await response.json();
+            if (!response.ok) {
+                throw new Error(data?.error || "Failed to update quote request");
+            }
+
+            if (data?.quoteRequest) {
+                setQuotes((prev) =>
+                    prev.map((quote) =>
+                        quote.id === data.quoteRequest.id ? data.quoteRequest : quote,
+                    ),
+                );
+                setSelectedQuote(data.quoteRequest);
+                setEditingQuoteTitle(data.quoteRequest.title);
+                setEditingQuoteDescription(data.quoteRequest.description || "");
+                setEditingQuoteStatus(data.quoteRequest.status || "Requested");
+                setEditingAssignedAgentId(data.quoteRequest.assignedTo?.id || "");
+                setDetailsAgentSearch(data.quoteRequest.assignedTo?.name || "");
+            }
+
+            toast.success("Quote request updated successfully");
+            setIsDetailsModalOpen(false);
+        } catch (error) {
+            console.error(error);
+            toast.error(error instanceof Error ? error.message : "Failed to update quote request");
+        } finally {
+            setUpdatingQuote(false);
+        }
     };
 
     return (
@@ -417,7 +519,7 @@ export default function RequestQuotePage() {
                 <CardHeader>
                     <CardTitle>Requested Quotes Showcase</CardTitle>
                     <CardDescription>
-                        List of quote requests with creator, assignee, title, and description.
+                        List of quote requests with title, creator, assignee, and status.
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -438,12 +540,10 @@ export default function RequestQuotePage() {
                                 <Table>
                                     <TableHeader>
                                         <TableRow>
-                                            <TableHead>Requested Quote</TableHead>
+                                            <TableHead>Title</TableHead>
                                             <TableHead>Who Created</TableHead>
                                             <TableHead>Assigned To</TableHead>
                                             <TableHead>Status</TableHead>
-                                            <TableHead>Title</TableHead>
-                                            <TableHead>Description</TableHead>
                                             <TableHead className="text-right">Action</TableHead>
                                         </TableRow>
                                     </TableHeader>
@@ -451,20 +551,16 @@ export default function RequestQuotePage() {
                                         {paginatedQuotes.map((quote) => (
                                             <TableRow
                                                 key={quote.id}
-                                                onClick={() => openQuoteDetails(quote)}
+                                                onClick={() => openQuoteDetails(quote, "view")}
                                                 className="cursor-pointer"
                                             >
                                                 <TableCell>
-                                                    <Badge
-                                                        className={`${quote.status === "Accepted"
-                                                            ? "bg-green-100 text-green-800 border-green-200"
-                                                            : quote.status === "Rejected"
-                                                                ? "bg-red-100 text-red-800 border-red-200"
-                                                                : "bg-blue-100 text-blue-800 border-blue-200"
-                                                            } border`}
-                                                    >
-                                                        {quote.status || "Requested"}
-                                                    </Badge>
+                                                    <div className="min-w-70 max-w-80  truncate">
+                                                        <p className="font-medium leading-5">{quote.title}</p>
+                                                        <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
+                                                            {quote.description || "No description"}
+                                                        </p>
+                                                    </div>
                                                 </TableCell>
                                                 <TableCell>
                                                     <div className="font-medium">{quote.createdBy || "Unknown"}</div>
@@ -486,26 +582,35 @@ export default function RequestQuotePage() {
                                                     )}
                                                 </TableCell>
                                                 <TableCell>
-                                                    <span className="text-sm">{quote.status || "Requested"}</span>
-                                                </TableCell>
-                                                <TableCell className="font-medium">{quote.title}</TableCell>
-                                                <TableCell className="max-w-[380px]">
-                                                    <p className="line-clamp-2 text-sm text-muted-foreground">
-                                                        {quote.description || "No description"}
-                                                    </p>
+                                                    <Badge className={getStatusBadgeClass(quote.status)}>
+                                                        {quote.status || "Requested"}
+                                                    </Badge>
                                                 </TableCell>
                                                 <TableCell className="text-right">
-                                                    <Button
-                                                        type="button"
-                                                        variant="outline"
-                                                        size="sm"
-                                                        onClick={(event) => {
-                                                            event.stopPropagation();
-                                                            openQuoteDetails(quote);
-                                                        }}
-                                                    >
-                                                        View
-                                                    </Button>
+                                                    <div className="flex justify-end gap-2">
+                                                        <Button
+                                                            type="button"
+                                                            variant="outline"
+                                                            size="sm"
+                                                            onClick={(event) => {
+                                                                event.stopPropagation();
+                                                                openQuoteDetails(quote, "view");
+                                                            }}
+                                                        >
+                                                            View
+                                                        </Button>
+                                                        <Button
+                                                            type="button"
+                                                            variant="outline"
+                                                            size="sm"
+                                                            onClick={(event) => {
+                                                                event.stopPropagation();
+                                                                openQuoteDetails(quote, "edit");
+                                                            }}
+                                                        >
+                                                            Edit
+                                                        </Button>
+                                                    </div>
                                                 </TableCell>
                                             </TableRow>
                                         ))}
@@ -518,7 +623,7 @@ export default function RequestQuotePage() {
                                     <div className="flex items-center gap-2">
                                         <p className="text-sm text-muted-foreground">Rows per page</p>
                                         <Select value={itemsPerPage.toString()} onValueChange={handleItemsPerPageChange}>
-                                            <SelectTrigger className="w-[90px]">
+                                            <SelectTrigger className="w-22.5">
                                                 <SelectValue />
                                             </SelectTrigger>
                                             <SelectContent>
@@ -577,7 +682,7 @@ export default function RequestQuotePage() {
             </Card>
 
             <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-                <DialogContent className="sm:max-w-[620px]">
+                <DialogContent className="sm:max-w-155">
                     <DialogHeader>
                         <DialogTitle className="flex items-center gap-2">
                             <FileText className="h-5 w-5" />
@@ -679,13 +784,15 @@ export default function RequestQuotePage() {
             </Dialog>
 
             <Dialog open={isDetailsModalOpen} onOpenChange={setIsDetailsModalOpen}>
-                <DialogContent className="sm:max-w-[680px]">
+                <DialogContent className="sm:max-w-170">
                     <DialogHeader>
                         <DialogTitle className="flex items-center justify-between gap-2">
-                            <span>Quote Request Details</span>
+                            <span>{detailsMode === "view" ? "Quote Request Details" : "Edit Quote Request"}</span>
                         </DialogTitle>
                         <DialogDescription>
-                            View the complete details for this quote request.
+                            {detailsMode === "view"
+                                ? "View the complete details for this quote request."
+                                : "Update the quote title, description, assignee, and status."}
                         </DialogDescription>
                     </DialogHeader>
 
@@ -694,18 +801,24 @@ export default function RequestQuotePage() {
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                                 <div className="rounded-lg border bg-muted/30 p-3">
                                     <Label className="text-[11px] uppercase tracking-wide text-muted-foreground">Status</Label>
-                                    <div className="mt-2">
-                                        <Badge
-                                            className={`${selectedQuote.status === "Accepted"
-                                                ? "bg-green-100 text-green-800 border-green-200"
-                                                : selectedQuote.status === "Rejected"
-                                                    ? "bg-red-100 text-red-800 border-red-200"
-                                                    : "bg-blue-100 text-blue-800 border-blue-200"
-                                                } border`}
-                                        >
-                                            {selectedQuote.status || "Requested"}
-                                        </Badge>
-                                    </div>
+                                    {detailsMode === "view" ? (
+                                        <div className="mt-2">
+                                            <Badge className={getStatusBadgeClass(editingQuoteStatus)}>
+                                                {editingQuoteStatus || "Requested"}
+                                            </Badge>
+                                        </div>
+                                    ) : (
+                                        <Select value={editingQuoteStatus} onValueChange={setEditingQuoteStatus}>
+                                            <SelectTrigger className="mt-2 w-full bg-background">
+                                                <SelectValue placeholder="Select status" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="Requested">Requested</SelectItem>
+                                                <SelectItem value="Accepted">Accepted</SelectItem>
+                                                <SelectItem value="Rejected">Rejected</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    )}
                                 </div>
                                 <div className="rounded-lg border bg-muted/30 p-3">
                                     <Label className="text-[11px] uppercase tracking-wide text-muted-foreground">Requested At</Label>
@@ -715,15 +828,64 @@ export default function RequestQuotePage() {
                                 </div>
                                 <div className="rounded-lg border bg-muted/30 p-3">
                                     <Label className="text-[11px] uppercase tracking-wide text-muted-foreground">Assigned To</Label>
-                                    {selectedQuote.assignedTo ? (
-                                        <>
-                                            <p className="mt-2 text-sm font-semibold">{selectedQuote.assignedTo.name}</p>
-                                            <p className="text-xs text-muted-foreground mt-0.5">
-                                                {selectedQuote.assignedTo.agentRole || selectedQuote.assignedTo.agentType}
-                                            </p>
-                                        </>
+                                    {detailsMode === "view" ? (
+                                        selectedDetailsAgent ? (
+                                            <div className="mt-2">
+                                                <p className="text-sm font-semibold">{selectedDetailsAgent.name}</p>
+                                                <p className="text-xs text-muted-foreground mt-0.5">
+                                                    {selectedDetailsAgent.email} ({selectedDetailsAgent.agentRole || selectedDetailsAgent.agentType})
+                                                </p>
+                                            </div>
+                                        ) : (
+                                            <p className="mt-2 text-sm text-muted-foreground">Unassigned</p>
+                                        )
                                     ) : (
-                                        <p className="mt-2 text-sm text-muted-foreground">Unassigned</p>
+                                        <>
+                                            <div className="relative mt-2">
+                                                <Input
+                                                    value={detailsAgentSearch}
+                                                    onChange={(e) => {
+                                                        setDetailsAgentSearch(e.target.value);
+                                                        setEditingAssignedAgentId("");
+                                                        setShowDetailsAgentDropdown(true);
+                                                    }}
+                                                    onFocus={() => {
+                                                        if (detailsAgentSearch.trim()) {
+                                                            setShowDetailsAgentDropdown(true);
+                                                        }
+                                                    }}
+                                                    placeholder="Type advisor name or email"
+                                                    className="bg-background"
+                                                />
+                                                {showDetailsAgentDropdown && detailsAgentSearch.trim() && filteredAdvisorAgentsForDetails.length > 0 && (
+                                                    <div className="absolute z-20 w-full mt-1 bg-background border border-border rounded-md shadow-lg max-h-56 overflow-auto">
+                                                        {filteredAdvisorAgentsForDetails.map((agent) => (
+                                                            <button
+                                                                key={agent.id}
+                                                                type="button"
+                                                                className="w-full text-left px-3 py-2 hover:bg-muted border-b border-border last:border-b-0"
+                                                                onClick={() => handleDetailsAgentSelect(agent)}
+                                                            >
+                                                                <div className="font-medium">{agent.name}</div>
+                                                                <div className="text-xs text-muted-foreground">
+                                                                    {agent.email} ({agent.agentRole || agent.agentType})
+                                                                </div>
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                                {showDetailsAgentDropdown && detailsAgentSearch.trim() && filteredAdvisorAgentsForDetails.length === 0 && (
+                                                    <div className="absolute z-20 w-full mt-1 bg-background border border-border rounded-md shadow-lg px-3 py-2 text-sm text-muted-foreground">
+                                                        No advisor agent found
+                                                    </div>
+                                                )}
+                                            </div>
+                                            {selectedDetailsAgent && (
+                                                <p className="text-xs text-muted-foreground mt-2">
+                                                    Selected: {selectedDetailsAgent.name} ({selectedDetailsAgent.email})
+                                                </p>
+                                            )}
+                                        </>
                                     )}
                                 </div>
                             </div>
@@ -731,13 +893,32 @@ export default function RequestQuotePage() {
                             <div className="rounded-xl border p-4 space-y-3">
                                 <div>
                                     <Label className="text-[11px] uppercase tracking-wide text-muted-foreground">Title</Label>
-                                    <p className="mt-1.5 text-base font-semibold leading-snug">{selectedQuote.title}</p>
+                                    {detailsMode === "view" ? (
+                                        <p className="mt-2 text-base font-semibold leading-snug">{editingQuoteTitle}</p>
+                                    ) : (
+                                        <Input
+                                            value={editingQuoteTitle}
+                                            onChange={(e) => setEditingQuoteTitle(e.target.value)}
+                                            placeholder="Enter quote title"
+                                            className="mt-2"
+                                        />
+                                    )}
                                 </div>
                                 <div>
                                     <Label className="text-[11px] uppercase tracking-wide text-muted-foreground">Description</Label>
-                                    <p className="mt-1.5 text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed">
-                                        {selectedQuote.description || "No description"}
-                                    </p>
+                                    {detailsMode === "view" ? (
+                                        <p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground leading-relaxed">
+                                            {editingQuoteDescription || "No description"}
+                                        </p>
+                                    ) : (
+                                        <Textarea
+                                            rows={6}
+                                            value={editingQuoteDescription}
+                                            onChange={(e) => setEditingQuoteDescription(e.target.value)}
+                                            placeholder="Write quote request details here..."
+                                            className="mt-2"
+                                        />
+                                    )}
                                 </div>
                             </div>
 
@@ -774,6 +955,15 @@ export default function RequestQuotePage() {
                         <Button type="button" variant="outline" onClick={() => setIsDetailsModalOpen(false)}>
                             Close
                         </Button>
+                        {detailsMode === "view" ? (
+                            <Button type="button" onClick={() => setDetailsMode("edit")}>
+                                Edit
+                            </Button>
+                        ) : (
+                            <Button type="button" onClick={handleUpdateQuote} disabled={updatingQuote}>
+                                {updatingQuote ? "Saving..." : "Save Changes"}
+                            </Button>
+                        )}
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

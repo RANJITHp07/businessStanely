@@ -47,18 +47,33 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
-
-import type { Prospect } from "@/types"
 import { toast } from "react-toastify"
 import { cn } from "@/lib/utils"
 
-const statuses = ["Proposal Issued", "Closed as Won", "Closed as Loss",]
+type OpportunityRow = {
+    id: string
+    name: string
+    phoneNumber?: string
+    description?: string
+    nextFollowUp?: string
+    status: string
+    comments?: { authorId?: string; createdAt: string }[]
+    prospect?: {
+        id?: string
+        name?: string
+        assignedAgentId?: string
+        assignedAgent?: { name?: string }
+        createdByAgent?: { name?: string }
+    }
+}
+
+const statuses = ["Proposal Issued", "Closed as Won", "Closed as Loss", "New Opportunity"]
 const engagementStatuses = ["Follow Up", "Missed Out"]
 
 export default function ProspectsTable() {
     const router = useRouter()
     const searchParams = useSearchParams()
-    const [prospects, setProspects] = useState<Prospect[]>([])
+    const [prospects, setProspects] = useState<OpportunityRow[]>([])
     const [loading, setLoading] = useState(true)
     const [searchTerm, setSearchTerm] = useState("")
     const [selectedStatuses, setSelectedStatuses] = useState<string[]>([])
@@ -66,7 +81,7 @@ export default function ProspectsTable() {
     const [currentPage, setCurrentPage] = useState(1)
     const [itemsPerPage, setItemsPerPage] = useState(20)
     const [deletingId, setDeletingId] = useState<string | null>(null);
-    const [sourceToDelete, setSourceToDelete] = useState<Prospect | null>(null)
+    const [sourceToDelete, setSourceToDelete] = useState<OpportunityRow | null>(null)
     const [dateType, setDateType] = useState<string>("")
     const [startDate, setStartDate] = useState("")
     const [endDate, setEndDate] = useState("")
@@ -121,7 +136,7 @@ export default function ProspectsTable() {
 
     const filteredProspects = prospects.filter((prospect) => {
         const matchesSearch =
-            prospect.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (prospect.name ?? "").toLowerCase().includes(searchTerm.toLowerCase()) ||
             (prospect.phoneNumber ?? "").toLowerCase().includes(searchTerm.toLowerCase()) ||
             (prospect.description ?? "").toLowerCase().includes(searchTerm.toLowerCase());
         const matchesStatus = selectedStatuses.length === 0 || selectedStatuses.includes(prospect.status);
@@ -129,15 +144,15 @@ export default function ProspectsTable() {
         let engagementStatus: "To Be Contacted" | "Follow Up" | "Missed Out" = "To Be Contacted";
 
         const assignedAgentComments = (Array.isArray(prospect?.comments) ? prospect.comments : [])
-            .filter((c) => c.authorId === prospect.prospect?.assignedAgentId);
+            .filter((c: { authorId?: string }) => c.authorId === prospect.prospect?.assignedAgentId);
 
         if (prospect.status == "Proposal Issued") {
             if (assignedAgentComments.length === 0 && prospect.nextFollowUp) {
                 engagementStatus = "Follow Up";
             } else if (prospect.nextFollowUp) {
                 const lastCommentDate = assignedAgentComments
-                    .map((c) => new Date(c.createdAt))
-                    .sort((a, b) => b.getTime() - a.getTime())[0];
+                    .map((c: { createdAt: string }) => new Date(c.createdAt))
+                    .sort((a: Date, b: Date) => b.getTime() - a.getTime())[0];
 
                 const followUpDate = new Date(prospect.nextFollowUp);
 
@@ -482,6 +497,7 @@ export default function ProspectsTable() {
                                             <TableHead>Description</TableHead>
                                             <TableHead>Next Follow Up</TableHead>
                                             <TableHead>Assigned To</TableHead>
+                                            <TableHead>Created By</TableHead>
                                             <TableHead>Status</TableHead>
                                             <TableHead className="text-right">Actions</TableHead>
                                         </TableRow>
@@ -489,14 +505,14 @@ export default function ProspectsTable() {
                                     <TableBody>
                                         {currentProspects.length === 0 ? (
                                             <TableRow>
-                                                <TableCell colSpan={6} className="text-center py-8">
+                                                <TableCell colSpan={8} className="text-center py-8">
                                                     No prospects found
                                                 </TableCell>
                                             </TableRow>
                                         ) : (
                                             currentProspects.map((prospect) => (
                                                 <TableRow key={prospect.id} className="cursor-pointer" >
-                                                    <TableCell className="font-medium max-w-[150px] truncate" onClick={() => router.push(`/dashboard/opportunities/${prospect.id}`)}>{prospect.prospect.name}</TableCell>
+                                                    <TableCell className="font-medium max-w-[150px] truncate" onClick={() => router.push(`/dashboard/opportunities/${prospect.id}`)}>{prospect.prospect?.name || "N/A"}</TableCell>
                                                     <TableCell> {prospect.phoneNumber}</TableCell>
                                                     <TableCell className="max-w-[300px] truncate" onClick={() => router.push(`/dashboard/opportunities/${prospect.id}`)}>{prospect.description || "N/A"}</TableCell>
                                                     <TableCell onClick={() => router.push(`/dashboard/opportunities/${prospect.id}`)}>
@@ -508,13 +524,16 @@ export default function ProspectsTable() {
                                                     <TableCell>
                                                         <div className="flex items-center gap-2">
                                                             <div className="h-7 w-7 rounded-full bg-gradient-to-br from-blue-100 to-purple-100 flex items-center justify-center text-xs font-semibold text-slate-700">
-                                                                {prospect?.prospect?.assignedAgent?.name
+                                                                {(prospect?.prospect?.assignedAgent?.name || "NA")
                                                                     .split(" ")
                                                                     .map((n: string) => n[0])
                                                                     .join("")}
                                                             </div>
-                                                            <span className="text-sm text-slate-700">{prospect?.prospect?.assignedAgent?.name}</span>
+                                                            <span className="text-sm text-slate-700">{prospect?.prospect?.assignedAgent?.name || "Unknown"}</span>
                                                         </div>
+                                                    </TableCell>
+                                                    <TableCell onClick={() => router.push(`/dashboard/opportunities/${prospect.id}`)}>
+                                                        <span className="text-sm text-slate-700">{prospect?.prospect?.createdByAgent?.name || "Unknown"}</span>
                                                     </TableCell>
                                                     <TableCell onClick={() => router.push(`/dashboard/opportunities/${prospect.id}`)}>
                                                         <Badge

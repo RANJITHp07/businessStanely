@@ -150,7 +150,7 @@ export function ProspectsTable({ label, prospects, statusFilter, assignedId }: {
                                     <tbody className="divide-y divide-slate-100">
                                         {prospects.map((prospect) => (
                                             <tr key={prospect.id} className="hover:bg-slate-50/50 transition-colors cursor-pointer"
-                                                onClick={() => router.push(`/dashboard/prospects/${prospect?.id}`)}
+                                                onClick={() => router.push(`/dashboard/opportunities/${prospect?.id}`)}
                                             >
                                                 <td className="py-3 px-4">
                                                     <div>
@@ -343,7 +343,7 @@ function SegregationTable({
                                             <tr
                                                 key={lead.id}
                                                 className="hover:bg-slate-50/50 transition-colors cursor-pointer"
-                                                onClick={() => router.push(`/dashboard/prospects/${lead?.id}`)}
+                                                onClick={() => router.push(`/dashboard/opportunities/${lead?.id}`)}
                                             >
                                                 <td className="py-3 px-4">
                                                     <div>
@@ -789,21 +789,21 @@ export default function ProspectDashboard() {
                         <div className="h-8 w-8 rounded-lg bg-slate-200 flex items-center justify-center">
                             <Users className="h-4 w-4 text-slate-700" />
                         </div>
-                        <h2 className="text-xl font-bold text-slate-800">Active Lead</h2>
+                        <h2 className="text-xl font-bold text-slate-800">Active Opportunities</h2>
                     </div>
 
                     <ProspectsTable label="New Opportunity" prospects={prospects.filter((prospect) => prospect.status == "New Opportunity").slice(0, 5)} statusFilter="New Opportunity" />
 
                     <ProspectsTable label="Proposal Issued" prospects={prospects.filter((prospect) => prospect.status == "Proposal Issued").slice(0, 5)} statusFilter="Proposal Issued" />
                     <ProspectsTable
-                        label="Closed as Won Prospects"
+                        label="Closed as Won"
                         prospects={prospects.filter((prospect) => prospect.status == "Closed as Won").slice(0, 5)}
-                        statusFilter="Closed as Won Prospects"
+                        statusFilter="Closed as Won"
                     />
                     <ProspectsTable
-                        label="Closed as Loss Prospects"
+                        label="Closed as Loss"
                         prospects={prospects.filter((prospect) => prospect.status == "Closed as Loss").slice(0, 5)}
-                        statusFilter="Closed as Loss Prospects"
+                        statusFilter="Closed as Loss"
                     />
                 </div>
 
@@ -813,7 +813,7 @@ export default function ProspectDashboard() {
                         <div className="h-8 w-8 rounded-lg bg-slate-200 flex items-center justify-center">
                             <Calendar className="h-4 w-4 text-slate-700" />
                         </div>
-                        <h2 className="text-xl font-bold text-slate-800">Lead Segregation</h2>
+                        <h2 className="text-xl font-bold text-slate-800">Opportunities Segregation</h2>
                     </div>
                     <SegregationTable
                         label="Follow Up"

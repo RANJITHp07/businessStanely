@@ -489,6 +489,7 @@ export default function ProspectsTable() {
                                             <TableHead>Description</TableHead>
                                             <TableHead>Next Follow Up</TableHead>
                                             <TableHead>Assigned To</TableHead>
+                                            <TableHead>Created By</TableHead>
                                             <TableHead>Status</TableHead>
                                             <TableHead className="text-right">Actions</TableHead>
                                         </TableRow>
@@ -496,7 +497,7 @@ export default function ProspectsTable() {
                                     <TableBody>
                                         {currentProspects.length === 0 ? (
                                             <TableRow>
-                                                <TableCell colSpan={6} className="text-center py-8">
+                                                <TableCell colSpan={8} className="text-center py-8">
                                                     No prospects found
                                                 </TableCell>
                                             </TableRow>
@@ -522,6 +523,9 @@ export default function ProspectsTable() {
                                                             </div>
                                                             <span className="text-sm text-slate-700">{prospect?.assignedAgent?.name}</span>
                                                         </div>
+                                                    </TableCell>
+                                                    <TableCell onClick={() => router.push(`/dashboard/prospects/${prospect.id}`)}>
+                                                        <span className="text-sm text-slate-700">{prospect?.createdByAgent?.name || "Unknown"}</span>
                                                     </TableCell>
                                                     <TableCell onClick={() => router.push(`/dashboard/prospects/${prospect.id}`)}>
                                                         <Badge

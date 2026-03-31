@@ -200,7 +200,7 @@ function SectionTable({ label, opportunities }: { label: string; opportunities: 
                                             opportunities.map((opp) => {
                                                 const shortId = `O-${opp.id.slice(0, 6).toUpperCase()}`
                                                 return (
-                                                    <TableRow onClick={() => router.push(`/sales/opportunites/${opp.id}`)} key={opp.id} className="hover:bg-muted/50 even:bg-muted/30">
+                                                    <TableRow onClick={() => router.push(`/sales/opportunites/${opp.id}`)} key={opp.id} className="hover:bg-muted/50 even:bg-muted/30 cursor-pointer">
                                                         <TableCell className="truncate max-w-[180px] align-top" title={opp.name}>
                                                             <div className="flex flex-col">
                                                                 <span className="text-foreground font-medium truncate">{opp.prospect?.name || shortId}</span>

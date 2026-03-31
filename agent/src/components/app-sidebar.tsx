@@ -52,19 +52,9 @@ type MenuItem = {
 
 const salesItems: MenuItem[] = [
   {
-    title: "Team",
-    url: "/team",
-    icon: UserRoundPen,
-  },
-  {
     title: "Sales Dashboard",
     url: "/sales/dashboard",
     icon: Home,
-  },
-  {
-    title: "Opportunities",
-    url: "/sales/opportunites",
-    icon: ClipboardList,
   },
   {
     title: "Leads",
@@ -72,13 +62,23 @@ const salesItems: MenuItem[] = [
     icon: UserSearch,
   },
   {
+    title: "Opportunities",
+    url: "/sales/opportunites",
+    icon: ClipboardList,
+  },
+  {
     title: "Calendar",
     url: "/sales/calendar",
     icon: Calendar,
   },
   {
-    title: "Client Detail",
+    title: "Client Details",
     url: "/sales/client",
+    icon: UserRoundPen,
+  },
+  {
+    title: "Team",
+    url: "/team",
     icon: UserRoundPen,
   },
   {
@@ -185,6 +185,20 @@ export function AppSidebar() {
       ? salesItems.filter((item) => item.title !== "Team")
       : salesItems;
 
+    if (agentType === "Client Advisor") {
+      const clientAdvisorTitles = [
+        "Sales Dashboard",
+        "Leads",
+        "Opportunities",
+        "Calendar",
+        "Client Details",
+      ];
+
+      return clientAdvisorTitles
+        .map((title) => advisorItems.find((item) => item.title === title))
+        .filter((item): item is MenuItem => Boolean(item));
+    }
+
     if (agentType === "Lead Maker") {
       return advisorItems.filter((item) => item.title !== "Calendar");
     }
@@ -202,6 +216,13 @@ export function AppSidebar() {
     }
 
     if (showSalesPanel) {
+      if (agentType === "Client Advisor") {
+        const clientAdvisorCommonItems = commonItems.filter(
+          (item) => item.title === "Service Records" || item.title === "Settings",
+        );
+        return [...visibleSalesItems, ...clientAdvisorCommonItems];
+      }
+
       return [...visibleSalesItems, ...commonItems];
     }
 

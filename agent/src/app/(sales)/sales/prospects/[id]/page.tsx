@@ -251,6 +251,7 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
     }
 
     const formatDate = (dateString: string) => {
+        if (!dateString) return "N/A"
         return new Date(dateString).toLocaleDateString("en-US", {
             month: "short",
             day: "numeric",

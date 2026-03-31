@@ -282,9 +282,15 @@ export default function OppurtunitiesDetailPage() {
         setSubmitting(false);
     }
 
-    const formatDate = (dateString: string) => {
-        if (!dateString) return "N/A    "
-        return new Date(dateString).toLocaleDateString("en-US", {
+    const formatDate = (dateString?: string) => {
+        if (!dateString) return "N/A"
+
+        const parsedDate = new Date(dateString)
+        if (Number.isNaN(parsedDate.getTime())) {
+            return "N/A"
+        }
+
+        return parsedDate.toLocaleDateString("en-US", {
             month: "short",
             day: "numeric",
             year: "numeric",
@@ -851,7 +857,7 @@ export default function OppurtunitiesDetailPage() {
                                 {
                                     oppurtunities.quote &&
                                     <a
-                                        href={oppurtunities.quote} // URL of the already uploaded quote
+                                        href={getAttachmentUrl(oppurtunities.quote)} // URL of the already uploaded quote
                                         target="_blank"
                                         rel="noopener noreferrer"
                                         className="flex items-center gap-2 px-3 py-1.5 bg-muted rounded-md text-sm hover:bg-muted/80 transition-colors"

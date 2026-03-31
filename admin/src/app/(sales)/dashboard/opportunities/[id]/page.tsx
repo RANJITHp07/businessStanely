@@ -254,9 +254,11 @@ export default function OppurtunitiesDetailPage() {
                                                 <SelectValue />
                                             </SelectTrigger>
                                             <SelectContent>
+                                                <SelectItem value="New Opportunity">New Opportunity</SelectItem>
                                                 <SelectItem value="Proposal Issued">Proposal Issued</SelectItem>
                                                 <SelectItem value="Closed as Won">Closed as Won</SelectItem>
                                                 <SelectItem value="Closed as Loss">Closed as Loss</SelectItem>
+
                                             </SelectContent>
                                         </Select>
                                     </div>

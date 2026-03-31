@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { hasAdvisorRole } from "@/lib/agentRole";
+import { getCurrentAdmin } from "@/lib/auth";
 
 const getAdvisorType = (agent: {
   agentType?: string | null;
@@ -12,6 +13,11 @@ export async function PUT(
   { params }: { params: { id: string } },
 ) {
   try {
+    const currentAdmin = await getCurrentAdmin(req);
+    if (!currentAdmin) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const agentId = params.id;
     const { transferAgentId } = await req.json();
 
@@ -71,7 +77,38 @@ export async function PUT(
       );
     }
 
-    await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx) => {
+      const allTaskStatuses = await tx.task.findMany({
+        where: { assignedToId: agentId },
+        select: { status: true, completed: true },
+      });
+
+      const tasksToTransfer = await tx.task.findMany({
+        where: {
+          assignedToId: agentId,
+          status: { notIn: ["Completed", "Abandoned"] },
+        },
+        select: { id: true },
+      });
+
+      const completedTasks = await tx.task.findMany({
+        where: {
+          assignedToId: agentId,
+          status: { in: ["Completed", "Abandoned"] },
+        },
+        select: { id: true, status: true, completed: true },
+      });
+
+      const assignedLeads = await tx.prospect.findMany({
+        where: { assignedAgentId: agentId },
+        select: { id: true },
+      });
+
+      const createdLeads = await tx.prospect.findMany({
+        where: { createdByAgentId: agentId },
+        select: { id: true },
+      });
+
       // Transfer leads assigned to this advisor.
       await tx.prospect.updateMany({
         where: { assignedAgentId: agentId },
@@ -80,6 +117,54 @@ export async function PUT(
 
       // Transfer leads created by this advisor (important for Lead Maker flow).
       await tx.prospect.updateMany({
+        where: { createdByAgentId: agentId },
+        data: { createdByAgentId: transferAgentId },
+      });
+
+      // Transfer non-completed tasks and archive completed tasks.
+      await tx.task.updateMany({
+        where: {
+          assignedToId: agentId,
+          status: { notIn: ["Completed", "Abandoned"] },
+        },
+        data: { assignedToId: transferAgentId },
+      });
+
+      await tx.task.updateMany({
+        where: {
+          assignedToId: agentId,
+          status: { in: ["Completed", "Abandoned"] },
+        },
+        data: { active: false },
+      });
+
+      const [assignedQuoteRequests, createdQuoteRequests, diaryEntries] =
+        await Promise.all([
+          tx.quoteRequest.findMany({
+            where: { assignedAgentId: agentId },
+            select: { id: true, status: true },
+          }),
+          tx.quoteRequest.findMany({
+            where: { createdByAgentId: agentId },
+            select: { id: true, status: true },
+          }),
+          tx.diaryEntry.findMany({
+            where: { createdByAgentId: agentId },
+            select: { id: true },
+          }),
+        ]);
+
+      await tx.quoteRequest.updateMany({
+        where: { assignedAgentId: agentId },
+        data: { assignedAgentId: transferAgentId },
+      });
+
+      await tx.quoteRequest.updateMany({
+        where: { createdByAgentId: agentId },
+        data: { createdByAgentId: transferAgentId },
+      });
+
+      await tx.diaryEntry.updateMany({
         where: { createdByAgentId: agentId },
         data: { createdByAgentId: transferAgentId },
       });
@@ -112,12 +197,60 @@ export async function PUT(
         where: { id: agentId },
         data: { status: "inactive" },
       });
+
+      const taskStatusBreakdown = allTaskStatuses.reduce(
+        (acc, task) => {
+          acc[task.status] = (acc[task.status] || 0) + 1;
+          return acc;
+        },
+        {} as Record<string, number>,
+      );
+
+      const quoteStatusBreakdown = assignedQuoteRequests.reduce(
+        (acc, quote) => {
+          acc[quote.status] = (acc[quote.status] || 0) + 1;
+          return acc;
+        },
+        {} as Record<string, number>,
+      );
+
+      const completedTaskCount = completedTasks.filter(
+        (task) => task.completed || task.status === "Completed",
+      ).length;
+
+      const summary = {
+        sourceAgentId: agentId,
+        sourceAgentStatus: "inactive",
+        transferredToAgentId: transferAgentId,
+        transferredAt: new Date().toISOString(),
+        assignedLeadsTransferredCount: assignedLeads.length,
+        createdLeadsTransferredCount: createdLeads.length,
+        tasksTransferredCount: tasksToTransfer.length,
+        completedOrAbandonedTasksArchivedCount: completedTasks.length,
+        completedTaskCount,
+        taskStatusBreakdown,
+        assignedQuoteRequestsTransferredCount: assignedQuoteRequests.length,
+        createdQuoteRequestsTransferredCount: createdQuoteRequests.length,
+        quoteStatusBreakdown,
+        diaryEntriesTransferredCount: diaryEntries.length,
+      };
+
+      await tx.serviceRecord.create({
+        data: {
+          agentId,
+          createdBy: currentAdmin.id,
+          note: `AUTO_TRANSFER_AUDIT ${JSON.stringify(summary)}`,
+        },
+      });
+
+      return summary;
     });
 
     return NextResponse.json({
       success: true,
       message:
-        "Advisor agent deactivated, leads/opportunities ownership transferred, and team reassigned",
+        "Advisor agent deactivated, data transferred, and completion/status snapshot stored",
+      summary: result,
     });
   } catch (error) {
     console.error("Error transferring advisor agent data:", error);

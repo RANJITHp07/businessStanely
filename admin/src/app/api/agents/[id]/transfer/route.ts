@@ -2,6 +2,18 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getCurrentAdmin } from "@/lib/auth";
 
+const buildArchivedAgentEmail = (email: string, agentId: string) => {
+  const normalized = email.toLowerCase();
+  const [localPart, domainPart] = normalized.split("@");
+  const suffix = `inactive-${agentId.slice(-6)}-${Date.now()}`;
+
+  if (localPart && domainPart) {
+    return `${localPart}+${suffix}@${domainPart}`;
+  }
+
+  return `${normalized}.${suffix}`;
+};
+
 export async function PUT(
   req: NextRequest,
   { params }: { params: { id: string } },
@@ -146,7 +158,10 @@ export async function PUT(
       // Soft delete the agent
       await tx.agent.update({
         where: { id: agentId },
-        data: { status: "inactive" },
+        data: {
+          status: "inactive",
+          email: buildArchivedAgentEmail(agent.email, agent.id),
+        },
       });
 
       const taskStatusBreakdown = allTaskStatuses.reduce(

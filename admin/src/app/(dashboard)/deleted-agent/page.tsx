@@ -81,6 +81,7 @@ const jurisdictions = ["All Jurisdictions", "India", "USA", "UAE", "Others"];
 
 import { Agent } from "@/types";
 import { hasExecutionRole } from "@/lib/agentRole";
+import { sanitizeInactiveAgentEmail } from "@/lib/agentEmail";
 
 export default function AgentsTable() {
     const router = useRouter();
@@ -116,9 +117,10 @@ export default function AgentsTable() {
 
     // Filter agents based on search and filters
     const filteredAgents = agents.filter((agent) => {
+        const displayEmail = sanitizeInactiveAgentEmail(agent.email);
         const matchesSearch =
             agent.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            agent.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            displayEmail.toLowerCase().includes(searchTerm.toLowerCase()) ||
             agent.specializations
                 .join(", ")
                 .toLowerCase()
@@ -345,7 +347,7 @@ export default function AgentsTable() {
                                                                     {agent.name.charAt(0).toUpperCase() + agent.name.slice(1)}
                                                                 </div>
                                                                 <div className="text-xs text-muted-foreground truncate">
-                                                                    {agent.email}
+                                                                    {sanitizeInactiveAgentEmail(agent.email)}
                                                                 </div>
                                                             </div>
                                                         </div>
@@ -443,7 +445,7 @@ export default function AgentsTable() {
                                                                     {agent.name.charAt(0).toUpperCase() + agent.name.slice(1)}
                                                                 </div>
                                                                 <div className="text-xs text-muted-foreground truncate">
-                                                                    {agent.email}
+                                                                    {sanitizeInactiveAgentEmail(agent.email)}
                                                                 </div>
                                                             </div>
                                                         </div>

@@ -86,6 +86,7 @@ const jurisdictions = ["All Jurisdictions", "India", "USA", "UAE", "Others"];
 
 import { Agent } from "@/types";
 import { hasAdvisorRole } from "@/lib/agentRole";
+import { sanitizeInactiveAgentEmail } from "@/lib/agentEmail";
 
 const advisorTypesSet = new Set(["Lead Maker", "Client Advisor", "Client Manager"]);
 
@@ -150,11 +151,21 @@ function ClientAdvisorsModal({ leadMaker, open, onOpenChange }: ClientAdvisorsMo
                     mergedById.set(agent.id, agent);
                 });
 
-                setAllAdvisors(
-                    Array.from(mergedById.values()).filter(
+                const normalizedAdvisors: ClientAdvisor[] = Array.from(mergedById.values())
+                    .filter(
                         (a: Agent) => getAdvisorType(a) !== "Lead Maker" && hasAdvisorRole(a.agentRole),
-                    ),
-                );
+                    )
+                    .map((a: Agent) => ({
+                        id: a.id,
+                        name: a.name,
+                        email: a.email,
+                        phoneNumber: a.phoneNumber,
+                        specializations: a.specializations || [],
+                        photo: a.photo || undefined,
+                        status: a.status,
+                    }));
+
+                setAllAdvisors(normalizedAdvisors);
             }
         } catch (err) {
             console.error("Error fetching client advisors:", err);
@@ -218,7 +229,7 @@ function ClientAdvisorsModal({ leadMaker, open, onOpenChange }: ClientAdvisorsMo
     const filteredAdvisors = allAdvisors.filter(
         (a) =>
             a.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            a.email.toLowerCase().includes(searchTerm.toLowerCase())
+            sanitizeInactiveAgentEmail(a.email).toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     const hasChanges =
@@ -308,7 +319,7 @@ function ClientAdvisorsModal({ leadMaker, open, onOpenChange }: ClientAdvisorsMo
                                                         {advisor.name.charAt(0).toUpperCase() + advisor.name.slice(1)}
                                                     </div>
                                                     <div className="text-xs text-muted-foreground truncate">
-                                                        {advisor.email}
+                                                        {sanitizeInactiveAgentEmail(advisor.email)}
                                                     </div>
                                                 </div>
                                                 {advisor.specializations?.length > 0 && (
@@ -374,7 +385,7 @@ function ClientAdvisorsModal({ leadMaker, open, onOpenChange }: ClientAdvisorsMo
                                                                 {advisor.name.charAt(0).toUpperCase() + advisor.name.slice(1)}
                                                             </div>
                                                             <div className="text-xs text-muted-foreground truncate">
-                                                                {advisor.email}
+                                                                {sanitizeInactiveAgentEmail(advisor.email)}
                                                             </div>
                                                         </div>
                                                         {isDeleted && (
@@ -468,9 +479,10 @@ export default function AgentsTable() {
 
     // Filter agents based on search and filters
     const filteredAgents = agents.filter((agent) => {
+        const displayEmail = sanitizeInactiveAgentEmail(agent.email);
         const matchesSearch =
             agent.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            agent.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            displayEmail.toLowerCase().includes(searchTerm.toLowerCase()) ||
             agent.specializations
                 .join(", ")
                 .toLowerCase()
@@ -765,7 +777,7 @@ export default function AgentsTable() {
                                                                         {agent.name.charAt(0).toUpperCase() + agent.name.slice(1)}
                                                                     </div>
                                                                     <div className="text-xs text-muted-foreground truncate">
-                                                                        {agent.email}
+                                                                        {sanitizeInactiveAgentEmail(agent.email)}
                                                                     </div>
                                                                 </div>
                                                             </div>
@@ -888,7 +900,7 @@ export default function AgentsTable() {
                                                                         {agent.name.charAt(0).toUpperCase() + agent.name.slice(1)}
                                                                     </div>
                                                                     <div className="text-xs text-muted-foreground truncate">
-                                                                        {agent.email}
+                                                                        {sanitizeInactiveAgentEmail(agent.email)}
                                                                     </div>
                                                                 </div>
                                                             </div>

@@ -3,6 +3,18 @@ import prisma from "@/lib/prisma";
 import { hasAdvisorRole } from "@/lib/agentRole";
 import { getCurrentAdmin } from "@/lib/auth";
 
+const buildArchivedAgentEmail = (email: string, agentId: string) => {
+  const normalized = email.toLowerCase();
+  const [localPart, domainPart] = normalized.split("@");
+  const suffix = `inactive-${agentId.slice(-6)}-${Date.now()}`;
+
+  if (localPart && domainPart) {
+    return `${localPart}+${suffix}@${domainPart}`;
+  }
+
+  return `${normalized}.${suffix}`;
+};
+
 const getAdvisorType = (agent: {
   agentType?: string | null;
   advisorAgentType?: string | null;
@@ -195,7 +207,10 @@ export async function PUT(
       // Soft delete advisor.
       await tx.agent.update({
         where: { id: agentId },
-        data: { status: "inactive" },
+        data: {
+          status: "inactive",
+          email: buildArchivedAgentEmail(agent.email, agent.id),
+        },
       });
 
       const taskStatusBreakdown = allTaskStatuses.reduce(

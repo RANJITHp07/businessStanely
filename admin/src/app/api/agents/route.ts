@@ -11,6 +11,18 @@ import {
   hasExecutionRole,
 } from "@/lib/agentRole";
 
+const buildArchivedAgentEmail = (email: string, agentId: string) => {
+  const normalized = email.toLowerCase();
+  const [localPart, domainPart] = normalized.split("@");
+  const suffix = `inactive-${agentId.slice(-6)}-${Date.now()}`;
+
+  if (localPart && domainPart) {
+    return `${localPart}+${suffix}@${domainPart}`;
+  }
+
+  return `${normalized}.${suffix}`;
+};
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -53,6 +65,31 @@ export async function POST(req: NextRequest) {
     // Always store emails in lowercase for case-insensitive uniqueness
     if (agentData.email) {
       agentData.email = agentData.email.toLowerCase();
+
+      const existingAgent = await prisma.agent.findFirst({
+        where: {
+          email: { equals: agentData.email, mode: "insensitive" },
+        },
+      });
+
+      if (existingAgent) {
+        if (existingAgent.status !== "inactive") {
+          return NextResponse.json(
+            { error: "An agent with this email already exists." },
+            { status: 409 },
+          );
+        }
+
+        await prisma.agent.update({
+          where: { id: existingAgent.id },
+          data: {
+            email: buildArchivedAgentEmail(
+              existingAgent.email,
+              existingAgent.id,
+            ),
+          },
+        });
+      }
     }
 
     // Remove subordinates from agentData if present

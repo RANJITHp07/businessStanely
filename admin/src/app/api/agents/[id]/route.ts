@@ -8,6 +8,18 @@ import {
   hasExecutionRole,
 } from "@/lib/agentRole";
 
+const buildArchivedAgentEmail = (email: string, agentId: string) => {
+  const normalized = email.toLowerCase();
+  const [localPart, domainPart] = normalized.split("@");
+  const suffix = `inactive-${agentId.slice(-6)}-${Date.now()}`;
+
+  if (localPart && domainPart) {
+    return `${localPart}+${suffix}@${domainPart}`;
+  }
+
+  return `${normalized}.${suffix}`;
+};
+
 export async function GET(
   req: NextRequest,
   { params }: { params: { id: string } },
@@ -79,10 +91,19 @@ export async function PUT(
 
     const { id } = await params;
     if (existingAgent && existingAgent.id !== id) {
-      return NextResponse.json(
-        { error: "Another user with the same email already exists." },
-        { status: 400 },
-      );
+      if (existingAgent.status !== "inactive") {
+        return NextResponse.json(
+          { error: "Another user with the same email already exists." },
+          { status: 400 },
+        );
+      }
+
+      await prisma.agent.update({
+        where: { id: existingAgent.id },
+        data: {
+          email: buildArchivedAgentEmail(existingAgent.email, existingAgent.id),
+        },
+      });
     }
 
     const currentAgent = await prisma.agent.findUnique({

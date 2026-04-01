@@ -315,9 +315,11 @@ export async function PUT(
     // Remove any frontend-only fields
     delete updateData.legislationName;
 
-    if ((body.status = "Completed")) {
-      updateData.lastCompletedDate = new Date();
-    } else {
+    if (body.status === "Completed") {
+      if (task.status !== "Completed") {
+        updateData.lastCompletedDate = new Date();
+      }
+    } else if (body.status !== undefined && task.status === "Completed") {
       updateData.lastCompletedDate = null;
     }
 

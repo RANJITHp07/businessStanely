@@ -113,12 +113,24 @@ export async function PUT(
 
       const assignedLeads = await tx.prospect.findMany({
         where: { assignedAgentId: agentId },
-        select: { id: true },
+        select: { id: true, status: true },
       });
 
       const createdLeads = await tx.prospect.findMany({
         where: { createdByAgentId: agentId },
         select: { id: true },
+      });
+
+      const advisorOpportunities = await tx.opportunity.findMany({
+        where: {
+          prospect: {
+            assignedAgentId: agentId,
+          },
+        },
+        select: {
+          id: true,
+          status: true,
+        },
       });
 
       // Transfer leads assigned to this advisor.
@@ -233,6 +245,22 @@ export async function PUT(
         (task) => task.completed || task.status === "Completed",
       ).length;
 
+      const convertedLeadsCount = assignedLeads.filter(
+        (lead) => (lead.status || "").toLowerCase() === "converted",
+      ).length;
+
+      const opportunitiesClosedWonCount = advisorOpportunities.filter(
+        (opportunity) =>
+          (opportunity.status || "").toLowerCase() === "closed as won",
+      ).length;
+
+      const opportunitiesClosedLossCount = advisorOpportunities.filter(
+        (opportunity) => {
+          const status = (opportunity.status || "").toLowerCase();
+          return status === "closed as loss" || status === "closed as lost";
+        },
+      ).length;
+
       const summary = {
         sourceAgentId: agentId,
         sourceAgentStatus: "inactive",
@@ -240,6 +268,9 @@ export async function PUT(
         transferredAt: new Date().toISOString(),
         assignedLeadsTransferredCount: assignedLeads.length,
         createdLeadsTransferredCount: createdLeads.length,
+        convertedLeadsCount,
+        opportunitiesClosedWonCount,
+        opportunitiesClosedLossCount,
         tasksTransferredCount: tasksToTransfer.length,
         completedOrAbandonedTasksArchivedCount: completedTasks.length,
         completedTaskCount,

@@ -61,8 +61,8 @@ import { Agent, Client, Task } from "@/types";
 import Link from "next/link";
 import { fetchWithAuth } from "@/lib/fetchWithAuth";
 import { hasAdvisorRole, hasExecutionRole } from "@/lib/agentRole";
-import { ProspectTable } from "@/app/(sales)/dashboard/prospects/page";
-import { ProspectsTable } from "@/app/(sales)/dashboard/opportunities/page";
+import { ProspectTable } from "@/app/(sales)/dashboard/prospects/tables/page";
+import { ProspectsTable } from "@/app/(sales)/dashboard/opportunities/tables/page";
 
 
 interface AgentActivity {
@@ -81,6 +81,16 @@ interface ServiceRecord {
     username: string;
     adminType: string;
   };
+}
+
+interface TransferAuditSummary {
+  completedTaskCount?: number;
+  taskStatusBreakdown?: Record<string, number>;
+  assignedLeadsTransferredCount?: number;
+  createdLeadsTransferredCount?: number;
+  convertedLeadsCount?: number;
+  opportunitiesClosedWonCount?: number;
+  opportunitiesClosedLossCount?: number;
 }
 
 interface CurrentUser {
@@ -155,6 +165,10 @@ function statusKey(s?: string) {
   return k || "todo";
 }
 
+function normalizeStatus(value?: string) {
+  return (value || "").toLowerCase().replace(/\s+/g, " ").trim();
+}
+
 function groupActivitiesByDate(activities: AgentActivity[]) {
   return activities.reduce((acc, activity) => {
     // Store the ISO date string instead of localized string
@@ -223,6 +237,24 @@ export default function AgentDetails() {
   const [addingNote, setAddingNote] = useState(false);
   const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  const parseLatestTransferAudit = (
+    records: ServiceRecord[],
+  ): TransferAuditSummary | null => {
+    for (const record of records) {
+      if (!record.note?.startsWith("AUTO_TRANSFER_AUDIT ")) continue;
+
+      const jsonPayload = record.note.replace("AUTO_TRANSFER_AUDIT ", "").trim();
+      try {
+        const parsed = JSON.parse(jsonPayload) as TransferAuditSummary;
+        return parsed;
+      } catch (error) {
+        console.error("Failed to parse transfer audit summary:", error);
+      }
+    }
+
+    return null;
+  };
 
   useEffect(() => {
     // Load current user from localStorage
@@ -634,6 +666,85 @@ export default function AgentDetails() {
   const tabCount = 4 + (showExecutionTabs ? 1 : 0) + (showAdvisorTabs ? 2 : 0);
   const standardAgentTasks = agentTasks.filter((task) => !task.legislationId);
 
+  const transferAuditSummary =
+    agent.status === "inactive" ? parseLatestTransferAudit(serviceRecords) : null;
+
+  const isAdvisorOnly = showAdvisorTabs && !showExecutionTabs;
+  const isDualRole = showAdvisorTabs && showExecutionTabs;
+
+  const statusCounts = ["Completed", "To Do", "In Progress", "Hold"].reduce(
+    (acc, status) => {
+      acc[status] = agentTasks.filter((task) => task.status === status).length;
+      return acc;
+    },
+    {} as Record<string, number>,
+  );
+
+  const taskStatusBreakdown = transferAuditSummary?.taskStatusBreakdown || {};
+  const staticTotalTasks = Object.values(taskStatusBreakdown).reduce(
+    (total, count) => total + Number(count || 0),
+    0,
+  );
+  const staticCompletedTasks = Number(transferAuditSummary?.completedTaskCount || 0);
+
+  const totalTasksForStats =
+    agent.status === "inactive" ? staticTotalTasks : agentTasks.length;
+  const completedForStats =
+    agent.status === "inactive"
+      ? staticCompletedTasks
+      : statusCounts["Completed"] || 0;
+  const completionRateForStats =
+    totalTasksForStats > 0
+      ? Math.round((completedForStats / totalTasksForStats) * 100)
+      : 0;
+
+  const liveTotalLeads = agentLeads.length;
+  const liveConvertedLeads = agentLeads.filter(
+    (lead) => normalizeStatus((lead as unknown as { status?: string }).status) === "converted",
+  ).length;
+  const liveClosedWon = agentOpportunities.filter(
+    (opportunity) =>
+      normalizeStatus((opportunity as unknown as { status?: string }).status) ===
+      "closed as won",
+  ).length;
+  const liveClosedLoss = agentOpportunities.filter(
+    (opportunity) => {
+      const status = normalizeStatus((opportunity as unknown as { status?: string }).status);
+      return status === "closed as loss" || status === "closed as lost";
+    },
+  ).length;
+
+  const staticTotalLeads = Number(
+    transferAuditSummary?.assignedLeadsTransferredCount || 0,
+  );
+  const staticConvertedLeads = Number(
+    transferAuditSummary?.convertedLeadsCount || 0,
+  );
+  const staticClosedWon = Number(
+    transferAuditSummary?.opportunitiesClosedWonCount || 0,
+  );
+  const staticClosedLoss = Number(
+    transferAuditSummary?.opportunitiesClosedLossCount || 0,
+  );
+
+  const totalLeadsForStats =
+    agent.status === "inactive" ? staticTotalLeads : liveTotalLeads;
+  const convertedLeadsForStats =
+    agent.status === "inactive" ? staticConvertedLeads : liveConvertedLeads;
+  const closedWonForStats =
+    agent.status === "inactive" ? staticClosedWon : liveClosedWon;
+  const closedLossForStats =
+    agent.status === "inactive" ? staticClosedLoss : liveClosedLoss;
+  const conversionRateForStats =
+    totalLeadsForStats > 0
+      ? Math.round((convertedLeadsForStats / totalLeadsForStats) * 100)
+      : 0;
+  const advisorSuccessCountForStats = convertedLeadsForStats + closedWonForStats;
+  const advisorSuccessRateForStats =
+    totalLeadsForStats > 0
+      ? Math.round((advisorSuccessCountForStats / totalLeadsForStats) * 100)
+      : 0;
+
   return (
     <div className="container mx-auto p-6 max-w-7xl">
       {/* Header */}
@@ -693,28 +804,15 @@ export default function AgentDetails() {
                 <div className="grid grid-cols-2 gap-4 text-center">
                   <div>
                     <div className="text-2xl font-bold text-blue-600">
-                      {
-                        agentTasks.filter(
-                          (task) =>
-                            task.status === "Completed"
-                        ).length
-                      }
+                      {showAdvisorTabs ? convertedLeadsForStats : completedForStats}
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      Completed
+                      {showAdvisorTabs ? "Leads Converted" : "Completed"}
                     </div>
                   </div>
                   <div>
                     <div className="text-2xl font-bold text-green-600">
-                      {agentTasks.length > 0
-                        ? Math.round(
-                          (agentTasks.filter(
-                            (task) =>
-                              task.status === "Completed"
-                          ).length / agentTasks.length) *
-                          100
-                        )
-                        : 0}
+                      {showAdvisorTabs ? advisorSuccessRateForStats : completionRateForStats}
                       %
                     </div>
                     <div className="text-xs text-muted-foreground">
@@ -860,81 +958,111 @@ export default function AgentDetails() {
             <div className="space-y-6">
               <Card>
                 <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <TrendingUp className="h-5 w-5" />
-                    Performance Stats
+                  <CardTitle className="flex items-center gap-2 justify-between">
+                    <span className="flex items-center gap-2">
+                      <TrendingUp className="h-5 w-5" />
+                      Performance Stats
+                    </span>
+                    {agent.status === "inactive" && (
+                      <Badge variant="outline">Static Snapshot</Badge>
+                    )}
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="space-y-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm font-medium">Total Tasks</span>
-                      <span className="text-lg font-bold">
-                        {agentTasks.length}
-                      </span>
-                    </div>
-                    {/* Dynamically show all status counts */}
-                    {[
-                      "Completed",
-                      "To Do",
-                      "In Progress",
-                      "Hold"
-                    ].map((status) => (
-                      <div className="flex justify-between items-center" key={status}>
-                        <span className="text-sm font-medium">{status}</span>
-                        <span className={
-                          `text-lg font-bold ` +
-                          (status === "Completed"
-                            ? "text-green-600"
-                            : status === "To Do"
-                              ? "text-orange-600"
-                              : status === "In Progress"
-                                ? "text-blue-600"
-                                : status === "Hold"
-                                  ? "text-gray-500"
-                                  : "text-gray-800")
-                        }>
-                          {agentTasks.filter((task) => task.status === status).length}
-                        </span>
+                  {showExecutionTabs && (
+                    <>
+                      {isDualRole && (
+                        <div className="text-sm font-semibold text-muted-foreground">Task Metrics</div>
+                      )}
+                      <div className="space-y-3">
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm font-medium">Total Tasks</span>
+                          <span className="text-lg font-bold">
+                            {totalTasksForStats}
+                          </span>
+                        </div>
+                        {[
+                          "Completed",
+                          "To Do",
+                          "In Progress",
+                          "Hold"
+                        ].map((status) => (
+                          <div className="flex justify-between items-center" key={status}>
+                            <span className="text-sm font-medium">{status}</span>
+                            <span className={
+                              `text-lg font-bold ` +
+                              (status === "Completed"
+                                ? "text-green-600"
+                                : status === "To Do"
+                                  ? "text-orange-600"
+                                  : status === "In Progress"
+                                    ? "text-blue-600"
+                                    : status === "Hold"
+                                      ? "text-gray-500"
+                                      : "text-gray-800")
+                            }>
+                              {agent.status === "inactive"
+                                ? Number(taskStatusBreakdown[status] || 0)
+                                : Number(statusCounts[status] || 0)}
+                            </span>
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm font-medium">
-                        Completion Rate
-                      </span>
-                      <span className="text-sm font-bold">
-                        {agentTasks.length > 0
-                          ? Math.round(
-                            (agentTasks.filter(
-                              (task) =>
-                                task.status === "Completed" ||
-                                task.status === "Done"
-                            ).length /
-                              agentTasks.length) *
-                            100
-                          )
-                          : 0}
-                        %
-                      </span>
-                    </div>
-                    <Progress
-                      value={
-                        agentTasks.length > 0
-                          ? Math.round(
-                            (agentTasks.filter(
-                              (task) =>
-                                task.status === "Completed"
-                            ).length /
-                              agentTasks.length) *
-                            100
-                          )
-                          : 0
-                      }
-                      className="h-2"
-                    />
-                  </div>
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm font-medium">
+                            Completion Rate
+                          </span>
+                          <span className="text-sm font-bold">
+                            {completionRateForStats}
+                            %
+                          </span>
+                        </div>
+                        <Progress
+                          value={completionRateForStats}
+                          className="h-2"
+                        />
+                      </div>
+                    </>
+                  )}
+
+                  {showAdvisorTabs && (
+                    <>
+                      {isDualRole && <div className="border-t my-2" />}
+                      {isDualRole && (
+                        <div className="text-sm font-semibold text-muted-foreground">Lead & Opportunity Metrics</div>
+                      )}
+                      <div className="space-y-3">
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm font-medium">Total Leads</span>
+                          <span className="text-lg font-bold">{totalLeadsForStats}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm font-medium">Leads Converted to Opportunity</span>
+                          <span className="text-lg font-bold text-blue-600">{convertedLeadsForStats}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm font-medium">Opportunities Closed as Won</span>
+                          <span className="text-lg font-bold text-green-600">{closedWonForStats}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm font-medium">Opportunities Closed as Loss</span>
+                          <span className="text-lg font-bold text-red-600">{closedLossForStats}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm font-medium">Success Count (Converted + Won)</span>
+                          <span className="text-lg font-bold text-emerald-600">{advisorSuccessCountForStats}</span>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-center">
+                          <span className="text-sm font-medium">Success Rate</span>
+                          <span className="text-sm font-bold">{advisorSuccessRateForStats}%</span>
+                        </div>
+                        <Progress value={advisorSuccessRateForStats} className="h-2" />
+                      </div>
+                    </>
+                  )}
                 </CardContent>
               </Card>
             </div>

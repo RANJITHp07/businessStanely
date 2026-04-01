@@ -28,17 +28,54 @@ export async function GET(req: NextRequest) {
             client: true,
           },
         },
-        tasks: true,
+        tasks: {
+          select: {
+            id: true,
+            active: true,
+            completed: true,
+            status: true,
+            dueDate: true,
+            lastCompletedDate: true,
+          },
+        },
       },
       orderBy: { createdAt: "desc" },
     });
 
-    return NextResponse.json(legislations);
+    const legislationsWithLastCompletedDate = legislations
+      .map((legislation) => {
+        const completedDates = (legislation.tasks || [])
+          .map((task) => task.lastCompletedDate)
+          .filter((date): date is Date => Boolean(date));
+
+        const lastCompletedDate =
+          completedDates.length > 0
+            ? new Date(
+                Math.max(...completedDates.map((date) => date.getTime())),
+              )
+            : null;
+
+        return {
+          ...legislation,
+          lastCompletedDate,
+        };
+      })
+      .sort((a, b) => {
+        const aTime = a.lastCompletedDate
+          ? new Date(a.lastCompletedDate).getTime()
+          : 0;
+        const bTime = b.lastCompletedDate
+          ? new Date(b.lastCompletedDate).getTime()
+          : 0;
+        return bTime - aTime;
+      });
+
+    return NextResponse.json(legislationsWithLastCompletedDate);
   } catch (error) {
     console.error("Error fetching legislations:", error);
     return NextResponse.json(
       { error: "Internal Server Error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

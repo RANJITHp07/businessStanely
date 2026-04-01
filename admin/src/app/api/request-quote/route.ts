@@ -218,7 +218,6 @@ export async function PATCH(req: NextRequest) {
       description?: string;
       status?: string;
       assignedAgent?: { connect: { id: string } };
-      acceptedByAgent?: { disconnect: boolean };
       acceptedAt?: Date | null;
     } = {};
 
@@ -238,10 +237,6 @@ export async function PATCH(req: NextRequest) {
 
     if (status) {
       updateData.status = status;
-      if (status !== "Accepted") {
-        updateData.acceptedByAgent = { disconnect: true };
-        updateData.acceptedAt = null;
-      }
     }
 
     if (assignedAgentId) {

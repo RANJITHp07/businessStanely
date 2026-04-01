@@ -26,7 +26,7 @@ import { Button } from "@/components/ui/button";
 export default function LegislationDetail({ params }: { params: Promise<{ id: string }> | { id: string } }) {
   const resolvedParams = params instanceof Promise ? use(params) : params;
 
-  const [legislation, setLegislation] = useState<any | null>(null);
+  const [legislation, setLegislation] = useState<Legislation | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
@@ -56,6 +56,40 @@ export default function LegislationDetail({ params }: { params: Promise<{ id: st
 
     fetchData();
   }, [resolvedParams.id]);
+
+  const formatDate = (dateString?: string | null) => {
+    if (!dateString) return "N/A";
+    return new Date(dateString).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  };
+
+  const sortedTasks = [...tasks].sort((a, b) => {
+    const aCompleted = a.lastCompletedDate
+      ? new Date(a.lastCompletedDate).getTime()
+      : 0;
+    const bCompleted = b.lastCompletedDate
+      ? new Date(b.lastCompletedDate).getTime()
+      : 0;
+
+    if (bCompleted !== aCompleted) {
+      return bCompleted - aCompleted;
+    }
+
+    const aCreated = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+    const bCreated = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+    return bCreated - aCreated;
+  });
+
+  const computedLastCompletedDate = legislation?.lastCompletedDate
+    ? legislation.lastCompletedDate
+    : sortedTasks.find((task) => task.lastCompletedDate)?.lastCompletedDate || null;
+
+  const assignedAgentId = legislation?.assignedAgent?.id || "";
+  const clientId =
+    ((legislation?.retainership?.client as { id?: string } | undefined)?.id) || "";
 
   if (loading) {
     return (
@@ -106,6 +140,10 @@ export default function LegislationDetail({ params }: { params: Promise<{ id: st
                     <FileText className="h-4 w-4 text-muted-foreground" />
                     <span>Assigned Agent: {legislation.assignedAgent?.name || "Unknown"}</span>
                   </div>
+                  <div className="flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-muted-foreground" />
+                    <span>Last Completed Date: {formatDate(computedLastCompletedDate)}</span>
+                  </div>
                   {legislation.client && (
                     <>
                       <div className="flex items-center gap-2">
@@ -148,7 +186,16 @@ export default function LegislationDetail({ params }: { params: Promise<{ id: st
               <FileText className="h-5 w-5" />
               Legislation Tasks
             </CardTitle>
-            <Button onClick={() => router.push(`/task/create?legislationId=${resolvedParams.id}&assignedAgent=${legislation.assignedAgent.id}&client=${legislation.retainership.client?.id}`)}>Add Task</Button>
+            <Button
+              onClick={() =>
+                router.push(
+                  `/task/create?legislationId=${resolvedParams.id}&assignedAgent=${assignedAgentId}&client=${clientId}`,
+                )
+              }
+              disabled={!assignedAgentId}
+            >
+              Add Task
+            </Button>
           </div>
         </CardHeader>
         <CardContent>
@@ -163,14 +210,14 @@ export default function LegislationDetail({ params }: { params: Promise<{ id: st
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {tasks.length === 0 ? (
+                {sortedTasks.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
                       No tasks found for this legislation.
                     </TableCell>
                   </TableRow>
                 ) : (
-                  tasks.map((task) => (
+                  sortedTasks.map((task) => (
                     <TableRow
                       key={task.id}
                       onClick={() => router.push(`/task/${task.id}`)}

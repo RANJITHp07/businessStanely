@@ -306,6 +306,7 @@ export default function AgentsTable() {
                                     <TableRow isHeader>
                                         <TableHead className="text-xs sm:text-sm">Agent</TableHead>
                                         <TableHead className="text-xs sm:text-sm">Type</TableHead>
+                                        <TableHead className="text-xs sm:text-sm">Performance Stat</TableHead>
                                         <TableHead className="text-xs sm:text-sm">Specializations</TableHead>
                                         <TableHead className="text-xs sm:text-sm">Jurisdiction</TableHead>
                                         <TableHead className="text-xs sm:text-sm text-right">Actions</TableHead>
@@ -316,7 +317,7 @@ export default function AgentsTable() {
                                     {currentAgents.length === 0 ? (
                                         <TableRow>
                                             <TableCell
-                                                colSpan={5}
+                                                colSpan={6}
                                                 className="text-center py-8 text-sm text-muted-foreground"
                                             >
                                                 No agents found matching your criteria.
@@ -353,6 +354,11 @@ export default function AgentsTable() {
                                                         </div>
                                                     </TableCell>
                                                     <TableCell>{getAgentTypeBadge(agent.agentType)}</TableCell>
+                                                    <TableCell>
+                                                        <Badge variant="outline" className="text-xs">
+                                                            Static
+                                                        </Badge>
+                                                    </TableCell>
                                                     <TableCell>
                                                         <div className="flex flex-wrap gap-1">
                                                             {agent.specializations.slice(0, 2).map((spec) => (

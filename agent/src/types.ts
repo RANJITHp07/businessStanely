@@ -145,6 +145,7 @@ export interface Task {
   }; // Added legislation object to include detailed information
   triggerDate?: string; // Added triggerDate property to Task interface
   recurringType?: string;
+  lastCompletedDate?: string;
 }
 
 export interface Comment {
@@ -227,6 +228,9 @@ export interface Legislation {
   id: string;
   title: string;
   description?: string;
+  createdAt?: string;
+  lastCompletedDate?: string | null;
+  tasks?: Task[];
   assignedAgent?: {
     id: string;
     name: string;

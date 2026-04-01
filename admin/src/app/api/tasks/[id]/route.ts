@@ -145,8 +145,13 @@ export async function PUT(
       data.holdDate = new Date();
     }
     if (body.status === "Completed") {
-      data.lastCompletedDate = new Date();
-    } else if (body.status !== undefined) {
+      if (currentTask.status !== "Completed") {
+        data.lastCompletedDate = new Date();
+      }
+    } else if (
+      body.status !== undefined &&
+      currentTask.status === "Completed"
+    ) {
       data.lastCompletedDate = null;
     }
     const updatedTask = await prisma.task.update({

@@ -140,6 +140,9 @@ export function ProspectsTable({ label, prospects, statusFilter, assignedId }: {
                                                 Assigned To
                                             </th>
                                             <th className="text-left py-3 px-4 text-xs font-semibold  uppercase tracking-wide">
+                                                Created By
+                                            </th>
+                                            <th className="text-left py-3 px-4 text-xs font-semibold  uppercase tracking-wide">
                                                 Follow Up
                                             </th>
                                             <th className="text-left py-3 px-4 text-xs font-semibold  uppercase tracking-wide">
@@ -172,6 +175,9 @@ export function ProspectsTable({ label, prospects, statusFilter, assignedId }: {
                                                         </div>
                                                         <span className="text-sm text-slate-700">{prospect?.prospect?.assignedAgent?.name}</span>
                                                     </div>
+                                                </td>
+                                                <td className="py-3 px-4">
+                                                    <p className="text-sm text-slate-700">{prospect?.prospect?.createdByAgent?.name || "Unknown"}</p>
                                                 </td>
                                                 <td className="py-3 px-4">
                                                     <p className="text-sm ">{formatDate(prospect.nextFollowUp)}</p>
@@ -217,6 +223,10 @@ export function ProspectsTable({ label, prospects, statusFilter, assignedId }: {
                                             <div>
                                                 <p className="text-slate-500 mb-1">Advisor</p>
                                                 <p className="text-slate-700 font-medium">{prospect?.assignedAgent?.name}</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-slate-500 mb-1">Created By</p>
+                                                <p className="text-slate-700 font-medium">{prospect?.prospect?.createdByAgent?.name || "Unknown"}</p>
                                             </div>
                                             <div>
                                                 <p className="text-slate-500 mb-1">Follow Up</p>
@@ -331,6 +341,9 @@ function SegregationTable({
                                                 Assigned To
                                             </th>
                                             <th className="text-left py-3 px-4 text-xs font-semibold uppercase tracking-wide">
+                                                Created By
+                                            </th>
+                                            <th className="text-left py-3 px-4 text-xs font-semibold uppercase tracking-wide">
                                                 {dateLabel}
                                             </th>
                                             <th className="text-left py-3 px-4 text-xs font-semibold uppercase tracking-wide">
@@ -373,6 +386,9 @@ function SegregationTable({
                                                             {lead?.prospect?.assignedAgent?.name}
                                                         </span>
                                                     </div>
+                                                </td>
+                                                <td className="py-3 px-4">
+                                                    <p className="text-sm text-slate-700">{lead?.prospect?.createdByAgent?.name || "Unknown"}</p>
                                                 </td>
                                                 <td className="py-3 px-4">
                                                     <p className="text-sm ">
@@ -436,6 +452,10 @@ function SegregationTable({
                                             <div>
                                                 <p className="text-slate-500 mb-1">Advisor</p>
                                                 <p className="text-slate-700 font-medium">{lead.advisor}</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-slate-500 mb-1">Created By</p>
+                                                <p className="text-slate-700 font-medium">{lead?.prospect?.createdByAgent?.name || "Unknown"}</p>
                                             </div>
                                             <div>
                                                 <p className="text-slate-500 mb-1">{dateLabel}</p>

@@ -190,8 +190,19 @@ export default function RetainershipTable() {
         setItemsPerPage(Number.parseInt(value))
         setCurrentPage(1)
     }
-    // Apply sorting to filtered retainerships
-    const sortedRetainerships = filteredRetainerships
+    // Sort by latest completed date first, then by creation date.
+    const sortedRetainerships = [...filteredRetainerships].sort((a, b) => {
+        const aCompleted = a.lastCompletedDate ? new Date(a.lastCompletedDate).getTime() : 0;
+        const bCompleted = b.lastCompletedDate ? new Date(b.lastCompletedDate).getTime() : 0;
+
+        if (bCompleted !== aCompleted) {
+            return bCompleted - aCompleted;
+        }
+
+        const aCreated = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const bCreated = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return bCreated - aCreated;
+    })
 
     const resetFilters = () => {
         setSearchTerm("")
@@ -383,6 +394,7 @@ export default function RetainershipTable() {
                                                 <TableRow>
                                                     <TableHead>Client Name</TableHead>
                                                     <TableHead> Legislation Name</TableHead>
+                                                    <TableHead>Last Completed Date</TableHead>
                                                     <TableHead>Tasks</TableHead>
                                                     <TableHead>Assigned Agent</TableHead>
                                                     <TableHead className="text-right">Actions</TableHead>
@@ -391,7 +403,7 @@ export default function RetainershipTable() {
                                             <TableBody>
                                                 {sortedRetainerships?.length === 0 ? (
                                                     <TableRow>
-                                                        <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                                                        <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                                                             No legislation found for this retainership.
                                                         </TableCell>
                                                     </TableRow>
@@ -441,6 +453,9 @@ export default function RetainershipTable() {
                                                                     ? legislation.title.slice(0, 42) + '...'
                                                                     : legislation.title
                                                                 }
+                                                            </TableCell>
+                                                            <TableCell>
+                                                                {formatDate(legislation.lastCompletedDate)}
                                                             </TableCell>
                                                             <TableCell className="flex flex-col gap-2">
                                                                 <Badge>Total Task: {legislation.tasks?.length || 0}</Badge>

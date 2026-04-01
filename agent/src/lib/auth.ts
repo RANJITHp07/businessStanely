@@ -66,25 +66,6 @@ export async function getCurrentAgent(req: NextRequest) {
       return null;
     }
 
-    const lastLogin = await prisma.loginHistory.findFirst({
-      where: {
-        agentId: agent.id,
-        logoutAt: null,
-      },
-      orderBy: {
-        loginAt: "desc",
-      },
-    });
-
-    if (lastLogin) {
-      await prisma.loginHistory.update({
-        where: { id: lastLogin.id },
-        data: {
-          logoutAt: new Date(),
-        },
-      });
-    }
-
     // Remove currentSessionToken from returned object (ignore unused var warning)
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { currentSessionToken, ...agentData } = agent;

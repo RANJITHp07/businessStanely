@@ -500,6 +500,7 @@ export default function TaskForm({ id }: TaskFormProps) {
         setFormData((prev) => ({ ...prev, clientId: newClient.id }));
         setIsModalOpen(false);
         toast.success("Client created successfully!");
+        router.back()
       } else {
         const errorData = await response.json();
         toast.error(errorData.error || "Failed to create client");

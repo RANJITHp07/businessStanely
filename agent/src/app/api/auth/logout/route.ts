@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
       const lastLogin = await prisma.loginHistory.findFirst({
         where: {
           agentId,
-          // logoutAt: null,
+          logoutAt: null,
         },
         orderBy: {
           loginAt: "desc",

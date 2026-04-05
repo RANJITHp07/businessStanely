@@ -26,6 +26,15 @@ export async function GET(req: NextRequest) {
     const categoryId = searchParams.get("categoryId");
     const trigger = searchParams.get("trigger");
     const retainershipTasks = searchParams.get("retainershipTasks");
+    const clientUpdateFilter = searchParams.get("clientUpdate");
+    const statusCheckDurationParam = searchParams.get("statusCheckDuration");
+
+    const statusCheckDurations = statusCheckDurationParam
+      ? statusCheckDurationParam
+          .split(",")
+          .map((s) => s.trim())
+          .filter((s) => ["24hr", "48hr", "1w"].includes(s))
+      : undefined;
 
     let where: Prisma.TaskWhereInput = {};
 
@@ -103,6 +112,98 @@ export async function GET(req: NextRequest) {
 
     if (priority) {
       where.priority = priority;
+    }
+
+    const appendAndFilter = (filter: Prisma.TaskWhereInput) => {
+      const currentAnd = where.AND;
+      if (!currentAnd) {
+        where.AND = [filter];
+        return;
+      }
+
+      if (Array.isArray(currentAnd)) {
+        where.AND = [...currentAnd, filter];
+        return;
+      }
+
+      where.AND = [currentAnd, filter];
+    };
+
+    if (clientUpdateFilter === "updated" || clientUpdateFilter === "not-updated") {
+      const durationsToCheck =
+        statusCheckDurations && statusCheckDurations.length > 0
+          ? statusCheckDurations
+          : ["24hr", "48hr", "1w"];
+
+      const now = Date.now();
+      const durationCutoffs = {
+        "24hr": new Date(now - 24 * 60 * 60 * 1000),
+        "48hr": new Date(now - 48 * 60 * 60 * 1000),
+        "1w": new Date(now - 7 * 24 * 60 * 60 * 1000),
+      } as const;
+
+      const durationFilters = durationsToCheck.map((duration) => {
+        const cutoff = durationCutoffs[duration as keyof typeof durationCutoffs];
+        return clientUpdateFilter === "updated"
+          ? {
+              statusCheckDuration: duration,
+              OR: [
+                {
+                  comments: {
+                    some: {
+                      createdAt: {
+                        gte: cutoff,
+                      },
+                    },
+                  },
+                },
+                {
+                  AND: [
+                    {
+                      comments: {
+                        none: {},
+                      },
+                    },
+                    {
+                      createdAt: {
+                        gte: cutoff,
+                      },
+                    },
+                  ],
+                },
+              ],
+            }
+          : {
+              statusCheckDuration: duration,
+              AND: [
+                {
+                  comments: {
+                    none: {
+                      createdAt: {
+                        gte: cutoff,
+                      },
+                    },
+                  },
+                },
+                {
+                  OR: [
+                    {
+                      comments: {
+                        some: {},
+                      },
+                    },
+                    {
+                      createdAt: {
+                        lt: cutoff,
+                      },
+                    },
+                  ],
+                },
+              ],
+            };
+      });
+
+      appendAndFilter({ OR: durationFilters });
     }
 
     const tasks = await prisma.task.findMany({

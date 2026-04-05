@@ -955,7 +955,7 @@ export default function TaskDetails() {
               <div className="flex flex-col md:flex-row md:items-center gap-4 md:gap-6 p-0 md:p-4 bg-muted/30 rounded-lg">
                 <div className="flex items-center space-x-2">
                   <Label htmlFor="follow-up-duration" className="text-sm font-medium cursor-pointer">
-                    Follow-up Required
+                    Followup&Status check
                   </Label>
                   <Select
                     value={task.followUpDuration || "None"}
@@ -973,7 +973,7 @@ export default function TaskDetails() {
                 </div>
                 <div className="flex items-center space-x-2">
                   <Label htmlFor="status-check-duration" className="text-sm font-medium cursor-pointer">
-                    Status Check
+                    Client update
                   </Label>
                   <Select
                     value={task.statusCheckDuration || "None"}

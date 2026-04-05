@@ -104,6 +104,8 @@ export async function GET(req: NextRequest) {
     const status = searchParams.get("status");
     const trigger = searchParams.get("trigger");
     const retainershipTasks = searchParams.get("retainershipTasks");
+    const clientUpdateFilter = searchParams.get("clientUpdate");
+    const statusCheckDurationParam = searchParams.get("statusCheckDuration");
     // Parse statuses as a comma-separated list
     const statusesParam = searchParams.get("statuses");
     const statusesArray = statusesParam
@@ -111,6 +113,12 @@ export async function GET(req: NextRequest) {
           .split(",")
           .map((s) => s.trim())
           .filter(Boolean)
+      : undefined;
+    const statusCheckDurations = statusCheckDurationParam
+      ? statusCheckDurationParam
+          .split(",")
+          .map((s) => s.trim())
+          .filter((s) => ["24hr", "48hr", "1w"].includes(s))
       : undefined;
 
     // Build the where clause: if filtering by categoryId, allow any status; otherwise, only approved
@@ -148,6 +156,99 @@ export async function GET(req: NextRequest) {
     } else if (status) {
       whereClause.status = status;
     }
+
+    const appendAndFilter = (filter: Prisma.TaskWhereInput) => {
+      const currentAnd = whereClause.AND;
+      if (!currentAnd) {
+        whereClause.AND = [filter];
+        return;
+      }
+
+      if (Array.isArray(currentAnd)) {
+        whereClause.AND = [...currentAnd, filter];
+        return;
+      }
+
+      whereClause.AND = [currentAnd, filter];
+    };
+
+    if (clientUpdateFilter === "updated" || clientUpdateFilter === "not-updated") {
+      const durationsToCheck =
+        statusCheckDurations && statusCheckDurations.length > 0
+          ? statusCheckDurations
+          : ["24hr", "48hr", "1w"];
+
+      const now = Date.now();
+      const durationCutoffs = {
+        "24hr": new Date(now - 24 * 60 * 60 * 1000),
+        "48hr": new Date(now - 48 * 60 * 60 * 1000),
+        "1w": new Date(now - 7 * 24 * 60 * 60 * 1000),
+      } as const;
+
+      const durationFilters = durationsToCheck.map((duration) => {
+        const cutoff = durationCutoffs[duration as keyof typeof durationCutoffs];
+        return clientUpdateFilter === "updated"
+          ? {
+              statusCheckDuration: duration,
+              OR: [
+                {
+                  comments: {
+                    some: {
+                      createdAt: {
+                        gte: cutoff,
+                      },
+                    },
+                  },
+                },
+                {
+                  AND: [
+                    {
+                      comments: {
+                        none: {},
+                      },
+                    },
+                    {
+                      createdAt: {
+                        gte: cutoff,
+                      },
+                    },
+                  ],
+                },
+              ],
+            }
+          : {
+              statusCheckDuration: duration,
+              AND: [
+                {
+                  comments: {
+                    none: {
+                      createdAt: {
+                        gte: cutoff,
+                      },
+                    },
+                  },
+                },
+                {
+                  OR: [
+                    {
+                      comments: {
+                        some: {},
+                      },
+                    },
+                    {
+                      createdAt: {
+                        lt: cutoff,
+                      },
+                    },
+                  ],
+                },
+              ],
+            };
+      });
+
+      appendAndFilter({ OR: durationFilters });
+    }
+
     const tasks = await prisma.task.findMany({
       where: { ...whereClause },
       include: {

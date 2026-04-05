@@ -88,6 +88,7 @@ export default function TasksTable() {
   const [selectedFollowUpDurations, setSelectedFollowUpDurations] = useState<string[]>([]);
   // Multi-select status check durations
   const [selectedStatusCheckDurations, setSelectedStatusCheckDurations] = useState<string[]>([]);
+  const [clientUpdateFilter, setClientUpdateFilter] = useState<"all" | "updated" | "not-updated">("all");
   const [sortBy, setSortBy] = useState("a-z");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
@@ -133,11 +134,17 @@ export default function TasksTable() {
         const assignedToId = searchParams?.get('assignedToId');
         const status = searchParams?.get('status');
         const retainershipTasks = searchParams?.get("retainershipTasks")
+        const statuses = searchParams?.get("statuses");
+        const statusCheckDuration = searchParams?.get("statusCheckDuration");
+        const clientUpdate = searchParams?.get("clientUpdate");
         let url = '/api/tasks';
         const params = [];
         if (assignedToId) params.push(`assignedToId=${assignedToId}`);
         if (retainershipTasks) params.push(`retainershipTasks=${retainershipTasks}`);
         if (status) params.push(`status=${encodeURIComponent(status)}`);
+        if (statuses) params.push(`statuses=${encodeURIComponent(statuses)}`);
+        if (statusCheckDuration) params.push(`statusCheckDuration=${encodeURIComponent(statusCheckDuration)}`);
+        if (clientUpdate) params.push(`clientUpdate=${encodeURIComponent(clientUpdate)}`);
         if (params.length) url += `?${params.join('&')}`;
         const response = await fetchWithAuth(url);
         if (response.ok) {
@@ -217,7 +224,14 @@ export default function TasksTable() {
   };
 
   // Update URL when filters change
-  const updateUrlFilters = (priorities: string[], statuses: string[], search: string, followUpDurations: string[], statusCheckDuration: string[]) => {
+  const updateUrlFilters = (
+    priorities: string[],
+    statuses: string[],
+    search: string,
+    followUpDurations: string[],
+    statusCheckDuration: string[],
+    clientUpdate: "all" | "updated" | "not-updated" = clientUpdateFilter,
+  ) => {
     const params = new URLSearchParams();
     const assignedToId = searchParams.get("assignedToId");
     const retainershipTasks = searchParams?.get("retainershipTasks")
@@ -228,6 +242,7 @@ export default function TasksTable() {
     if (statuses.length > 0) params.set("statuses", statuses.join(","));
     if (followUpDurations.length > 0) params.set("followUpDurations", followUpDurations.join(","));
     if (statusCheckDuration.length > 0) params.set("statusCheckDuration", statusCheckDuration.join(","));
+    if (clientUpdate !== "all") params.set("clientUpdate", clientUpdate);
     const newUrl = params.toString() ? `?${params.toString()}` : window.location.pathname;
     window.history.replaceState({}, "", newUrl);
   };
@@ -238,14 +253,22 @@ export default function TasksTable() {
       const urlSearch = searchParams?.get("search");
       const urlPriorities = searchParams?.get("priorities");
       const urlStatuses = searchParams?.get("statuses");
+      const urlFollowUpDurations = searchParams?.get("followUpDurations");
+      const urlStatusCheckDurations = searchParams?.get("statusCheckDuration");
+      const urlClientUpdate = searchParams?.get("clientUpdate");
 
       if (urlSearch) setSearchTerm(urlSearch);
       if (urlPriorities) setSelectedPriorities(urlPriorities.split(","));
       if (urlStatuses) setSelectedStatuses(urlStatuses.split(","));
+      if (urlFollowUpDurations) setSelectedFollowUpDurations(urlFollowUpDurations.split(","));
+      if (urlStatusCheckDurations) setSelectedStatusCheckDurations(urlStatusCheckDurations.split(","));
+      if (urlClientUpdate === "updated" || urlClientUpdate === "not-updated") {
+        setClientUpdateFilter(urlClientUpdate);
+      }
     } catch (e) {
       // ignore
     }
-  }, []);
+  }, [searchParams]);
 
   const getPriorityBadge = (priority: string) => {
     const colors = {
@@ -377,7 +400,7 @@ export default function TasksTable() {
                   </div>
 
                   {/* Filter Controls */}
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                     <div className="space-y-2">
                       <Label>Priority</Label>
                       <DropdownMenu>
@@ -574,7 +597,7 @@ export default function TasksTable() {
                         </div>
                       )}
                     </div>
-
+                    {/* 
                     <div className="space-y-2">
                       <Label>Status Check Duration</Label>
                       <DropdownMenu>
@@ -637,6 +660,33 @@ export default function TasksTable() {
                           ))}
                         </div>
                       )}
+                    </div> */}
+
+                    <div className="space-y-2">
+                      <Label>Client Update</Label>
+                      <Select
+                        value={clientUpdateFilter}
+                        onValueChange={(value: "all" | "updated" | "not-updated") => {
+                          setClientUpdateFilter(value);
+                          updateUrlFilters(
+                            selectedPriorities,
+                            selectedStatuses,
+                            searchTerm,
+                            selectedFollowUpDurations,
+                            selectedStatusCheckDurations,
+                            value,
+                          );
+                        }}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue placeholder="All" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All</SelectItem>
+                          <SelectItem value="updated">Updated Client</SelectItem>
+                          <SelectItem value="not-updated">Not Updated Client</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
 
@@ -649,7 +699,8 @@ export default function TasksTable() {
                         setSelectedStatuses([]);
                         setSelectedFollowUpDurations([]);
                         setSelectedStatusCheckDurations([]);
-                        updateUrlFilters([], [], "", [], []);
+                        setClientUpdateFilter("all");
+                        updateUrlFilters([], [], "", [], [], "all");
                       }}
                       className="cursor-pointer hover:text-white text-white bg-[#f42b03] hover:bg-[#f42b03] rounded-lg px-4 py-2 shadow-none hover:shadow-lg transition-shadow duration-300"
                       variant="outline"

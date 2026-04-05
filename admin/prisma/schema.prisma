@@ -293,6 +293,9 @@ model Task {
   // Add this to the Task model
   retainershipId String? @db.ObjectId
   retainership   Retainership? @relation("RetainershipTasks", fields: [retainershipId], references: [id])
+
+  @@index([assignedToId, legislationId, active, statusCheckDuration, status])
+  @@index([categoryId, assignedToId, status, active])
 }
 
 model Legislation {
@@ -377,6 +380,8 @@ model Comment {
   authorType String @default("USER") // "USER" or "AGENT"
   user       User?  @relation("UserComments", fields: [authorId], references: [id])
   agent      Agent? @relation("CommentAuthor", fields: [authorId], references: [id])
+
+  @@index([taskId, createdAt])
 }
 
 model TaskCategory {

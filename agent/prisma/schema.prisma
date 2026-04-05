@@ -304,6 +304,9 @@ model Task {
 
   // Per-status progress tracking
   statusProgressMap Json?
+
+  @@index([assignedToId, legislationId, active, statusCheckDuration, status])
+  @@index([categoryId, assignedToId, status, active])
 }
 
 
@@ -389,6 +392,8 @@ model Comment {
   authorType String @default("USER") // "USER" or "AGENT"
   user       User?  @relation("UserComments", fields: [authorId], references: [id])
   agent      Agent? @relation("CommentAuthor", fields: [authorId], references: [id])
+
+  @@index([taskId, createdAt])
 }
 
 model TaskCategory {

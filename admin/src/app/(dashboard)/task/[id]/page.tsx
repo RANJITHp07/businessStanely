@@ -471,6 +471,20 @@ export default function TaskDetails() {
         setStartTime("");
         setEndTime("");
 
+        if (taskData.statusCheckDuration && taskData.statusCheckDuration !== "None") {
+          await fetch(`/api/tasks/${id}`, {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ statusCheckDuration: "None" }),
+          });
+
+          setTaskData((prev) =>
+            prev ? { ...prev, statusCheckDuration: "None" } : prev,
+          );
+        }
+
         // Update task status from "To Do" to "In Progress" if needed
         if (taskData.status === "To Do") {
           setTaskData((prev) => prev ? { ...prev, status: "In Progress" } : null);
@@ -885,7 +899,7 @@ export default function TaskDetails() {
               <div className="flex gap-2">
                 <div className="space-y-2 w-1/4">
                   <Label htmlFor="follow-up-duration" className="text-sm font-medium cursor-pointer">
-                    Follow-up Required
+                    Followup&Status check
                   </Label>
                   <Select
                     value={taskData.followUpDuration || "None"}
@@ -903,7 +917,7 @@ export default function TaskDetails() {
                 </div>
                 <div className="space-y-2 w-1/4">
                   <Label htmlFor="status-check-duration" className="text-sm font-medium cursor-pointer">
-                    Status Check
+                    Client update
                   </Label>
                   <Select
                     value={taskData.statusCheckDuration || "None"}
@@ -1410,7 +1424,7 @@ export default function TaskDetails() {
                           ) : (
                             <Clock className="h-3 w-3 text-gray-400" />
                           )}
-                          Follow-up Required
+                          Followup&Status check
                         </span>
                         <span
                           className={`font-medium ${taskData.followUpRequired
@@ -1421,7 +1435,7 @@ export default function TaskDetails() {
                           {taskData.followUpRequired ? `+10%` : `0%`}
                         </span>
                       </div>
-                      {/* Status Check Completed Progress */}
+                      {/* Client update completed progress */}
                       <div className="flex justify-between items-center text-xs">
                         <span className="flex items-center gap-2">
                           {taskData.completed ? (
@@ -1429,7 +1443,7 @@ export default function TaskDetails() {
                           ) : (
                             <Clock className="h-3 w-3 text-gray-400" />
                           )}
-                          Status Check
+                          Client update
                         </span>
                         <span
                           className={`font-medium ${taskData.completed
@@ -1532,7 +1546,7 @@ export default function TaskDetails() {
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="status-check-duration" className="text-sm font-medium cursor-pointer">
-                      Status Check
+                      Client update
                     </Label>
                     <Select
                       value={taskData.statusCheckDuration || "None"}

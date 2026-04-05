@@ -370,8 +370,8 @@ export default function AgentDetails() {
           : [];
         const completedTriggerTasks = completedResponse.ok
           ? parseTaskResponse(await completedResponse.json()).filter(
-              (task) => !!task.triggerDate,
-            )
+            (task) => !!task.triggerDate,
+          )
           : [];
 
         const mergedTriggerTasks = [

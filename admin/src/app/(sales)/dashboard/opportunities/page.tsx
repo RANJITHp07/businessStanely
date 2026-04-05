@@ -693,7 +693,7 @@ export default function ProspectDashboard() {
                             <div className="h-1.5 bg-rose-300" />
                             <CardHeader className="pb-3">
                                 <div className="flex items-center justify-between">
-                                    <CardTitle className="text-sm font-semibold text-slate-700">Leads Missed Out</CardTitle>
+                                    <CardTitle className="text-sm font-semibold text-slate-700">Opportunities Missed Out</CardTitle>
                                     <div className="h-10 w-10 rounded-xl bg-rose-100 flex items-center justify-center">
                                         <Activity className="h-5 w-5 text-rose-600" />
                                     </div>

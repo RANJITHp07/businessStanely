@@ -114,7 +114,7 @@ export default function ClientForm({ client }: ClientFormProps) {
 
             if (response.ok) {
                 toast.success(`Client ${client ? 'updated' : 'created'} successfully!`)
-                // router.push("/client")
+                router.back()
 
             } else {
                 const errorData = await response.json();

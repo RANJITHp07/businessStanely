@@ -38,8 +38,12 @@ export async function GET(req: NextRequest) {
     else if (trigger === "true") {
       where = {
         assignedToId,
-        active: false,
         legislationId: { not: null },
+        OR: [
+          { active: false },
+          { status: "Completed" },
+          { status: "completed" },
+        ],
 
         // OR: [
         //   { retainershipId: { not: null } },
@@ -60,6 +64,7 @@ export async function GET(req: NextRequest) {
     else if (retainershipTasks === "true") {
       where = {
         assignedToId,
+        active: true,
         legislationId: { not: null },
         // OR: [
         //   { retainershipId: { not: null } },
@@ -92,6 +97,8 @@ export async function GET(req: NextRequest) {
     // OPTIONAL FILTERS
     if (status) {
       where.status = status;
+    } else if (retainershipTasks === "true") {
+      where.status = { notIn: ["Completed", "completed"] };
     }
 
     if (priority) {
@@ -99,10 +106,7 @@ export async function GET(req: NextRequest) {
     }
 
     const tasks = await prisma.task.findMany({
-      where: {
-        ...where,
-        ...(trigger === "true" ? { active: false } : { active: true }),
-      },
+      where: trigger === "true" ? where : { ...where, active: true },
       include: {
         legislation: true,
         client: {

@@ -15,6 +15,7 @@ const ALLOWED_TYPES = [
   "image/webp",
   "application/pdf",
   "text/plain",
+  "audio/mp4",
 ];
 
 const MAX_SIZE = 500 * 1024 * 1024; // 500MB
@@ -26,17 +27,27 @@ export async function POST(request: NextRequest) {
     const fileName = body.fileName?.trim();
     const fileSize = body.fileSize;
     const contentType = body.contentType;
+    const parsedContentType = contentType?.split(";")[0]?.trim()?.toLowerCase();
+    const normalizedContentType =
+      parsedContentType === "mp4" ? "audio/mp4" : parsedContentType;
 
-    if (!fileName || !contentType || typeof fileSize !== "number") {
+    if (!fileName || !normalizedContentType || typeof fileSize !== "number") {
       return NextResponse.json(
         { error: "Invalid upload payload" },
         { status: 400 },
       );
     }
 
-    console.log(contentType);
-    const isAllowedAudio = contentType.startsWith("audio/");
-    if (!ALLOWED_TYPES.includes(contentType) && !isAllowedAudio) {
+    const isAllowedAudio = normalizedContentType.startsWith("audio/");
+    const isAllowedMp4Container =
+      normalizedContentType === "video/mp4" ||
+      normalizedContentType === "application/mp4";
+
+    if (
+      !ALLOWED_TYPES.includes(normalizedContentType) &&
+      !isAllowedAudio &&
+      !isAllowedMp4Container
+    ) {
       return NextResponse.json(
         { error: "File type not allowed" },
         { status: 400 },
@@ -52,7 +63,7 @@ export async function POST(request: NextRequest) {
 
     const safeFileName = fileName.replace(/[^a-zA-Z0-9.-]/g, "_");
     const key = `uploads/${Date.now()}_${safeFileName}`;
-    const uploadId = await createMultipartUpload(key, contentType);
+    const uploadId = await createMultipartUpload(key, normalizedContentType);
     const totalParts = Math.ceil(fileSize / CHUNK_SIZE);
 
     return NextResponse.json({
@@ -62,7 +73,7 @@ export async function POST(request: NextRequest) {
       originalName: fileName,
       filename: safeFileName,
       size: fileSize,
-      type: contentType,
+      type: normalizedContentType,
       chunkSize: CHUNK_SIZE,
       totalParts,
     });

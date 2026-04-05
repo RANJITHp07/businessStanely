@@ -13,8 +13,11 @@ export async function POST(request: NextRequest) {
     const fileName = body.fileName?.trim();
     const fileSize = body.fileSize;
     const contentType = body.contentType;
+    const parsedContentType = contentType?.split(";")[0]?.trim()?.toLowerCase();
+    const normalizedContentType =
+      parsedContentType === "mp4" ? "audio/mp4" : parsedContentType;
 
-    if (!fileName || !contentType || typeof fileSize !== "number") {
+    if (!fileName || !normalizedContentType || typeof fileSize !== "number") {
       return NextResponse.json(
         { error: "Invalid upload payload" },
         { status: 400 },
@@ -28,9 +31,18 @@ export async function POST(request: NextRequest) {
       "image/webp",
       "application/pdf",
       "text/plain",
+      "audio/mp4",
     ];
-    const isAllowedAudio = contentType.startsWith("audio/");
-    if (!allowedTypes.includes(contentType) && !isAllowedAudio) {
+    const isAllowedAudio = normalizedContentType.startsWith("audio/");
+    const isAllowedMp4Container =
+      normalizedContentType === "video/mp4" ||
+      normalizedContentType === "application/mp4";
+
+    if (
+      !allowedTypes.includes(normalizedContentType) &&
+      !isAllowedAudio &&
+      !isAllowedMp4Container
+    ) {
       return NextResponse.json(
         { error: "File type not allowed" },
         { status: 400 },
@@ -47,7 +59,7 @@ export async function POST(request: NextRequest) {
 
     const safeFileName = fileName.replace(/[^a-zA-Z0-9.-]/g, "_");
     const key = `uploads/${Date.now()}_${safeFileName}`;
-    const uploadUrl = await getPresignedUploadUrl(key, contentType);
+    const uploadUrl = await getPresignedUploadUrl(key, normalizedContentType);
 
     return NextResponse.json({
       uploadUrl,
@@ -55,7 +67,7 @@ export async function POST(request: NextRequest) {
       filename: safeFileName,
       originalName: fileName,
       size: fileSize,
-      type: contentType,
+      type: normalizedContentType,
     });
   } catch (error) {
     console.error("Upload error:", error);

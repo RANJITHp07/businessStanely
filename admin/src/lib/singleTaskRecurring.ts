@@ -21,12 +21,22 @@ export async function updateRecurringTaskSchedule(taskId: string) {
 
   if (!task || !task.recurring) return null;
 
-  let recurringType: "day" | "week" | "month" = "month";
+  let recurringType: "once" | "day" | "week" | "month" = "month";
   let recurringValue = typeof task.recurring === "number" ? task.recurring : 1;
 
+  if (typeof task.recurringType === "string" && task.recurringType) {
+    const normalizedType = task.recurringType.toLowerCase();
+    if (["once", "day", "week", "month"].includes(normalizedType)) {
+      recurringType = normalizedType as "once" | "day" | "week" | "month";
+    }
+  }
+
+  // Backward compatibility if recurring was previously stored as "type-value".
   if (typeof task.recurring === "string" && task.recurring.includes("-")) {
     const [type, value] = task.recurring.split("-");
-    recurringType = type as "day" | "week" | "month";
+    if (["once", "day", "week", "month"].includes(type)) {
+      recurringType = type as "once" | "day" | "week" | "month";
+    }
     recurringValue = parseInt(value, 10);
   }
 
@@ -37,14 +47,42 @@ export async function updateRecurringTaskSchedule(taskId: string) {
   endOfToday.setHours(23, 59, 59, 999);
 
   const triggerDate = new Date(task.triggerDate || task.dueDate);
+  if (isNaN(triggerDate.getTime())) return null;
   if (triggerDate < startOfToday || triggerDate > endOfToday) return null;
 
+  const dueDate = new Date(task.triggerDate || task.dueDate);
+  if (task.category?.timePeriod) {
+    dueDate.setDate(dueDate.getDate() + Number(task.category.timePeriod));
+  }
+
+  if (recurringType === "once") {
+    const updatedTask = await prisma.task.update({
+      where: { id: taskId },
+      data: {
+        triggerDate: null,
+        dueDate,
+        nextDueDate: null,
+        currentPeriodStart: triggerDate,
+        completed: false,
+        progress: 0,
+        status: "To Do",
+        active: true,
+        recurring: null,
+        recurringType: null,
+      },
+    });
+
+    return updatedTask;
+  }
+
   const nextTriggerDate = new Date(triggerDate);
-  if (recurringType === "day")
+  if (recurringType === "day") {
     nextTriggerDate.setDate(nextTriggerDate.getDate() + recurringValue);
-  else if (recurringType === "week")
+  } else if (recurringType === "week") {
     nextTriggerDate.setDate(nextTriggerDate.getDate() + recurringValue * 7);
-  else nextTriggerDate.setMonth(nextTriggerDate.getMonth() + recurringValue);
+  } else {
+    nextTriggerDate.setMonth(nextTriggerDate.getMonth() + recurringValue);
+  }
 
   const nextDueDate = new Date(nextTriggerDate);
   if (task.category?.timePeriod) {
@@ -53,17 +91,12 @@ export async function updateRecurringTaskSchedule(taskId: string) {
     );
   }
 
-  const dueDate = new Date(task.triggerDate || task.dueDate);
-  if (task.category?.timePeriod) {
-    dueDate.setDate(dueDate.getDate() + Number(task.category.timePeriod));
-  }
-
   const updatedTask = await prisma.task.update({
     where: { id: taskId },
     data: {
       triggerDate: nextTriggerDate,
-      dueDate: dueDate,
-      nextDueDate: nextDueDate,
+      dueDate,
+      nextDueDate,
       currentPeriodStart: triggerDate,
       completed: false,
       progress: 0,
@@ -155,7 +188,7 @@ export async function updateAllRecurringTasks() {
   for (const task of recurringTasks) {
     try {
       const updatedTask = await updateRecurringTaskSchedule(task.id);
-      if (updatedTask && updatedTask.id !== task.id) {
+      if (updatedTask) {
         updatedTasks.push(updatedTask);
       }
     } catch (error) {
@@ -461,7 +494,7 @@ function buildActivityEmailHTML(
                   ${
                     comment.endTime
                       ? `End Time: ${formatTime(comment.endTime)}`
-                        : ""
+                      : ""
                   }
                 </small>
               </div>

@@ -862,7 +862,7 @@ export default function ProspectDashboard() {
                         dateLabel="Contacted Date"
                     />
                     <SegregationTable
-                        label="Leads Missed Out"
+                        label="Opportunities Missed Out"
                         leads={prospects
                             .filter((prospect: any) => {
                                 if (prospect.status != "Proposal Issued") return false;

@@ -655,13 +655,28 @@ export default function TaskForm() {
   };
 
   const handleRecurringChange = (value: string) => {
-    handleInputChange("recurring", value.split("-")[1]);
-    handleInputChange("recurringType", value.split("-")[0].toLocaleUpperCase());
+    if (value === "0") {
+      handleInputChange("recurring", "0");
+      handleInputChange("recurringType", "");
+      return;
+    }
+
+    const [type, interval] = value.split("-");
+    handleInputChange("recurring", interval || "1");
+    handleInputChange("recurringType", type.toLocaleUpperCase());
 
     // Show information about next task creation if recurring is selected
-    if (value !== "0" && dueDate) {
+    if (dueDate && interval) {
       const nextDueDate = new Date(dueDate);
-      nextDueDate.setMonth(nextDueDate.getMonth() + parseInt(value));
+      const parsedInterval = parseInt(interval, 10);
+
+      if (type === "day") {
+        nextDueDate.setDate(nextDueDate.getDate() + parsedInterval);
+      } else if (type === "week") {
+        nextDueDate.setDate(nextDueDate.getDate() + parsedInterval * 7);
+      } else {
+        nextDueDate.setMonth(nextDueDate.getMonth() + parsedInterval);
+      }
     }
   };
 
@@ -1494,6 +1509,7 @@ export default function TaskForm() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="0">No Recurring</SelectItem>
+                      <SelectItem value="once-1">Trigger only once</SelectItem>
                       <SelectItem value="day-1">Every 1 day</SelectItem>
                       <SelectItem value="day-2">Every 2 days</SelectItem>
                       <SelectItem value="day-3">Every 3 days</SelectItem>
@@ -1508,7 +1524,7 @@ export default function TaskForm() {
                     </SelectContent>
                   </Select>
                   <p className="text-xs text-muted-foreground">
-                    Set how often this task should repeat (1-12 months, optional)
+                    Set how often this task should repeat, or trigger once (optional)
                     {formData.recurring !== "0" && formData.categoryId && dueDate && (
                       <span className="block mt-1 text-blue-600">
                         {(() => {

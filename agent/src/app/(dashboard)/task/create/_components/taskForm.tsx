@@ -725,14 +725,32 @@ export default function TaskForm({ id }: TaskFormProps) {
 
   // Add handler for recurring selection to show information
   const handleRecurringChange = (value: string) => {
-    handleInputChange("recurring", value.split("-")[1]);
-    handleInputChange("recurringType", value.split("-")[0].toLocaleUpperCase());
+    if (value === "0") {
+      handleInputChange("recurring", "0");
+      handleInputChange("recurringType", "");
+      return;
+    }
+
+    const [type, interval] = value.split("-");
+    handleInputChange("recurring", interval || "1");
+    handleInputChange("recurringType", type.toLocaleUpperCase());
 
     // Show information about next task creation if recurring is selected
-    if (value !== "0" && dueDate) {
+    if (dueDate && interval) {
       const nextDueDate = new Date(dueDate);
-      nextDueDate.setMonth(nextDueDate.getMonth() + parseInt(value));
-      console.log(`Next recurring task will be due on: ${nextDueDate.toLocaleDateString()}`);
+      const parsedInterval = parseInt(interval, 10);
+
+      if (type === "day") {
+        nextDueDate.setDate(nextDueDate.getDate() + parsedInterval);
+      } else if (type === "week") {
+        nextDueDate.setDate(nextDueDate.getDate() + parsedInterval * 7);
+      } else {
+        nextDueDate.setMonth(nextDueDate.getMonth() + parsedInterval);
+      }
+
+      console.log(
+        `Next recurring task will be due on: ${nextDueDate.toLocaleDateString()}`,
+      );
     }
   };
 
@@ -1657,6 +1675,7 @@ export default function TaskForm({ id }: TaskFormProps) {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="0">No Recurring</SelectItem>
+                      <SelectItem value="once-1">Trigger only once</SelectItem>
                       <SelectItem value="day-1">Every 1 Day</SelectItem>
                       <SelectItem value="week-1">Every 1 week</SelectItem>
                       <SelectItem value="week-2">Every 2 weeks</SelectItem>
@@ -1669,31 +1688,7 @@ export default function TaskForm({ id }: TaskFormProps) {
                     </SelectContent>
                   </Select>
                   <p className="text-xs text-muted-foreground">
-                    Set how often this task should repeat (1-12 months, optional)
-                    {formData.recurring !== "0" && formData.categoryId && dueDate && (
-                      <span className="block mt-1 text-blue-600">
-                        {(() => {
-                          if (!formData.triggerDate) return "";
-
-                          const startDate = new Date(formData.triggerDate);
-
-                          // Get selected category to find time period
-                          const selectedCategory = categories.find(
-                            cat => cat.id === formData.categoryId
-                          );
-
-                          const timePeriod = selectedCategory?.timePeriod || 7; // default 7 days
-
-                          // End date = triggerDate + timePeriod
-                          const endDate = new Date(startDate);
-                          endDate.setDate(endDate.getDate() + timePeriod);
-
-                          return `Next task period:${startDate.toLocaleDateString(
-                            "en-GB"
-                          )} to ${endDate.toLocaleDateString("en-GB")}`;
-                        })()}
-                      </span>
-                    )}
+                    Set how often this task should repeat, or trigger once (optional)
                   </p>
                 </div>
                 {formData.recurring && formData.recurring !== "0" && (
@@ -1786,6 +1781,24 @@ export default function TaskForm({ id }: TaskFormProps) {
                       {dueDate && formData.active && (
                         <p className="text-sm text-green-600">
                           Due: {format(dueDate, "EEEE, MMMM do, yyyy")}
+                        </p>
+                      )}
+                      {formData.recurring !== "0" && formData.categoryId && formData.triggerDate && (
+                        <p className="text-sm text-green-700">
+                          {(() => {
+                            const startDate = new Date(formData.triggerDate as string);
+
+                            const selectedCategory = categories.find(
+                              (cat) => cat.id === formData.categoryId,
+                            );
+
+                            const timePeriod = selectedCategory?.timePeriod || 7;
+
+                            const endDate = new Date(startDate);
+                            endDate.setDate(endDate.getDate() + timePeriod);
+
+                            return `Next task period: ${startDate.toLocaleDateString("en-GB")} to ${endDate.toLocaleDateString("en-GB")}`;
+                          })()}
                         </p>
                       )}
                     </div>

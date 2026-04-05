@@ -131,10 +131,14 @@ export async function GET(req: NextRequest) {
     }
     if (trigger === "true") {
       whereClause.legislationId = { not: null };
-      whereClause.active = false;
+      whereClause.OR = [{ active: false }, { status: "Completed" }];
     } else if (retainershipTasks === "true") {
       whereClause.legislationId = { not: null };
       whereClause.active = true;
+
+      if (!statusesArray?.length && !status) {
+        whereClause.status = { notIn: ["Completed", "completed"] };
+      }
     }
     if (clientId) {
       whereClause.clientId = clientId;

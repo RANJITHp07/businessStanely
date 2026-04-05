@@ -343,7 +343,10 @@ export default function AgentDetails() {
         );
         if (response.ok) {
           const data = await response.json();
-          setAgentRetainershipTasks(parseTaskResponse(data));
+          const retainershipTasks = parseTaskResponse(data).filter(
+            (task) => statusKey(task.status) !== "completed",
+          );
+          setAgentRetainershipTasks(retainershipTasks);
         } else {
           setAgentRetainershipTasks([]);
         }
@@ -355,15 +358,30 @@ export default function AgentDetails() {
 
     const fetchAgentTriggerTasks = async () => {
       try {
-        const response = await fetchWithAuth(
-          `/api/tasks?assignedToId=${id}&trigger=true`,
+        const [triggerResponse, completedResponse] = await Promise.all([
+          fetchWithAuth(`/api/tasks?assignedToId=${id}&trigger=true`),
+          fetchWithAuth(
+            `/api/tasks?assignedToId=${id}&retainershipTasks=true&status=Completed`,
+          ),
+        ]);
+
+        const pendingTriggerTasks = triggerResponse.ok
+          ? parseTaskResponse(await triggerResponse.json())
+          : [];
+        const completedTriggerTasks = completedResponse.ok
+          ? parseTaskResponse(await completedResponse.json()).filter(
+              (task) => !!task.triggerDate,
+            )
+          : [];
+
+        const mergedTriggerTasks = [
+          ...pendingTriggerTasks,
+          ...completedTriggerTasks,
+        ];
+        const uniqueTriggerTasks = Array.from(
+          new Map(mergedTriggerTasks.map((task) => [task.id, task])).values(),
         );
-        if (response.ok) {
-          const data = await response.json();
-          setAgentTriggerTasks(parseTaskResponse(data));
-        } else {
-          setAgentTriggerTasks([]);
-        }
+        setAgentTriggerTasks(uniqueTriggerTasks);
       } catch (error) {
         console.error("Error fetching agent trigger tasks:", error);
         setAgentTriggerTasks([]);
@@ -1186,7 +1204,14 @@ export default function AgentDetails() {
                                     className="cursor-pointer hover:bg-muted/50"
                                     onClick={() => router.push(`/legislation/${legislation.id}`)}
                                   >
-                                    <TableCell>
+                                    <TableCell
+                                      onClick={(event) => {
+                                        if (!client?.id) return;
+                                        event.stopPropagation();
+                                        router.push(`/client/${client.id}`);
+                                      }}
+                                      className={client?.id ? "cursor-pointer" : undefined}
+                                    >
                                       <div className="flex items-center gap-3">
                                         <Avatar className="h-10 w-10 flex-shrink-0">
                                           <AvatarFallback>{getClientInitials(client)}</AvatarFallback>
@@ -1354,7 +1379,11 @@ export default function AgentDetails() {
                               </TableRow>
                             ) : (
                               agentClients.map((client) => (
-                                <TableRow key={client.id}>
+                                <TableRow
+                                  key={client.id}
+                                  onClick={() => router.push(`/client/${client.id}`)}
+                                  className="cursor-pointer hover:bg-muted/50"
+                                >
                                   <TableCell>
                                     <div className="flex items-center gap-3">
                                       <Avatar className="h-10 w-10 flex-shrink-0">

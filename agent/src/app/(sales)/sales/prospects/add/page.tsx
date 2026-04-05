@@ -23,6 +23,9 @@ import { Badge } from "@/components/ui/badge"
 import { hasAdvisorRole } from "@/lib/agentRole"
 import { getAdvisorAgentType, isClientAdvisorOrManager, isLeadMaker } from "@/lib/agentType"
 
+const isVisibleAgent = (agent: { status?: string }) =>
+    agent.status?.toLowerCase() !== "inactive"
+
 type LeadSource = {
     id: string
     name: string
@@ -114,15 +117,18 @@ export default function NewProspectPage() {
             // Fallback: fetch all agents
             const allRes = await fetch("/api/agents")
             if (allRes.ok) {
-                if (hasAdvisorRole(agent.agentRole) && apiAdvisorType === "Lead Maker") {
-                    const allAgentsData = await allRes.json();
+                const allAgentsData = await allRes.json()
 
+                if (hasAdvisorRole(agent.agentRole) && apiAdvisorType === "Lead Maker") {
                     const filteredAgents = Array.isArray(allAgentsData)
-                        ? allAgentsData.filter((agent) => hasAdvisorRole(agent.agentRole))
+                        ? allAgentsData.filter((agent) => hasAdvisorRole(agent.agentRole) && isVisibleAgent(agent))
                         : [];
 
                     setTeamMembers(filteredAgents);
+                    return
                 }
+
+                setTeamMembers(Array.isArray(allAgentsData) ? allAgentsData.filter(isVisibleAgent) : [])
             } else {
                 setTeamMembers([])
             }

@@ -83,6 +83,9 @@ import { Agent } from "@/types";
 import { toast } from "react-toastify";
 import { hasExecutionRole } from "@/lib/agentRole";
 
+const isVisibleExecutionAgent = (agent: Agent) =>
+  hasExecutionRole(agent?.agentRole) && agent.status?.toLowerCase() !== "inactive";
+
 export default function AgentsTable() {
   const router = useRouter();
   const [agents, setAgents] = useState<Agent[]>([]);
@@ -105,7 +108,7 @@ export default function AgentsTable() {
         const response = await fetchWithAuth("/api/agents");
         if (response.ok) {
           const data = await response.json();
-          setAgents(data.filter((agent: Agent) => hasExecutionRole(agent?.agentRole) && agent.status == "active"));
+          setAgents(data.filter((agent: Agent) => isVisibleExecutionAgent(agent)));
         } else {
           console.error("Failed to fetch agents");
         }
@@ -142,6 +145,7 @@ export default function AgentsTable() {
 
   const deleteFilteredAgents = agents.filter((agent) => {
     if (!agentToDelete) return false;
+    if (!isVisibleExecutionAgent(agent)) return false;
 
     const matchesSearch = agent.name
       .toLowerCase()
@@ -197,10 +201,18 @@ export default function AgentsTable() {
           transferAgentId
         }),
       });
-      setAgents(agents.filter((agent) => agent.id !== agentToDelete.id));
+
+      if (!response.ok) {
+        throw new Error("Failed to delete agent");
+      }
+
+      setAgents((currentAgents) =>
+        currentAgents.filter((agent) => agent.id !== agentToDelete.id),
+      );
       toast.success(`Agent deleted successfully and all task transferred to ${agentSearchQuery}`);
     } catch (error) {
       console.error("Error deleting agent:", error);
+      toast.error("Failed to delete agent");
     } finally {
       setIsSubmitting(false);
       setAgentToDelete(null);

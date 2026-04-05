@@ -278,10 +278,12 @@ export async function POST(req: NextRequest) {
 export async function GET(req: NextRequest) {
   try {
     const statusParam = req.nextUrl.searchParams.get("status");
+    const normalizedStatus = statusParam?.trim().toLowerCase();
 
-    const whereClause = statusParam
-      ? { status: "inactive" } // if status is given, use it
-      : { status: { not: "inactive" } }; // otherwise, active agents
+    const whereClause =
+      normalizedStatus === "inactive"
+        ? { status: "inactive" }
+        : { status: { not: "inactive" } };
     const agents = await prisma.agent.findMany({
       where: whereClause,
       include: {

@@ -25,6 +25,9 @@ import { uploadFileToS3Direct } from "@/lib/directUpload"
 import { hasAdvisorRole } from "@/lib/agentRole"
 import { getAdvisorAgentType, isLeadMaker } from "@/lib/agentType"
 
+const isVisibleAgent = (agent: { status?: string }) =>
+  agent.status?.toLowerCase() !== "inactive"
+
 
 export default function EditProspectPage() {
   const agent = useAgentContext()
@@ -109,9 +112,9 @@ export default function EditProspectPage() {
 
         if (teamMembersList.length === 0 && Array.isArray(allAgentsData)) {
           if (hasAdvisorRole(agent.agentRole) && isLeadMaker(agent)) {
-            teamMembersList = allAgentsData.filter((a: any) => hasAdvisorRole(a.agentRole));
+            teamMembersList = allAgentsData.filter((a: any) => hasAdvisorRole(a.agentRole) && isVisibleAgent(a));
           } else {
-            teamMembersList = allAgentsData;
+            teamMembersList = allAgentsData.filter((a: any) => isVisibleAgent(a));
           }
         }
 

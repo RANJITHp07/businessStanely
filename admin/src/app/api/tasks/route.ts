@@ -172,7 +172,10 @@ export async function GET(req: NextRequest) {
       whereClause.AND = [currentAnd, filter];
     };
 
-    if (clientUpdateFilter === "updated" || clientUpdateFilter === "not-updated") {
+    if (
+      clientUpdateFilter === "updated" ||
+      clientUpdateFilter === "not-updated"
+    ) {
       const durationsToCheck =
         statusCheckDurations && statusCheckDurations.length > 0
           ? statusCheckDurations
@@ -186,7 +189,8 @@ export async function GET(req: NextRequest) {
       } as const;
 
       const durationFilters = durationsToCheck.map((duration) => {
-        const cutoff = durationCutoffs[duration as keyof typeof durationCutoffs];
+        const cutoff =
+          durationCutoffs[duration as keyof typeof durationCutoffs];
         return clientUpdateFilter === "updated"
           ? {
               statusCheckDuration: duration,

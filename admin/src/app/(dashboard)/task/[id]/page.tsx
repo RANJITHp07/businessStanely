@@ -1467,7 +1467,7 @@ export default function TaskDetails() {
                   <div className="flex items-center gap-2">
                     <Calendar className="h-4 w-4 text-muted-foreground" />
                     <div>
-                      <div className="text-sm font-medium">Created</div>
+                      <div className="text-sm font-medium">Created Date</div>
                       <div className="text-sm text-muted-foreground">
                         {formatDateTime(taskData.createdAt, true)}
                       </div>
@@ -1476,48 +1476,39 @@ export default function TaskDetails() {
                   <div className="flex items-center gap-2">
                     <Calendar className="h-4 w-4 text-muted-foreground" />
                     <div>
-                      <div className="text-sm font-medium">Due Date</div>
+                      <div className="text-sm font-medium">Last Due Date</div>
                       <div className="text-sm text-muted-foreground">
                         {formatDateTime(taskData.dueDate, true)}
                       </div>
                     </div>
                   </div>
-                  {
-                    taskData.status == "Completed" && taskData?.lastCompletedDate &&
-                    <div className="flex items-center gap-2">
-                      <Calendar className="h-4 w-4 text-muted-foreground" />
-                      <div>
-                        <div className="text-sm font-medium">Completed Date</div>
-                        <div className="text-sm text-muted-foreground">
-                          {formatDateTime(taskData?.lastCompletedDate, true)}
-                        </div>
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <div className="text-sm font-medium">Completion Date</div>
+                      <div className="text-sm text-muted-foreground">
+                        {formatDateTime(taskData.lastCompletedDate, true)}
                       </div>
                     </div>
-                  }
-                  {
-                    taskData.status == "Hold" && taskData?.holdDate &&
-                    < div className="flex items-center gap-2">
-                      <Calendar className="h-4 w-4 text-muted-foreground" />
-                      <div>
-                        <div className="text-sm font-medium">Hold Date</div>
-                        <div className="text-sm text-muted-foreground">
-                          {formatDateTime(taskData?.holdDate, true)}
-                        </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <div className="text-sm font-medium">Next Trigger Date</div>
+                      <div className="text-sm text-muted-foreground">
+                        {formatDateTime(taskData.triggerDate, true)}
                       </div>
                     </div>
-                  }
-                  {
-                    taskData?.triggerDate &&
-                    < div className="flex items-center gap-2">
-                      <Calendar className="h-4 w-4 text-muted-foreground" />
-                      <div>
-                        <div className="text-sm font-medium">{taskData.active ? "Next" : ""} Trigger Date</div>
-                        <div className="text-sm text-muted-foreground">
-                          {formatDateTime(taskData?.triggerDate, true)}
-                        </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <div className="text-sm font-medium">Next Due Date</div>
+                      <div className="text-sm text-muted-foreground">
+                        {formatDateTime(taskData.nextDueDate, true)}
                       </div>
                     </div>
-                  }
+                  </div>
                 </CardContent>
               </Card>
 

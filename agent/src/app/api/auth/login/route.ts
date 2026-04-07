@@ -161,14 +161,14 @@ export async function POST(req: NextRequest) {
     });
 
     if (openLoginHistory && !openLoginHistory.logoutAt) {
-      // Close the previous session
-      await prisma.loginHistory.update({
+      // Do not auto-write logoutAt during login. If a previous session is still open,
+      // treat it as abandoned and remove it to avoid synthetic same-time login/logout rows.
+      await prisma.loginHistory.delete({
         where: { id: openLoginHistory.id },
-        data: { logoutAt: new Date() },
       });
     }
 
-    // Create a new login history entry
+    // Create a new login history entry for this session
     await prisma.loginHistory.create({
       data: {
         agentId: agent.id,

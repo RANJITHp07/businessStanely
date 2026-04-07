@@ -36,6 +36,7 @@ export interface TaskCategory {
   status: "pending" | "approved";
   createdAt: string;
   updatedAt: string;
+  nextDueDate?: string;
   createdBy: string | null;
   createdByType?: "user" | "agent" | null;
   createdByRole?: "owner" | "admin" | null;
@@ -44,6 +45,7 @@ export interface TaskCategory {
   approvedBy?: string;
   approvedAt?: string;
   rejectedById?: string;
+  currentPeriodStart?: string;
   rejectedBy?: string;
   rejectedAt?: string;
   rejectionReason?: string;
@@ -186,6 +188,7 @@ export interface Retainership {
   color: string;
   status: "pending" | "approved";
   createdAt: string;
+  nextDueDate?: string;
   updatedAt: string;
   createdBy: string | null;
   createdByType?: "user" | "agent" | null;
@@ -194,6 +197,7 @@ export interface Retainership {
   approvedById?: string;
   approvedBy?: string;
   approvedAt?: string;
+  holdDate?: string;
   rejectedById?: string;
   rejectedBy?: string;
   rejectedAt?: string;
@@ -207,6 +211,7 @@ export interface Retainership {
     description?: string;
     assignedAgent?: {
       id: string;
+  currentPeriodStart?: string;
       name: string;
       email: string;
     };

@@ -145,6 +145,9 @@ export async function GET(req: NextRequest) {
     // LOGIN / LOGOUT ENTRIES
     loginHistory.forEach((log) => {
       const loginDate = new Date(log.loginAt);
+      const logoutDate = log.logoutAt ? new Date(log.logoutAt) : null;
+      const syntheticSameTimeLogout =
+        logoutDate && logoutDate.getTime() - loginDate.getTime() <= 5000;
 
       if (loginDate >= startDate && loginDate <= endDate) {
         timeEntries.push({
@@ -168,8 +171,7 @@ export async function GET(req: NextRequest) {
         });
       }
 
-      if (log.logoutAt) {
-        const logoutDate = new Date(log.logoutAt);
+      if (logoutDate && !syntheticSameTimeLogout) {
 
         if (logoutDate >= startDate && logoutDate <= endDate) {
           timeEntries.push({

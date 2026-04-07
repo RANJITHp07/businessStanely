@@ -83,7 +83,16 @@ interface Task {
     name: string;
     email: string;
   };
+  ownerShipBy?: {
+    id: string;
+    name: string;
+    email: string;
+  };
   currentPeriodStart?: string;
+  lastCompletedDate?: string;
+  nextDueDate?: string;
+  triggerDate?: string;
+  holdDate?: string;
   client: {
     id: string;
     clientType: string;
@@ -376,15 +385,24 @@ export default function TaskDetails() {
     );
   };
 
-  const formatDateTime = (dateString: string | undefined) => {
+  const formatDateTime = (
+    dateString: string | undefined,
+    showTime: boolean = true,
+  ) => {
     if (!dateString) return "N/A";
-    return new Date(dateString).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    return new Date(dateString).toLocaleDateString("en-US", showTime
+      ? {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      }
+      : {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      });
   };
 
   // Helper function to convert 24-hour format to 12-hour AM/PM format
@@ -1304,74 +1322,47 @@ export default function TaskDetails() {
                   <div className="flex items-center gap-2">
                     <Calendar className="h-4 w-4 text-muted-foreground" />
                     <div>
-                      <div className="text-sm font-medium">Created</div>
+                      <div className="text-sm font-medium">Created Date</div>
                       <div className="text-sm text-muted-foreground">
-                        {formatDateTime(task.createdAt)}
+                        {formatDateTime(task.createdAt, true)}
                       </div>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
                     <Calendar className="h-4 w-4 text-muted-foreground" />
                     <div>
-                      <div className="text-sm font-medium">Start Date</div>
+                      <div className="text-sm font-medium">Last Due Date</div>
                       <div className="text-sm text-muted-foreground">
-                        {formatDateTime(task?.currentPeriodStart || task.createdAt)}
+                        {formatDateTime(task.dueDate, true)}
                       </div>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
                     <Calendar className="h-4 w-4 text-muted-foreground" />
                     <div>
-                      <div className="text-sm font-medium">Due Date</div>
+                      <div className="text-sm font-medium">Completion Date</div>
                       <div className="text-sm text-muted-foreground">
-                        {formatDateTime(task.dueDate)}
+                        {formatDateTime(task.lastCompletedDate, true)}
                       </div>
                     </div>
                   </div>
-                  {
-                    task.status == "Completed" && task?.lastCompletedDate &&
-                    <div className="flex items-center gap-2">
-                      <Calendar className="h-4 w-4 text-muted-foreground" />
-                      <div>
-                        <div className="text-sm font-medium">Completed Date</div>
-                        <div className="text-sm text-muted-foreground">
-                          {formatDateTime(task?.lastCompletedDate, true)}
-                        </div>
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <div className="text-sm font-medium">Next Trigger Date</div>
+                      <div className="text-sm text-muted-foreground">
+                        {formatDateTime(task.triggerDate, true)}
                       </div>
                     </div>
-                  }
-                  {
-                    task.status == "Hold" && task?.holdDate &&
-                    < div className="flex items-center gap-2">
-                      <Calendar className="h-4 w-4 text-muted-foreground" />
-                      <div>
-                        <div className="text-sm font-medium">Hold Date</div>
-                        <div className="text-sm text-muted-foreground">
-                          {formatDateTime(task?.holdDate, true)}
-                        </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <div className="text-sm font-medium">Next Due Date</div>
+                      <div className="text-sm text-muted-foreground">
+                        {formatDateTime(task.nextDueDate, true)}
                       </div>
                     </div>
-                  }
-                  {task?.triggerDate &&
-                    < div className="flex items-center gap-2">
-                      <Calendar className="h-4 w-4 text-muted-foreground" />
-                      <div>
-                        <div className="text-sm font-medium">{task.active ? "Next" : ""} Trigger Date</div>
-                        <div className="text-sm text-muted-foreground">
-                          {formatDateTime(task?.triggerDate, true)}
-                        </div>
-                      </div>
-                    </div>
-                  }
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-gray-600">
-                      Days Remaining
-                    </span>
-                    <Badge
-                      variant={daysRemaining < 7 ? "destructive" : "secondary"}
-                    >
-                      {daysRemaining} days
-                    </Badge>
                   </div>
                 </CardContent>
               </Card>

@@ -42,6 +42,7 @@ export interface Task {
   priority: string;
   dueDate?: string;
   lastCompletedDate?: string;
+  nextDueDate?: string;
   holdDate?: string;
   progress?: number;
   followUpRequired?: boolean;
@@ -53,6 +54,7 @@ export interface Task {
   updatedAt: string;
   client?: Client;
   createdBy: Agent;
+  ownerShipBy?: Agent;
   assignedTo?: Agent;
   category?: {
     id: string;
@@ -65,6 +67,7 @@ export interface Task {
   comments?: Comment[];
   recurringType?: string;
   legislationId?: string; // Added to link tasks to legislations
+  currentPeriodStart?: string;
   legislation?: {
     id: string;
     title: string;
@@ -166,6 +169,7 @@ export interface Retainership {
     email: string;
   };
   createdByAgent?: {
+  currentPeriodStart?: string;
     id: string;
     name: string;
     email: string;
@@ -189,6 +193,9 @@ export interface Comment {
   content: string;
   createdAt: string;
   updatedAt: string;
+  commentDate?: string;
+  startTime?: string;
+  endTime?: string;
   taskId: string;
   authorId: string;
   authorType: "USER" | "AGENT";

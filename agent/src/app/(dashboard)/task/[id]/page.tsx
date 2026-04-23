@@ -177,7 +177,7 @@ export default function TaskDetails() {
   const [showAssignSearch, setShowAssignSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
-  const [duration, setDuration] = useState(0)
+  const [duration, setDuration] = useState(2)
 
   const params = useParams();
   const router = useRouter();
@@ -190,6 +190,7 @@ export default function TaskDetails() {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("comments");
   const [newComment, setNewComment] = useState("");
+  const [isClientUpdateInteraction, setIsClientUpdateInteraction] = useState(false);
   const [submittingComment, setSubmittingComment] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadPercent, setUploadPercent] = useState(0);
@@ -480,7 +481,8 @@ export default function TaskDetails() {
         },
         body: JSON.stringify({
           taskId: task.id,
-          content: newComment,
+          content: `${isClientUpdateInteraction ? "[CLIENT_UPDATE]" : "[NORMAL]"} ${newComment.trim()}`,
+          interactionType: isClientUpdateInteraction ? "CLIENT_UPDATE" : "NORMAL",
           commentDate: commentDate.toISOString(),
           startTime: startDateTime.toISOString(),
           endTime: endDateTime.toISOString(),
@@ -506,6 +508,26 @@ export default function TaskDetails() {
         setCommentDate(new Date()); // Reset to current date
         setStartTime("");
         setEndTime("");
+        setDuration(2);
+        setIsClientUpdateInteraction(false);
+
+        if (
+          isClientUpdateInteraction &&
+          task.statusCheckDuration &&
+          task.statusCheckDuration !== "None"
+        ) {
+          await fetch(`/api/tasks/${task.id}`, {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ statusCheckDuration: "None" }),
+          });
+
+          setTask((prev) =>
+            prev ? { ...prev, statusCheckDuration: "None" } : prev,
+          );
+        }
       } else {
         const errorData = await response.json();
         console.error("Failed to add comment:", errorData);
@@ -845,6 +867,24 @@ export default function TaskDetails() {
     return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`
   }
 
+  const getInteractionType = (content?: string) => {
+    if (content?.startsWith("[CLIENT_UPDATE]")) return "CLIENT_UPDATE";
+    return "NORMAL";
+  };
+
+  const getDisplayInteractionContent = (content?: string) => {
+    if (!content) return "";
+    return content.replace(/^\[(CLIENT_UPDATE|NORMAL)\]\s*/, "");
+  };
+
+  useEffect(() => {
+    if (startTime && duration > 0) {
+      setEndTime(addMinutes(startTime, duration));
+      return;
+    }
+    setEndTime("");
+  }, [startTime, duration]);
+
 
   const handleDeleteTimeLog = async (timeLogId: string) => {
     if (!confirm("Are you sure you want to delete this time log entry?"))
@@ -973,7 +1013,7 @@ export default function TaskDetails() {
               <div className="flex flex-col md:flex-row md:items-center gap-4 md:gap-6 p-0 md:p-4 bg-muted/30 rounded-lg">
                 <div className="flex items-center space-x-2">
                   <Label htmlFor="follow-up-duration" className="text-sm font-medium cursor-pointer">
-                    Followup&Status check
+                    StatusCheck&Followup
                   </Label>
                   <Select
                     value={task.followUpDuration || "None"}
@@ -996,6 +1036,7 @@ export default function TaskDetails() {
                   <Select
                     value={task.statusCheckDuration || "None"}
                     onValueChange={handleStatusCheckDurationChange}
+                    disabled
                   >
                     <SelectTrigger id="status-check-duration" className="w-28">
                       <SelectValue placeholder="None" />
@@ -1393,9 +1434,29 @@ export default function TaskDetails() {
                       onChange={(e) => setNewComment(e.target.value)}
                       rows={3}
                     />
+                    <div className="mt-3 space-y-1">
+                      <div className="flex items-center gap-2">
+                        <Checkbox
+                          id="interaction-client-update"
+                          checked={isClientUpdateInteraction}
+                          onCheckedChange={(checked) =>
+                            setIsClientUpdateInteraction(Boolean(checked))
+                          }
+                        />
+                        <Label
+                          htmlFor="interaction-client-update"
+                          className="text-sm font-medium cursor-pointer"
+                        >
+                          Mark as Client Update Interaction
+                        </Label>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Keep this unchecked for a normal internal interaction. Check this only when this comment is a direct update to the client.
+                      </p>
+                    </div>
 
                     {/* Timesheet fields */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-muted/50 p-4 rounded-lg">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-muted/50 p-4 rounded-lg">
                       <div className="space-y-2">
                         <Label className="text-sm">Work Date</Label>
                         <Popover>
@@ -1448,7 +1509,7 @@ export default function TaskDetails() {
                         />
                       </div>
 
-                      <div className="space-y-2 md:col-span-3">
+                      <div className="space-y-2">
                         <Label className="text-sm">End Time</Label>
                         <div className="flex gap-2 items-center">
                           <Input
@@ -1574,6 +1635,11 @@ export default function TaskDetails() {
                                 ? comment.user?.username
                                 : comment.agent?.name}
                             </span>
+                            <Badge variant="outline" className="text-[10px] uppercase tracking-wide">
+                              {getInteractionType(comment.content) === "CLIENT_UPDATE"
+                                ? "Client Update"
+                                : "Normal"}
+                            </Badge>
                             <span className="text-xs text-muted-foreground">
                               {formatDateTime(comment.createdAt)}
                             </span>
@@ -1611,7 +1677,7 @@ export default function TaskDetails() {
                             </div>
                           )}
 
-                          <p className="text-sm">{comment.content}</p>
+                          <p className="text-sm">{getDisplayInteractionContent(comment.content)}</p>
                           {comment.attachmentName && (
                             <div className="mt-2">
                               {/* Check if attachment is an image */}

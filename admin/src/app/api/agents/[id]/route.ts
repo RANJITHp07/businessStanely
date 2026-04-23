@@ -32,14 +32,14 @@ export async function GET(
     if (!agent) {
       return NextResponse.json({ error: "Agent not found" }, { status: 404 });
     }
-    // Fetch superiors
+    // Fetch superiors (only active)
     const superiorsLinks = await prisma.agentSuperior.findMany({
-      where: { subordinateId: id },
+      where: { subordinateId: id, superior: { status: "active" } },
       include: { superior: true },
     });
-    // Fetch subordinates
+    // Fetch subordinates (only active)
     const subordinatesLinks = await prisma.agentSuperior.findMany({
-      where: { superiorId: id },
+      where: { superiorId: id, subordinate: { status: "active" } },
       include: { subordinate: true },
     });
 
@@ -269,13 +269,13 @@ export async function PUT(
       }
     }
 
-    // Fetch updated superiors/subordinates
+    // Fetch updated superiors/subordinates (only active)
     const superiorsLinks = await prisma.agentSuperior.findMany({
-      where: { subordinateId: id },
+      where: { subordinateId: id, superior: { status: "active" } },
       include: { superior: true },
     });
     const subordinatesLinks = await prisma.agentSuperior.findMany({
-      where: { superiorId: id },
+      where: { superiorId: id, subordinate: { status: "active" } },
       include: { subordinate: true },
     });
 

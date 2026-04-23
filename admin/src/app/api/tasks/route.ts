@@ -21,6 +21,7 @@ export async function POST(req: NextRequest) {
       recurringType,
       triggerDate,
       active,
+      statusCheckDuration,
     } = body;
 
     if (!title || !createdById) {
@@ -51,6 +52,7 @@ export async function POST(req: NextRequest) {
         legislationId: legislationId || null, // Save legislationId
         recurring: recurringValue, // Save recurring field
         recurringType,
+        statusCheckDuration: statusCheckDuration || "48hr",
         active,
       },
       include: {

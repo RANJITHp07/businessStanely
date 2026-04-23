@@ -169,7 +169,7 @@ export interface Retainership {
     email: string;
   };
   createdByAgent?: {
-  currentPeriodStart?: string;
+    currentPeriodStart?: string;
     id: string;
     name: string;
     email: string;

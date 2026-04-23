@@ -219,13 +219,13 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // Fetch agent with superiors/subordinates
+    // Fetch agent with superiors/subordinates (only active)
     const superiorsLinks = await prisma.agentSuperior.findMany({
-      where: { subordinateId: newAgent.id },
+      where: { subordinateId: newAgent.id, superior: { status: "active" } },
       include: { superior: true },
     });
     const subordinatesLinks = await prisma.agentSuperior.findMany({
-      where: { superiorId: newAgent.id },
+      where: { superiorId: newAgent.id, subordinate: { status: "active" } },
       include: { subordinate: true },
     });
     const executionSubordinates = subordinatesLinks
@@ -280,12 +280,8 @@ export async function GET(req: NextRequest) {
     const statusParam = req.nextUrl.searchParams.get("status");
     const normalizedStatus = statusParam?.trim().toLowerCase();
 
-    const whereClause =
-      normalizedStatus === "inactive"
-        ? { status: "inactive" }
-        : { status: { not: "inactive" } };
+    const shouldReturnInactive = normalizedStatus === "inactive";
     const agents = await prisma.agent.findMany({
-      where: whereClause,
       include: {
         superiorsLinks: { include: { superior: true } },
         subordinatesLinks: { include: { subordinate: true } },
@@ -294,16 +290,23 @@ export async function GET(req: NextRequest) {
         createdAt: "desc",
       },
     });
-    const mappedAgents = agents.map((agent) => ({
-      ...agent,
-      superiors: agent.superiorsLinks.map((link) => link.superior),
-      subordinates: agent.subordinatesLinks
-        .filter((link) => link.teamType !== "advisor")
-        .map((link) => link.subordinate),
-      advisorSubordinates: agent.subordinatesLinks
-        .filter((link) => link.teamType === "advisor")
-        .map((link) => link.subordinate),
-    }));
+    const mappedAgents = agents
+      .map((agent) => ({
+        ...agent,
+        superiors: agent.superiorsLinks
+          .filter((link) => link.superior.status?.trim().toLowerCase() !== "inactive")
+          .map((link) => link.superior),
+        subordinates: agent.subordinatesLinks
+          .filter((link) => link.teamType !== "advisor" && link.subordinate.status?.trim().toLowerCase() !== "inactive")
+          .map((link) => link.subordinate),
+        advisorSubordinates: agent.subordinatesLinks
+          .filter((link) => link.teamType === "advisor" && link.subordinate.status?.trim().toLowerCase() !== "inactive")
+          .map((link) => link.subordinate),
+      }))
+      .filter((agent) => {
+        const isInactive = agent.status?.trim().toLowerCase() === "inactive";
+        return shouldReturnInactive ? isInactive : !isInactive;
+      });
 
     return NextResponse.json(mappedAgents);
   } catch (error) {

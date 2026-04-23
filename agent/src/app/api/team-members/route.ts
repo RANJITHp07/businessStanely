@@ -19,6 +19,7 @@ export async function GET(req: NextRequest) {
     const subordinatesLinks = await prisma.agentSuperior.findMany({
       where: {
         superiorId: agentId,
+        subordinate: { status: "active" },
         ...(teamType === "advisor"
           ? { teamType: "advisor" }
           : teamType === "execution"

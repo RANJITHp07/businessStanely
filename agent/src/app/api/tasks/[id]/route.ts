@@ -158,7 +158,10 @@ export async function GET(
     let assignedAgentSubordinates: TeamMember[] = [];
     if (task?.assignedTo?.id) {
       const subLinks = await prisma.agentSuperior.findMany({
-        where: { superiorId: task.assignedTo.id },
+        where: {
+          superiorId: task.assignedTo.id,
+          subordinate: { status: "active" },
+        },
         include: {
           subordinate: {
             select: {

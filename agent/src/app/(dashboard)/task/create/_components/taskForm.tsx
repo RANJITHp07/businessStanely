@@ -583,6 +583,7 @@ export default function TaskForm({ id }: TaskFormProps) {
           recurring: formData.recurring,
           dueDate,
           status: formData.status || "To Do",
+          statusCheckDuration: !isEditMode ? "48hr" : undefined,
           createdById: !isEditMode ? agents[0].id : undefined,
         }),
       });

@@ -211,7 +211,7 @@ export interface Retainership {
     description?: string;
     assignedAgent?: {
       id: string;
-  currentPeriodStart?: string;
+      currentPeriodStart?: string;
       name: string;
       email: string;
     };

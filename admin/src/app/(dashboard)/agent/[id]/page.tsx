@@ -48,6 +48,7 @@ import {
   Phone,
   Users,
   FileText,
+  LayoutDashboard,
   MoreHorizontal,
   Edit,
   Eye,
@@ -56,6 +57,7 @@ import {
   CheckCircle,
   Building2,
   PlusCircle,
+  AlertTriangle,
 } from "lucide-react";
 import { Agent, Client, Task } from "@/types";
 import Link from "next/link";
@@ -119,6 +121,24 @@ interface AgentLegislation {
 interface AgentClient extends Client {
   retainershipCount?: number;
   statusCounts?: Record<string, number>;
+}
+
+interface DashboardTaskItem {
+  id: string;
+  title: string;
+  status: string;
+  priority: string;
+  followUpDuration: string | null;
+  statusCheckDuration: string | null;
+  clientName: string;
+  referenceAt: string;
+  expectedDuration?: string;
+}
+
+interface DashboardStatusResponse {
+  notTouchedTasks: DashboardTaskItem[];
+  clientNotUpdatedTasks: DashboardTaskItem[];
+  followUpStatusNotDoneTasks: DashboardTaskItem[];
 }
 
 function parseTaskResponse(data: Task[] | { tasks?: Task[] }) {
@@ -221,6 +241,12 @@ export default function AgentDetails() {
   const [tasksLoading, setTasksLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<string>(searchParams.get("tab") || "details");
   const [taskOverviewTab, setTaskOverviewTab] = useState("standard-tasks");
+  const [dashboardLoading, setDashboardLoading] = useState(true);
+  const [dashboardData, setDashboardData] = useState<DashboardStatusResponse>({
+    notTouchedTasks: [],
+    clientNotUpdatedTasks: [],
+    followUpStatusNotDoneTasks: [],
+  });
 
   // Keep activeTab in sync with the tab query param
   useEffect(() => {
@@ -285,7 +311,7 @@ export default function AgentDetails() {
 
           if (!tabParam) {
             setActiveTab(
-              hasExecutionAccess ? "tasks" : "leads",
+              hasExecutionAccess ? "dashboard" : "leads",
             );
           }
 
@@ -293,6 +319,7 @@ export default function AgentDetails() {
 
           if (hasExecutionAccess) {
             dataRequests.push(
+              fetchDashboardStatus(),
               fetchAgentTasks(),
               fetchAgentRetainershipTasks(),
               fetchAgentTriggerTasks(),
@@ -334,6 +361,36 @@ export default function AgentDetails() {
       } catch (error) {
         console.error("Error fetching agent tasks:", error);
         setAgentTasks([]);
+      }
+    };
+
+    const fetchDashboardStatus = async () => {
+      try {
+        setDashboardLoading(true);
+        const response = await fetchWithAuth(`/api/agents/dashboard-status?assignedToId=${id}`);
+        if (response.ok) {
+          const data = (await response.json()) as DashboardStatusResponse;
+          setDashboardData({
+            notTouchedTasks: data.notTouchedTasks || [],
+            clientNotUpdatedTasks: data.clientNotUpdatedTasks || [],
+            followUpStatusNotDoneTasks: data.followUpStatusNotDoneTasks || [],
+          });
+        } else {
+          setDashboardData({
+            notTouchedTasks: [],
+            clientNotUpdatedTasks: [],
+            followUpStatusNotDoneTasks: [],
+          });
+        }
+      } catch (error) {
+        console.error("Error fetching dashboard status:", error);
+        setDashboardData({
+          notTouchedTasks: [],
+          clientNotUpdatedTasks: [],
+          followUpStatusNotDoneTasks: [],
+        });
+      } finally {
+        setDashboardLoading(false);
       }
     };
 
@@ -682,7 +739,7 @@ export default function AgentDetails() {
 
   const showExecutionTabs = hasExecutionRole(agent.agentRole);
   const showAdvisorTabs = hasAdvisorRole(agent.agentRole);
-  const tabCount = 4 + (showExecutionTabs ? 1 : 0) + (showAdvisorTabs ? 2 : 0);
+  const tabCount = 4 + (showExecutionTabs ? 2 : 0) + (showAdvisorTabs ? 2 : 0);
   const standardAgentTasks = agentTasks.filter((task) => !task.legislationId);
 
   const transferAuditSummary =
@@ -763,6 +820,93 @@ export default function AgentDetails() {
     totalLeadsForStats > 0
       ? Math.round((advisorSuccessCountForStats / totalLeadsForStats) * 100)
       : 0;
+
+  const formatDashboardDateTime = (value?: string) => {
+    if (!value) return "-";
+    const date = new Date(value);
+    if (isNaN(date.getTime())) return "-";
+    return date.toLocaleString();
+  };
+
+  const renderDashboardTable = (
+    title: string,
+    description: string,
+    rows: DashboardTaskItem[],
+    compact: boolean = false,
+    accentColor: string = "border-l-gray-300",
+  ) => {
+    return (
+      <Card className={`border-l-4 ${accentColor}`}>
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base font-semibold">{title}</CardTitle>
+            <Badge
+              variant={rows.length > 0 ? "destructive" : "secondary"}
+              className="text-xs px-2 py-0.5"
+            >
+              {rows.length} {rows.length === 1 ? "task" : "tasks"}
+            </Badge>
+          </div>
+          <CardDescription className="text-xs leading-snug">{description}</CardDescription>
+        </CardHeader>
+        <CardContent className="pt-0">
+          {rows.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+              <CheckCircle className="h-8 w-8 mb-2 text-green-400" />
+              <p className="text-sm font-medium">All clear</p>
+              <p className="text-xs">No tasks require attention</p>
+            </div>
+          ) : (
+            <div className="rounded-md border overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-muted/40 hover:bg-muted/40">
+                    <TableHead className="text-xs font-semibold w-8">#</TableHead>
+                    <TableHead className="text-xs font-semibold">Task</TableHead>
+                    <TableHead className="text-xs font-semibold">Client</TableHead>
+                    <TableHead className="text-xs font-semibold">Last Relevant Interaction</TableHead>
+                    {!compact && <TableHead className="text-xs font-semibold">Follow-up</TableHead>}
+                    {!compact && <TableHead className="text-xs font-semibold">Status Check</TableHead>}
+                    {!compact && <TableHead className="text-xs font-semibold">Status</TableHead>}
+                    {!compact && <TableHead className="text-xs font-semibold text-right">Action</TableHead>}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {rows.map((item, idx) => (
+                    <TableRow
+                      key={item.id}
+                      className={compact ? "cursor-pointer hover:bg-muted/50 transition-colors" : "hover:bg-muted/30 transition-colors"}
+                      onClick={compact ? () => router.push(`/task/${item.id}`) : undefined}
+                    >
+                      <TableCell className="text-xs text-muted-foreground">{idx + 1}</TableCell>
+                      <TableCell className="font-medium text-sm">{item.title}</TableCell>
+                      <TableCell className="text-sm">{item.clientName || "N/A"}</TableCell>
+                      <TableCell className="text-sm">{formatDashboardDateTime(item.referenceAt)}</TableCell>
+                      {!compact && <TableCell className="text-sm">{item.followUpDuration || "None"}</TableCell>}
+                      {!compact && <TableCell className="text-sm">{item.statusCheckDuration || "None"}</TableCell>}
+                      {!compact && <TableCell className="text-sm">{item.status}</TableCell>}
+                      {!compact && (
+                        <TableCell className="text-right">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 text-xs gap-1"
+                            onClick={() => router.push(`/task/${item.id}`)}
+                          >
+                            <Eye className="h-3 w-3" /> View
+                          </Button>
+                        </TableCell>
+                      )}
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    );
+  };
 
   return (
     <div className="container mx-auto p-6 max-w-7xl">
@@ -858,6 +1002,12 @@ export default function AgentDetails() {
         className="space-y-6"
       >
         <TabsList className="grid w-full" style={{ gridTemplateColumns: `repeat(${tabCount}, minmax(0, 1fr))` }}>
+          {showExecutionTabs && (
+            <TabsTrigger value="dashboard" className="flex items-center gap-2">
+              <LayoutDashboard className="h-4 w-4 hidden md:block" />
+              <p className="text-[10px] md:text-[12px]">Dashboard</p>
+            </TabsTrigger>
+          )}
           <TabsTrigger value="details" className="flex items-center gap-2">
             <User className="h-4 w-4 hidden md:block" />
             <p className="text-[10px] md:text-[12px]">Agent Details</p>
@@ -902,6 +1052,95 @@ export default function AgentDetails() {
             <p className="text-[10px] md:text-[12px]">Service Records</p>
           </TabsTrigger>
         </TabsList>
+
+        {showExecutionTabs && (
+          <TabsContent value="dashboard" className="space-y-6">
+            <div className="flex items-start justify-between">
+              <div>
+                <h2 className="text-xl font-semibold">SLA Dashboard</h2>
+                <p className="text-muted-foreground text-sm">
+                  Task attention overview for <span className="font-medium text-foreground">{agent.name}</span>
+                </p>
+              </div>
+            </div>
+
+            {dashboardLoading ? (
+              <div className="flex flex-col items-center justify-center py-20 text-muted-foreground gap-3">
+                <Clock className="h-8 w-8 animate-spin text-primary/60" />
+                <p className="text-sm">Loading dashboard data...</p>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {/* Summary stat cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <Card className="border-l-4 border-l-amber-500">
+                    <CardContent className="p-4 flex items-center justify-between">
+                      <div>
+                        <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Not Touched</p>
+                        <p className="text-2xl font-bold mt-0.5">{dashboardData.notTouchedTasks.length}</p>
+                      </div>
+                      <div className="h-10 w-10 rounded-full bg-amber-50 flex items-center justify-center shrink-0">
+                        <Clock className="h-5 w-5 text-amber-600" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card className="border-l-4 border-l-red-500">
+                    <CardContent className="p-4 flex items-center justify-between">
+                      <div>
+                        <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Client Not Updated</p>
+                        <p className="text-2xl font-bold mt-0.5">{dashboardData.clientNotUpdatedTasks.length}</p>
+                      </div>
+                      <div className="h-10 w-10 rounded-full bg-red-50 flex items-center justify-center shrink-0">
+                        <AlertTriangle className="h-5 w-5 text-red-500" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card className="border-l-4 border-l-purple-500">
+                    <CardContent className="p-4 flex items-center justify-between">
+                      <div>
+                        <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Follow-up Issues</p>
+                        <p className="text-2xl font-bold mt-0.5">{dashboardData.followUpStatusNotDoneTasks.length}</p>
+                      </div>
+                      <div className="h-10 w-10 rounded-full bg-purple-50 flex items-center justify-center shrink-0">
+                        <CheckCircle className="h-5 w-5 text-purple-500" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Side-by-side compact tables */}
+                <div className="flex flex-col lg:flex-row gap-6 items-start">
+                  <div className="flex-1 min-w-0">
+                    {renderDashboardTable(
+                      "Not Touched Tasks",
+                      "Follow-up must be None and no normal interaction in the last 24 hours.",
+                      dashboardData.notTouchedTasks,
+                      true,
+                      "border-l-amber-500",
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    {renderDashboardTable(
+                      "Client Not Updated Tasks",
+                      "Any follow-up is allowed; evaluates only client-update interactions against expected update duration.",
+                      dashboardData.clientNotUpdatedTasks,
+                      true,
+                      "border-l-red-500",
+                    )}
+                  </div>
+                </div>
+
+                {renderDashboardTable(
+                  "Follow-up & Status Not Done (48hrs / 1 Week)",
+                  "Includes only 48hr/1w follow-ups where no interaction happened in duration, follow-up is not done, and status is not updated.",
+                  dashboardData.followUpStatusNotDoneTasks,
+                  false,
+                  "border-l-purple-500",
+                )}
+              </div>
+            )}
+          </TabsContent>
+        )}
 
         {/* Agent Details Tab */}
         <TabsContent value="details" className="space-y-6">

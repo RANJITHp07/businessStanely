@@ -328,14 +328,7 @@ export default function ClientsTable() {
     };
 
     const openClientDiary = (client: Client) => {
-        setSelectedClientForDiary(client);
-        setSelectedDiaryDate("");
-        setAddDiaryDate(new Date());
-        setUpdateDiaryDate(new Date());
-        setAddDiaryDraft("");
-        setUpdateDiaryDraft("");
-        setSelectedDiaryEntryForUpdate(null);
-        setIsDiaryOpen(true);
+        window.open(`/client/${client.id}/diary`, "_blank");
     };
 
     const fetchDiaryEntries = async (clientId: string, date?: string) => {

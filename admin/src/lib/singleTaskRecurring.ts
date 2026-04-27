@@ -123,11 +123,36 @@ export async function updateHoldTasks() {
     try {
       if (!task.dueDate) continue; // Ensure dueDate is not null
 
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      // Auto-resume: if task has been on hold for 10+ days, move to "To Do" (New Tasks)
+      if (task.holdDate) {
+        const holdStart = new Date(task.holdDate);
+        holdStart.setHours(0, 0, 0, 0);
+        const daysOnHold = Math.floor(
+          (today.getTime() - holdStart.getTime()) / (1000 * 60 * 60 * 24),
+        );
+
+        if (daysOnHold >= 10) {
+          const resumedTask = await prisma.task.update({
+            where: { id: task.id },
+            data: {
+              status: "To Do",
+              holdDate: null,
+              holdDaysLeft: null,
+            },
+          });
+          updatedTasks.push(resumedTask);
+          console.log(
+            `✅ Auto-resumed task ${task.id} after ${daysOnHold} days on hold.`,
+          );
+          continue;
+        }
+      }
+
       // Extend due date by 1 day if the task is still on "Hold"
       if (task.dueDate && task.createdAt) {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-
         const due = new Date(task.dueDate);
         due.setHours(0, 0, 0, 0);
 

@@ -161,10 +161,11 @@ export async function POST(req: NextRequest) {
     });
 
     if (openLoginHistory && !openLoginHistory.logoutAt) {
-      // Do not auto-write logoutAt during login. If a previous session is still open,
-      // treat it as abandoned and remove it to avoid synthetic same-time login/logout rows.
-      await prisma.loginHistory.delete({
+      // Close the abandoned session by recording logoutAt at the current time.
+      // This ensures logout time is visible in the timesheet.
+      await prisma.loginHistory.update({
         where: { id: openLoginHistory.id },
+        data: { logoutAt: new Date() },
       });
     }
 

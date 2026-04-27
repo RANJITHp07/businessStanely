@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentAdmin } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 
+const IST_TIME_ZONE = "Asia/Kolkata";
+
 export async function GET(req: NextRequest) {
   try {
     const admin = await getCurrentAdmin(req);
@@ -67,7 +69,13 @@ export async function GET(req: NextRequest) {
       }),
 
       prisma.loginHistory.findMany({
-        where: { agentId },
+        where: {
+          agentId,
+          OR: [
+            { loginAt: { gte: startDate, lte: endDate } },
+            { logoutAt: { gte: startDate, lte: endDate } },
+          ],
+        },
         orderBy: { loginAt: "desc" },
       }),
 
@@ -111,17 +119,20 @@ export async function GET(req: NextRequest) {
                   hour: "2-digit",
                   minute: "2-digit",
                   hour12: true,
+                  timeZone: IST_TIME_ZONE,
                 })
               : new Date(comment.createdAt).toLocaleTimeString("en-US", {
                   hour: "2-digit",
                   minute: "2-digit",
                   hour12: true,
+                  timeZone: IST_TIME_ZONE,
                 }),
             endTime: comment.endTime
               ? new Date(comment.endTime).toLocaleTimeString("en-US", {
                   hour: "2-digit",
                   minute: "2-digit",
                   hour12: true,
+                  timeZone: IST_TIME_ZONE,
                 })
               : new Date(
                   new Date(commentDate).getTime() + 60 * 60 * 1000,
@@ -129,6 +140,7 @@ export async function GET(req: NextRequest) {
                   hour: "2-digit",
                   minute: "2-digit",
                   hour12: true,
+                  timeZone: IST_TIME_ZONE,
                 }),
             status,
             type: "task",
@@ -160,11 +172,13 @@ export async function GET(req: NextRequest) {
             hour: "2-digit",
             minute: "2-digit",
             hour12: true,
+            timeZone: IST_TIME_ZONE,
           }),
           endTime: loginDate.toLocaleTimeString("en-US", {
             hour: "2-digit",
             minute: "2-digit",
             hour12: true,
+            timeZone: IST_TIME_ZONE,
           }),
           status: "login",
           type: "login",
@@ -172,7 +186,6 @@ export async function GET(req: NextRequest) {
       }
 
       if (logoutDate && !syntheticSameTimeLogout) {
-
         if (logoutDate >= startDate && logoutDate <= endDate) {
           timeEntries.push({
             id: `logout-${log.id}`,
@@ -184,11 +197,13 @@ export async function GET(req: NextRequest) {
               hour: "2-digit",
               minute: "2-digit",
               hour12: true,
+              timeZone: IST_TIME_ZONE,
             }),
             endTime: logoutDate.toLocaleTimeString("en-US", {
               hour: "2-digit",
               minute: "2-digit",
               hour12: true,
+              timeZone: IST_TIME_ZONE,
             }),
             status: "logout",
             type: "logout",

@@ -294,13 +294,23 @@ export async function GET(req: NextRequest) {
       .map((agent) => ({
         ...agent,
         superiors: agent.superiorsLinks
-          .filter((link) => link.superior.status?.trim().toLowerCase() !== "inactive")
+          .filter(
+            (link) => link.superior.status?.trim().toLowerCase() !== "inactive",
+          )
           .map((link) => link.superior),
         subordinates: agent.subordinatesLinks
-          .filter((link) => link.teamType !== "advisor" && link.subordinate.status?.trim().toLowerCase() !== "inactive")
+          .filter(
+            (link) =>
+              link.teamType !== "advisor" &&
+              link.subordinate.status?.trim().toLowerCase() !== "inactive",
+          )
           .map((link) => link.subordinate),
         advisorSubordinates: agent.subordinatesLinks
-          .filter((link) => link.teamType === "advisor" && link.subordinate.status?.trim().toLowerCase() !== "inactive")
+          .filter(
+            (link) =>
+              link.teamType === "advisor" &&
+              link.subordinate.status?.trim().toLowerCase() !== "inactive",
+          )
           .map((link) => link.subordinate),
       }))
       .filter((agent) => {

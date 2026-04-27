@@ -6,6 +6,7 @@ const prismaWithDiary = prisma as typeof prisma & {
   clientDiaryEntry: {
     findUnique: (...args: any[]) => Promise<any>;
     update: (...args: any[]) => Promise<any>;
+    delete: (...args: any[]) => Promise<any>;
   };
 };
 
@@ -48,6 +49,7 @@ export async function PUT(
         ? normalizeEntryDate(body.entryDate)
         : "";
     const content = typeof body.content === "string" ? body.content.trim() : "";
+    const heading = typeof body.heading === "string" ? body.heading.trim() : "";
 
     if (!entryDate) {
       return NextResponse.json(
@@ -79,6 +81,7 @@ export async function PUT(
       where: { id: entryId },
       data: {
         entryDate,
+        heading: heading || null,
         content,
       },
     });
@@ -88,6 +91,47 @@ export async function PUT(
     console.error("Error updating client diary entry:", error);
     return NextResponse.json(
       { error: "Failed to update client diary entry" },
+      { status: 500 },
+    );
+  }
+}
+
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: { id: string; entryId: string } },
+) {
+  try {
+    const clientId = params.id;
+    const entryId = params.entryId;
+
+    if (!clientId || !entryId) {
+      return NextResponse.json(
+        { error: "Missing client id or entry id" },
+        { status: 400 },
+      );
+    }
+
+    const existingEntry = await prismaWithDiary.clientDiaryEntry.findUnique({
+      where: { id: entryId },
+      select: { id: true, clientId: true },
+    });
+
+    if (!existingEntry || existingEntry.clientId !== clientId) {
+      return NextResponse.json(
+        { error: "Diary entry not found" },
+        { status: 404 },
+      );
+    }
+
+    await prismaWithDiary.clientDiaryEntry.delete({
+      where: { id: entryId },
+    });
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Error deleting client diary entry:", error);
+    return NextResponse.json(
+      { error: "Failed to delete client diary entry" },
       { status: 500 },
     );
   }

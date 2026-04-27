@@ -98,6 +98,7 @@ export async function POST(
         ? normalizeEntryDate(body.entryDate)
         : "";
     const content = typeof body.content === "string" ? body.content.trim() : "";
+    const heading = typeof body.heading === "string" ? body.heading.trim() : "";
 
     if (!entryDate) {
       return NextResponse.json(
@@ -126,6 +127,7 @@ export async function POST(
       data: {
         clientId,
         entryDate,
+        heading: heading || null,
         content,
       },
     });

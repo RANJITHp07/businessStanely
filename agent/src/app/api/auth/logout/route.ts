@@ -24,7 +24,15 @@ export async function POST(req: NextRequest) {
           agentId = decoded.agentId as string;
         }
       } catch {
-        // Ignore invalid/expired token
+        // Token may be expired — decode without verification to still get agentId
+        try {
+          const decoded = jwt.decode(token);
+          if (typeof decoded === "object" && decoded && "agentId" in decoded) {
+            agentId = decoded.agentId as string;
+          }
+        } catch {
+          // Completely invalid token — cannot determine agentId
+        }
       }
     }
 

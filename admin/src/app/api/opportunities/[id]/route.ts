@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { getCurrentAdmin } from "@/lib/auth";
 
 // GET: Get a single opportunity by ID
 export async function GET(
@@ -95,15 +96,14 @@ export async function PUT(
 
 // DELETE: Delete an opportunity by ID
 // POST: Add a comment to an opportunity
-import { getCurrentAgent } from "@/lib/auth";
 
 export async function POST(
   req: NextRequest,
   { params }: { params: { id: string } },
 ) {
   try {
-    const agent = await getCurrentAgent(req);
-    if (!agent) {
+    const admin = await getCurrentAdmin(req);
+    if (!admin) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     const { id } = await params;
@@ -132,12 +132,12 @@ export async function POST(
         ...(attachments && Array.isArray(attachments) && attachments.length > 0
           ? { attachments }
           : {}),
-        authorId: agent.id,
-        authorType: "AGENT",
+        authorId: admin.id,
+        authorType: "ADMIN",
         opportunityId: id,
       },
     });
-    // Fetch the comment with agent/user relation for display
+    // Fetch the comment with admin/user relation for display
     const comment = await prisma.comment.findUnique({
       where: { id: created.id },
       include: {
@@ -148,7 +148,7 @@ export async function POST(
     return NextResponse.json({ comment });
   } catch (error) {
     return NextResponse.json(
-      { error: "Failed to add comment", details: error?.message || error },
+      { error: "Failed to add comment", details: error },
       { status: 500 },
     );
   }

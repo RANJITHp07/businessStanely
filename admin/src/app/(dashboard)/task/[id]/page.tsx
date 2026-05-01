@@ -664,16 +664,12 @@ export default function TaskDetails() {
   const handleFollowUpDurationChange = async (value: string) => {
     if (!taskData) return;
     const prevTask = { ...taskData };
-    let newStatusCheckDuration = taskData.statusCheckDuration;
-    if (value !== "None" && taskData.statusCheckDuration !== "None") {
-      newStatusCheckDuration = "None";
-    }
-    setTaskData({ ...taskData, followUpDuration: value, statusCheckDuration: newStatusCheckDuration });
+    setTaskData({ ...taskData, followUpDuration: value });
     try {
       const response = await fetch(`/api/tasks/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ followUpDuration: value, statusCheckDuration: newStatusCheckDuration }),
+        body: JSON.stringify({ followUpDuration: value }),
       });
       if (response.ok) {
         const data = await response.json();
@@ -695,16 +691,12 @@ export default function TaskDetails() {
   const handleStatusCheckDurationChange = async (value: string) => {
     if (!taskData) return;
     const prevTask = { ...taskData };
-    let newFollowUpDuration = taskData.followUpDuration;
-    if (value !== "None" && taskData.followUpDuration !== "None") {
-      newFollowUpDuration = "None";
-    }
-    setTaskData({ ...taskData, statusCheckDuration: value, followUpDuration: newFollowUpDuration });
+    setTaskData({ ...taskData, statusCheckDuration: value });
     try {
       const response = await fetch(`/api/tasks/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ statusCheckDuration: value, followUpDuration: newFollowUpDuration }),
+        body: JSON.stringify({ statusCheckDuration: value }),
       });
       if (response.ok) {
         const data = await response.json();

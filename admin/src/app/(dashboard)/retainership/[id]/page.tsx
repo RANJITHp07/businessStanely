@@ -303,14 +303,7 @@ export default function RetainershipDetail({ params }: { params: Promise<{ id: s
 
     const openClientDiary = () => {
         if (!retainership?.client?.id) return
-        setSelectedDiaryDate("")
-        setAddDiaryDate(new Date())
-        setUpdateDiaryDate(new Date())
-        setAddDiaryDraft("")
-        setUpdateDiaryDraft("")
-        setSelectedDiaryEntryForUpdate(null)
-        setSelectedDiaryEntryForView(null)
-        setIsClientDiaryOpen(true)
+        window.open(`/client/${retainership.client.id}/diary`, "_blank")
     }
 
     useEffect(() => {

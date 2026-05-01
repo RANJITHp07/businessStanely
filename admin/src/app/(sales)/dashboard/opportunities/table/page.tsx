@@ -494,7 +494,7 @@ export default function ProspectsTable() {
                                         <TableRow>
                                             <TableHead>Name</TableHead>
                                             <TableHead>Phone Number</TableHead>
-                                            <TableHead>Description</TableHead>
+                                            {/* <TableHead>Description</TableHead> */}
                                             <TableHead>Next Follow Up</TableHead>
                                             <TableHead>Assigned To</TableHead>
                                             <TableHead>Created By</TableHead>
@@ -514,7 +514,7 @@ export default function ProspectsTable() {
                                                 <TableRow key={prospect.id} className="cursor-pointer" >
                                                     <TableCell className="font-medium max-w-[150px] truncate" onClick={() => router.push(`/dashboard/opportunities/${prospect.id}`)}>{prospect.prospect?.name || "N/A"}</TableCell>
                                                     <TableCell> {prospect.phoneNumber}</TableCell>
-                                                    <TableCell className="max-w-[300px] truncate" onClick={() => router.push(`/dashboard/opportunities/${prospect.id}`)}>{prospect.description || "N/A"}</TableCell>
+                                                    {/* <TableCell className="max-w-[300px] truncate" onClick={() => router.push(`/dashboard/opportunities/${prospect.id}`)}>{prospect.description || "N/A"}</TableCell> */}
                                                     <TableCell onClick={() => router.push(`/dashboard/opportunities/${prospect.id}`)}>
                                                         <div className="flex items-center gap-2">
                                                             <Calendar className="h-4 w-4 text-muted-foreground" />

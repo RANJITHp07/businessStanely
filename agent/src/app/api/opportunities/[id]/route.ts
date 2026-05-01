@@ -129,6 +129,7 @@ export async function POST(
       attachmentUrl,
       attachmentSize,
       attachmentType,
+      attachments,
       commentDate,
       startTime,
       endTime,
@@ -146,6 +147,9 @@ export async function POST(
         attachmentUrl,
         attachmentSize,
         attachmentType,
+        ...(attachments && Array.isArray(attachments) && attachments.length > 0
+          ? { attachments }
+          : {}),
         commentDate: commentDate ? new Date(commentDate) : null,
         startTime: startTime ? new Date(startTime) : null,
         endTime: endTime ? new Date(endTime) : null,

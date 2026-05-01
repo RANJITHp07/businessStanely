@@ -142,6 +142,7 @@ interface Comment {
   attachmentSize?: number;
   attachmentType?: string;
   attachmentUrl?: string;
+  attachments?: { name: string; url: string; size: number; type: string }[];
   user?: {
     id: string;
     username: string;
@@ -192,7 +193,7 @@ export default function TaskDetails() {
   const [newComment, setNewComment] = useState("");
   const [isClientUpdateInteraction, setIsClientUpdateInteraction] = useState(false);
   const [submittingComment, setSubmittingComment] = useState(false);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [uploadPercent, setUploadPercent] = useState(0);
   const [uploadMessage, setUploadMessage] = useState("");
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -201,6 +202,8 @@ export default function TaskDetails() {
   const [commentDate, setCommentDate] = useState<Date | undefined>(new Date());
   const [startTime, setStartTime] = useState("");
   const [endTime, setEndTime] = useState("");
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Use subordinates from assignedTo if available (from API)
   // Type guard for subordinates
@@ -416,13 +419,18 @@ export default function TaskDetails() {
   };
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      setSelectedFile(file);
+    const files = Array.from(event.target.files || []);
+    if (files.length > 0) {
+      setSelectedFiles((prev) => [...prev, ...files]);
       setUploadPercent(0);
       setUploadMessage("");
       setUploadError(null);
     }
+    event.target.value = "";
+  };
+
+  const removeFile = (index: number) => {
+    setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleAddComment = async () => {
@@ -434,35 +442,40 @@ export default function TaskDetails() {
     setUploadError(null);
 
     try {
-      let attachmentData = {};
+      let attachmentData: { attachments?: { name: string; url: string; size: number; type: string }[] } = {};
 
-      // Handle file upload if a file is selected
-      if (selectedFile) {
-        try {
-          const uploadResult = await uploadFileToS3Direct(selectedFile, {
-            onProgress: (progress) => {
-              setUploadPercent(progress.percent);
-              setUploadMessage(progress.message);
-            },
-          });
-          attachmentData = {
-            attachmentName: uploadResult.originalName,
-            attachmentSize: uploadResult.size,
-            attachmentType: uploadResult.type,
-            attachmentUrl: uploadResult.url,
-          };
+      // Handle file uploads if files are selected
+      if (selectedFiles.length > 0) {
+        const uploaded: { name: string; url: string; size: number; type: string }[] = [];
+        for (let i = 0; i < selectedFiles.length; i++) {
+          const file = selectedFiles[i];
+          try {
+            const uploadResult = await uploadFileToS3Direct(file, {
+              onProgress: (progress) => {
+                setUploadPercent(progress.percent);
+                setUploadMessage(`Uploading ${i + 1}/${selectedFiles.length}: ${progress.message}`);
+              },
+            });
+            uploaded.push({
+              name: uploadResult.originalName,
+              size: uploadResult.size,
+              type: uploadResult.type,
+              url: uploadResult.url,
+            });
 
-          if (task.status === "To Do") {
-            setTask((prev) => prev ? { ...prev, status: "In Progress" } : null);
+            if (task.status === "To Do") {
+              setTask((prev) => prev ? { ...prev, status: "In Progress" } : null);
+            }
+          } catch (error) {
+            console.error("Failed to upload file", error);
+            setUploadError(
+              error instanceof Error ? error.message : "Upload failed. Please retry.",
+            );
+            setSubmittingComment(false);
+            return;
           }
-        } catch (error) {
-          console.error("Failed to upload file", error);
-          setUploadError(
-            error instanceof Error ? error.message : "Upload failed. Please retry.",
-          );
-          setSubmittingComment(false);
-          return;
         }
+        attachmentData = { attachments: uploaded };
       }
 
       // Combine date and time values
@@ -501,7 +514,7 @@ export default function TaskDetails() {
             : prevTask
         );
         setNewComment("");
-        setSelectedFile(null);
+        setSelectedFiles([]);
         setUploadPercent(0);
         setUploadMessage("");
         setUploadError(null);
@@ -1538,35 +1551,33 @@ export default function TaskDetails() {
                       <div className="flex items-center gap-2">
                         <input
                           type="file"
-                          id="file-upload"
+                          ref={fileInputRef}
                           className="hidden"
                           onChange={handleFileSelect}
                           accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png"
+                          multiple
                         />
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() =>
-                            document.getElementById("file-upload")?.click()
-                          }
+                          onClick={() => fileInputRef.current?.click()}
                         >
                           <Paperclip className="h-4 w-4 mr-2" />
-                          Attach File
+                          Attach Files
                         </Button>
-                        {selectedFile && (
-                          <div className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded">
-                            {selectedFile.name}
-                            <button
-                              onClick={() => {
-                                setSelectedFile(null);
-                                setUploadPercent(0);
-                                setUploadMessage("");
-                                setUploadError(null);
-                              }}
-                              className="ml-2 text-red-500 hover:text-red-700"
-                            >
-                              ×
-                            </button>
+                        {selectedFiles.length > 0 && (
+                          <div className="flex flex-wrap gap-2">
+                            {selectedFiles.map((file, index) => (
+                              <div key={index} className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded flex items-center gap-1">
+                                {file.name}
+                                <button
+                                  onClick={() => removeFile(index)}
+                                  className="ml-1 text-red-500 hover:text-red-700"
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            ))}
                           </div>
                         )}
                       </div>
@@ -1579,7 +1590,7 @@ export default function TaskDetails() {
                         {submittingComment ? "Adding..." : "Add Comment"}
                       </Button>
                     </div>
-                    {selectedFile && (submittingComment || uploadPercent > 0 || uploadError) && (
+                    {selectedFiles.length > 0 && (submittingComment || uploadPercent > 0 || uploadError) && (
                       <div className="space-y-2">
                         <Progress value={uploadPercent} className="h-2" />
                         <div className="flex items-center justify-between text-xs text-muted-foreground">
@@ -1739,7 +1750,7 @@ export default function TaskDetails() {
                                       target="_blank"
                                       rel="noopener noreferrer"
                                     >
-                                      Download
+                                      View
                                     </a>
                                   </div>
                                 </div>
@@ -1764,7 +1775,7 @@ export default function TaskDetails() {
                                       target="_blank"
                                       rel="noopener noreferrer"
                                     >
-                                      Download
+                                      View
                                     </a>
                                   )}
                                 </div>

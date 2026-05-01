@@ -84,12 +84,13 @@ export default function OppurtunitiesDetailPage() {
         attachmentSize?: number;
         attachmentName?: string;
         attachmentUrl?: string;
+        attachments?: Array<{ name: string; url: string; size: number; type: string }>;
     }
 
     const [comments, setComments] = useState<Comment[]>([])
     const [loading, setLoading] = useState(true)
     const [newComment, setNewComment] = useState("")
-    const [selectedFile, setSelectedFile] = useState<File | null>(null)
+    const [selectedFiles, setSelectedFiles] = useState<File[]>([])
     const [uploadPercent, setUploadPercent] = useState(0)
     const [uploadMessage, setUploadMessage] = useState("")
     const [uploadError, setUploadError] = useState<string | null>(null)
@@ -157,13 +158,17 @@ export default function OppurtunitiesDetailPage() {
     }
 
     const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0]
-        if (file) {
-            setSelectedFile(file)
+        if (event.target.files && event.target.files.length > 0) {
+            setSelectedFiles(prev => [...prev, ...Array.from(event.target.files!)])
             setUploadPercent(0)
             setUploadMessage("")
             setUploadError(null)
+            event.target.value = ""
         }
+    }
+
+    const removeSelectedFile = (index: number) => {
+        setSelectedFiles(prev => prev.filter((_, i) => i !== index))
     }
 
     const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -221,21 +226,26 @@ export default function OppurtunitiesDetailPage() {
         setSubmitting(true);
         setUploadError(null)
         try {
-            let attachmentData = {}
-            if (selectedFile) {
+            let attachmentData: object = {}
+            if (selectedFiles.length > 0) {
                 try {
-                    const uploadResult = await uploadFileToS3Direct(selectedFile, {
-                        onProgress: (progress) => {
-                            setUploadPercent(progress.percent)
-                            setUploadMessage(progress.message)
-                        },
-                    });
-                    attachmentData = {
-                        attachmentName: uploadResult.originalName,
-                        attachmentSize: uploadResult.size,
-                        attachmentType: uploadResult.type,
-                        attachmentUrl: uploadResult.url,
-                    };
+                    const uploaded: Array<{ name: string; url: string; size: number; type: string }> = []
+                    for (let i = 0; i < selectedFiles.length; i++) {
+                        const file = selectedFiles[i]
+                        const uploadResult = await uploadFileToS3Direct(file, {
+                            onProgress: (progress) => {
+                                setUploadPercent(Math.round(((i / selectedFiles.length) + progress.percent / 100 / selectedFiles.length) * 100))
+                                setUploadMessage(`Uploading ${file.name}: ${progress.message}`)
+                            },
+                        });
+                        uploaded.push({
+                            name: uploadResult.originalName,
+                            size: uploadResult.size,
+                            type: uploadResult.type,
+                            url: uploadResult.url,
+                        })
+                    }
+                    attachmentData = { attachments: uploaded }
                 } catch (error) {
                     console.error("Failed to upload file", error)
                     setUploadError(error instanceof Error ? error.message : "Upload failed. Please retry.")
@@ -267,7 +277,7 @@ export default function OppurtunitiesDetailPage() {
                 const { comment } = await res.json();
                 setComments([comment, ...comments]);
                 setNewComment("");
-                setSelectedFile(null)
+                setSelectedFiles([])
                 setUploadPercent(0)
                 setUploadMessage("")
                 setUploadError(null)
@@ -518,7 +528,24 @@ export default function OppurtunitiesDetailPage() {
                                                     </div>
                                                 </div>
                                             )}
-                                            {comment.attachmentUrl && (
+                                            {comment.attachments && comment.attachments.length > 0 && (
+                                                <div className="flex flex-wrap gap-2 pt-2">
+                                                    {comment.attachments.map((att, idx) => (
+                                                        <a
+                                                            key={idx}
+                                                            href={getAttachmentUrl(att.url)}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="flex items-center gap-2 px-3 py-1.5 bg-muted rounded-md text-sm hover:bg-muted/80 transition-colors"
+                                                        >
+                                                            <Paperclip className="h-3 w-3 shrink-0" />
+                                                            <span className="max-w-[150px] truncate">{att.name}</span>
+                                                            <span className="text-xs text-muted-foreground">({(att.size / 1024).toFixed(1)} KB)</span>
+                                                        </a>
+                                                    ))}
+                                                </div>
+                                            )}
+                                            {!comment.attachments && comment.attachmentUrl && (
                                                 <div className="flex flex-wrap gap-2 pt-2">
                                                     {comment.attachmentType?.startsWith("image/") ? (
                                                         <a
@@ -640,20 +667,19 @@ export default function OppurtunitiesDetailPage() {
                                     </div>
                                 </div>
 
-                                {selectedFile && (
-                                    <div className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded w-fit">
-                                        {selectedFile.name}
-                                        <button
-                                            onClick={() => {
-                                                setSelectedFile(null)
-                                                setUploadPercent(0)
-                                                setUploadMessage("")
-                                                setUploadError(null)
-                                            }}
-                                            className="ml-2 text-red-500 hover:text-red-700"
-                                        >
-                                            x
-                                        </button>
+                                {selectedFiles.length > 0 && (
+                                    <div className="flex flex-wrap gap-2">
+                                        {selectedFiles.map((file, index) => (
+                                            <div key={index} className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded flex items-center gap-1">
+                                                <span className="max-w-[150px] truncate">{file.name}</span>
+                                                <button
+                                                    onClick={() => removeSelectedFile(index)}
+                                                    className="ml-1 text-red-500 hover:text-red-700"
+                                                >
+                                                    x
+                                                </button>
+                                            </div>
+                                        ))}
                                     </div>
                                 )}
 
@@ -682,6 +708,7 @@ export default function OppurtunitiesDetailPage() {
                                             className="hidden"
                                             onChange={handleFileSelect}
                                             accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png"
+                                            multiple
                                         />
                                         <Button
                                             type="button"
@@ -690,11 +717,11 @@ export default function OppurtunitiesDetailPage() {
                                             className="gap-2"
                                         >
                                             <Paperclip className="h-4 w-4" />
-                                            Attach File
+                                            Attach Files
                                         </Button>
                                     </div>
                                 </div>
-                                {selectedFile && (submitting || uploadPercent > 0 || uploadError) && (
+                                {selectedFiles.length > 0 && (submitting || uploadPercent > 0 || uploadError) && (
                                     <div className="space-y-2">
                                         <Progress value={uploadPercent} className="h-2" />
                                         <div className="flex items-center justify-between text-xs text-muted-foreground">

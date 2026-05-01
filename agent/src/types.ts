@@ -168,6 +168,7 @@ export interface Comment {
   attachmentUrl?: string;
   attachmentSize?: number;
   attachmentType?: string;
+  attachments?: { name: string; url: string; size: number; type: string }[];
   user?: {
     id: string;
     username: string;

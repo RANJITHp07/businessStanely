@@ -189,6 +189,7 @@ export async function POST(
       attachmentUrl,
       attachmentSize,
       attachmentType,
+      attachments,
     } = body;
     if (!content) {
       return NextResponse.json(
@@ -212,6 +213,11 @@ export async function POST(
           attachmentUrl,
           attachmentSize,
           attachmentType,
+          ...(attachments &&
+          Array.isArray(attachments) &&
+          attachments.length > 0
+            ? { attachments }
+            : {}),
           authorId: agent.id,
           authorType: "AGENT",
           prospectId: id,

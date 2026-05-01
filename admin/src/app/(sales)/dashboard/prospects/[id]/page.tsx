@@ -28,7 +28,10 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { Separator } from "@/components/ui/separator"
+import { Progress } from "@/components/ui/progress"
+import { uploadFileToS3Direct } from "@/lib/directUpload"
 import { cn } from "@/lib/utils"
+
 
 interface Prospect {
     id: string;
@@ -68,6 +71,7 @@ interface Comment {
     user?: { username?: string };
     attachmentName?: string;
     attachmentUrl?: string;
+    attachments?: Array<{ name: string; url: string; size: number; type: string }>;
 }
 
 export default function ProspectDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -79,6 +83,9 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
     const [newComment, setNewComment] = useState("")
     const [attachments, setAttachments] = useState<File[]>([])
     const [submitting, setSubmitting] = useState(false)
+    const [uploadPercent, setUploadPercent] = useState(0)
+    const [uploadMessage, setUploadMessage] = useState("")
+    const [uploadError, setUploadError] = useState<string | null>(null)
     const [nextFollowUpDate, setNextFollowUpDate] = useState<Date | undefined>(undefined)
 
     useEffect(() => {
@@ -169,18 +176,40 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
         if (isCommentDisabled) return;
         if (!newComment.trim() && attachments.length === 0) return;
         setSubmitting(true);
+        setUploadError(null);
         try {
-            // TODO: Replace with actual user context
-            const authorId = "current-user-id";
-            const authorType = "ADMIN";
+            let attachmentData: object = {}
+            if (attachments.length > 0) {
+                try {
+                    const uploaded: Array<{ name: string; url: string; size: number; type: string }> = []
+                    for (let i = 0; i < attachments.length; i++) {
+                        const file = attachments[i]
+                        const uploadResult = await uploadFileToS3Direct(file, {
+                            onProgress: (progress) => {
+                                setUploadPercent(Math.round(((i / attachments.length) + progress.percent / 100 / attachments.length) * 100))
+                                setUploadMessage(`Uploading ${file.name}: ${progress.message}`)
+                            },
+                        });
+                        uploaded.push({
+                            name: uploadResult.originalName,
+                            size: uploadResult.size,
+                            type: uploadResult.type,
+                            url: uploadResult.url,
+                        })
+                    }
+                    attachmentData = { attachments: uploaded }
+                } catch (error) {
+                    setUploadError(error instanceof Error ? error.message : "Upload failed. Please retry.")
+                    setSubmitting(false)
+                    return;
+                }
+            }
             const res = await fetch(`/api/prospects/${resolvedParams.id}`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     content: newComment,
-                    authorId,
-                    authorType,
-                    // Attachments logic can be expanded here
+                    ...attachmentData
                 }),
             });
             if (res.ok) {
@@ -191,6 +220,9 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
                 }
                 setNewComment("");
                 setAttachments([]);
+                setUploadPercent(0);
+                setUploadMessage("");
+                setUploadError(null);
             }
         } catch (err) {
             // Handle error
@@ -401,7 +433,24 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
                                                 </div>
                                             </div>
                                             <p className="text-sm leading-relaxed">{comment.content}</p>
-                                            {comment.attachmentUrl && (
+                                            {comment.attachments && comment.attachments.length > 0 && (
+                                                <div className="flex flex-wrap gap-2 pt-2">
+                                                    {comment.attachments.map((att, idx) => (
+                                                        <a
+                                                            key={idx}
+                                                            href={att.url}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="flex items-center gap-2 px-3 py-1.5 bg-muted rounded-md text-sm hover:bg-muted/80 transition-colors"
+                                                        >
+                                                            <Paperclip className="h-3 w-3 shrink-0" />
+                                                            <span className="max-w-[150px] truncate">{att.name}</span>
+                                                            <span className="text-xs text-muted-foreground">({(att.size / 1024).toFixed(1)} KB)</span>
+                                                        </a>
+                                                    ))}
+                                                </div>
+                                            )}
+                                            {!comment.attachments && comment.attachmentUrl && (
                                                 <div className="flex flex-wrap gap-2 pt-2">
                                                     <a
                                                         href={comment.attachmentUrl}
@@ -474,6 +523,26 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
                                         </Button>
                                     </div>
                                 </div>
+                                {attachments.length > 0 && (submitting || uploadPercent > 0 || uploadError) && (
+                                    <div className="space-y-2">
+                                        <Progress value={uploadPercent} className="h-2" />
+                                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                                            <span>{uploadError || uploadMessage || "Ready to upload"}</span>
+                                            <span>{uploadPercent}%</span>
+                                        </div>
+                                        {uploadError && (
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={handleSubmitComment}
+                                                disabled={submitting || isCommentDisabled}
+                                            >
+                                                Retry Upload
+                                            </Button>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                         </CardContent>
                     </Card>

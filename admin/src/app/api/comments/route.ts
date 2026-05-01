@@ -14,6 +14,7 @@ export async function POST(req: NextRequest) {
       attachmentUrl,
       attachmentSize,
       attachmentType,
+      attachments,
       commentDate,
       startTime,
       endTime,
@@ -22,7 +23,7 @@ export async function POST(req: NextRequest) {
     if (!content || !taskId || !authorId) {
       return NextResponse.json(
         { error: "Content, taskId, and authorId are required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -38,7 +39,7 @@ export async function POST(req: NextRequest) {
     if (!user && !agent) {
       return NextResponse.json(
         { error: "Invalid authorId. No user or agent found with this ID." },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -56,6 +57,9 @@ export async function POST(req: NextRequest) {
       commentData.attachmentUrl = attachmentUrl;
       commentData.attachmentSize = attachmentSize;
       commentData.attachmentType = attachmentType;
+    }
+    if (attachments && Array.isArray(attachments) && attachments.length > 0) {
+      (commentData as any).attachments = attachments;
     }
 
     // Add timesheet fields if provided
@@ -110,7 +114,7 @@ export async function POST(req: NextRequest) {
     }
     return NextResponse.json(
       { error: "Failed to create comment" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -123,7 +127,7 @@ export async function GET(req: NextRequest) {
     if (!taskId) {
       return NextResponse.json(
         { error: "taskId is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -156,7 +160,7 @@ export async function GET(req: NextRequest) {
     console.error("Error fetching comments:", error);
     return NextResponse.json(
       { error: "Failed to fetch comments" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -169,7 +173,7 @@ export async function DELETE(req: NextRequest) {
     if (!commentId) {
       return NextResponse.json(
         { error: "commentId is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -198,7 +202,7 @@ export async function DELETE(req: NextRequest) {
     console.error("Error deleting comment:", error);
     return NextResponse.json(
       { error: "Failed to delete comment" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

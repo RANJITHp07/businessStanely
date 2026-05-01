@@ -374,6 +374,7 @@ model Comment {
   attachmentUrl  String?
   attachmentSize Int?
   attachmentType String?
+  attachments    Json?   // Array of {name, url, size, type} for multiple file attachments
 
   // Timesheet fields for task comments
   commentDate DateTime? // The date when the comment/work was done (defaults to createdAt if not provided)

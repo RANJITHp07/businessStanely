@@ -20,6 +20,7 @@ export async function POST(req: NextRequest) {
       attachmentUrl,
       attachmentSize,
       attachmentType,
+      attachments,
       commentDate,
       startTime,
       endTime,
@@ -77,6 +78,9 @@ export async function POST(req: NextRequest) {
       commentData.attachmentUrl = attachmentUrl;
       commentData.attachmentSize = attachmentSize;
       commentData.attachmentType = attachmentType;
+    }
+    if (attachments && Array.isArray(attachments) && attachments.length > 0) {
+      (commentData as any).attachments = attachments;
     }
 
     // Add timesheet fields if provided

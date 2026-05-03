@@ -223,7 +223,14 @@ export async function PUT(
     // Allow update if agent is creator, assigned, or superior of assigned agent
     const task = await prisma.task.findUnique({
       where: { id: taskId },
-      select: { createdById: true, assignedToId: true, dueDate: true },
+      select: {
+        createdById: true,
+        assignedToId: true,
+        dueDate: true,
+        status: true,
+        followUpDuration: true,
+        statusCheckDuration: true,
+      },
     });
     if (!task) {
       return NextResponse.json({ error: "Task not found" }, { status: 404 });
@@ -358,6 +365,45 @@ export async function PUT(
         },
       },
     });
+
+    // Upsert daily duration audit entries
+    const today = new Date().toISOString().slice(0, 10);
+    const durationFields = [
+      {
+        field: "followUpDuration",
+        bodyVal: body.followUpDuration,
+        currentVal: task.followUpDuration,
+      },
+      {
+        field: "statusCheckDuration",
+        bodyVal: body.statusCheckDuration,
+        currentVal: task.statusCheckDuration,
+      },
+    ] as const;
+    for (const { field, bodyVal, currentVal } of durationFields) {
+      if (bodyVal !== undefined && bodyVal !== currentVal) {
+        const existing = await prisma.taskDurationAudit.findFirst({
+          where: { taskId, field, auditDate: today },
+        });
+        if (existing) {
+          await prisma.taskDurationAudit.update({
+            where: { id: existing.id },
+            data: { newValue: bodyVal },
+          });
+        } else {
+          await prisma.taskDurationAudit.create({
+            data: {
+              taskId,
+              field,
+              oldValue: currentVal ?? "None",
+              newValue: bodyVal,
+              auditDate: today,
+              changedByAgentId: agent.id,
+            },
+          });
+        }
+      }
+    }
 
     // Check if task is transitioning from not completed to completed and has recurring setting
     // Recurring tasks are handled automatically by calendar schedule via cron job

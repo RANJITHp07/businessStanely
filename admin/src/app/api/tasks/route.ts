@@ -21,6 +21,7 @@ export async function POST(req: NextRequest) {
       recurringType,
       triggerDate,
       active,
+      followUpDuration,
       statusCheckDuration,
     } = body;
 
@@ -52,6 +53,7 @@ export async function POST(req: NextRequest) {
         legislationId: legislationId || null, // Save legislationId
         recurring: recurringValue, // Save recurring field
         recurringType,
+        followUpDuration: followUpDuration || "None",
         statusCheckDuration: statusCheckDuration || "48hr",
         active,
       },
@@ -61,6 +63,28 @@ export async function POST(req: NextRequest) {
         assignedTo: true,
         category: true,
       },
+    });
+
+    const today = new Date().toISOString().slice(0, 10);
+    const initialDurationAudits = [
+      {
+        field: "followUpDuration",
+        value: newTask.followUpDuration || "None",
+      },
+      {
+        field: "statusCheckDuration",
+        value: newTask.statusCheckDuration || "None",
+      },
+    ] as const;
+
+    await prisma.taskDurationAudit.createMany({
+      data: initialDurationAudits.map(({ field, value }) => ({
+        taskId: newTask.id,
+        field,
+        oldValue: "None",
+        newValue: value,
+        auditDate: today,
+      })),
     });
 
     // Initialize recurring fields if this is a recurring task

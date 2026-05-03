@@ -205,6 +205,7 @@ model Agent {
   serviceRecords ServiceRecord[] @relation("AgentServiceRecords")
   loginHistory   LoginHistory[]
   timesheetEntries TimesheetEntry[] @relation("TimesheetEntries")
+  durationAudits TaskDurationAudit[]
   
 }
 
@@ -290,6 +291,7 @@ model Task {
 
   comments Comment[]
   timeLogs TimeLog[]
+  durationAudits TaskDurationAudit[]
 
   // Add this to the Task model
   retainershipId String? @db.ObjectId
@@ -297,6 +299,20 @@ model Task {
 
   @@index([assignedToId, legislationId, active, statusCheckDuration, status])
   @@index([categoryId, assignedToId, status, active])
+}
+
+model TaskDurationAudit {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  taskId    String   @db.ObjectId
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  field     String   // "followUpDuration" or "statusCheckDuration"
+  oldValue  String?  // Value before the first change of the day
+  newValue  String?  // Latest value set on this day
+  auditDate String   // "YYYY-MM-DD" — one entry per (task, field, day)
+  changedByAgentId String? @db.ObjectId
+  changedByAgent   Agent?  @relation(fields: [changedByAgentId], references: [id])
+  changedAt DateTime @default(now()) @updatedAt
+  createdAt DateTime @default(now())
 }
 
 model Legislation {

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { getCurrentAdmin } from "@/lib/auth";
 
@@ -18,19 +19,22 @@ const normalizeInteractionType = (content?: string): InteractionKind => {
 };
 
 const parseDurationMs = (value?: string | null): number | null => {
-  if (!value) return null;
+  if (!value || value === "None") return null;
   return DURATION_MS[value] ?? null;
 };
 
 const hasExceededDuration = (
   referenceDate: Date,
   durationMs: number,
+  pointInTime: Date,
 ): boolean => {
-  return Date.now() - referenceDate.getTime() > durationMs;
+  return pointInTime.getTime() - referenceDate.getTime() > durationMs;
 };
 
-const isCompletedStatus = (status?: string | null): boolean => {
-  return (status || "").trim().toLowerCase() === "completed";
+const durationLabelFromMs = (value: number): "24hr" | "48hr" | "1w" => {
+  if (value === DURATION_MS["48hr"]) return "48hr";
+  if (value === DURATION_MS["1w"]) return "1w";
+  return "24hr";
 };
 
 const getLatestDate = (
@@ -62,6 +66,7 @@ export async function GET(req: NextRequest) {
 
     const { searchParams } = new URL(req.url);
     const assignedToId = searchParams.get("assignedToId");
+    const dateParam = searchParams.get("date");
 
     if (!assignedToId) {
       return NextResponse.json(
@@ -70,35 +75,79 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const tasks = await prisma.task.findMany({
-      where: {
+    let snapshotDate = new Date();
+    if (dateParam) {
+      const parsed = new Date(dateParam);
+      if (isNaN(parsed.getTime())) {
+        return NextResponse.json(
+          { error: "Invalid date format. Use YYYY-MM-DD" },
+          { status: 400 },
+        );
+      }
+      parsed.setHours(23, 59, 59, 999);
+      snapshotDate = parsed;
+    }
+
+    const snapshotDateKey = snapshotDate.toISOString().slice(0, 10);
+
+    const baseAndFilters: Prisma.TaskWhereInput[] = [
+      {
         assignedToId,
         active: true,
-        status: { notIn: ["Completed", "completed"] },
+        status: { in: ["In Progress", "in progress"] },
+        createdAt: { lte: snapshotDate },
       },
-      include: {
-        client: {
-          select: {
-            id: true,
-            clientType: true,
-            firstName: true,
-            lastName: true,
-            organizationName: true,
-          },
+    ];
+
+    const buildWhere = (
+      extraFilters: Prisma.TaskWhereInput[],
+    ): Prisma.TaskWhereInput => ({
+      AND: [...baseAndFilters, ...extraFilters],
+    });
+
+    const taskInclude = {
+      client: {
+        select: {
+          id: true,
+          clientType: true,
+          firstName: true,
+          lastName: true,
+          organizationName: true,
         },
-        comments: {
-          select: {
-            createdAt: true,
-            content: true,
-          },
-          orderBy: {
-            createdAt: "desc",
-          },
+      },
+      comments: {
+        where: {
+          createdAt: { lte: snapshotDate },
+        },
+        select: {
+          createdAt: true,
+          content: true,
+        },
+        orderBy: {
+          createdAt: "desc" as const,
         },
       },
-      orderBy: {
-        updatedAt: "desc",
+      durationAudits: {
+        where: {
+          auditDate: { lte: snapshotDateKey },
+        },
+        select: {
+          field: true,
+          newValue: true,
+          auditDate: true,
+          changedAt: true,
+        },
+        orderBy: [
+          { auditDate: "desc" as const },
+          { changedAt: "desc" as const },
+        ],
       },
+    };
+
+    const tasks = await prisma.task.findMany({
+      where: buildWhere([]),
+      include: taskInclude,
+      orderBy: { updatedAt: "desc" },
     });
 
     const notTouchedTasks = [] as Array<{
@@ -135,64 +184,87 @@ export async function GET(req: NextRequest) {
       referenceAt: string;
     }>;
 
-    for (const task of tasks) {
-      if (isCompletedStatus(task.status)) continue;
+    const getClientName = (task: {
+      client: {
+        clientType: string;
+        firstName: string | null;
+        lastName: string | null;
+        organizationName: string | null;
+      } | null;
+    }) => {
+      if (!task.client) return "N/A";
 
-      const clientName = task.client
-        ? task.client.clientType === "organization"
-          ? task.client.organizationName || "N/A"
-          : `${task.client.firstName || ""} ${task.client.lastName || ""}`.trim() ||
-            "N/A"
-        : "N/A";
+      if (task.client.clientType === "organization") {
+        return task.client.organizationName || "N/A";
+      }
+
+      return (
+        `${task.client.firstName || ""} ${task.client.lastName || ""}`.trim() ||
+        "N/A"
+      );
+    };
+
+    for (const task of tasks) {
+      const latestAuditValue = (
+        field: "followUpDuration" | "statusCheckDuration",
+      ) => {
+        const latestAudit = task.durationAudits.find(
+          (audit) => audit.field === field,
+        );
+        return latestAudit?.newValue || null;
+      };
+
+      const effectiveFollowUpDuration =
+        latestAuditValue("followUpDuration") || task.followUpDuration || "None";
+      const effectiveStatusCheckDuration =
+        latestAuditValue("statusCheckDuration") ||
+        task.statusCheckDuration ||
+        "None";
 
       const latestNormal = getLatestDate(task.comments, "NORMAL");
       const latestClientUpdate = getLatestDate(task.comments, "CLIENT_UPDATE");
       const latestAny = getLatestDate(task.comments, "ANY");
+      const clientName = getClientName(task);
 
-      // 1) Not Touched: follow-up None + no normal interaction in last 24h
-      if ((task.followUpDuration || "None") === "None") {
+      if (effectiveFollowUpDuration === "None") {
         const reference = latestNormal || task.createdAt;
-        if (hasExceededDuration(reference, DURATION_MS["24hr"])) {
+        if (hasExceededDuration(reference, DURATION_MS["24hr"], snapshotDate)) {
           notTouchedTasks.push({
             id: task.id,
             title: task.title,
             status: task.status,
             priority: task.priority,
-            followUpDuration: task.followUpDuration || null,
-            statusCheckDuration: task.statusCheckDuration || null,
+            followUpDuration: effectiveFollowUpDuration,
+            statusCheckDuration: effectiveStatusCheckDuration,
             clientName,
             referenceAt: reference.toISOString(),
           });
         }
       }
 
-      // 2) Client Not Updated: any follow-up + only client-update interactions + overdue by expected duration
       const expectedMs =
-        parseDurationMs(task.statusCheckDuration) ||
-        parseDurationMs(task.followUpDuration) ||
+        parseDurationMs(effectiveStatusCheckDuration) ||
+        parseDurationMs(effectiveFollowUpDuration) ||
         DURATION_MS["24hr"];
-      const clientUpdateReference = latestClientUpdate || task.createdAt;
-      if (hasExceededDuration(clientUpdateReference, expectedMs)) {
+      const clientReference = latestClientUpdate || task.createdAt;
+
+      if (hasExceededDuration(clientReference, expectedMs, snapshotDate)) {
         clientNotUpdatedTasks.push({
           id: task.id,
           title: task.title,
           status: task.status,
           priority: task.priority,
-          followUpDuration: task.followUpDuration || null,
-          statusCheckDuration: task.statusCheckDuration || null,
+          followUpDuration: effectiveFollowUpDuration,
+          statusCheckDuration: effectiveStatusCheckDuration,
           clientName,
-          referenceAt: clientUpdateReference.toISOString(),
-          expectedDuration:
-            Object.entries(DURATION_MS).find(
-              ([, value]) => value === expectedMs,
-            )?.[0] || "24hr",
+          referenceAt: clientReference.toISOString(),
+          expectedDuration: durationLabelFromMs(expectedMs),
         });
       }
 
-      // 3) Follow-up & Status Not Done: 48hr/1w + no interaction in duration + follow-up not completed + status not updated
-      const followUpDurationMs = parseDurationMs(task.followUpDuration);
+      const followUpDurationMs = parseDurationMs(effectiveFollowUpDuration);
       const isEligibleFollowUp = ["48hr", "1w"].includes(
-        task.followUpDuration || "",
+        effectiveFollowUpDuration,
       );
       const followUpNotDone = !task.followUpRequired;
       const statusNotUpdated = !task.completed;
@@ -204,14 +276,14 @@ export async function GET(req: NextRequest) {
         statusNotUpdated
       ) {
         const reference = latestAny || task.createdAt;
-        if (hasExceededDuration(reference, followUpDurationMs)) {
+        if (hasExceededDuration(reference, followUpDurationMs, snapshotDate)) {
           followUpStatusNotDoneTasks.push({
             id: task.id,
             title: task.title,
             status: task.status,
             priority: task.priority,
-            followUpDuration: task.followUpDuration || null,
-            statusCheckDuration: task.statusCheckDuration || null,
+            followUpDuration: effectiveFollowUpDuration,
+            statusCheckDuration: effectiveStatusCheckDuration,
             clientName,
             referenceAt: reference.toISOString(),
           });
@@ -219,10 +291,49 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    const overdueRaw = await prisma.task.findMany({
+      where: {
+        assignedToId,
+        active: true,
+        status: { notIn: ["Completed", "completed"] },
+        dueDate: { lte: snapshotDate, not: null },
+      },
+      select: {
+        id: true,
+        title: true,
+        status: true,
+        priority: true,
+        followUpDuration: true,
+        statusCheckDuration: true,
+        dueDate: true,
+        client: {
+          select: {
+            clientType: true,
+            firstName: true,
+            lastName: true,
+            organizationName: true,
+          },
+        },
+      },
+      orderBy: { dueDate: "asc" },
+    });
+
+    const overdueTasks = overdueRaw.map((task) => ({
+      id: task.id,
+      title: task.title,
+      status: task.status,
+      priority: task.priority,
+      followUpDuration: task.followUpDuration,
+      statusCheckDuration: task.statusCheckDuration,
+      clientName: getClientName(task),
+      referenceAt: task.dueDate?.toISOString() ?? "",
+    }));
+
     return NextResponse.json({
       notTouchedTasks,
       clientNotUpdatedTasks,
       followUpStatusNotDoneTasks,
+      overdueTasks,
     });
   } catch (error) {
     console.error("Error in dashboard-status route:", error);

@@ -159,6 +159,44 @@ export async function PUT(
       data,
     });
 
+    // Upsert daily duration audit entries
+    const today = new Date().toISOString().slice(0, 10);
+    const durationFields = [
+      {
+        field: "followUpDuration",
+        bodyVal: body.followUpDuration,
+        currentVal: currentTask.followUpDuration,
+      },
+      {
+        field: "statusCheckDuration",
+        bodyVal: body.statusCheckDuration,
+        currentVal: currentTask.statusCheckDuration,
+      },
+    ] as const;
+    for (const { field, bodyVal, currentVal } of durationFields) {
+      if (bodyVal !== undefined && bodyVal !== currentVal) {
+        const existing = await prisma.taskDurationAudit.findFirst({
+          where: { taskId: id, field, auditDate: today },
+        });
+        if (existing) {
+          await prisma.taskDurationAudit.update({
+            where: { id: existing.id },
+            data: { newValue: bodyVal },
+          });
+        } else {
+          await prisma.taskDurationAudit.create({
+            data: {
+              taskId: id,
+              field,
+              oldValue: currentVal ?? "None",
+              newValue: bodyVal,
+              auditDate: today,
+            },
+          });
+        }
+      }
+    }
+
     return NextResponse.json(updatedTask);
   } catch (error) {
     console.error(`Error updating task ${params.id}:`, error);

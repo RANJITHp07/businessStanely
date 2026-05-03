@@ -4,7 +4,13 @@ import { useState, useEffect, Fragment } from "react";
 import { notFound, useParams, useRouter, useSearchParams } from "next/navigation";
 import { SectionTable } from "@/components/SectionTable";
 import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -58,11 +64,13 @@ import {
   Building2,
   PlusCircle,
   AlertTriangle,
+  Calendar as CalendarIcon,
 } from "lucide-react";
 import { Agent, Client, Task } from "@/types";
 import Link from "next/link";
 import { fetchWithAuth } from "@/lib/fetchWithAuth";
 import { hasAdvisorRole, hasExecutionRole } from "@/lib/agentRole";
+import { cn } from "@/lib/utils";
 import { ProspectTable } from "@/app/(sales)/dashboard/prospects/tables/page";
 import { ProspectsTable } from "@/app/(sales)/dashboard/opportunities/tables/page";
 
@@ -139,6 +147,7 @@ interface DashboardStatusResponse {
   notTouchedTasks: DashboardTaskItem[];
   clientNotUpdatedTasks: DashboardTaskItem[];
   followUpStatusNotDoneTasks: DashboardTaskItem[];
+  overdueTasks: DashboardTaskItem[];
 }
 
 function parseTaskResponse(data: Task[] | { tasks?: Task[] }) {
@@ -209,6 +218,20 @@ function formatDateDMY(dateString: string) {
   });
 }
 
+function toISODate(value: Date) {
+  const year = value.getFullYear();
+  const month = String(value.getMonth() + 1).padStart(2, "0");
+  const day = String(value.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function formatDateDDMMYY(value: Date) {
+  const day = String(value.getDate()).padStart(2, "0");
+  const month = String(value.getMonth() + 1).padStart(2, "0");
+  const year = String(value.getFullYear()).slice(-2);
+  return `${day}/${month}/${year}`;
+}
+
 function mergeTeamMembers(agentData: Agent) {
   const combinedMembers = [
     ...(agentData.subordinates || []),
@@ -246,7 +269,11 @@ export default function AgentDetails() {
     notTouchedTasks: [],
     clientNotUpdatedTasks: [],
     followUpStatusNotDoneTasks: [],
+    overdueTasks: [],
   });
+  const [dashboardDate, setDashboardDate] = useState<Date | undefined>(
+    () => new Date(),
+  );
 
   // Keep activeTab in sync with the tab query param
   useEffect(() => {
@@ -318,8 +345,9 @@ export default function AgentDetails() {
           const dataRequests: Promise<void>[] = [];
 
           if (hasExecutionAccess) {
+            const today = new Date();
             dataRequests.push(
-              fetchDashboardStatus(),
+              fetchDashboardStatus(today),
               fetchAgentTasks(),
               fetchAgentRetainershipTasks(),
               fetchAgentTriggerTasks(),
@@ -364,22 +392,26 @@ export default function AgentDetails() {
       }
     };
 
-    const fetchDashboardStatus = async () => {
+    const fetchDashboardStatus = async (date?: Date) => {
       try {
         setDashboardLoading(true);
-        const response = await fetchWithAuth(`/api/agents/dashboard-status?assignedToId=${id}`);
+        const params = new URLSearchParams({ assignedToId: id });
+        if (date) params.set("date", toISODate(date));
+        const response = await fetchWithAuth(`/api/agents/dashboard-status?${params.toString()}`);
         if (response.ok) {
           const data = (await response.json()) as DashboardStatusResponse;
           setDashboardData({
             notTouchedTasks: data.notTouchedTasks || [],
             clientNotUpdatedTasks: data.clientNotUpdatedTasks || [],
             followUpStatusNotDoneTasks: data.followUpStatusNotDoneTasks || [],
+            overdueTasks: data.overdueTasks || [],
           });
         } else {
           setDashboardData({
             notTouchedTasks: [],
             clientNotUpdatedTasks: [],
             followUpStatusNotDoneTasks: [],
+            overdueTasks: [],
           });
         }
       } catch (error) {
@@ -388,6 +420,7 @@ export default function AgentDetails() {
           notTouchedTasks: [],
           clientNotUpdatedTasks: [],
           followUpStatusNotDoneTasks: [],
+          overdueTasks: [],
         });
       } finally {
         setDashboardLoading(false);
@@ -825,7 +858,12 @@ export default function AgentDetails() {
     if (!value) return "-";
     const date = new Date(value);
     if (isNaN(date.getTime())) return "-";
-    return date.toLocaleString();
+    const formattedDate = formatDateDDMMYY(date);
+    const formattedTime = date.toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+    return `${formattedDate} ${formattedTime}`;
   };
 
   const renderDashboardTable = (
@@ -834,9 +872,10 @@ export default function AgentDetails() {
     rows: DashboardTaskItem[],
     compact: boolean = false,
     accentColor: string = "border-l-gray-300",
+    referenceLabel: string = "Last Relevant Interaction",
   ) => {
     return (
-      <Card className={`border-l-4 ${accentColor}`}>
+      <Card className={`border-l-4 min-h-30 ${accentColor}`}>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <CardTitle className="text-base font-semibold">{title}</CardTitle>
@@ -863,8 +902,8 @@ export default function AgentDetails() {
                   <TableRow className="bg-muted/40 hover:bg-muted/40">
                     <TableHead className="text-xs font-semibold w-8">#</TableHead>
                     <TableHead className="text-xs font-semibold">Task</TableHead>
-                    <TableHead className="text-xs font-semibold">Client</TableHead>
-                    <TableHead className="text-xs font-semibold">Last Relevant Interaction</TableHead>
+                    <TableHead className="text-xs font-semibold w-55 min-w-55">Client</TableHead>
+                    <TableHead className="text-xs font-semibold">{referenceLabel}</TableHead>
                     {!compact && <TableHead className="text-xs font-semibold">Follow-up</TableHead>}
                     {!compact && <TableHead className="text-xs font-semibold">Status Check</TableHead>}
                     {!compact && <TableHead className="text-xs font-semibold">Status</TableHead>}
@@ -879,8 +918,8 @@ export default function AgentDetails() {
                       onClick={compact ? () => router.push(`/task/${item.id}`) : undefined}
                     >
                       <TableCell className="text-xs text-muted-foreground">{idx + 1}</TableCell>
-                      <TableCell className="font-medium text-sm">{item.title}</TableCell>
-                      <TableCell className="text-sm">{item.clientName || "N/A"}</TableCell>
+                      <TableCell className="font-medium text-sm max-w-32 truncate">{item.title}</TableCell>
+                      <TableCell className="text-sm max-w-32 truncate">{item.clientName || "N/A"}</TableCell>
                       <TableCell className="text-sm">{formatDashboardDateTime(item.referenceAt)}</TableCell>
                       {!compact && <TableCell className="text-sm">{item.followUpDuration || "None"}</TableCell>}
                       {!compact && <TableCell className="text-sm">{item.statusCheckDuration || "None"}</TableCell>}
@@ -1055,12 +1094,104 @@ export default function AgentDetails() {
 
         {showExecutionTabs && (
           <TabsContent value="dashboard" className="space-y-6">
-            <div className="flex items-start justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
                 <h2 className="text-xl font-semibold">SLA Dashboard</h2>
                 <p className="text-muted-foreground text-sm">
                   Task attention overview for <span className="font-medium text-foreground">{agent.name}</span>
                 </p>
+              </div>
+              {/* Date snapshot filter */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "h-8 w-56 justify-start text-left font-normal",
+                        !dashboardDate && "text-muted-foreground",
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {dashboardDate
+                        ? formatDateDDMMYY(dashboardDate)
+                        : "Select date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="end">
+                    <Calendar
+                      mode="single"
+                      selected={dashboardDate}
+                      onSelect={setDashboardDate}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
+                <Button
+                  size="sm"
+                  className="h-8"
+                  onClick={() => {
+                    const fetchDashboard = async () => {
+                      try {
+                        setDashboardLoading(true);
+                        const params = new URLSearchParams({ assignedToId: id });
+                        if (dashboardDate) params.set("date", toISODate(dashboardDate));
+                        const response = await fetchWithAuth(`/api/agents/dashboard-status?${params.toString()}`);
+                        if (response.ok) {
+                          const data = (await response.json()) as DashboardStatusResponse;
+                          setDashboardData({
+                            notTouchedTasks: data.notTouchedTasks || [],
+                            clientNotUpdatedTasks: data.clientNotUpdatedTasks || [],
+                            followUpStatusNotDoneTasks: data.followUpStatusNotDoneTasks || [],
+                            overdueTasks: data.overdueTasks || [],
+                          });
+                        }
+                      } catch (err) {
+                        console.error(err);
+                      } finally {
+                        setDashboardLoading(false);
+                      }
+                    };
+                    fetchDashboard();
+                  }}
+                >
+                  Apply
+                </Button>
+                {dashboardDate && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-8"
+                    onClick={() => {
+                      const today = new Date();
+                      setDashboardDate(today);
+                      const fetchDashboard = async () => {
+                        try {
+                          setDashboardLoading(true);
+                          const params = new URLSearchParams({ assignedToId: id });
+                          params.set("date", toISODate(today));
+                          const response = await fetchWithAuth(`/api/agents/dashboard-status?${params.toString()}`);
+                          if (response.ok) {
+                            const data = (await response.json()) as DashboardStatusResponse;
+                            setDashboardData({
+                              notTouchedTasks: data.notTouchedTasks || [],
+                              clientNotUpdatedTasks: data.clientNotUpdatedTasks || [],
+                              followUpStatusNotDoneTasks: data.followUpStatusNotDoneTasks || [],
+                              overdueTasks: data.overdueTasks || [],
+                            });
+                          }
+                        } catch (err) {
+                          console.error(err);
+                        } finally {
+                          setDashboardLoading(false);
+                        }
+                      };
+                      fetchDashboard();
+                    }}
+                  >
+                    Today
+                  </Button>
+                )}
               </div>
             </div>
 
@@ -1072,7 +1203,7 @@ export default function AgentDetails() {
             ) : (
               <div className="space-y-6">
                 {/* Summary stat cards */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   <Card className="border-l-4 border-l-amber-500">
                     <CardContent className="p-4 flex items-center justify-between">
                       <div>
@@ -1106,6 +1237,17 @@ export default function AgentDetails() {
                       </div>
                     </CardContent>
                   </Card>
+                  <Card className="border-l-4 border-l-rose-500">
+                    <CardContent className="p-4 flex items-center justify-between">
+                      <div>
+                        <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Overdue</p>
+                        <p className="text-2xl font-bold mt-0.5">{dashboardData.overdueTasks.length}</p>
+                      </div>
+                      <div className="h-10 w-10 rounded-full bg-rose-50 flex items-center justify-center shrink-0">
+                        <AlertTriangle className="h-5 w-5 text-rose-600" />
+                      </div>
+                    </CardContent>
+                  </Card>
                 </div>
 
                 {/* Side-by-side compact tables */}
@@ -1130,13 +1272,27 @@ export default function AgentDetails() {
                   </div>
                 </div>
 
-                {renderDashboardTable(
-                  "Follow-up & Status Not Done (48hrs / 1 Week)",
-                  "Includes only 48hr/1w follow-ups where no interaction happened in duration, follow-up is not done, and status is not updated.",
-                  dashboardData.followUpStatusNotDoneTasks,
-                  false,
-                  "border-l-purple-500",
-                )}
+                <div className="flex flex-col lg:flex-row gap-6 items-start">
+                  <div className="flex-1 min-w-0">
+                    {renderDashboardTable(
+                      "Follow-up & Status Not Done (48hrs / 1 Week)",
+                      "Includes only 48hr/1w follow-ups where no interaction happened in duration, follow-up is not done, and status is not updated.",
+                      dashboardData.followUpStatusNotDoneTasks,
+                      true,
+                      "border-l-purple-500",
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    {renderDashboardTable(
+                      "Overdue Tasks",
+                      "Tasks whose due date has passed and are still active and incomplete.",
+                      dashboardData.overdueTasks,
+                      true,
+                      "border-l-rose-500",
+                      "Due Date",
+                    )}
+                  </div>
+                </div>
               </div>
             )}
           </TabsContent>

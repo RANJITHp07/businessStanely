@@ -928,7 +928,7 @@ export default function TaskDetails() {
               <div className="flex gap-2">
                 <div className="space-y-2 w-1/4">
                   <Label htmlFor="follow-up-duration" className="text-sm font-medium cursor-pointer">
-                    StatusCheck&Followup
+                    StatusCheck & Followup
                   </Label>
                   <Select
                     value={taskData.followUpDuration || "None"}
@@ -1453,7 +1453,7 @@ export default function TaskDetails() {
                           ) : (
                             <Clock className="h-3 w-3 text-gray-400" />
                           )}
-                          StatusCheck&Followup
+                          StatusCheck & Followup
                         </span>
                         <span
                           className={`font-medium ${taskData.followUpRequired

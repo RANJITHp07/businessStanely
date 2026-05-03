@@ -78,6 +78,17 @@ export interface Task {
     triggerDate?: Date | null;
   };
   triggerDate?: string; // <-- Add this line for direct access
+  durationAudits?: DurationAudit[];
+}
+export interface DurationAudit {
+  id: string;
+  field: string; // "followUpDuration" | "statusCheckDuration"
+  oldValue?: string;
+  newValue?: string;
+  auditDate: string; // "YYYY-MM-DD"
+  changedAt: string;
+  createdAt: string;
+  changedByAgent?: { id: string; name: string };
 }
 export interface Prospect {
   id: string;

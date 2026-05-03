@@ -644,7 +644,7 @@ export default function Dashboard() {
             <div className="flex-1 min-w-0">
               {renderSlaTable(
                 "Overdue Tasks",
-                "Active tasks whose due date has already passed.",,
+                "Active tasks whose due date has already passed.",
                 slaData.overdueTasks,
                 "border-l-rose-500",
                 "Due Date",

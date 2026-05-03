@@ -81,7 +81,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const assignedToId = currentAgent.agentId;
+    const assignedToId = currentAgent.id;
     const { searchParams } = new URL(req.url);
     const dateParam = searchParams.get("date");
 
@@ -113,7 +113,7 @@ export async function GET(req: NextRequest) {
       where: {
         assignedToId,
         active: true,
-        status: { notIn: ["Completed", "completed"] },
+        status: { in: ["In Progress", "in progress"] },
         createdAt: { lte: snapshotDate },
       },
       include: {
@@ -125,7 +125,12 @@ export async function GET(req: NextRequest) {
         },
         durationAudits: {
           where: { auditDate: { lte: snapshotDateKey } },
-          select: { field: true, newValue: true, auditDate: true, changedAt: true },
+          select: {
+            field: true,
+            newValue: true,
+            auditDate: true,
+            changedAt: true,
+          },
           orderBy: [
             { auditDate: "desc" as const },
             { changedAt: "desc" as const },
@@ -136,25 +141,43 @@ export async function GET(req: NextRequest) {
     });
 
     const notTouchedTasks = [] as Array<{
-      id: string; title: string; status: string; priority: string;
-      followUpDuration: string | null; statusCheckDuration: string | null;
-      clientName: string; referenceAt: string;
+      id: string;
+      title: string;
+      status: string;
+      priority: string;
+      followUpDuration: string | null;
+      statusCheckDuration: string | null;
+      clientName: string;
+      referenceAt: string;
     }>;
 
     const clientNotUpdatedTasks = [] as Array<{
-      id: string; title: string; status: string; priority: string;
-      followUpDuration: string | null; statusCheckDuration: string | null;
-      clientName: string; referenceAt: string; expectedDuration: string;
+      id: string;
+      title: string;
+      status: string;
+      priority: string;
+      followUpDuration: string | null;
+      statusCheckDuration: string | null;
+      clientName: string;
+      referenceAt: string;
+      expectedDuration: string;
     }>;
 
     const followUpStatusNotDoneTasks = [] as Array<{
-      id: string; title: string; status: string; priority: string;
-      followUpDuration: string | null; statusCheckDuration: string | null;
-      clientName: string; referenceAt: string;
+      id: string;
+      title: string;
+      status: string;
+      priority: string;
+      followUpDuration: string | null;
+      statusCheckDuration: string | null;
+      clientName: string;
+      referenceAt: string;
     }>;
 
     for (const task of tasks) {
-      const latestAuditValue = (field: "followUpDuration" | "statusCheckDuration") => {
+      const latestAuditValue = (
+        field: "followUpDuration" | "statusCheckDuration",
+      ) => {
         const latestAudit = task.durationAudits.find((a) => a.field === field);
         return latestAudit?.newValue || null;
       };
@@ -162,7 +185,9 @@ export async function GET(req: NextRequest) {
       const effectiveFollowUpDuration =
         latestAuditValue("followUpDuration") || task.followUpDuration || "None";
       const effectiveStatusCheckDuration =
-        latestAuditValue("statusCheckDuration") || task.statusCheckDuration || "None";
+        latestAuditValue("statusCheckDuration") ||
+        task.statusCheckDuration ||
+        "None";
 
       const latestNormal = getLatestDate(task.comments, "NORMAL");
       const latestClientUpdate = getLatestDate(task.comments, "CLIENT_UPDATE");
@@ -173,9 +198,13 @@ export async function GET(req: NextRequest) {
         const reference = latestNormal || task.createdAt;
         if (hasExceededDuration(reference, DURATION_MS["24hr"], snapshotDate)) {
           notTouchedTasks.push({
-            id: task.id, title: task.title, status: task.status,
-            priority: task.priority, followUpDuration: effectiveFollowUpDuration,
-            statusCheckDuration: effectiveStatusCheckDuration, clientName,
+            id: task.id,
+            title: task.title,
+            status: task.status,
+            priority: task.priority,
+            followUpDuration: effectiveFollowUpDuration,
+            statusCheckDuration: effectiveStatusCheckDuration,
+            clientName,
             referenceAt: reference.toISOString(),
           });
         }
@@ -189,24 +218,39 @@ export async function GET(req: NextRequest) {
 
       if (hasExceededDuration(clientReference, expectedMs, snapshotDate)) {
         clientNotUpdatedTasks.push({
-          id: task.id, title: task.title, status: task.status,
-          priority: task.priority, followUpDuration: effectiveFollowUpDuration,
-          statusCheckDuration: effectiveStatusCheckDuration, clientName,
+          id: task.id,
+          title: task.title,
+          status: task.status,
+          priority: task.priority,
+          followUpDuration: effectiveFollowUpDuration,
+          statusCheckDuration: effectiveStatusCheckDuration,
+          clientName,
           referenceAt: clientReference.toISOString(),
           expectedDuration: durationLabelFromMs(expectedMs),
         });
       }
 
       const followUpDurationMs = parseDurationMs(effectiveFollowUpDuration);
-      const isEligibleFollowUp = ["48hr", "1w"].includes(effectiveFollowUpDuration);
+      const isEligibleFollowUp = ["48hr", "1w"].includes(
+        effectiveFollowUpDuration,
+      );
 
-      if (isEligibleFollowUp && followUpDurationMs && !task.followUpRequired && !task.completed) {
+      if (
+        isEligibleFollowUp &&
+        followUpDurationMs &&
+        !task.followUpRequired &&
+        !task.completed
+      ) {
         const reference = latestAny || task.createdAt;
         if (hasExceededDuration(reference, followUpDurationMs, snapshotDate)) {
           followUpStatusNotDoneTasks.push({
-            id: task.id, title: task.title, status: task.status,
-            priority: task.priority, followUpDuration: effectiveFollowUpDuration,
-            statusCheckDuration: effectiveStatusCheckDuration, clientName,
+            id: task.id,
+            title: task.title,
+            status: task.status,
+            priority: task.priority,
+            followUpDuration: effectiveFollowUpDuration,
+            statusCheckDuration: effectiveStatusCheckDuration,
+            clientName,
             referenceAt: reference.toISOString(),
           });
         }
@@ -221,16 +265,25 @@ export async function GET(req: NextRequest) {
         dueDate: { lte: snapshotDate, not: null },
       },
       select: {
-        id: true, title: true, status: true, priority: true,
-        followUpDuration: true, statusCheckDuration: true, dueDate: true,
+        id: true,
+        title: true,
+        status: true,
+        priority: true,
+        followUpDuration: true,
+        statusCheckDuration: true,
+        dueDate: true,
         client: clientSelect,
       },
       orderBy: { dueDate: "asc" },
     });
 
     const overdueTasks = overdueRaw.map((task) => ({
-      id: task.id, title: task.title, status: task.status, priority: task.priority,
-      followUpDuration: task.followUpDuration, statusCheckDuration: task.statusCheckDuration,
+      id: task.id,
+      title: task.title,
+      status: task.status,
+      priority: task.priority,
+      followUpDuration: task.followUpDuration,
+      statusCheckDuration: task.statusCheckDuration,
       clientName: getClientName(task),
       referenceAt: task.dueDate?.toISOString() ?? "",
     }));

@@ -919,7 +919,7 @@ export default function AgentDetails() {
                     >
                       <TableCell className="text-xs text-muted-foreground">{idx + 1}</TableCell>
                       <TableCell className="font-medium text-sm max-w-32 truncate">{item.title}</TableCell>
-                      <TableCell className="text-sm max-w-32 truncate">{item.clientName || "N/A"}</TableCell>
+                      <TableCell className="text-sm max-w-24 truncate">{item.clientName || "N/A"}</TableCell>
                       <TableCell className="text-sm">{formatDashboardDateTime(item.referenceAt)}</TableCell>
                       {!compact && <TableCell className="text-sm">{item.followUpDuration || "None"}</TableCell>}
                       {!compact && <TableCell className="text-sm">{item.statusCheckDuration || "None"}</TableCell>}
@@ -1255,7 +1255,7 @@ export default function AgentDetails() {
                   <div className="flex-1 min-w-0">
                     {renderDashboardTable(
                       "Not Touched Tasks",
-                      "Follow-up must be None and no normal interaction in the last 24 hours.",
+                      "No normal interaction in the last 24 hours (follow-up: None).",
                       dashboardData.notTouchedTasks,
                       true,
                       "border-l-amber-500",
@@ -1264,7 +1264,7 @@ export default function AgentDetails() {
                   <div className="flex-1 min-w-0">
                     {renderDashboardTable(
                       "Client Not Updated Tasks",
-                      "Any follow-up is allowed; evaluates only client-update interactions against expected update duration.",
+                      "No client update received within the expected duration.",
                       dashboardData.clientNotUpdatedTasks,
                       true,
                       "border-l-red-500",
@@ -1276,7 +1276,7 @@ export default function AgentDetails() {
                   <div className="flex-1 min-w-0">
                     {renderDashboardTable(
                       "Follow-up & Status Not Done (48hrs / 1 Week)",
-                      "Includes only 48hr/1w follow-ups where no interaction happened in duration, follow-up is not done, and status is not updated.",
+                      "48hr/1w follow-up tasks with no interaction, follow-up pending, and status unchanged.",
                       dashboardData.followUpStatusNotDoneTasks,
                       true,
                       "border-l-purple-500",
@@ -1285,7 +1285,7 @@ export default function AgentDetails() {
                   <div className="flex-1 min-w-0">
                     {renderDashboardTable(
                       "Overdue Tasks",
-                      "Tasks whose due date has passed and are still active and incomplete.",
+                      "Active tasks whose due date has already passed.",,
                       dashboardData.overdueTasks,
                       true,
                       "border-l-rose-500",

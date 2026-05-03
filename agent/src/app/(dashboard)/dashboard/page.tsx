@@ -34,12 +34,39 @@ import {
   AlertTriangle,
   TrendingUp,
   TrendingDown,
-  Calendar,
   Building2,
   User,
+  Clock,
 } from "lucide-react";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 import { useRouter } from "next/navigation";
+
+interface DashboardTaskItem {
+  id: string;
+  title: string;
+  status: string;
+  priority: string;
+  followUpDuration: string | null;
+  statusCheckDuration: string | null;
+  clientName: string;
+  referenceAt: string;
+  expectedDuration?: string;
+}
+
+interface DashboardStatusResponse {
+  notTouchedTasks: DashboardTaskItem[];
+  clientNotUpdatedTasks: DashboardTaskItem[];
+  followUpStatusNotDoneTasks: DashboardTaskItem[];
+  overdueTasks: DashboardTaskItem[];
+}
 // Mock data for dashboard - will be replaced with real data for charts
 const mockDashboardStats = {
   agents: {
@@ -98,49 +125,22 @@ const monthlyTasksData = [
 //     { month: "Jun", individual: 98, organization: 58 },
 // ];
 
-const recentActivities = [
-  {
-    id: 1,
-    type: "task_completed",
-    description: "Contract Review completed by John Smith",
-    time: "2 hours ago",
-    icon: CheckCircle,
-    color: "text-green-600",
-  },
-  {
-    id: 2,
-    type: "client_added",
-    description: "New client 'TechCorp Inc.' added to system",
-    time: "4 hours ago",
-    icon: UserCheck,
-    color: "text-blue-600",
-  },
-  {
-    id: 3,
-    type: "task_overdue",
-    description: "Legal Research task is now overdue",
-    time: "6 hours ago",
-    icon: AlertTriangle,
-    color: "text-red-600",
-  },
-  {
-    id: 4,
-    type: "agent_assigned",
-    description: "Emily Davis Ownership to new case",
-    time: "8 hours ago",
-    icon: Users,
-    color: "text-purple-600",
-  },
-];
-
 export default function Dashboard() {
   const [dashboardStats, setDashboardStats] = useState(mockDashboardStats);
   const [loading, setLoading] = useState(true);
+  const [slaData, setSlaData] = useState<DashboardStatusResponse>({
+    notTouchedTasks: [],
+    clientNotUpdatedTasks: [],
+    followUpStatusNotDoneTasks: [],
+    overdueTasks: [],
+  });
+  const [slaLoading, setSlaLoading] = useState(true);
   const router = useRouter();
+
   useEffect(() => {
     const fetchDashboardStats = async () => {
       try {
-  const response = await fetchWithAuth("/api/dashboard");
+        const response = await fetchWithAuth("/api/dashboard");
         if (response.ok) {
           const data = await response.json();
           setDashboardStats(data);
@@ -154,7 +154,27 @@ export default function Dashboard() {
       }
     };
 
+    const fetchSlaStatus = async () => {
+      try {
+        const response = await fetchWithAuth("/api/agents/dashboard-status");
+        if (response.ok) {
+          const data = (await response.json()) as DashboardStatusResponse;
+          setSlaData({
+            notTouchedTasks: data.notTouchedTasks || [],
+            clientNotUpdatedTasks: data.clientNotUpdatedTasks || [],
+            followUpStatusNotDoneTasks: data.followUpStatusNotDoneTasks || [],
+            overdueTasks: data.overdueTasks || [],
+          });
+        }
+      } catch (error) {
+        console.error("Error fetching SLA status:", error);
+      } finally {
+        setSlaLoading(false);
+      }
+    };
+
     fetchDashboardStats();
+    fetchSlaStatus();
   }, []);
 
   const chartConfig = {
@@ -175,6 +195,76 @@ export default function Dashboard() {
       color: "hsl(var(--chart-4))",
     },
   };
+
+  const formatSlaDateTime = (value?: string) => {
+    if (!value) return "-";
+    const date = new Date(value);
+    if (isNaN(date.getTime())) return "-";
+    const day = String(date.getDate()).padStart(2, "0");
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const year = String(date.getFullYear()).slice(-2);
+    const time = date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    return `${day}/${month}/${year} ${time}`;
+  };
+
+  const renderSlaTable = (
+    title: string,
+    description: string,
+    rows: DashboardTaskItem[],
+    accentColor: string = "border-l-gray-300",
+    referenceLabel: string = "Last Relevant Interaction",
+  ) => (
+    <Card className={`border-l-4 min-h-30 ${accentColor}`}>
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-base font-semibold">{title}</CardTitle>
+          <Badge
+            variant={rows.length > 0 ? "destructive" : "secondary"}
+            className="text-xs px-2 py-0.5"
+          >
+            {rows.length} {rows.length === 1 ? "task" : "tasks"}
+          </Badge>
+        </div>
+        <CardDescription className="text-xs leading-snug">{description}</CardDescription>
+      </CardHeader>
+      <CardContent className="pt-0">
+        {rows.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+            <CheckCircle className="h-8 w-8 mb-2 text-green-400" />
+            <p className="text-sm font-medium">All clear</p>
+            <p className="text-xs">No tasks require attention</p>
+          </div>
+        ) : (
+          <div className="rounded-md border overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow className="bg-muted/40 hover:bg-muted/40">
+                  <TableHead className="text-xs font-semibold w-8">#</TableHead>
+                  <TableHead className="text-xs font-semibold">Task</TableHead>
+                  <TableHead className="text-xs font-semibold">Client</TableHead>
+                  <TableHead className="text-xs font-semibold">{referenceLabel}</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {rows.map((item, idx) => (
+                  <TableRow
+                    key={item.id}
+                    className="cursor-pointer hover:bg-muted/50 transition-colors"
+                    onClick={() => router.push(`/task/${item.id}`)}
+                  >
+                    <TableCell className="text-xs text-muted-foreground">{idx + 1}</TableCell>
+                    <TableCell className="font-medium text-sm max-w-32 truncate">{item.title}</TableCell>
+                    <TableCell className="text-sm max-w-32 truncate">{item.clientName || "N/A"}</TableCell>
+                    <TableCell className="text-sm">{formatSlaDateTime(item.referenceAt)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
 
   return (
     <div className="container mx-auto p-6 max-w-7xl space-y-8">
@@ -457,40 +547,104 @@ export default function Dashboard() {
       {/* Charts Row 2 */}
 
 
-      {/* Recent Activity */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Calendar className="h-5 w-5" />
-            Recent Activity
-          </CardTitle>
-          <CardDescription>
-            Latest updates and activities in your system
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {recentActivities.map((activity) => (
-              <div
-                key={activity.id}
-                className="flex items-center space-x-4 p-3 rounded-lg bg-muted/50"
-              >
-                <div
-                  className={`p-2 rounded-full bg-background ${activity.color}`}
-                >
-                  <activity.icon className="h-4 w-4" />
+      {/* SLA Status */}
+      {slaLoading ? (
+        <div className="flex flex-col items-center justify-center py-16 text-muted-foreground gap-3">
+          <Clock className="h-8 w-8 animate-spin text-primary/60" />
+          <p className="text-sm">Loading SLA data...</p>
+        </div>
+      ) : (
+        <div className="space-y-6">
+          {/* Stat cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <Card className="border-l-4 border-l-amber-500">
+              <CardContent className="p-4 flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Not Touched</p>
+                  <p className="text-2xl font-bold mt-0.5">{slaData.notTouchedTasks.length}</p>
                 </div>
-                <div className="flex-1">
-                  <p className="text-sm font-medium">{activity.description}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {activity.time}
-                  </p>
+                <div className="h-10 w-10 rounded-full bg-amber-50 flex items-center justify-center shrink-0">
+                  <Clock className="h-5 w-5 text-amber-600" />
                 </div>
-              </div>
-            ))}
+              </CardContent>
+            </Card>
+            <Card className="border-l-4 border-l-red-500">
+              <CardContent className="p-4 flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Client Not Updated</p>
+                  <p className="text-2xl font-bold mt-0.5">{slaData.clientNotUpdatedTasks.length}</p>
+                </div>
+                <div className="h-10 w-10 rounded-full bg-red-50 flex items-center justify-center shrink-0">
+                  <AlertTriangle className="h-5 w-5 text-red-500" />
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="border-l-4 border-l-purple-500">
+              <CardContent className="p-4 flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Follow-up Issues</p>
+                  <p className="text-2xl font-bold mt-0.5">{slaData.followUpStatusNotDoneTasks.length}</p>
+                </div>
+                <div className="h-10 w-10 rounded-full bg-purple-50 flex items-center justify-center shrink-0">
+                  <CheckCircle className="h-5 w-5 text-purple-500" />
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="border-l-4 border-l-rose-500">
+              <CardContent className="p-4 flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide">Overdue</p>
+                  <p className="text-2xl font-bold mt-0.5">{slaData.overdueTasks.length}</p>
+                </div>
+                <div className="h-10 w-10 rounded-full bg-rose-50 flex items-center justify-center shrink-0">
+                  <AlertTriangle className="h-5 w-5 text-rose-600" />
+                </div>
+              </CardContent>
+            </Card>
           </div>
-        </CardContent>
-      </Card>
+
+          {/* Tables row 1 */}
+          <div className="flex flex-col lg:flex-row gap-6 items-start">
+            <div className="flex-1 min-w-0">
+              {renderSlaTable(
+                "Not Touched Tasks",
+                "Follow-up must be None and no normal interaction in the last 24 hours.",
+                slaData.notTouchedTasks,
+                "border-l-amber-500",
+              )}
+            </div>
+            <div className="flex-1 min-w-0">
+              {renderSlaTable(
+                "Client Not Updated Tasks",
+                "Any follow-up is allowed; evaluates only client-update interactions against expected update duration.",
+                slaData.clientNotUpdatedTasks,
+                "border-l-red-500",
+              )}
+            </div>
+          </div>
+
+          {/* Tables row 2 */}
+          <div className="flex flex-col lg:flex-row gap-6 items-start">
+            <div className="flex-1 min-w-0">
+              {renderSlaTable(
+                "Follow-up & Status Not Done (48hrs / 1 Week)",
+                "Includes only 48hr/1w follow-ups where no interaction happened in duration, follow-up is not done, and status is not updated.",
+                slaData.followUpStatusNotDoneTasks,
+                "border-l-purple-500",
+              )}
+            </div>
+            <div className="flex-1 min-w-0">
+              {renderSlaTable(
+                "Overdue Tasks",
+                "Tasks whose due date has passed and are still active and incomplete.",
+                slaData.overdueTasks,
+                "border-l-rose-500",
+                "Due Date",
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

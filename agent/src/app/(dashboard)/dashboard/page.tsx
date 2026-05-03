@@ -243,6 +243,7 @@ export default function Dashboard() {
                   <TableHead className="text-xs font-semibold">Task</TableHead>
                   <TableHead className="text-xs font-semibold">Client</TableHead>
                   <TableHead className="text-xs font-semibold">{referenceLabel}</TableHead>
+                  <TableHead className="text-xs font-semibold">Follow-up</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -256,6 +257,13 @@ export default function Dashboard() {
                     <TableCell className="font-medium text-sm max-w-32 truncate">{item.title}</TableCell>
                     <TableCell className="text-sm max-w-24 truncate">{item.clientName || "N/A"}</TableCell>
                     <TableCell className="text-sm">{formatSlaDateTime(item.referenceAt)}</TableCell>
+                    <TableCell className="text-sm">
+                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${item.followUpDuration === "24hr" ? "bg-blue-100 text-blue-700" :
+                        item.followUpDuration === "48hr" ? "bg-amber-100 text-amber-700" :
+                          item.followUpDuration === "1w" ? "bg-purple-100 text-purple-700" :
+                            "bg-gray-100 text-gray-500"
+                        }`}>{item.followUpDuration || "None"}</span>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>

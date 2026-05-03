@@ -904,7 +904,7 @@ export default function AgentDetails() {
                     <TableHead className="text-xs font-semibold">Task</TableHead>
                     <TableHead className="text-xs font-semibold w-55 min-w-55">Client</TableHead>
                     <TableHead className="text-xs font-semibold">{referenceLabel}</TableHead>
-                    {!compact && <TableHead className="text-xs font-semibold">Follow-up</TableHead>}
+                    <TableHead className="text-xs font-semibold">Follow-up</TableHead>
                     {!compact && <TableHead className="text-xs font-semibold">Status Check</TableHead>}
                     {!compact && <TableHead className="text-xs font-semibold">Status</TableHead>}
                     {!compact && <TableHead className="text-xs font-semibold text-right">Action</TableHead>}
@@ -921,7 +921,13 @@ export default function AgentDetails() {
                       <TableCell className="font-medium text-sm max-w-32 truncate">{item.title}</TableCell>
                       <TableCell className="text-sm max-w-24 truncate">{item.clientName || "N/A"}</TableCell>
                       <TableCell className="text-sm">{formatDashboardDateTime(item.referenceAt)}</TableCell>
-                      {!compact && <TableCell className="text-sm">{item.followUpDuration || "None"}</TableCell>}
+                      <TableCell className="text-sm">
+                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${item.followUpDuration === "24hr" ? "bg-blue-100 text-blue-700" :
+                          item.followUpDuration === "48hr" ? "bg-amber-100 text-amber-700" :
+                            item.followUpDuration === "1w" ? "bg-purple-100 text-purple-700" :
+                              "bg-gray-100 text-gray-500"
+                          }`}>{item.followUpDuration || "None"}</span>
+                      </TableCell>
                       {!compact && <TableCell className="text-sm">{item.statusCheckDuration || "None"}</TableCell>}
                       {!compact && <TableCell className="text-sm">{item.status}</TableCell>}
                       {!compact && (
@@ -1285,7 +1291,7 @@ export default function AgentDetails() {
                   <div className="flex-1 min-w-0">
                     {renderDashboardTable(
                       "Overdue Tasks",
-                      "Active tasks whose due date has already passed.",,
+                      "Active tasks whose due date has already passed.",
                       dashboardData.overdueTasks,
                       true,
                       "border-l-rose-500",

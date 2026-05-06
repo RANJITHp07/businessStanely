@@ -141,6 +141,8 @@ interface DashboardTaskItem {
   clientName: string;
   referenceAt: string;
   expectedDuration?: string;
+  lastInteractionContent?: string | null;
+  lastInteractionAt?: string | null;
 }
 
 interface DashboardStatusResponse {
@@ -874,6 +876,8 @@ export default function AgentDetails() {
     accentColor: string = "border-l-gray-300",
     referenceLabel: string = "Last Relevant Interaction",
   ) => {
+    const showLastComment = rows.some((r) => r.lastInteractionContent != null);
+
     return (
       <Card className={`border-l-4 min-h-30 ${accentColor}`}>
         <CardHeader className="pb-3">
@@ -904,6 +908,7 @@ export default function AgentDetails() {
                     <TableHead className="text-xs font-semibold">Task</TableHead>
                     <TableHead className="text-xs font-semibold w-55 min-w-55">Client</TableHead>
                     <TableHead className="text-xs font-semibold">{referenceLabel}</TableHead>
+                    {showLastComment && <TableHead className="text-xs font-semibold">Last Comment</TableHead>}
                     <TableHead className="text-xs font-semibold">Follow-up</TableHead>
                     {!compact && <TableHead className="text-xs font-semibold">Status Check</TableHead>}
                     {!compact && <TableHead className="text-xs font-semibold">Status</TableHead>}
@@ -921,6 +926,18 @@ export default function AgentDetails() {
                       <TableCell className="font-medium text-sm max-w-32 truncate">{item.title}</TableCell>
                       <TableCell className="text-sm max-w-24 truncate">{item.clientName || "N/A"}</TableCell>
                       <TableCell className="text-sm">{formatDashboardDateTime(item.referenceAt)}</TableCell>
+                      {showLastComment && (
+                        <TableCell className="text-sm max-w-48">
+                          {item.lastInteractionContent ? (
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-xs text-muted-foreground">{formatDashboardDateTime(item.lastInteractionAt ?? "")}</span>
+                              <span className="truncate block max-w-44" title={item.lastInteractionContent}>{item.lastInteractionContent}</span>
+                            </div>
+                          ) : (
+                            <span className="text-muted-foreground text-xs italic">No comment</span>
+                          )}
+                        </TableCell>
+                      )}
                       <TableCell className="text-sm">
                         <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${item.followUpDuration === "24hr" ? "bg-blue-100 text-blue-700" :
                           item.followUpDuration === "48hr" ? "bg-amber-100 text-amber-700" :
@@ -1260,8 +1277,8 @@ export default function AgentDetails() {
                 <div className="flex flex-col lg:flex-row gap-6 items-start">
                   <div className="flex-1 min-w-0">
                     {renderDashboardTable(
-                      "Not Touched Tasks",
-                      "No normal interaction in the last 24 hours (follow-up: None).",
+                      "Touchbased Not Yet",
+                      "All Tasks other than StatusCheck&Followup has to be Touchbased once every day. ",
                       dashboardData.notTouchedTasks,
                       true,
                       "border-l-amber-500",
@@ -1269,8 +1286,8 @@ export default function AgentDetails() {
                   </div>
                   <div className="flex-1 min-w-0">
                     {renderDashboardTable(
-                      "Client Not Updated Tasks",
-                      "No client update received within the expected duration.",
+                      "Tasks where Client not updated",
+                      "Every Client has to be updated at least once in 48 hours.",
                       dashboardData.clientNotUpdatedTasks,
                       true,
                       "border-l-red-500",
@@ -1281,8 +1298,8 @@ export default function AgentDetails() {
                 <div className="flex flex-col lg:flex-row gap-6 items-start">
                   <div className="flex-1 min-w-0">
                     {renderDashboardTable(
-                      "Follow-up & Status Not Done (48hrs / 1 Week)",
-                      "48hr/1w follow-up tasks with no interaction, follow-up pending, and status unchanged.",
+                      "Follow-up & Status Not Done (24/48hrs /1-Week)",
+                      "All Task has to be updated based on the Periodicity of Followup&StatusCheck",
                       dashboardData.followUpStatusNotDoneTasks,
                       true,
                       "border-l-purple-500",
@@ -1291,7 +1308,7 @@ export default function AgentDetails() {
                   <div className="flex-1 min-w-0">
                     {renderDashboardTable(
                       "Overdue Tasks",
-                      "Active tasks whose due date has already passed.",
+                      "The following Task Due date has crossed and require immediate completion",
                       dashboardData.overdueTasks,
                       true,
                       "border-l-rose-500",

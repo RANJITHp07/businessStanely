@@ -37,6 +37,13 @@ const durationLabelFromMs = (value: number): "24hr" | "48hr" | "1w" => {
   return "24hr";
 };
 
+/** Returns the more recent of two nullable dates. */
+const maxDate = (a: Date | null, b: Date | null): Date | null => {
+  if (!a) return b;
+  if (!b) return a;
+  return a > b ? a : b;
+};
+
 const getLatestDate = (
   comments: Array<{ createdAt: Date; content: string | null }>,
   type: InteractionKind | "ANY",
@@ -54,6 +61,36 @@ const getLatestDate = (
     (latest, current) =>
       current.createdAt > latest ? current.createdAt : latest,
     filtered[0].createdAt,
+  );
+};
+
+const getLatestComment = (
+  comments: Array<{ createdAt: Date; content: string | null }>,
+  type: InteractionKind | "ANY",
+): { createdAt: Date; content: string | null } | null => {
+  const filtered =
+    type === "ANY"
+      ? comments
+      : comments.filter(
+          (comment) => normalizeInteractionType(comment.content || "") === type,
+        );
+
+  if (filtered.length === 0) return null;
+
+  return filtered.reduce(
+    (latest, current) =>
+      current.createdAt > latest.createdAt ? current : latest,
+    filtered[0],
+  );
+};
+
+const cleanCommentContent = (content: string | null): string | null => {
+  if (!content) return null;
+  return (
+    content
+      .replace(/^\[CLIENT_UPDATE\]\s*/, "")
+      .replace(/^\[NORMAL\]\s*/, "")
+      .trim() || null
   );
 };
 
@@ -171,6 +208,8 @@ export async function GET(req: NextRequest) {
       clientName: string;
       referenceAt: string;
       expectedDuration: string;
+      lastInteractionContent: string | null;
+      lastInteractionAt: string | null;
     }>;
 
     const followUpStatusNotDoneTasks = [] as Array<{
@@ -205,14 +244,13 @@ export async function GET(req: NextRequest) {
     };
 
     for (const task of tasks) {
+      const latestAuditEntry = (
+        field: "followUpDuration" | "statusCheckDuration",
+      ) => task.durationAudits.find((a) => a.field === field) ?? null;
+
       const latestAuditValue = (
         field: "followUpDuration" | "statusCheckDuration",
-      ) => {
-        const latestAudit = task.durationAudits.find(
-          (audit) => audit.field === field,
-        );
-        return latestAudit?.newValue || null;
-      };
+      ) => latestAuditEntry(field)?.newValue || null;
 
       const effectiveFollowUpDuration =
         latestAuditValue("followUpDuration") || task.followUpDuration || "None";
@@ -226,8 +264,16 @@ export async function GET(req: NextRequest) {
       const latestAny = getLatestDate(task.comments, "ANY");
       const clientName = getClientName(task);
 
+      // When a duration field is changed, the audit.changedAt acts as a clock
+      // reset — the gap should be measured from max(lastRelevantComment, auditChangedAt)
+      const followUpAuditAt =
+        latestAuditEntry("followUpDuration")?.changedAt ?? null;
+      const statusCheckAuditAt =
+        latestAuditEntry("statusCheckDuration")?.changedAt ?? null;
+
       if (effectiveFollowUpDuration === "None") {
-        const reference = latestNormal || task.createdAt;
+        const reference =
+          maxDate(latestNormal, followUpAuditAt) ?? task.createdAt;
         if (hasExceededDuration(reference, DURATION_MS["24hr"], snapshotDate)) {
           notTouchedTasks.push({
             id: task.id,
@@ -246,9 +292,21 @@ export async function GET(req: NextRequest) {
         parseDurationMs(effectiveStatusCheckDuration) ||
         parseDurationMs(effectiveFollowUpDuration) ||
         DURATION_MS["24hr"];
-      const clientReference = latestClientUpdate || task.createdAt;
+      // Use the audit that corresponds to the active duration field as the reset point
+      const clientAuditAt = statusCheckAuditAt ?? followUpAuditAt;
+      const clientReference =
+        maxDate(latestClientUpdate, clientAuditAt) ?? task.createdAt;
 
       if (hasExceededDuration(clientReference, expectedMs, snapshotDate)) {
+        // Find the actual last CLIENT_UPDATE comment; fall back to last NORMAL comment
+        const lastClientUpdateComment = getLatestComment(
+          task.comments,
+          "CLIENT_UPDATE",
+        );
+        const lastNormalComment = getLatestComment(task.comments, "NORMAL");
+        const lastRelevantComment =
+          lastClientUpdateComment ?? lastNormalComment;
+
         clientNotUpdatedTasks.push({
           id: task.id,
           title: task.title,
@@ -259,6 +317,11 @@ export async function GET(req: NextRequest) {
           clientName,
           referenceAt: clientReference.toISOString(),
           expectedDuration: durationLabelFromMs(expectedMs),
+          lastInteractionContent: cleanCommentContent(
+            lastRelevantComment?.content ?? null,
+          ),
+          lastInteractionAt:
+            lastRelevantComment?.createdAt.toISOString() ?? null,
         });
       }
 
@@ -275,7 +338,7 @@ export async function GET(req: NextRequest) {
         followUpNotDone &&
         statusNotUpdated
       ) {
-        const reference = latestAny || task.createdAt;
+        const reference = maxDate(latestAny, followUpAuditAt) ?? task.createdAt;
         if (hasExceededDuration(reference, followUpDurationMs, snapshotDate)) {
           followUpStatusNotDoneTasks.push({
             id: task.id,

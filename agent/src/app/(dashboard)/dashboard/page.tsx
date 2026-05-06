@@ -615,16 +615,16 @@ export default function Dashboard() {
           <div className="flex flex-col lg:flex-row gap-6 items-start">
             <div className="flex-1 min-w-0">
               {renderSlaTable(
-                "Not Touched Tasks",
-                "No normal interaction in the last 24 hours (follow-up: None).",
+                "Touchbased Not Yet",
+                "All Tasks other than StatusCheck&Followup has to be Touchbased once every day. ",
                 slaData.notTouchedTasks,
                 "border-l-amber-500",
               )}
             </div>
             <div className="flex-1 min-w-0">
               {renderSlaTable(
-                "Client Not Updated Tasks",
-                "No client update received within the expected duration.",
+                "Tasks where Client not updated",
+                "Every Client has to be updated at least once in 48 hours.",
                 slaData.clientNotUpdatedTasks,
                 "border-l-red-500",
               )}
@@ -635,8 +635,8 @@ export default function Dashboard() {
           <div className="flex flex-col lg:flex-row gap-6 items-start">
             <div className="flex-1 min-w-0">
               {renderSlaTable(
-                "Follow-up & Status Not Done (48hrs / 1 Week)",
-                "48hr/1w follow-up tasks with no interaction, follow-up pending, and status unchanged.",
+                "Follow-up & Status Not Done (24/48hrs /1-Week)",
+                "All Task has to be updated based on the Periodicity of Followup&StatusCheck",
                 slaData.followUpStatusNotDoneTasks,
                 "border-l-purple-500",
               )}
@@ -644,7 +644,7 @@ export default function Dashboard() {
             <div className="flex-1 min-w-0">
               {renderSlaTable(
                 "Overdue Tasks",
-                "Active tasks whose due date has already passed.",
+                "The following Task Due date has crossed and require immediate completion",
                 slaData.overdueTasks,
                 "border-l-rose-500",
                 "Due Date",

@@ -163,6 +163,15 @@ body {
   overflow-y: auto;
 }
 
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 .Toastify__toast-container--top-right {
   top: 1rem;
   right: 1rem;

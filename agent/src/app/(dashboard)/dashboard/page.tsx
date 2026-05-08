@@ -213,8 +213,10 @@ export default function Dashboard() {
     rows: DashboardTaskItem[],
     accentColor: string = "border-l-gray-300",
     referenceLabel: string = "Last Relevant Interaction",
+    showFollowUp: boolean = true,
+    showClientUpdate: boolean = false,
   ) => (
-    <Card className={`border-l-4 min-h-30 ${accentColor}`}>
+    <Card className={`border-l-4 h-[560px] ${accentColor}`}>
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <CardTitle className="text-base font-semibold">{title}</CardTitle>
@@ -235,39 +237,53 @@ export default function Dashboard() {
             <p className="text-xs">No tasks require attention</p>
           </div>
         ) : (
-          <div className="rounded-md border overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-muted/40 hover:bg-muted/40">
-                  <TableHead className="text-xs font-semibold w-8">#</TableHead>
-                  <TableHead className="text-xs font-semibold">Task</TableHead>
-                  <TableHead className="text-xs font-semibold">Client</TableHead>
-                  <TableHead className="text-xs font-semibold">{referenceLabel}</TableHead>
-                  <TableHead className="text-xs font-semibold">Follow-up</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {rows.map((item, idx) => (
-                  <TableRow
-                    key={item.id}
-                    className="cursor-pointer hover:bg-muted/50 transition-colors"
-                    onClick={() => router.push(`/task/${item.id}`)}
-                  >
-                    <TableCell className="text-xs text-muted-foreground">{idx + 1}</TableCell>
-                    <TableCell className="font-medium text-sm max-w-32 truncate">{item.title}</TableCell>
-                    <TableCell className="text-sm max-w-24 truncate">{item.clientName || "N/A"}</TableCell>
-                    <TableCell className="text-sm">{formatSlaDateTime(item.referenceAt)}</TableCell>
-                    <TableCell className="text-sm">
-                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${item.followUpDuration === "24hr" ? "bg-blue-100 text-blue-700" :
-                        item.followUpDuration === "48hr" ? "bg-amber-100 text-amber-700" :
-                          item.followUpDuration === "1w" ? "bg-purple-100 text-purple-700" :
-                            "bg-gray-100 text-gray-500"
-                        }`}>{item.followUpDuration || "None"}</span>
-                    </TableCell>
+          <div className="rounded-md border overflow-hidden">
+            <div className="h-[420px] overflow-y-auto overflow-x-auto no-scrollbar">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-muted/40 hover:bg-muted/40">
+                    <TableHead className="text-xs font-semibold w-8">#</TableHead>
+                    <TableHead className="text-xs font-semibold">Task</TableHead>
+                    <TableHead className="text-xs font-semibold">Client</TableHead>
+                    <TableHead className="text-xs font-semibold">{referenceLabel}</TableHead>
+                    {showFollowUp && <TableHead className="text-xs font-semibold">Follow-up</TableHead>}
+                    {showClientUpdate && <TableHead className="text-xs font-semibold">Client Update</TableHead>}
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {rows.map((item, idx) => (
+                    <TableRow
+                      key={item.id}
+                      className="cursor-pointer hover:bg-muted/50 transition-colors"
+                      onClick={() => router.push(`/task/${item.id}`)}
+                    >
+                      <TableCell className="text-xs text-muted-foreground">{idx + 1}</TableCell>
+                      <TableCell className="font-medium text-sm max-w-32 truncate">{item.title}</TableCell>
+                      <TableCell className="text-sm max-w-24 truncate">{item.clientName || "N/A"}</TableCell>
+                      <TableCell className="text-sm">{formatSlaDateTime(item.referenceAt)}</TableCell>
+                      {showFollowUp && (
+                        <TableCell className="text-sm">
+                          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${item.followUpDuration === "24hr" ? "bg-blue-100 text-blue-700" :
+                            item.followUpDuration === "48hr" ? "bg-amber-100 text-amber-700" :
+                              item.followUpDuration === "1w" ? "bg-purple-100 text-purple-700" :
+                                "bg-gray-100 text-gray-500"
+                            }`}>{item.followUpDuration || "None"}</span>
+                        </TableCell>
+                      )}
+                      {showClientUpdate && (
+                        <TableCell className="text-sm">
+                          <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${item.expectedDuration === "24hr" ? "bg-blue-100 text-blue-700" :
+                            item.expectedDuration === "48hr" ? "bg-amber-100 text-amber-700" :
+                              item.expectedDuration === "1w" ? "bg-purple-100 text-purple-700" :
+                                "bg-gray-100 text-gray-500"
+                            }`}>{item.expectedDuration || "None"}</span>
+                        </TableCell>
+                      )}
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           </div>
         )}
       </CardContent>
@@ -627,6 +643,9 @@ export default function Dashboard() {
                 "Every Client has to be updated at least once in 48 hours.",
                 slaData.clientNotUpdatedTasks,
                 "border-l-red-500",
+                "Last Relevant Interaction",
+                false,
+                true,
               )}
             </div>
           </div>

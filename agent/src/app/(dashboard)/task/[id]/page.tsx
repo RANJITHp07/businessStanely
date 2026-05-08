@@ -174,6 +174,32 @@ export default function TaskDetails() {
     return `${MANAGEMENT_BASE_URL}${url.startsWith("/") ? url : `/${url}`}`;
   };
 
+  const getCommentAttachments = (comment: Comment) => {
+    const fromArray = Array.isArray(comment.attachments)
+      ? comment.attachments.filter(
+        (attachment): attachment is { name: string; url: string; size: number; type: string } =>
+          Boolean(attachment?.name && attachment?.url),
+      )
+      : [];
+
+    if (fromArray.length > 0) {
+      return fromArray;
+    }
+
+    if (comment.attachmentName && comment.attachmentUrl) {
+      return [
+        {
+          name: comment.attachmentName,
+          url: comment.attachmentUrl,
+          size: comment.attachmentSize ?? 0,
+          type: comment.attachmentType ?? "",
+        },
+      ];
+    }
+
+    return [];
+  };
+
   // Assignment (Reassign) states
   const [showAssignSearch, setShowAssignSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -1681,99 +1707,70 @@ export default function TaskDetails() {
                           )}
 
                           <p className="text-sm">{getDisplayInteractionContent(comment.content)}</p>
-                          {comment.attachmentName && (
-                            <div className="mt-2">
-                              {/* Check if attachment is an image */}
-                              {comment.attachmentType?.startsWith("image/") &&
-                                comment.attachmentUrl ? (
-                                <div className="space-y-2">
-                                  {/* Image preview */}
-                                  <div className="relative inline-block">
-                                    {/* Use regular img for local URLs, Image for external URLs */}
-                                    {comment.attachmentUrl.startsWith(
-                                      "http"
-                                    ) ? (
-                                      <Image
-                                        src={getAttachmentUrl(comment.attachmentUrl)}
-                                        alt={comment.attachmentName}
-                                        width={300}
-                                        height={200}
-                                        className="max-w-xs max-h-48 rounded-lg border shadow-sm cursor-pointer hover:shadow-md transition-shadow object-cover"
-                                        onClick={() =>
-                                          window.open(
-                                            getAttachmentUrl(comment.attachmentUrl),
-                                            "_blank"
-                                          )
-                                        }
-                                      />
-                                    ) : (
-                                      <Image
-                                        src={getAttachmentUrl(comment.attachmentUrl)}
-                                        alt={comment.attachmentName}
-                                        width={300}
-                                        height={200}
-                                        className="max-w-xs max-h-48 rounded-lg border shadow-sm cursor-pointer hover:shadow-md transition-shadow object-cover"
-                                        onClick={() =>
-                                          window.open(
-                                            getAttachmentUrl(comment.attachmentUrl),
-                                            "_blank"
-                                          )
-                                        }
-                                        unoptimized={true}
-                                      />
-                                    )}
+                          {(() => {
+                            const commentAttachments = getCommentAttachments(comment);
+
+                            if (commentAttachments.length === 0) {
+                              return null;
+                            }
+
+                            return (
+                              <div className="mt-2 space-y-3">
+                                {commentAttachments.map((attachment, index) => (
+                                  <div key={`${comment.id}-${attachment.url}-${index}`} className="space-y-2">
+                                    {attachment.type?.startsWith("image/") ? (
+                                      <div className="relative inline-block">
+                                        {attachment.url.startsWith("http") ? (
+                                          <Image
+                                            src={getAttachmentUrl(attachment.url)}
+                                            alt={attachment.name}
+                                            width={300}
+                                            height={200}
+                                            className="max-w-xs max-h-48 rounded-lg border shadow-sm cursor-pointer hover:shadow-md transition-shadow object-cover"
+                                            onClick={() =>
+                                              window.open(
+                                                getAttachmentUrl(attachment.url),
+                                                "_blank"
+                                              )
+                                            }
+                                          />
+                                        ) : (
+                                          <Image
+                                            src={getAttachmentUrl(attachment.url)}
+                                            alt={attachment.name}
+                                            width={300}
+                                            height={200}
+                                            className="max-w-xs max-h-48 rounded-lg border shadow-sm cursor-pointer hover:shadow-md transition-shadow object-cover"
+                                            onClick={() =>
+                                              window.open(
+                                                getAttachmentUrl(attachment.url),
+                                                "_blank"
+                                              )
+                                            }
+                                            unoptimized={true}
+                                          />
+                                        )}
+                                      </div>
+                                    ) : null}
+
+                                    <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted p-2 rounded border">
+                                      <Paperclip className="h-3 w-3" />
+                                      <span className="font-medium">{attachment.name}</span>
+                                      <span>({(attachment.size / 1024).toFixed(1)} KB)</span>
+                                      <a
+                                        href={getAttachmentUrl(attachment.url)}
+                                        className="text-blue-600 hover:text-blue-800 underline ml-auto"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                      >
+                                        View
+                                      </a>
+                                    </div>
                                   </div>
-                                  {/* Image file info */}
-                                  <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted p-2 rounded border">
-                                    <Paperclip className="h-3 w-3" />
-                                    <span className="font-medium">
-                                      {comment.attachmentName}
-                                    </span>
-                                    <span>
-                                      (
-                                      {(comment.attachmentSize! / 1024).toFixed(
-                                        1
-                                      )}{" "}
-                                      KB)
-                                    </span>
-                                    <a
-                                      href={getAttachmentUrl(comment.attachmentUrl)}
-                                      className="text-blue-600 hover:text-blue-800 underline ml-auto"
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                    >
-                                      View
-                                    </a>
-                                  </div>
-                                </div>
-                              ) : (
-                                /* Non-image file attachment */
-                                <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted p-2 rounded border">
-                                  <Paperclip className="h-3 w-3" />
-                                  <span className="font-medium">
-                                    {comment.attachmentName}
-                                  </span>
-                                  <span>
-                                    (
-                                    {(comment.attachmentSize! / 1024).toFixed(
-                                      1
-                                    )}{" "}
-                                    KB)
-                                  </span>
-                                  {comment.attachmentUrl && (
-                                    <a
-                                      href={getAttachmentUrl(comment.attachmentUrl)}
-                                      className="text-blue-600 hover:text-blue-800 underline ml-auto"
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                    >
-                                      View
-                                    </a>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          )}
+                                ))}
+                              </div>
+                            );
+                          })()}
                         </div>
                       </div>
                     ))}

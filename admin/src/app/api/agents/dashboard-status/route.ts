@@ -121,7 +121,7 @@ export async function GET(req: NextRequest) {
           { status: 400 },
         );
       }
-      parsed.setHours(23, 59, 59, 999);
+      // parsed.setHours(23, 59, 59, 999);
       snapshotDate = parsed;
     }
 
@@ -272,8 +272,7 @@ export async function GET(req: NextRequest) {
         latestAuditEntry("statusCheckDuration")?.changedAt ?? null;
 
       if (effectiveFollowUpDuration === "None") {
-        const reference =
-          maxDate(latestNormal, followUpAuditAt) ?? task.createdAt;
+        const reference = maxDate(latestAny, followUpAuditAt) ?? task.createdAt;
         if (hasExceededDuration(reference, DURATION_MS["24hr"], snapshotDate)) {
           notTouchedTasks.push({
             id: task.id,
@@ -326,7 +325,7 @@ export async function GET(req: NextRequest) {
       }
 
       const followUpDurationMs = parseDurationMs(effectiveFollowUpDuration);
-      const isEligibleFollowUp = ["48hr", "1w"].includes(
+      const isEligibleFollowUp = ["24hr", "48hr", "1w"].includes(
         effectiveFollowUpDuration,
       );
       const followUpNotDone = !task.followUpRequired;

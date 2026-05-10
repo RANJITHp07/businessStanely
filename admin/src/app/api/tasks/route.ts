@@ -160,12 +160,14 @@ export async function GET(req: NextRequest) {
     }
     if (assignedToId) {
       whereClause.assignedToId = assignedToId;
-    } else {
-      whereClause.active = true;
     }
     if (trigger === "true") {
       whereClause.legislationId = { not: null };
-      whereClause.OR = [{ active: false }, { status: "Completed" }];
+      whereClause.OR = [
+        { active: false },
+        { status: "Completed" },
+        { status: "completed" },
+      ];
     } else if (retainershipTasks === "true") {
       whereClause.legislationId = { not: null };
       whereClause.active = true;
@@ -280,7 +282,10 @@ export async function GET(req: NextRequest) {
     }
 
     const tasks = await prisma.task.findMany({
-      where: { ...whereClause },
+      where:
+        trigger === "true"
+          ? { ...whereClause }
+          : { ...whereClause, active: true },
       include: {
         client: true,
         createdBy: true,

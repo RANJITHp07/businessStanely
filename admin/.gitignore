@@ -50,3 +50,14 @@ next-env.d.ts
 /prisma/dev.db
 /prisma/*.db
 /prisma/*.db-journal
+
+# whatsapp-web.js runtime
+/.wwebjs_auth/
+/.wwebjs_cache/
+/.wwebjs_session/
+/.wwebjs_logs/
+/.wwebjs_runtime/
+/.wwebjs_chromium/
+/.wwebjs_temp/
+/.wwebjs_debug/
+/.wwebjs_store/

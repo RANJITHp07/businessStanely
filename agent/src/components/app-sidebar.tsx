@@ -10,7 +10,8 @@ import {
   ClipboardList,
   UserSearch,
   FileText,
-  Calendar
+  Calendar,
+  MessageSquare,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import Link from "next/link";
@@ -48,7 +49,11 @@ type MenuItem = {
   title: string;
   url: string;
   icon: typeof Home;
+  newTab?: boolean;
 };
+
+const DEFAULT_ADMIN_WHATSAPP_URL =
+  "https://management.legalstanley.com/whatsapp";
 
 const salesItems: MenuItem[] = [
   {
@@ -154,6 +159,7 @@ export function AppSidebar() {
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
   const pathname = usePathname();
   const { setOpenMobile, isMobile } = useSidebar();
+  const adminWhatsAppUrl = DEFAULT_ADMIN_WHATSAPP_URL;
 
   const { agentRole, agentType } = useMemo(() => {
     if (typeof window === "undefined") {
@@ -206,28 +212,51 @@ export function AppSidebar() {
     return advisorItems;
   }, [agentType, showExecutionPanel]);
 
+  const commonItemsWithWhatsApp = useMemo(
+    () => [
+      ...commonItems,
+      {
+        title: "WhatsApp",
+        url: adminWhatsAppUrl,
+        icon: MessageSquare,
+        newTab: true,
+      } as MenuItem,
+    ],
+    [adminWhatsAppUrl],
+  );
+
   const singleRoleItems = useMemo(() => {
     if (isDualRole) {
       return [] as MenuItem[];
     }
 
     if (showExecutionPanel) {
-      return [...dashboardItems, ...commonItems];
+      return [...dashboardItems, ...commonItemsWithWhatsApp];
     }
 
     if (showSalesPanel) {
       if (agentType === "Client Advisor") {
-        const clientAdvisorCommonItems = commonItems.filter(
-          (item) => item.title === "Service Records" || item.title === "Settings",
+        const clientAdvisorCommonItems = commonItemsWithWhatsApp.filter(
+          (item) =>
+            item.title === "Service Records" ||
+            item.title === "Settings" ||
+            item.title === "WhatsApp",
         );
         return [...visibleSalesItems, ...clientAdvisorCommonItems];
       }
 
-      return [...visibleSalesItems, ...commonItems];
+      return [...visibleSalesItems, ...commonItemsWithWhatsApp];
     }
 
-    return [...commonItems];
-  }, [isDualRole, showExecutionPanel, showSalesPanel, visibleSalesItems]);
+    return [...commonItemsWithWhatsApp];
+  }, [
+    agentType,
+    commonItemsWithWhatsApp,
+    isDualRole,
+    showExecutionPanel,
+    showSalesPanel,
+    visibleSalesItems,
+  ]);
 
   const renderItems = (items: MenuItem[]) =>
     items.map((item) => {
@@ -241,6 +270,8 @@ export function AppSidebar() {
             <Link
               href={item.url}
               onClick={() => isMobile && setOpenMobile(false)}
+              target={item.newTab ? "_blank" : undefined}
+              rel={item.newTab ? "noreferrer" : undefined}
               className={`flex items-center gap-2 ${isActive ? "bg-white text-primary" : "hover:bg-white hover:text-primary"}`}
             >
               <item.icon className="w-5 h-5" />
@@ -328,7 +359,7 @@ export function AppSidebar() {
               </SidebarGroupLabel>
               <SidebarGroupContent>
                 <SidebarMenu className="mt-[8px]">
-                  {renderItems(commonItems)}
+                  {renderItems(commonItemsWithWhatsApp)}
                 </SidebarMenu>
               </SidebarGroupContent>
             </SidebarGroup>

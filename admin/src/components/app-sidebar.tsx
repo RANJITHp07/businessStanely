@@ -14,7 +14,8 @@ import {
   CircleFadingPlusIcon,
   ChartLine,
   Calendar,
-  FileText
+  FileText,
+  MessageSquare
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -58,6 +59,7 @@ type MenuItem = {
   icon: any;
   url?: string;
   children?: ChildItem[];
+  newTab?: boolean;
 };
 
 const allItems: MenuItem[] = [
@@ -75,6 +77,7 @@ const allItems: MenuItem[] = [
   { title: "Retainership", url: "/retainership", icon: Boxes },
   { title: "Request Quote", url: "/request-quote", icon: FileText },
   { title: "Lead Source", url: "/lead_source", icon: CircleFadingPlusIcon },
+  { title: "WhatsApp", url: "/whatsapp", icon: MessageSquare, newTab: true },
   { title: "Deleted Client Advisor", url: "/dashboard/deleted-advisor", icon: UserRoundPen },
   { title: "Admin", url: "/admin", icon: ShieldUser },
   { title: "My Diary", url: "/my-diary", icon: UserRoundPen },
@@ -179,6 +182,8 @@ export function AppSidebar() {
               <Link
                 href={item.url!}
                 onClick={() => isMobile && setOpenMobile(false)}
+                target={item.newTab ? "_blank" : undefined}
+                rel={item.newTab ? "noreferrer" : undefined}
                 className={`flex items-center gap-2 ${pathname === item.url ? "bg-white text-primary" : ""
                   }`}
               >
@@ -193,18 +198,18 @@ export function AppSidebar() {
 
   return (
     <>
-      <Sidebar className="hidden md:flex flex-shrink-0">
+      <Sidebar className="hidden shrink-0 md:flex">
         <SidebarContent>
 
           <SidebarGroup>
-            <SidebarGroupLabel className="mt-[10px]">
+            <SidebarGroupLabel className="mt-2.5">
               <Image src={Logo} alt="logo" />
             </SidebarGroupLabel>
-            <SidebarGroupLabel className=" text-[16px] mt-[30px] text-white py-5 px-3 -ml-4  rounded-none border-b border-t border-white font-medium ">
+            <SidebarGroupLabel className=" mt-8 text-[16px] text-white py-5 px-3 -ml-4 rounded-none border-b border-t border-white font-medium ">
               Agent Panel
             </SidebarGroupLabel>
             <SidebarGroupContent >
-              <SidebarMenu className="mt-[8px]">
+              <SidebarMenu className="mt-2">
                 {renderItems(agentPanelItems)}
               </SidebarMenu>
             </SidebarGroupContent>
@@ -215,7 +220,7 @@ export function AppSidebar() {
               Sales Panel
             </SidebarGroupLabel>
             <SidebarGroupContent>
-              <SidebarMenu className="mt-[8px]">
+              <SidebarMenu className="mt-2">
                 {renderItems(salesPanelItems)}
               </SidebarMenu>
             </SidebarGroupContent>
@@ -225,7 +230,7 @@ export function AppSidebar() {
               Admin Settings
             </SidebarGroupLabel>
             <SidebarGroupContent>
-              <SidebarMenu className="mt-[8px]">
+              <SidebarMenu className="mt-2">
                 {renderItems(settingsPanelItems)}
               </SidebarMenu>
             </SidebarGroupContent>

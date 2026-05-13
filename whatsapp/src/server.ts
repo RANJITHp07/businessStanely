@@ -1,0 +1,326 @@
+import "dotenv/config";
+import express from "express";
+import cors from "cors";
+import QRCode from "qrcode";
+
+import { whatsappService } from "./whatsapp/service.js";
+import { subscribeWhatsAppEvent } from "./whatsapp/realtime.js";
+import type { WhatsAppEventPayload } from "./whatsapp/types.js";
+
+const PORT = Number(process.env.PORT ?? 4001);
+const SERVICE_TOKEN = process.env.WHATSAPP_SERVICE_TOKEN ?? "";
+const ALLOWED_ORIGIN = process.env.WHATSAPP_ALLOWED_ORIGIN ?? "";
+
+let recoveryTimer: NodeJS.Timeout | null = null;
+
+function isRecoverableBrowserError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  const normalized = message.toLowerCase();
+
+  return (
+    normalized.includes("execution context was destroyed") ||
+    normalized.includes("protocol error") ||
+    normalized.includes("runtime.callfunctionon") ||
+    normalized.includes("detached frame") ||
+    normalized.includes("target closed") ||
+    normalized.includes("browser has been closed")
+  );
+}
+
+function scheduleClientRecovery(trigger: string) {
+  if (recoveryTimer) {
+    return;
+  }
+
+  console.warn(`[WhatsApp Backend] Scheduling client recovery (${trigger})`);
+
+  recoveryTimer = setTimeout(() => {
+    recoveryTimer = null;
+    whatsappService.resetClient();
+    whatsappService.ensureInitialized().catch((err: unknown) => {
+      console.error("[WhatsApp Backend] Recovery initialization failed:", err);
+    });
+  }, 1500);
+}
+
+const app = express();
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!ALLOWED_ORIGIN || !origin || origin === ALLOWED_ORIGIN) {
+        callback(null, true);
+      } else {
+        callback(new Error("CORS: origin not allowed"));
+      }
+    },
+    credentials: true,
+  }),
+);
+app.use(express.json({ limit: "50mb" }));
+
+function auth(
+  req: express.Request,
+  res: express.Response,
+  next: express.NextFunction,
+) {
+  if (!SERVICE_TOKEN) {
+    next();
+    return;
+  }
+  const headerToken = req.headers["x-whatsapp-service-token"];
+  const authHeader = req.headers["authorization"];
+  const bearerToken =
+    typeof authHeader === "string" && authHeader.startsWith("Bearer ")
+      ? authHeader.slice(7).trim()
+      : undefined;
+  const token = headerToken ?? bearerToken ?? req.query["token"];
+  if (token === SERVICE_TOKEN) {
+    next();
+    return;
+  }
+  res.status(401).json({ error: "Unauthorized" });
+}
+
+// --- Status ---
+app.get("/status", auth, async (_req, res) => {
+  whatsappService.ensureInitialized().catch((err: unknown) => {
+    console.error("[WhatsApp Backend] ensureInitialized(/status) failed:", err);
+  });
+  const state = whatsappService.getState();
+  const qrCodeDataUrl = state.qr
+    ? await QRCode.toDataURL(state.qr, { margin: 1, width: 320 })
+    : null;
+  res.json({ ...state, qrCodeDataUrl });
+});
+
+// --- Chats ---
+app.get("/chats", auth, async (req, res) => {
+  const search = String(req.query.search ?? "");
+  try {
+    const chats = await whatsappService.listChats(search);
+    res.json({ chats });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Failed to load chats.";
+    console.log(error);
+    res.status(503).json({ error: message });
+  }
+});
+
+// --- Messages ---
+app.get("/messages", auth, async (req, res) => {
+  const chatId = String(req.query.chatId ?? "");
+  if (!chatId) {
+    res.status(400).json({ error: "chatId is required." });
+    return;
+  }
+  try {
+    const messages = await whatsappService.listMessages(chatId);
+    res.json({ messages });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Failed to load messages.";
+    res.status(500).json({ error: message });
+  }
+});
+
+app.patch("/messages", auth, async (req, res) => {
+  const { messageId, body } = req.body ?? {};
+  if (!messageId || !body) {
+    res.status(400).json({ error: "messageId and body are required." });
+    return;
+  }
+  try {
+    const message = await whatsappService.editMessage(messageId, body);
+    res.json({ message });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Failed to edit message.";
+    res.status(422).json({ error: message });
+  }
+});
+
+app.delete("/messages", auth, async (req, res) => {
+  const { messageId, everyone = true } = req.body ?? {};
+  if (!messageId) {
+    res.status(400).json({ error: "messageId is required." });
+    return;
+  }
+  try {
+    const result = await whatsappService.deleteMessage(messageId, everyone);
+    res.json({ ok: true, ...result });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Failed to delete message.";
+    res.status(500).json({ error: message });
+  }
+});
+
+// --- Send ---
+app.post("/send", auth, async (req, res) => {
+  const { chatId, body = "", media } = req.body ?? {};
+  if (!chatId || (!body && !media)) {
+    res.status(400).json({
+      error: "chatId and at least one of body or media are required.",
+    });
+    return;
+  }
+  try {
+    const message = await whatsappService.sendMessage(chatId, body, media);
+    res.json({ message });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Failed to send message.";
+    res.status(500).json({ error: message });
+  }
+});
+
+// --- Media ---
+app.get("/media", auth, async (req, res) => {
+  const messageId = String(req.query.messageId ?? "");
+  if (!messageId) {
+    res.status(400).json({ error: "messageId is required." });
+    return;
+  }
+  try {
+    const media = await whatsappService.getMedia(messageId);
+    const buffer = Buffer.from(media.data, "base64");
+    res.set({
+      "Content-Type": media.mimetype,
+      "Content-Length": String(buffer.byteLength),
+      "Cache-Control": "private, max-age=3600",
+    });
+    res.send(buffer);
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Failed to fetch media.";
+    res.status(500).json({ error: message });
+  }
+});
+
+// --- Logout ---
+app.post("/logout", auth, async (_req, res) => {
+  await whatsappService.logout();
+  res.json({ ok: true });
+});
+
+// --- SSE Stream ---
+app.get("/stream", auth, async (req, res) => {
+  whatsappService.ensureInitialized().catch((err: unknown) => {
+    console.error("[WhatsApp Backend] ensureInitialized(/stream) failed:", err);
+  });
+
+  res.set({
+    "Content-Type": "text/event-stream",
+    "Cache-Control": "no-cache, no-transform",
+    Connection: "keep-alive",
+    "X-Accel-Buffering": "no",
+  });
+  res.flushHeaders();
+
+  let closed = false;
+
+  const send = (event: string, data: unknown) => {
+    if (closed || res.writableEnded || res.destroyed) {
+      return;
+    }
+
+    try {
+      res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
+    } catch {
+      closed = true;
+    }
+  };
+
+  const state = whatsappService.getState();
+  const qrCodeDataUrl = state.qr
+    ? await QRCode.toDataURL(state.qr, { margin: 1, width: 320 })
+    : null;
+  send("state", { ...state, qrCodeDataUrl });
+
+  const unsubState = subscribeWhatsAppEvent("state", () => {
+    void (async () => {
+      try {
+        const s = whatsappService.getState();
+        const qr = s.qr
+          ? await QRCode.toDataURL(s.qr, { margin: 1, width: 320 })
+          : null;
+        send("state", { ...s, qrCodeDataUrl: qr });
+      } catch (error) {
+        console.error(
+          "[WhatsApp Backend] Failed to publish stream state:",
+          error,
+        );
+      }
+    })();
+  });
+
+  const unsubChats = subscribeWhatsAppEvent("chats-updated", () => {
+    send("chats-updated", { at: Date.now() });
+  });
+
+  const unsubMessage = subscribeWhatsAppEvent(
+    "message",
+    (payload: WhatsAppEventPayload) => {
+      send("message", payload);
+    },
+  );
+
+  const unsubMessages = subscribeWhatsAppEvent(
+    "messages-updated",
+    (payload: WhatsAppEventPayload) => {
+      send("messages-updated", payload);
+    },
+  );
+
+  const ping = setInterval(() => {
+    send("ping", { at: Date.now() });
+  }, 25000);
+
+  const cleanup = () => {
+    if (closed) {
+      return;
+    }
+
+    closed = true;
+    clearInterval(ping);
+    unsubState();
+    unsubChats();
+    unsubMessage();
+    unsubMessages();
+  };
+
+  req.on("close", cleanup);
+  req.on("error", cleanup);
+  res.on("close", cleanup);
+  res.on("error", cleanup);
+});
+
+app.listen(PORT, () => {
+  console.log(`[WhatsApp Backend] listening on http://localhost:${PORT}`);
+  whatsappService.ensureInitialized().catch((err: unknown) => {
+    console.error("[WhatsApp Backend] Failed to initialize service:", err);
+  });
+});
+
+process.on("unhandledRejection", (reason) => {
+  if (isRecoverableBrowserError(reason)) {
+    console.warn("[WhatsApp Backend] Recoverable unhandled rejection:", reason);
+    scheduleClientRecovery("unhandledRejection");
+    return;
+  }
+
+  console.error("[WhatsApp Backend] Unhandled rejection:", reason);
+});
+
+process.on("uncaughtException", (error) => {
+  if (isRecoverableBrowserError(error)) {
+    console.warn("[WhatsApp Backend] Recoverable uncaught exception:", error);
+    scheduleClientRecovery("uncaughtException");
+    return;
+  }
+
+  console.error("[WhatsApp Backend] Uncaught exception:", error);
+  process.exit(1);
+});

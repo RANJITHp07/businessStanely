@@ -1,9 +1,6 @@
 import { EventEmitter } from "events";
 
-import type {
-  WhatsAppEventPayload,
-  WhatsAppStreamEvent,
-} from "@/lib/whatsapp/types";
+import type { WhatsAppEventPayload, WhatsAppStreamEvent } from "./types.js";
 
 const globalRealtime = globalThis as typeof globalThis & {
   __adminWhatsAppRealtime?: EventEmitter;

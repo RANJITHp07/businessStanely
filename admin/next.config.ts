@@ -10,40 +10,54 @@ const nextConfig: NextConfig = {
   images: {
     remotePatterns: [
       {
-        protocol: 'https',
-        hostname: '*.amazonaws.com',
-        port: '',
-        pathname: '/**',
+        protocol: "https",
+        hostname: "*.amazonaws.com",
+        port: "",
+        pathname: "/**",
       },
     ],
     unoptimized: true,
   },
-  output: 'standalone',
+  output: "standalone",
   trailingSlash: false,
+  async rewrites() {
+    const backendUrl =
+      process.env.WHATSAPP_BACKEND_URL ?? "http://localhost:4001";
+    const serviceToken = process.env.WHATSAPP_SERVICE_TOKEN ?? "";
+    const tokenQuery = serviceToken
+      ? `?token=${encodeURIComponent(serviceToken)}`
+      : "";
+    return [
+      {
+        source: "/api/whatsapp/:path*",
+        destination: `${backendUrl}/:path*${tokenQuery}`,
+      },
+    ];
+  },
   async headers() {
     return [
       {
-        source: '/:path*',
+        source: "/:path*",
         headers: [
           {
-            key: 'X-DNS-Prefetch-Control',
-            value: 'on',
+            key: "X-DNS-Prefetch-Control",
+            value: "on",
           },
           {
-            key: 'Strict-Transport-Security',
-            value: 'max-age=31536000; includeSubDomains',
+            key: "Strict-Transport-Security",
+            value: "max-age=31536000; includeSubDomains",
           },
           {
-            key: 'X-Frame-Options',
-            value: 'SAMEORIGIN',
+            key: "X-Frame-Options",
+            value: "SAMEORIGIN",
           },
           {
-            key: 'X-Content-Type-Options',
-            value: 'nosniff',
+            key: "X-Content-Type-Options",
+            value: "nosniff",
           },
           {
-            key: 'X-XSS-Protection',
-            value: '1; mode=block',
+            key: "X-XSS-Protection",
+            value: "1; mode=block",
           },
         ],
       },

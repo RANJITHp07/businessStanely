@@ -17,6 +17,16 @@ const publicRoutes = ["/login", "/forgot-password", "/reset-password"];
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  // Inject service token for WhatsApp backend proxy requests
+  if (pathname.startsWith("/api/whatsapp")) {
+    const serviceToken = process.env.WHATSAPP_SERVICE_TOKEN ?? "";
+    const headers = new Headers(request.headers);
+    if (serviceToken) {
+      headers.set("x-whatsapp-service-token", serviceToken);
+    }
+    return NextResponse.next({ request: { headers } });
+  }
+
   // Validate token using verifyAuth
   const validUser = await verifyAuth(request);
 
@@ -54,5 +64,8 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!api|_next/static|_next/image|favicon.ico|public).*)"],
+  matcher: [
+    "/api/whatsapp/:path*",
+    "/((?!api|_next/static|_next/image|favicon.ico|public).*)",
+  ],
 };

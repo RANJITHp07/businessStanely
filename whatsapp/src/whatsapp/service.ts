@@ -3,22 +3,35 @@ import os from "os";
 import path from "path";
 
 import type { Chat, Client as WhatsAppClient, Message } from "whatsapp-web.js";
-import { LocalAuth } from "whatsapp-web.js";
 import pkg from "whatsapp-web.js";
 
-import { publishWhatsAppEvent } from "@/lib/whatsapp/realtime";
+import { publishWhatsAppEvent } from "./realtime.js";
 import type {
   WhatsAppChatSummary,
   WhatsAppMessage,
   WhatsAppState,
-} from "@/lib/whatsapp/types";
+} from "./types.js";
 
-const { Client, MessageMedia } = pkg;
+const { Client, LocalAuth, MessageMedia } = pkg;
 
-const SESSION_DIR = path.resolve(
-  process.cwd(),
-  process.env.WHATSAPP_SESSION_DIR || ".wwebjs_auth",
-);
+function resolveSessionDir() {
+  const configured = process.env.WHATSAPP_SESSION_DIR?.trim();
+
+  if (configured) {
+    return path.isAbsolute(configured)
+      ? configured
+      : path.resolve(process.cwd(), configured);
+  }
+
+  // /var/task and similar deployment roots are read-only on many serverless hosts.
+  if (process.env.NODE_ENV === "production") {
+    return path.join(os.tmpdir(), ".wwebjs_auth");
+  }
+
+  return path.resolve(process.cwd(), ".wwebjs_auth");
+}
+
+const SESSION_DIR = resolveSessionDir();
 
 /**
  * Clean up stuck lockfiles from crashed sessions (useful for local dev)
@@ -41,8 +54,37 @@ function cleanupStuckLockfiles() {
   }
 }
 
+function ensureSessionDirectoryWritable() {
+  fs.mkdirSync(SESSION_DIR, { recursive: true });
+
+  // Validate write access early to avoid opaque puppeteer auth failures.
+  const probePath = path.join(
+    SESSION_DIR,
+    `.wwebjs-write-test-${process.pid}-${Date.now()}`,
+  );
+
+  try {
+    fs.writeFileSync(probePath, "ok");
+  } finally {
+    try {
+      if (fs.existsSync(probePath)) {
+        fs.unlinkSync(probePath);
+      }
+    } catch {
+      // Ignore cleanup errors.
+    }
+  }
+}
+
 const chromiumExecutablePath =
   process.env.WHATSAPP_CHROMIUM_EXECUTABLE_PATH?.trim() || undefined;
+const protocolTimeoutMs = Number(
+  process.env.WHATSAPP_PROTOCOL_TIMEOUT_MS ?? 180000,
+);
+const chatFetchTimeoutMs = Number(
+  process.env.WHATSAPP_CHAT_FETCH_TIMEOUT_MS ?? 25000,
+);
+const chatCacheTtlMs = Number(process.env.WHATSAPP_CHAT_CACHE_TTL_MS ?? 12000);
 const WHATSAPP_EDIT_WINDOW_MS = 15 * 60 * 1000;
 
 /**
@@ -50,13 +92,44 @@ const WHATSAPP_EDIT_WINDOW_MS = 15 * 60 * 1000;
  */
 function isFatalBrowserError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
+  const normalized = message.toLowerCase();
+
+  if (
+    normalized.includes("timed out") &&
+    normalized.includes("runtime.callfunctionon")
+  ) {
+    return false;
+  }
+
   return (
-    message.includes("detached Frame") ||
-    message.includes("Target closed") ||
-    message.includes("Session closed") ||
-    message.includes("Protocol error") ||
-    message.includes("Browser has been closed")
+    normalized.includes("detached frame") ||
+    normalized.includes("target closed") ||
+    normalized.includes("session closed") ||
+    normalized.includes("protocol error") ||
+    normalized.includes("browser has been closed")
   );
+}
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string) {
+  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
+    return promise;
+  }
+
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(`${label} timed out after ${timeoutMs}ms.`));
+    }, timeoutMs);
+
+    promise
+      .then((value) => {
+        clearTimeout(timer);
+        resolve(value);
+      })
+      .catch((error) => {
+        clearTimeout(timer);
+        reject(error);
+      });
+  });
 }
 
 function toEditableMessageError(error: unknown): Error {
@@ -270,6 +343,9 @@ class WhatsAppService {
   private client: WhatsAppClient | null = null;
   private initializingPromise: Promise<void> | null = null;
   private state: WhatsAppState = createDefaultState();
+  private chatsCache: WhatsAppChatSummary[] = [];
+  private chatsCacheAt = 0;
+  private chatsRefreshPromise: Promise<WhatsAppChatSummary[]> | null = null;
 
   getState() {
     return this.state;
@@ -308,6 +384,8 @@ class WhatsAppService {
     this.setState({ status: "initializing", error: null, qr: null });
 
     try {
+      ensureSessionDirectoryWritable();
+
       // Clean up any stuck lockfiles before starting
       cleanupStuckLockfiles();
 
@@ -319,6 +397,9 @@ class WhatsAppService {
         puppeteer: {
           headless: process.env.WHATSAPP_HEADLESS !== "false",
           executablePath: chromiumExecutablePath,
+          protocolTimeout: Number.isFinite(protocolTimeoutMs)
+            ? protocolTimeoutMs
+            : 180000,
           args: [
             "--no-sandbox",
             "--disable-setuid-sandbox",
@@ -373,6 +454,10 @@ class WhatsAppService {
 
       client.on("error", (error: Error) => {
         console.error("[WhatsApp] Client error:", error.message);
+        if (isFatalBrowserError(error)) {
+          this.handleFatalBrowserError(error);
+          return;
+        }
         this.setState({
           status: "error",
           error: error.message || "WhatsApp client encountered an error.",
@@ -380,12 +465,16 @@ class WhatsAppService {
       });
 
       client.on("message", async (message: Message) => {
-        const mapped = mapMessage(message);
-        publishWhatsAppEvent("message", {
-          chatId: mapped.chatId,
-          message: mapped,
-        });
-        publishWhatsAppEvent("chats-updated", { chatId: mapped.chatId });
+        try {
+          const mapped = mapMessage(message);
+          publishWhatsAppEvent("message", {
+            chatId: mapped.chatId,
+            message: mapped,
+          });
+          publishWhatsAppEvent("chats-updated", { chatId: mapped.chatId });
+        } catch (error) {
+          this.handleFatalBrowserError(error);
+        }
       });
 
       client.on("message_create", async (message: Message) => {
@@ -393,12 +482,16 @@ class WhatsAppService {
           return;
         }
 
-        const mapped = mapMessage(message);
-        publishWhatsAppEvent("message", {
-          chatId: mapped.chatId,
-          message: mapped,
-        });
-        publishWhatsAppEvent("chats-updated", { chatId: mapped.chatId });
+        try {
+          const mapped = mapMessage(message);
+          publishWhatsAppEvent("message", {
+            chatId: mapped.chatId,
+            message: mapped,
+          });
+          publishWhatsAppEvent("chats-updated", { chatId: mapped.chatId });
+        } catch (error) {
+          this.handleFatalBrowserError(error);
+        }
       });
 
       this.client = client;
@@ -446,6 +539,9 @@ class WhatsAppService {
     }
     this.client = null;
     this.initializingPromise = null;
+    this.chatsCache = [];
+    this.chatsCacheAt = 0;
+    this.chatsRefreshPromise = null;
     this.setState(createDefaultState());
   }
 
@@ -568,30 +664,11 @@ class WhatsAppService {
     }
   }
 
-  async listChats(search = "") {
-    const client = await this.requireReadyClient();
-    let chats;
-    try {
-      chats = await client.getChats();
-    } catch (error) {
-      this.handleFatalBrowserError(error);
-      throw error;
-    }
-    const normalizedSearch = search.trim().toLowerCase();
-
-    const filteredChats = chats.filter((chat) => chat.id.server !== "status");
-    const mappedChats = await Promise.all(
-      filteredChats.map(async (chat) => {
-        const summary = mapChat(chat);
-        const avatarUrl = await this.getChatAvatarUrl(chat);
-        return {
-          ...summary,
-          avatarUrl,
-        };
-      }),
-    );
-
-    return mappedChats
+  private filterAndSortChats(
+    chats: WhatsAppChatSummary[],
+    normalizedSearch: string,
+  ) {
+    return chats
       .filter((chat) => {
         if (!normalizedSearch) {
           return true;
@@ -604,6 +681,75 @@ class WhatsAppService {
         return searchableText.includes(normalizedSearch);
       })
       .sort((left, right) => (right.timestamp ?? 0) - (left.timestamp ?? 0));
+  }
+
+  private async refreshChats(client: WhatsAppClient) {
+    if (this.chatsRefreshPromise) {
+      return this.chatsRefreshPromise;
+    }
+
+    this.chatsRefreshPromise = (async () => {
+      const chats = await withTimeout(
+        client.getChats(),
+        Number.isFinite(chatFetchTimeoutMs) ? chatFetchTimeoutMs : 25000,
+        "WhatsApp chat fetch",
+      );
+
+      const filteredChats = chats.filter((chat) => chat.id.server !== "status");
+      const mappedChats = await Promise.all(
+        filteredChats.map(async (chat) => {
+          const summary = mapChat(chat);
+          const avatarUrl = await this.getChatAvatarUrl(chat);
+          return {
+            ...summary,
+            avatarUrl,
+          };
+        }),
+      );
+
+      this.chatsCache = mappedChats;
+      this.chatsCacheAt = Date.now();
+      return mappedChats;
+    })();
+
+    try {
+      return await this.chatsRefreshPromise;
+    } finally {
+      this.chatsRefreshPromise = null;
+    }
+  }
+
+  async listChats(search = "") {
+    const client = await this.requireReadyClient();
+    const normalizedSearch = search.trim().toLowerCase();
+    const hasFreshCache =
+      this.chatsCache.length > 0 &&
+      Date.now() - this.chatsCacheAt <= chatCacheTtlMs;
+
+    if (hasFreshCache) {
+      return this.filterAndSortChats(this.chatsCache, normalizedSearch);
+    }
+
+    try {
+      const mappedChats = await this.refreshChats(client);
+      return this.filterAndSortChats(mappedChats, normalizedSearch);
+    } catch (error) {
+      this.handleFatalBrowserError(error);
+
+      if (this.chatsCache.length > 0) {
+        console.warn(
+          "[WhatsApp] listChats failed, returning cached chats:",
+          error instanceof Error ? error.message : String(error),
+        );
+        return this.filterAndSortChats(this.chatsCache, normalizedSearch);
+      }
+
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to load chats.";
+      throw new Error(
+        `Failed to load chats from WhatsApp Web. ${errorMessage}`,
+      );
+    }
   }
 
   async listMessages(chatId: string, limit = 80) {
@@ -785,13 +931,4 @@ class WhatsAppService {
   }
 }
 
-const globalWhatsApp = globalThis as typeof globalThis & {
-  __adminWhatsAppService?: WhatsAppService;
-};
-
-export const whatsappService =
-  globalWhatsApp.__adminWhatsAppService ?? new WhatsAppService();
-
-if (!globalWhatsApp.__adminWhatsAppService) {
-  globalWhatsApp.__adminWhatsAppService = whatsappService;
-}
+export const whatsappService = new WhatsAppService();

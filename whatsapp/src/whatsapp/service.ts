@@ -1,6 +1,10 @@
 import fs from "fs";
 import os from "os";
 import path from "path";
+import { exec } from "child_process";
+import { promisify } from "util";
+
+const execp = promisify(exec);
 
 import type { Chat, Client as WhatsAppClient, Message } from "whatsapp-web.js";
 import pkg from "whatsapp-web.js";
@@ -58,7 +62,10 @@ function cleanupStuckLockfiles() {
       if (fs.existsSync(p)) {
         try {
           fs.unlinkSync(p);
-          console.log(`[WhatsApp] Cleaned up stuck lockfile: ${name}`);
+          // DevToolsActivePort is always left behind on abrupt exit — not worth logging.
+          if (name !== "DevToolsActivePort") {
+            console.log(`[WhatsApp] Cleaned up stuck lockfile: ${name}`);
+          }
         } catch (e) {
           // Ignore, file might still be in use
         }
@@ -66,6 +73,40 @@ function cleanupStuckLockfiles() {
     }
   } catch (e) {
     // Ignore cleanup errors
+  }
+}
+
+/**
+ * Attempt to kill any browser processes that reference the session directory.
+ * This uses platform-specific commands and will ignore failures.
+ */
+async function killBrowserProcessesReferencing(sessionPath: string) {
+  try {
+    const marker = path.basename(sessionPath) || "session-admin-whatsapp";
+    if (process.platform === "win32") {
+      // Use PowerShell to find processes whose command line references the marker
+      const cmd = `powershell -NoProfile -Command "Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -and $_.CommandLine -match '${marker}' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }"`;
+      await execp(cmd);
+      LOG(
+        "killBrowserProcessesReferencing: attempted PowerShell stop for marker",
+        marker,
+      );
+      return;
+    }
+
+    // POSIX: try to kill by matching the marker in the command line
+    // This command finds matching PIDs and kills them; ignore failures.
+    const cmd = `ps aux | grep -F '${marker}' | grep -v grep | awk '{print $2}' | xargs -r kill -9`;
+    await execp(cmd);
+    LOG(
+      "killBrowserProcessesReferencing: attempted POSIX kill for marker",
+      marker,
+    );
+  } catch (e) {
+    LOG(
+      "killBrowserProcessesReferencing: error while killing processes",
+      String(e),
+    );
   }
 }
 
@@ -97,9 +138,10 @@ const protocolTimeoutMs = Number(
   process.env.WHATSAPP_PROTOCOL_TIMEOUT_MS ?? 180000,
 );
 const chatFetchTimeoutMs = Number(
-  process.env.WHATSAPP_CHAT_FETCH_TIMEOUT_MS ?? 25000,
+  process.env.WHATSAPP_CHAT_FETCH_TIMEOUT_MS ?? 60000,
 );
 const chatCacheTtlMs = Number(process.env.WHATSAPP_CHAT_CACHE_TTL_MS ?? 12000);
+const chatFetchLimit = Number(process.env.WHATSAPP_CHAT_FETCH_LIMIT ?? 200);
 const WHATSAPP_EDIT_WINDOW_MS = 15 * 60 * 1000;
 
 /**
@@ -406,11 +448,54 @@ class WhatsAppService {
       // Clean up any stuck lockfiles before starting
       cleanupStuckLockfiles();
 
+      // Ensure the session subdirectory exists and try to kill any lingering
+      // browser processes that may be holding the profile open. This prevents
+      // a loop where lockfiles are removed but the browser immediately
+      // recreates them.
+      try {
+        const sessionPath = path.join(SESSION_DIR, "session-admin-whatsapp");
+        fs.mkdirSync(sessionPath, { recursive: true });
+
+        const lockCandidates = [
+          path.join(sessionPath, "lockfile"),
+          path.join(sessionPath, "LOCK"),
+          path.join(sessionPath, "SingletonLock"),
+          path.join(sessionPath, "SingletonSocket"),
+          path.join(sessionPath, "DevToolsActivePort"),
+        ];
+
+        const anyLockExists = lockCandidates.some((p) => fs.existsSync(p));
+        if (anyLockExists) {
+          LOG(
+            "initializeClient: lockfiles detected, attempting to kill browser processes referencing session",
+          );
+          // best-effort kill; ignore errors
+          await killBrowserProcessesReferencing(sessionPath);
+          // allow filesystem settle
+          await new Promise((r) => setTimeout(r, 400));
+          // attempt cleanup again
+          cleanupStuckLockfiles();
+        }
+      } catch (e) {
+        LOG("initializeClient: session pre-setup failed", String(e));
+      }
+
       const client = new Client({
         authStrategy: new LocalAuth({
           clientId: "admin-whatsapp",
           dataPath: SESSION_DIR,
         }),
+        // Pin to a specific known-working version of WhatsApp Web.
+        // Without this, wwebjs loads the live WhatsApp Web which frequently
+        // breaks QR auth because WhatsApp updates their internal module names.
+        webVersion: "2.3000.1017054665",
+        webVersionCache: {
+          type: "remote",
+          remotePath:
+            "https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/{version}.html",
+        },
+        // Extra time for WhatsApp Web to inject and authenticate.
+        authTimeoutMs: 60000,
         puppeteer: {
           headless: process.env.WHATSAPP_HEADLESS !== "false",
           executablePath: chromiumExecutablePath,
@@ -424,6 +509,11 @@ class WhatsAppService {
             "--disable-accelerated-2d-canvas",
             "--no-first-run",
             "--disable-gpu",
+            "--disable-extensions",
+            "--disable-background-timer-throttling",
+            "--disable-backgrounding-occluded-windows",
+            "--disable-renderer-backgrounding",
+            "--window-size=1280,800",
           ],
         },
       });
@@ -438,7 +528,7 @@ class WhatsAppService {
         this.setState({ status: "authenticated", error: null });
       });
 
-      client.on("ready", async () => {
+      client.on("ready", () => {
         LOG("event: ready");
         this.setState({
           status: "ready",
@@ -451,7 +541,11 @@ class WhatsAppService {
           },
         });
 
-        publishWhatsAppEvent("chats-updated");
+        // Delay the initial chat fetch by 4 s so WhatsApp Web has time to
+        // fully sync its internal chat list after the session becomes ready.
+        setTimeout(() => {
+          publishWhatsAppEvent("chats-updated");
+        }, 4000);
       });
 
       client.on("auth_failure", (message: string) => {
@@ -736,23 +830,166 @@ class WhatsAppService {
     }
 
     this.chatsRefreshPromise = (async () => {
-      const chats = await withTimeout(
-        client.getChats(),
-        Number.isFinite(chatFetchTimeoutMs) ? chatFetchTimeoutMs : 25000,
-        "WhatsApp chat fetch",
-      );
+      const limit =
+        Number.isFinite(chatFetchLimit) && chatFetchLimit > 0
+          ? chatFetchLimit
+          : 200;
+      const timeoutMs = Number.isFinite(chatFetchTimeoutMs)
+        ? chatFetchTimeoutMs
+        : 60000;
 
-      const filteredChats = chats.filter((chat) => chat.id.server !== "status");
-      const mappedChats = await Promise.all(
-        filteredChats.map(async (chat) => {
-          const summary = mapChat(chat);
-          const avatarUrl = await this.getChatAvatarUrl(chat);
-          return {
-            ...summary,
-            avatarUrl,
+      // ── Fast path ────────────────────────────────────────────────────────
+      // client.getChats() calls WWebJS.getChatModel() for EVERY chat inside
+      // the Chromium page.  getChatModel() does async work (contact lookups,
+      // profile-pic fetches, etc.) for each chat, so with 100+ chats it
+      // floods Puppeteer's CDP queue and hangs for minutes.
+      //
+      // Instead, we execute ONE pupPage.evaluate() that reads the raw
+      // WhatsApp Web in-memory store synchronously — no per-chat async ops.
+      const pupPage = (client as unknown as { pupPage?: unknown }).pupPage as
+        | {
+            evaluate(
+              fn: (...a: unknown[]) => unknown,
+              ...args: unknown[]
+            ): Promise<unknown>;
+          }
+        | undefined;
+
+      if (pupPage?.evaluate) {
+        try {
+          type RawChat = {
+            id: string;
+            name: string;
+            idUser: string;
+            timestamp: number | null;
+            unreadCount: number;
+            isGroup: boolean;
+            isMuted: boolean;
+            isPinned: boolean;
+            lastMessageBody: string | null;
+            lastMessageHasMedia: boolean;
+            lastMessageType: string | null;
           };
-        }),
-      );
+
+          const raw = (await withTimeout(
+            pupPage.evaluate(async (lim: unknown) => {
+              try {
+                /* eslint-disable @typescript-eslint/no-explicit-any */
+                const store = (window as any).Store;
+                if (!store?.Chat) return null;
+
+                // models is a Backbone Collection array; some WA versions
+                // expose getModelsArray() returning a Promise.
+                let models: any[];
+                if (Array.isArray(store.Chat.models)) {
+                  models = store.Chat.models;
+                } else if (typeof store.Chat.getModelsArray === "function") {
+                  models = await store.Chat.getModelsArray();
+                } else {
+                  return null; // can't read store — fall through to getChats()
+                }
+
+                return models
+                  .filter(
+                    (c: any) =>
+                      c?.id?.server !== "status" &&
+                      c?.id?.server !== "broadcast" &&
+                      c?.id?._serialized,
+                  )
+                  .slice(0, lim as number)
+                  .map((c: any) => {
+                    try {
+                      const lm = c.lastMessage ?? c.msgs?.last ?? null;
+                      return {
+                        id: c.id._serialized,
+                        name: c.formattedTitle || c.name || c.id?.user || "",
+                        idUser: c.id?.user || "",
+                        timestamp: typeof c.t === "number" ? c.t : null,
+                        unreadCount:
+                          typeof c.unreadCount === "number" ? c.unreadCount : 0,
+                        isGroup: Boolean(c.isGroup),
+                        isMuted: Boolean(c.mute?.expiration),
+                        isPinned: Boolean(c.pin),
+                        lastMessageBody:
+                          typeof lm?.body === "string" ? lm.body : null,
+                        lastMessageHasMedia: Boolean(lm?.hasMedia),
+                        lastMessageType:
+                          typeof lm?.type === "string" ? lm.type : null,
+                      };
+                    } catch {
+                      return null;
+                    }
+                  })
+                  .filter((c: any) => c !== null);
+                /* eslint-enable @typescript-eslint/no-explicit-any */
+              } catch {
+                return null;
+              }
+            }, limit) as Promise<RawChat[] | null>,
+            timeoutMs,
+            "WhatsApp chat store read",
+          )) as RawChat[] | null;
+
+          if (Array.isArray(raw) && raw.length > 0) {
+            LOG(`refreshChats: fast path returned ${raw.length} chats`);
+            const mappedChats: WhatsAppChatSummary[] = raw.map((r) => ({
+              id: r.id,
+              name: r.name || r.idUser || "Unknown contact",
+              lastMessage: getLastMessagePreview(
+                r.lastMessageBody !== null || r.lastMessageHasMedia
+                  ? {
+                      body: r.lastMessageBody,
+                      hasMedia: r.lastMessageHasMedia,
+                      type: r.lastMessageType,
+                    }
+                  : null,
+              ),
+              timestamp: r.timestamp !== null ? r.timestamp * 1000 : null,
+              unreadCount: r.unreadCount,
+              avatarSeed: r.idUser || r.id,
+              avatarUrl: null,
+              isGroup: r.isGroup,
+              isMuted: r.isMuted,
+              isPinned: r.isPinned,
+            }));
+
+            this.chatsCache = mappedChats;
+            this.chatsCacheAt = Date.now();
+            return mappedChats;
+          }
+
+          LOG(
+            "refreshChats: fast path returned empty/null, falling back to getChats()",
+          );
+        } catch (fastErr) {
+          LOG(
+            "refreshChats: fast path error, falling back to getChats():",
+            fastErr instanceof Error ? fastErr.message : String(fastErr),
+          );
+        }
+      }
+
+      // ── Fallback: standard getChats() ────────────────────────────────────
+      LOG("refreshChats: using getChats() fallback");
+      const attemptFetch = () =>
+        withTimeout(client.getChats(), timeoutMs, "WhatsApp chat fetch");
+
+      let chats;
+      try {
+        chats = await attemptFetch();
+      } catch (firstError) {
+        LOG(
+          "refreshChats: first attempt failed, retrying after 5 s delay:",
+          firstError instanceof Error ? firstError.message : String(firstError),
+        );
+        await new Promise((r) => setTimeout(r, 5000));
+        chats = await attemptFetch();
+      }
+
+      const filteredChats = chats
+        .filter((chat) => chat.id.server !== "status")
+        .slice(0, limit);
+      const mappedChats = filteredChats.map((chat) => mapChat(chat));
 
       this.chatsCache = mappedChats;
       this.chatsCacheAt = Date.now();
@@ -992,6 +1229,88 @@ class WhatsAppService {
       });
       publishWhatsAppEvent("chats-updated");
       LOG("logout: complete, client cleared");
+    }
+  }
+
+  /**
+   * Force clear the session directory, kill lingering browser processes,
+   * and attempt to reinitialize a fresh client. This is destructive and will
+   * remove saved WhatsApp authentication (QR required to re-link).
+   */
+  /**
+   * Gracefully destroy the Chromium browser without touching the auth session.
+   * Called on SIGINT / SIGTERM so the browser cleans up its own lockfiles.
+   */
+  async shutdownClient() {
+    if (!this.client) {
+      return;
+    }
+    const c = this.client;
+    this.client = null;
+    this.initializingPromise = null;
+    try {
+      LOG("shutdownClient: destroying browser");
+      await c.destroy();
+      LOG("shutdownClient: done");
+    } catch (e) {
+      LOG("shutdownClient: error during destroy", String(e));
+    }
+  }
+
+  async forceClearSession() {
+    LOG("forceClearSession: starting");
+
+    const sessionPath = path.join(SESSION_DIR, "session-admin-whatsapp");
+
+    // Destroy client if present
+    if (this.client) {
+      try {
+        LOG("forceClearSession: destroying client");
+        await this.client.destroy();
+      } catch (e) {
+        LOG("forceClearSession: error destroying client", String(e));
+      }
+    }
+
+    this.client = null;
+    this.initializingPromise = null;
+
+    try {
+      cleanupStuckLockfiles();
+    } catch (e) {
+      LOG("forceClearSession: cleanupStuckLockfiles failed", String(e));
+    }
+
+    try {
+      await killBrowserProcessesReferencing(sessionPath);
+    } catch (e) {
+      LOG(
+        "forceClearSession: killBrowserProcessesReferencing failed",
+        String(e),
+      );
+    }
+
+    try {
+      // Remove session directory
+      if (fs.existsSync(sessionPath)) {
+        await fs.promises.rm(sessionPath, { recursive: true, force: true });
+        LOG("forceClearSession: removed session directory", sessionPath);
+      } else {
+        LOG("forceClearSession: session directory not present", sessionPath);
+      }
+    } catch (e) {
+      LOG("forceClearSession: failed to remove session directory", String(e));
+    }
+
+    // Reset state and try to re-initiate a new client instance
+    this.setState(createDefaultState());
+
+    try {
+      await this.ensureInitialized();
+      LOG("forceClearSession: reinitialization attempted");
+    } catch (e) {
+      LOG("forceClearSession: reinitialization failed", String(e));
+      throw e;
     }
   }
 }

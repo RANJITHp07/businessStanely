@@ -264,11 +264,14 @@ const MessageComposer = memo(function MessageComposer({
 
 export function WhatsAppDesktop() {
     const {
+        canLoadMore,
         chats,
         deleteMessage,
         editMessage,
         isBootstrapping,
+        isLoadingMore,
         isSending,
+        loadMoreMessages,
         logout,
         messages,
         searchQuery,
@@ -284,12 +287,28 @@ export function WhatsAppDesktop() {
     const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
     const [editingDraft, setEditingDraft] = useState("");
     const messagesContainerRef = useRef<HTMLDivElement>(null);
+    const suppressNextScrollRef = useRef(false);
 
+    // Scroll to bottom when new messages arrive, but NOT when loading older ones.
     useEffect(() => {
+        if (suppressNextScrollRef.current) return;
         if (messagesContainerRef.current) {
             messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
         }
     }, [messages]);
+
+    const handleLoadMore = async () => {
+        const container = messagesContainerRef.current;
+        const prevScrollHeight = container?.scrollHeight ?? 0;
+        suppressNextScrollRef.current = true;
+        await loadMoreMessages();
+        requestAnimationFrame(() => {
+            suppressNextScrollRef.current = false;
+            if (container) {
+                container.scrollTop = container.scrollHeight - prevScrollHeight;
+            }
+        });
+    };
 
     const handleRetry = async () => {
         setIsRetrying(true);
@@ -475,18 +494,28 @@ export function WhatsAppDesktop() {
 
                     <div className="flex items-center justify-center border-l border-white/6 bg-[#0f1a20] p-10">
                         <div className="w-full max-w-sm rounded-3xl bg-[#f7f8fa] p-8 text-[#111b21] shadow-2xl">
-                            {state.qrCodeDataUrl ? (
+                            {state.status === "authenticated" ? (
+                                <div className="mx-auto flex h-72 w-72 flex-col items-center justify-center gap-4 rounded-2xl bg-white text-[#5e6b72]">
+                                    <LoaderCircle className="h-10 w-10 animate-spin text-[#00a884]" />
+                                    <p className="text-center text-sm font-medium text-[#3b4a54]">Scan detected!<br />Connecting to WhatsApp…</p>
+                                </div>
+                            ) : state.qrCodeDataUrl ? (
                                 <img src={state.qrCodeDataUrl} alt="WhatsApp QR code" className="mx-auto h-72 w-72 rounded-2xl bg-white p-4" />
                             ) : (
-                                <div className="mx-auto flex h-72 w-72 items-center justify-center rounded-2xl bg-white text-[#5e6b72]">
+                                <div className="mx-auto flex h-72 w-72 flex-col items-center justify-center gap-3 rounded-2xl bg-white text-[#5e6b72]">
                                     <LoaderCircle className="h-8 w-8 animate-spin" />
+                                    <p className="text-xs text-center">
+                                        {state.status === "initializing" ? "Starting WhatsApp…" : "Waiting for QR code…"}
+                                    </p>
                                 </div>
                             )}
 
                             <div className="mt-6 rounded-2xl bg-[#e9edef] px-4 py-3 text-sm text-[#3b4a54]">
                                 <div className="flex items-center justify-between gap-4">
                                     <span>Status</span>
-                                    <span className="font-medium capitalize">{state.status.replace("-", " ")}</span>
+                                    <span className={`font-medium capitalize ${state.status === "authenticated" ? "text-[#00a884]" : state.status === "error" ? "text-red-500" : ""}`}>
+                                        {state.status === "authenticated" ? "Scan confirmed — connecting" : state.status.replace(/-/g, " ")}
+                                    </span>
                                 </div>
                             </div>
                         </div>
@@ -603,6 +632,22 @@ export function WhatsAppDesktop() {
                             <div className="relative flex-1 overflow-hidden bg-[#efeae2] bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.45),transparent_35%),linear-gradient(180deg,rgba(255,255,255,0.12),rgba(255,255,255,0.12))]">
                                 <div className="absolute inset-0 bg-[url('data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%22200%22 height=%22200%22 viewBox=%220 0 200 200%22%3E%3Cg fill=%22none%22 fill-rule=%22evenodd%22 opacity=%220.08%22%3E%3Ccircle fill=%22%2325d366%22 cx=%2225%22 cy=%2225%22 r=%222%22/%3E%3Ccircle fill=%22%23075e54%22 cx=%22130%22 cy=%2250%22 r=%222%22/%3E%3Ccircle fill=%22%2325d366%22 cx=%2290%22 cy=%22140%22 r=%222%22/%3E%3Cpath fill=%22%23075e54%22 d=%22M165 136l11 11-11 11-11-11z%22/%3E%3C/g%3E%3C/svg%3E')] opacity-40" />
                                 <div ref={messagesContainerRef} className="no-scrollbar relative z-10 flex h-full flex-col gap-6 overflow-y-auto px-4 py-6 md:px-12">
+                                    {canLoadMore && (
+                                        <div className="flex justify-center pt-1">
+                                            <button
+                                                type="button"
+                                                onClick={handleLoadMore}
+                                                disabled={isLoadingMore}
+                                                className="flex items-center gap-2 rounded-full bg-white/80 px-4 py-1.5 text-xs font-medium text-[#54656f] shadow-sm transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+                                            >
+                                                {isLoadingMore ? (
+                                                    <><LoaderCircle className="h-3.5 w-3.5 animate-spin" />Loading…</>
+                                                ) : (
+                                                    "Load older messages"
+                                                )}
+                                            </button>
+                                        </div>
+                                    )}
                                     {groupedMessages.map((group) => (
                                         <div key={group.label}>
                                             <div className="mb-4 flex justify-center">

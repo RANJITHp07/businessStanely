@@ -1,4 +1,6 @@
 import "dotenv/config";
+import fs from "fs";
+import path from "path";
 import express from "express";
 import cors from "cors";
 import QRCode from "qrcode";
@@ -48,9 +50,16 @@ const app = express();
 app.use(
   cors({
     origin: (origin, callback) => {
+      try {
+        console.log(
+          `[WhatsApp API] CORS check: incoming origin=${origin} allowed=${ALLOWED_ORIGIN}`,
+        );
+      } catch {}
+
       if (!ALLOWED_ORIGIN || !origin || origin === ALLOWED_ORIGIN) {
         callback(null, true);
       } else {
+        console.warn(`[WhatsApp API] CORS rejected origin=${origin}`);
         callback(new Error("CORS: origin not allowed"));
       }
     },
@@ -140,7 +149,10 @@ app.get("/messages", auth, async (req, res) => {
     return;
   }
   try {
-    const messages = await whatsappService.listMessages(chatId);
+    const rawLimit = Number(req.query.limit ?? 80);
+    const limit =
+      Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 500) : 80;
+    const messages = await whatsappService.listMessages(chatId, limit);
     res.json({ messages });
   } catch (error) {
     const message =
@@ -227,6 +239,18 @@ app.get("/media", auth, async (req, res) => {
 app.post("/logout", auth, async (_req, res) => {
   await whatsappService.logout();
   res.json({ ok: true });
+});
+
+// --- Force clear session (destructive) ---
+app.post("/force-clear-session", auth, async (_req, res) => {
+  try {
+    await whatsappService.forceClearSession();
+    res.json({ ok: true });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error("[WhatsApp Backend] forceClearSession failed:", message);
+    res.status(500).json({ error: message });
+  }
 });
 
 // --- SSE Stream ---
@@ -321,11 +345,23 @@ app.get("/stream", auth, async (req, res) => {
   res.on("error", cleanup);
 });
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`[WhatsApp Backend] listening on http://localhost:${PORT}`);
   whatsappService.ensureInitialized().catch((err: unknown) => {
     console.error("[WhatsApp Backend] Failed to initialize service:", err);
   });
+});
+
+server.on("error", (err: NodeJS.ErrnoException) => {
+  if (err.code === "EADDRINUSE") {
+    console.error(
+      `[WhatsApp Backend] Port ${PORT} is already in use. Another instance is likely running. Exiting.`,
+    );
+    process.exit(0);
+  } else {
+    console.error("[WhatsApp Backend] Server error:", err);
+    process.exit(1);
+  }
 });
 
 process.on("unhandledRejection", (reason) => {
@@ -345,6 +381,65 @@ process.on("uncaughtException", (error) => {
     return;
   }
 
+  // Network / Puppeteer errors that occur during QR or auth phase should
+  // trigger a client reset rather than crashing the entire server.
+  const msg = error instanceof Error ? error.message : String(error ?? "");
+  const norm = msg.toLowerCase();
+  const isPuppeteerError =
+    norm.includes("puppeteer") ||
+    norm.includes("navigation timeout") ||
+    norm.includes("page crashed") ||
+    norm.includes("net::") ||
+    norm.includes("auth timeout") ||
+    norm.includes("ready timeout") ||
+    norm.includes("fetch failed") ||
+    norm.includes("context not found");
+
+  if (isPuppeteerError) {
+    console.warn(
+      "[WhatsApp Backend] Puppeteer/navigation error, scheduling recovery:",
+      msg,
+    );
+    scheduleClientRecovery("uncaughtException:puppeteer");
+    return;
+  }
+
   console.error("[WhatsApp Backend] Uncaught exception:", error);
   process.exit(1);
 });
+
+// --- Graceful shutdown ---
+// Properly destroy the Chromium subprocess so it removes its own lockfiles
+// (DevToolsActivePort, SingletonLock, etc.) before the process exits.
+async function gracefulShutdown(signal: string) {
+  console.log(`[WhatsApp Backend] ${signal} received, shutting down...`);
+  if (recoveryTimer) {
+    clearTimeout(recoveryTimer);
+    recoveryTimer = null;
+  }
+  server.close();
+  await whatsappService.shutdownClient();
+  process.exit(0);
+}
+
+// Best-effort synchronous lockfile removal as a last resort (e.g. SIGKILL).
+process.on("exit", () => {
+  try {
+    const sessionPath = path.join(
+      process.env.WHATSAPP_SESSION_DIR ?? ".wwebjs_auth",
+      "session-admin-whatsapp",
+    );
+    for (const name of [
+      "DevToolsActivePort",
+      "SingletonLock",
+      "SingletonSocket",
+    ]) {
+      try {
+        fs.unlinkSync(path.join(sessionPath, name));
+      } catch {}
+    }
+  } catch {}
+});
+
+process.on("SIGINT", () => void gracefulShutdown("SIGINT"));
+process.on("SIGTERM", () => void gracefulShutdown("SIGTERM"));

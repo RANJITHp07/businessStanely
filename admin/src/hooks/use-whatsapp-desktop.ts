@@ -71,6 +71,9 @@ export function useWhatsAppDesktop() {
   const [searchQuery, setSearchQuery] = useState("");
   const [isBootstrapping, setIsBootstrapping] = useState(true);
   const [isSending, setIsSending] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [canLoadMore, setCanLoadMore] = useState(false);
+  const messageLimitRef = useRef(80);
   const eventSourceRef = useRef<EventSource | null>(null);
   const selectedChatIdRef = useRef<string | null>(null);
   const stateRef = useRef<SerializableWhatsAppState>(defaultState);
@@ -121,11 +124,28 @@ export function useWhatsAppDesktop() {
     return activeChat?.id ?? null;
   };
 
-  const loadMessages = async (chatId: string) => {
+  const loadMessages = async (chatId: string, limit = 80) => {
     const data = await getJson<{ messages: WhatsAppMessage[] }>(
-      `/api/whatsapp/messages?chatId=${encodeURIComponent(chatId)}`,
+      `/api/whatsapp/messages?chatId=${encodeURIComponent(chatId)}&limit=${limit}`,
     );
     setMessages(data.messages);
+    setCanLoadMore(data.messages.length >= limit);
+  };
+
+  const loadMoreMessages = async () => {
+    const chatId = selectedChatIdRef.current;
+    if (!chatId || isLoadingMore) return;
+    const nextLimit = messageLimitRef.current + 80;
+    messageLimitRef.current = nextLimit;
+    setIsLoadingMore(true);
+    try {
+      await loadMessages(chatId, nextLimit);
+    } catch {
+      messageLimitRef.current -= 80;
+      toast.error("Failed to load older messages.");
+    } finally {
+      setIsLoadingMore(false);
+    }
   };
 
   useEffect(() => {
@@ -248,16 +268,54 @@ export function useWhatsAppDesktop() {
     };
   }, []);
 
+  // Polling fallback: if SSE misses a state update while a QR/auth is in
+  // progress, poll /status every 3 s so the UI catches the "ready" transition.
+  useEffect(() => {
+    const pollable = ["initializing", "qr", "authenticated"];
+    if (!pollable.includes(state.status)) return;
+
+    let active = true;
+
+    const poll = async () => {
+      if (!active) return;
+      try {
+        const nextState = await loadStatus();
+        if (!active) return;
+        if (nextState.status === "ready") {
+          try {
+            const chatId = await loadChats(selectedChatIdRef.current);
+            if (active && chatId) {
+              await loadMessages(chatId);
+            }
+          } catch {
+            // ignore — chats load on next poll or SSE event
+          }
+        }
+      } catch {
+        // ignore transient network errors
+      }
+    };
+
+    const interval = setInterval(poll, 3000);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, [state.status]); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     if (!selectedChatId || state.status !== "ready") {
       setMessages([]);
+      setCanLoadMore(false);
+      messageLimitRef.current = 80;
       return;
     }
 
-    loadMessages(selectedChatId).catch(() => {
+    messageLimitRef.current = 80;
+    loadMessages(selectedChatId, 80).catch(() => {
       toast.error("Failed to load messages.");
     });
-  }, [selectedChatId, state.status]);
+  }, [selectedChatId, state.status]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const sendMessage = async (body: string, file?: File | null) => {
     const activeChatId = selectedChatIdRef.current ?? selectedChatId;
@@ -428,11 +486,14 @@ export function useWhatsAppDesktop() {
   };
 
   return {
+    canLoadMore,
     chats: filteredChats,
     deleteMessage,
     editMessage,
     isBootstrapping,
+    isLoadingMore,
     isSending,
+    loadMoreMessages,
     logout,
     messages,
     searchQuery,

@@ -14,6 +14,12 @@ import type {
 
 const { Client, LocalAuth, MessageMedia } = pkg;
 
+const LOG = (msg: string, ...args: unknown[]) => {
+  try {
+    console.log(`[WhatsApp] ${msg}`, ...args);
+  } catch {}
+};
+
 function resolveSessionDir() {
   const configured = process.env.WHATSAPP_SESSION_DIR?.trim();
 
@@ -39,14 +45,23 @@ const SESSION_DIR = resolveSessionDir();
 function cleanupStuckLockfiles() {
   try {
     const sessionPath = path.join(SESSION_DIR, "session-admin-whatsapp");
-    const lockfilePath = path.join(sessionPath, "lockfile");
+    const candidates = [
+      "lockfile",
+      "LOCK",
+      "SingletonLock",
+      "SingletonSocket",
+      "DevToolsActivePort",
+    ];
 
-    if (fs.existsSync(lockfilePath)) {
-      try {
-        fs.unlinkSync(lockfilePath);
-        console.log("[WhatsApp] Cleaned up stuck lockfile.");
-      } catch (e) {
-        // Ignore, lockfile might still be in use
+    for (const name of candidates) {
+      const p = path.join(sessionPath, name);
+      if (fs.existsSync(p)) {
+        try {
+          fs.unlinkSync(p);
+          console.log(`[WhatsApp] Cleaned up stuck lockfile: ${name}`);
+        } catch (e) {
+          // Ignore, file might still be in use
+        }
       }
     }
   } catch (e) {
@@ -367,6 +382,7 @@ class WhatsAppService {
 
   async ensureInitialized() {
     if (this.client) {
+      LOG("ensureInitialized: already initialized");
       return;
     }
 
@@ -382,6 +398,7 @@ class WhatsAppService {
 
   private async initializeClient() {
     this.setState({ status: "initializing", error: null, qr: null });
+    LOG("initializeClient: starting");
 
     try {
       ensureSessionDirectoryWritable();
@@ -412,14 +429,17 @@ class WhatsAppService {
       });
 
       client.on("qr", (qr: string) => {
+        LOG("event: qr received");
         this.setState({ status: "qr", qr, error: null });
       });
 
       client.on("authenticated", () => {
+        LOG("event: authenticated");
         this.setState({ status: "authenticated", error: null });
       });
 
       client.on("ready", async () => {
+        LOG("event: ready");
         this.setState({
           status: "ready",
           qr: null,
@@ -435,6 +455,7 @@ class WhatsAppService {
       });
 
       client.on("auth_failure", (message: string) => {
+        LOG("event: auth_failure", message);
         this.setState({
           status: "error",
           error: message || "WhatsApp authentication failed.",
@@ -442,6 +463,7 @@ class WhatsAppService {
       });
 
       client.on("disconnected", (reason: string) => {
+        LOG("event: disconnected", reason);
         this.client = null;
         this.setState({
           status: "disconnected",
@@ -453,7 +475,7 @@ class WhatsAppService {
       });
 
       client.on("error", (error: Error) => {
-        console.error("[WhatsApp] Client error:", error.message);
+        LOG("event: client error", error.message);
         if (isFatalBrowserError(error)) {
           this.handleFatalBrowserError(error);
           return;
@@ -465,6 +487,7 @@ class WhatsAppService {
       });
 
       client.on("message", async (message: Message) => {
+        LOG("event: message received", message.id?._serialized ?? "<no-id>");
         try {
           const mapped = mapMessage(message);
           publishWhatsAppEvent("message", {
@@ -478,6 +501,7 @@ class WhatsAppService {
       });
 
       client.on("message_create", async (message: Message) => {
+        LOG("event: message_create", message.id?._serialized ?? "<no-id>");
         if (!message.fromMe) {
           return;
         }
@@ -495,13 +519,35 @@ class WhatsAppService {
       });
 
       this.client = client;
-      await client.initialize();
+      try {
+        await client.initialize();
+        LOG("initializeClient: initialize() completed");
+      } catch (initError) {
+        const msg =
+          initError instanceof Error ? initError.message : String(initError);
+        const normalized = msg.toLowerCase();
+
+        if (
+          normalized.includes("already running") ||
+          normalized.includes("user data directory is already in use") ||
+          normalized.includes("the browser is already running")
+        ) {
+          console.warn(
+            "[WhatsApp] Browser profile in use. Cleaning locks and retrying initialization once.",
+          );
+          cleanupStuckLockfiles();
+          await new Promise((r) => setTimeout(r, 500));
+          await client.initialize();
+        } else {
+          throw initError;
+        }
+      }
     } catch (error) {
       const errorMessage =
         error instanceof Error
           ? error.message
           : "Unknown initialization error.";
-      console.error("[WhatsApp] Initialization failed:", errorMessage);
+      LOG("Initialization failed:", errorMessage);
       this.setState({
         status: "error",
         error: errorMessage,
@@ -530,6 +576,7 @@ class WhatsAppService {
   resetClient() {
     if (this.client) {
       try {
+        LOG("resetClient: destroying client");
         this.client.destroy().catch(() => {
           // Ignore errors during destroy
         });
@@ -547,8 +594,8 @@ class WhatsAppService {
 
   private handleFatalBrowserError(error: unknown) {
     if (isFatalBrowserError(error)) {
-      console.error(
-        "[WhatsApp] Fatal browser error detected, resetting client:",
+      LOG(
+        "Fatal browser error detected, resetting client:",
         (error as Error).message,
       );
       this.client = null;
@@ -720,6 +767,7 @@ class WhatsAppService {
   }
 
   async listChats(search = "") {
+    LOG("API: listChats", { search });
     const client = await this.requireReadyClient();
     const normalizedSearch = search.trim().toLowerCase();
     const hasFreshCache =
@@ -753,6 +801,7 @@ class WhatsAppService {
   }
 
   async listMessages(chatId: string, limit = 80) {
+    LOG("API: listMessages", { chatId, limit });
     const client = await this.requireReadyClient();
     try {
       const chat = await client.getChatById(chatId);
@@ -771,6 +820,11 @@ class WhatsAppService {
     body: string,
     media?: { data: string; mimetype: string; filename: string },
   ) {
+    LOG("API: sendMessage", {
+      chatId,
+      hasMedia: Boolean(media),
+      bodyLength: String(body ?? "").length,
+    });
     const client = await this.requireReadyClient();
     const content = body.trim();
 
@@ -803,6 +857,7 @@ class WhatsAppService {
   }
 
   async editMessage(messageId: string, body: string) {
+    LOG("API: editMessage", { messageId });
     const client = await this.requireReadyClient();
     const content = body.trim();
 
@@ -864,6 +919,7 @@ class WhatsAppService {
   }
 
   async deleteMessage(messageId: string, everyone = true) {
+    LOG("API: deleteMessage", { messageId, everyone });
     const client = await this.requireReadyClient();
 
     try {
@@ -891,6 +947,7 @@ class WhatsAppService {
   }
 
   async getMedia(messageId: string) {
+    LOG("API: getMedia", { messageId });
     const client = await this.requireReadyClient();
     try {
       const message = await client.getMessageById(messageId);
@@ -912,21 +969,29 @@ class WhatsAppService {
   }
 
   async logout() {
+    LOG("API: logout called");
     if (!this.client) {
+      LOG("logout: no client, resetting state");
       this.setState(createDefaultState());
       return;
     }
 
     try {
+      LOG("logout: calling client.logout()");
       await this.client.logout();
+      LOG("logout: calling client.destroy()");
       await this.client.destroy();
     } finally {
+      try {
+        cleanupStuckLockfiles();
+      } catch {}
       this.client = null;
       this.setState({
         ...createDefaultState(),
         status: "disconnected",
       });
       publishWhatsAppEvent("chats-updated");
+      LOG("logout: complete, client cleared");
     }
   }
 }

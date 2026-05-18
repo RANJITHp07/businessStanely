@@ -59,6 +59,30 @@ app.use(
 );
 app.use(express.json({ limit: "50mb" }));
 
+// Simple request logger to show which APIs are hit and key params
+app.use((req, _res, next) => {
+  try {
+    const time = new Date().toISOString();
+    const ip = req.ip || (req.headers["x-forwarded-for"] as string) || "-";
+    console.log(`[WhatsApp API] ${time} ${req.method} ${req.path} from ${ip}`);
+
+    if (req.path === "/send") {
+      const { chatId, body, media } = req.body ?? {};
+      console.log(
+        `[WhatsApp API] /send -> chatId=${String(chatId)} hasMedia=${Boolean(media)} bodyLength=${String(body ?? "").length}`,
+      );
+    }
+
+    if (req.path === "/messages" && req.method === "GET") {
+      const chatId = String(req.query?.chatId ?? "");
+      console.log(`[WhatsApp API] /messages -> chatId=${chatId}`);
+    }
+  } catch (e) {
+    // ignore logging errors
+  }
+  next();
+});
+
 function auth(
   req: express.Request,
   res: express.Response,

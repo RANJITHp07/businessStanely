@@ -151,6 +151,16 @@ function isFatalBrowserError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
   const normalized = message.toLowerCase();
 
+  // Transient: the Chromium page navigated / reloaded but the browser process
+  // is still alive. wwebjs will re-inject itself — no client reset needed.
+  if (
+    normalized.includes("execution context was destroyed") ||
+    normalized.includes("execution context with id")
+  ) {
+    return false;
+  }
+
+  // Transient: protocol-level timeout on a single CDP call, not a crash.
   if (
     normalized.includes("timed out") &&
     normalized.includes("runtime.callfunctionon")
@@ -164,6 +174,21 @@ function isFatalBrowserError(error: unknown): boolean {
     normalized.includes("session closed") ||
     normalized.includes("protocol error") ||
     normalized.includes("browser has been closed")
+  );
+}
+
+/**
+ * Returns true when the Puppeteer execution context was destroyed because the
+ * WhatsApp Web page navigated (common during authentication / reconnection).
+ * Both fast-path evaluate() and getChats() will fail with this error, so
+ * refreshChats should short-circuit instead of retrying.
+ */
+function isContextDestroyedError(error: unknown): boolean {
+  const msg = error instanceof Error ? error.message : String(error ?? "");
+  const norm = msg.toLowerCase();
+  return (
+    norm.includes("execution context was destroyed") ||
+    norm.includes("execution context with id")
   );
 }
 
@@ -574,6 +599,16 @@ class WhatsAppService {
           this.handleFatalBrowserError(error);
           return;
         }
+        // "Execution context was destroyed" is thrown when the WhatsApp Web
+        // page navigates (QR page → auth page → chat page). wwebjs handles
+        // page recovery internally — do not set error status or reset client.
+        if (isContextDestroyedError(error)) {
+          LOG(
+            "event: client error (transient — page navigating, ignoring):",
+            error.message,
+          );
+          return;
+        }
         this.setState({
           status: "error",
           error: error.message || "WhatsApp client encountered an error.",
@@ -963,6 +998,15 @@ class WhatsAppService {
             "refreshChats: fast path returned empty/null, falling back to getChats()",
           );
         } catch (fastErr) {
+          // If the WhatsApp Web page is navigating, getChats() will throw the
+          // exact same error — skip the fallback and return stale cache instead.
+          if (isContextDestroyedError(fastErr)) {
+            LOG(
+              "refreshChats: execution context destroyed during fast path — page is navigating",
+            );
+            if (this.chatsCache.length > 0) return this.chatsCache;
+            throw new Error("WhatsApp is reconnecting, please wait a moment.");
+          }
           LOG(
             "refreshChats: fast path error, falling back to getChats():",
             fastErr instanceof Error ? fastErr.message : String(fastErr),
@@ -979,6 +1023,15 @@ class WhatsAppService {
       try {
         chats = await attemptFetch();
       } catch (firstError) {
+        // Context-destroyed errors won't be fixed by a 5 s retry — the page
+        // is mid-navigation. Return stale cache or surface a clean message.
+        if (isContextDestroyedError(firstError)) {
+          LOG(
+            "refreshChats: execution context destroyed in fallback — page is navigating",
+          );
+          if (this.chatsCache.length > 0) return this.chatsCache;
+          throw new Error("WhatsApp is reconnecting, please wait a moment.");
+        }
         LOG(
           "refreshChats: first attempt failed, retrying after 5 s delay:",
           firstError instanceof Error ? firstError.message : String(firstError),

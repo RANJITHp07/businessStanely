@@ -871,23 +871,24 @@ class WhatsAppService {
             lastMessageType: string | null;
           };
 
+          // IMPORTANT: the callback MUST be synchronous (no async/await).
+          // If you pass an async function, Puppeteer sets awaitPromise:true on
+          // the CDP Runtime.callFunctionOn call and waits for the Promise to
+          // settle inside the browser — subject to the Puppeteer protocolTimeout,
+          // not our own withTimeout wrapper. A synchronous callback returns
+          // immediately and never triggers that timeout.
           const raw = (await withTimeout(
-            pupPage.evaluate(async (lim: unknown) => {
+            pupPage.evaluate((lim: unknown) => {
               try {
                 /* eslint-disable @typescript-eslint/no-explicit-any */
                 const store = (window as any).Store;
                 if (!store?.Chat) return null;
 
-                // models is a Backbone Collection array; some WA versions
-                // expose getModelsArray() returning a Promise.
-                let models: any[];
-                if (Array.isArray(store.Chat.models)) {
-                  models = store.Chat.models;
-                } else if (typeof store.Chat.getModelsArray === "function") {
-                  models = await store.Chat.getModelsArray();
-                } else {
-                  return null; // can't read store — fall through to getChats()
-                }
+                // models must be a synchronously-accessible array.
+                // If it's not, bail out — don't await getModelsArray() because
+                // that would require an async callback (see comment above).
+                if (!Array.isArray(store.Chat.models)) return null;
+                const models: any[] = store.Chat.models;
 
                 return models
                   .filter(

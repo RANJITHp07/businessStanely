@@ -3,7 +3,7 @@ import { NextRequest } from "next/server";
 export const dynamic = "force-dynamic";
 
 const WHATSAPP_BACKEND_URL =
-  process.env.WHATSAPP_BACKEND_URL ?? "http://localhost:4001";
+  process.env.WHATSAPP_BACKEND_URL ?? "http://13.201.224.117";
 const SERVICE_TOKEN = process.env.WHATSAPP_SERVICE_TOKEN ?? "";
 
 export async function GET(req: NextRequest) {
@@ -44,8 +44,18 @@ export async function GET(req: NextRequest) {
           controller.enqueue(value);
         }
       } catch (err: unknown) {
-        // AbortError means the browser disconnected — suppress it silently.
-        if (err instanceof Error && err.name !== "AbortError") {
+        // Suppress expected disconnection errors silently:
+        //  - AbortError    → req.signal fired (browser navigated away / closed tab)
+        //  - ResponseAborted → Next.js throws this when writing to a response whose
+        //                      client has already disconnected (empty message "")
+        const isDisconnect =
+          err instanceof Error &&
+          (err.name === "AbortError" ||
+            err.name === "ResponseAborted" ||
+            // Fallback: Next.js ResponseAborted has an empty message
+            (err.message === "" && err.name !== "Error"));
+
+        if (!isDisconnect) {
           try {
             controller.enqueue(
               new TextEncoder().encode(

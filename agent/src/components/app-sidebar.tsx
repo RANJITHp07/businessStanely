@@ -52,9 +52,6 @@ type MenuItem = {
   newTab?: boolean;
 };
 
-const DEFAULT_ADMIN_WHATSAPP_URL =
-  "https://management.legalstanley.com/whatsapp";
-
 const salesItems: MenuItem[] = [
   {
     title: "Sales Dashboard",
@@ -159,8 +156,6 @@ export function AppSidebar() {
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
   const pathname = usePathname();
   const { setOpenMobile, isMobile } = useSidebar();
-  const adminWhatsAppUrl = DEFAULT_ADMIN_WHATSAPP_URL;
-
   const { agentRole, agentType } = useMemo(() => {
     if (typeof window === "undefined") {
       return { agentRole: null as string | null, agentType: null as string | null };
@@ -217,12 +212,11 @@ export function AppSidebar() {
       ...commonItems,
       {
         title: "WhatsApp",
-        url: adminWhatsAppUrl,
+        url: "/whatsapp",
         icon: MessageSquare,
-        newTab: true,
       } as MenuItem,
     ],
-    [adminWhatsAppUrl],
+    [],
   );
 
   const singleRoleItems = useMemo(() => {

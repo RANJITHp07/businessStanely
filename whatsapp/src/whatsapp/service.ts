@@ -575,9 +575,29 @@ class WhatsAppService {
 
       client.on("auth_failure", (message: string) => {
         LOG("event: auth_failure", message);
+
+        // The saved session is invalid (device delinked, session expired, etc.).
+        // Clear it from disk so the next initialization generates a fresh QR
+        // instead of looping on auth_failure forever.
+        const sessionPath = path.join(SESSION_DIR, "session-admin-whatsapp");
+        try {
+          if (fs.existsSync(sessionPath)) {
+            fs.rmSync(sessionPath, { recursive: true, force: true });
+            LOG("auth_failure: cleared stale session directory");
+          }
+        } catch (e) {
+          LOG("auth_failure: failed to clear session directory", String(e));
+        }
+
+        // Null the client so ensureInitialized() creates a fresh one (new QR).
+        this.client = null;
+        this.initializingPromise = null;
+
         this.setState({
           status: "error",
-          error: message || "WhatsApp authentication failed.",
+          error:
+            message ||
+            "WhatsApp session expired. Please rescan the QR code to reconnect.",
         });
       });
 

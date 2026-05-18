@@ -67,11 +67,10 @@ export async function GET(req: NextRequest) {
           }
         }
       } finally {
-        try {
-          upstreamReader?.cancel();
-        } catch {
-          // ignore
-        }
+        // cancel() returns a Promise — must attach .catch() or await it,
+        // otherwise a rejection (e.g. stream already errored) becomes an
+        // unhandled rejection in Node.js.
+        upstreamReader?.cancel().catch(() => {});
         try {
           controller.close();
         } catch {
@@ -80,11 +79,7 @@ export async function GET(req: NextRequest) {
       }
     },
     cancel() {
-      try {
-        upstreamReader?.cancel();
-      } catch {
-        // ignore
-      }
+      upstreamReader?.cancel().catch(() => {});
     },
   });
 

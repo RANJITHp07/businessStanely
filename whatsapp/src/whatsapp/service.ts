@@ -677,6 +677,19 @@ class WhatsAppService {
           ? error.message
           : "Unknown initialization error.";
       LOG("Initialization failed:", errorMessage);
+
+      // "Execution context was destroyed" is thrown when the WhatsApp Web page
+      // navigates during initialization (QR → auth → ready). wwebjs has already
+      // set up its event listeners and will continue to fire qr/ready events.
+      // Treating this as a fatal failure would wrongly null the client and block
+      // all subsequent requests. Just log and let the events drive state.
+      if (isContextDestroyedError(error)) {
+        LOG(
+          "initializeClient: context destroyed during initialize() — transient, ignoring",
+        );
+        return;
+      }
+
       this.setState({
         status: "error",
         error: errorMessage,

@@ -510,15 +510,6 @@ class WhatsAppService {
           clientId: "admin-whatsapp",
           dataPath: SESSION_DIR,
         }),
-        // Pin to a specific known-working version of WhatsApp Web.
-        // Without this, wwebjs loads the live WhatsApp Web which frequently
-        // breaks QR auth because WhatsApp updates their internal module names.
-        webVersion: "2.3000.1017054665",
-        webVersionCache: {
-          type: "remote",
-          remotePath:
-            "https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/{version}.html",
-        },
         // Extra time for WhatsApp Web to inject and authenticate.
         authTimeoutMs: 60000,
         puppeteer: {
@@ -726,13 +717,24 @@ class WhatsAppService {
         LOG(
           "initializeClient: context destroyed before QR generated — resetting client for retry",
         );
-        // Destroy the broken browser (best effort).
+        // Destroy the broken browser and AWAIT completion before returning.
+        // Without awaiting, the next retry (triggered 3 s later by the
+        // frontend poll) launches a new Chromium while the old one is still
+        // shutting down — the old process still holds session directory
+        // lockfiles, so the new Chromium immediately fails with the same
+        // "context destroyed" error, creating an infinite loop.
         if (this.client) {
+          const brokenClient = this.client;
+          this.client = null;
           try {
-            this.client.destroy().catch(() => {});
+            await brokenClient.destroy();
           } catch {}
+        } else {
+          this.client = null;
         }
-        this.client = null;
+        // Extra settle time for the OS to release file handles / lockfiles
+        // from the destroyed browser process before the next retry.
+        await new Promise((r) => setTimeout(r, 800));
         // Keep status as "initializing" — the frontend polls every 3 s while
         // status is "initializing" and will trigger ensureInitialized() again.
         return;

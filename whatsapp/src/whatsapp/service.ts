@@ -698,15 +698,43 @@ class WhatsAppService {
           : "Unknown initialization error.";
       LOG("Initialization failed:", errorMessage);
 
-      // "Execution context was destroyed" is thrown when the WhatsApp Web page
-      // navigates during initialization (QR → auth → ready). wwebjs has already
-      // set up its event listeners and will continue to fire qr/ready events.
-      // Treating this as a fatal failure would wrongly null the client and block
-      // all subsequent requests. Just log and let the events drive state.
+      // "Execution context was destroyed" has two very different meanings
+      // depending on when it fires:
+      //
+      // CASE A — status is past "initializing" (qr/authenticated/ready):
+      //   The QR was already generated and the page navigated to the auth
+      //   screen. wwebjs has listeners set up and will fire qr/ready events.
+      //   → Ignore: treat as transient, let events drive state.
+      //
+      // CASE B — status is still "initializing" (QR never fired):
+      //   Chromium started but the page navigated before WhatsApp Web could
+      //   render (common on EC2 when the remote webVersionCache fetch is slow
+      //   or the page reloads). The client object is broken.
+      //   → Null the client so the next ensureInitialized() call (from the
+      //     frontend's 3-second poll while status === "initializing") creates
+      //     a fresh browser and retries.
       if (isContextDestroyedError(error)) {
+        if (this.state.status !== "initializing") {
+          LOG(
+            "initializeClient: context destroyed during initialize() — transient, ignoring (status:",
+            this.state.status,
+            ")",
+          );
+          return;
+        }
+
         LOG(
-          "initializeClient: context destroyed during initialize() — transient, ignoring",
+          "initializeClient: context destroyed before QR generated — resetting client for retry",
         );
+        // Destroy the broken browser (best effort).
+        if (this.client) {
+          try {
+            this.client.destroy().catch(() => {});
+          } catch {}
+        }
+        this.client = null;
+        // Keep status as "initializing" — the frontend polls every 3 s while
+        // status is "initializing" and will trigger ensureInitialized() again.
         return;
       }
 

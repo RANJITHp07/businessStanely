@@ -530,12 +530,15 @@ class WhatsAppService {
             "--disable-backgrounding-occluded-windows",
             "--disable-renderer-backgrounding",
             "--window-size=1280,800",
+
+            "--single-process", // helps on low-memory EC2 instances
+            "--no-zygote", // pairs with single-process
+            "--disable-software-rasterizer",
+            "--disable-features=VizDisplayCompositor",
           ],
         },
         webVersionCache: {
-          type: "remote",
-          remotePath:
-            "https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.2412.54.html",
+          type: "local",
         },
       });
 

@@ -296,7 +296,7 @@ export function useWhatsAppDesktop() {
       }
     };
 
-    const interval = setInterval(poll, 3000);
+    const interval = setInterval(poll, 10000); // Increased polling interval to 10 seconds
     return () => {
       active = false;
       clearInterval(interval);
@@ -317,24 +317,76 @@ export function useWhatsAppDesktop() {
     });
   }, [selectedChatId, state.status]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // --- DELETE MESSAGE ---
+  const deleteMessage = async (messageId: string) => {
+    const chatId = selectedChatIdRef.current;
+    if (!chatId) return;
+    const previousMessages = messages;
+    setMessages((current) =>
+      current.filter((message) => message.id !== messageId),
+    );
+    try {
+      await getJson<{ ok: boolean }>("/api/whatsapp/messages", {
+        method: "DELETE",
+        body: JSON.stringify({ messageId, everyone: true }),
+      });
+      await loadChats(chatId);
+    } catch (error) {
+      setMessages(previousMessages);
+      throw error;
+    }
+  };
+
+  // --- EDIT MESSAGE ---
+  const editMessage = async (messageId: string, body: string) => {
+    const chatId = selectedChatIdRef.current;
+    const content = body.trim();
+    if (!chatId || !content) return;
+    const previousMessages = messages;
+    setMessages((current) =>
+      current.map((message) =>
+        message.id === messageId ? { ...message, body: content } : message,
+      ),
+    );
+    try {
+      const data = await getJson<{ message: WhatsAppMessage }>(
+        "/api/whatsapp/messages",
+        {
+          method: "PATCH",
+          body: JSON.stringify({ messageId, body: content }),
+        },
+      );
+      setMessages((current) =>
+        current.map((message) =>
+          message.id === messageId ? data.message : message,
+        ),
+      );
+      await loadChats(chatId);
+    } catch (error) {
+      setMessages(previousMessages);
+      throw error;
+    }
+  };
+
+  // --- LOGOUT ---
+  const logout = async () => {
+    await getJson<{ ok: boolean }>("/api/whatsapp/logout", { method: "POST" });
+    setChats([]);
+    setMessages([]);
+    setSelectedChatId(null);
+    setSearchQuery("");
+    await loadStatus();
+  };
+
+  // --- SEND MESSAGE ---
   const sendMessage = async (body: string, file?: File | null) => {
     const activeChatId = selectedChatIdRef.current ?? selectedChatId;
-
-    if (!activeChatId) {
-      return;
-    }
-
+    if (!activeChatId) return;
     const chatId = activeChatId;
     const content = body.trim();
     const hasFile = Boolean(file && file.size > 0);
-
-    if (!content && !hasFile) {
-      return;
-    }
-
-    const optimisticId = `optimistic-${Date.now()}-${Math.random()
-      .toString(36)
-      .slice(2, 8)}`;
+    if (!content && !hasFile) return;
+    const optimisticId = `optimistic-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     if (!hasFile) {
       const optimisticMessage: WhatsAppMessage = {
         id: optimisticId,
@@ -351,12 +403,9 @@ export function useWhatsAppDesktop() {
       };
       setMessages((current) => [...current, optimisticMessage]);
     }
-
     setIsSending(true);
-
     try {
       let data: { message: WhatsAppMessage };
-
       if (hasFile && file) {
         const base64 = arrayBufferToBase64(await file.arrayBuffer());
         data = await getJson<{ message: WhatsAppMessage }>(
@@ -383,21 +432,17 @@ export function useWhatsAppDesktop() {
           },
         );
       }
-
       setMessages((current) => {
         const withoutOptimistic = current.filter(
           (message) => message.id !== optimisticId,
         );
-
         if (
           withoutOptimistic.some((message) => message.id === data.message.id)
         ) {
           return withoutOptimistic;
         }
-
         return [...withoutOptimistic, data.message];
       });
-
       loadChats(chatId).catch(() => {
         // Keep send responsive even if chat list refresh fails.
       });
@@ -413,78 +458,7 @@ export function useWhatsAppDesktop() {
     }
   };
 
-  const editMessage = async (messageId: string, body: string) => {
-    const chatId = selectedChatIdRef.current;
-    const content = body.trim();
-
-    if (!chatId || !content) {
-      return;
-    }
-
-    const previousMessages = messages;
-
-    setMessages((current) =>
-      current.map((message) =>
-        message.id === messageId ? { ...message, body: content } : message,
-      ),
-    );
-
-    try {
-      const data = await getJson<{ message: WhatsAppMessage }>(
-        "/api/whatsapp/messages",
-        {
-          method: "PATCH",
-          body: JSON.stringify({ messageId, body: content }),
-        },
-      );
-
-      setMessages((current) =>
-        current.map((message) =>
-          message.id === messageId ? data.message : message,
-        ),
-      );
-
-      await loadChats(chatId);
-    } catch (error) {
-      setMessages(previousMessages);
-      throw error;
-    }
-  };
-
-  const deleteMessage = async (messageId: string) => {
-    const chatId = selectedChatIdRef.current;
-
-    if (!chatId) {
-      return;
-    }
-
-    const previousMessages = messages;
-    setMessages((current) =>
-      current.filter((message) => message.id !== messageId),
-    );
-
-    try {
-      await getJson<{ ok: boolean }>("/api/whatsapp/messages", {
-        method: "DELETE",
-        body: JSON.stringify({ messageId, everyone: true }),
-      });
-
-      await loadChats(chatId);
-    } catch (error) {
-      setMessages(previousMessages);
-      throw error;
-    }
-  };
-
-  const logout = async () => {
-    await getJson<{ ok: boolean }>("/api/whatsapp/logout", { method: "POST" });
-    setChats([]);
-    setMessages([]);
-    setSelectedChatId(null);
-    setSearchQuery("");
-    await loadStatus();
-  };
-
+  // --- RETURN HOOK API ---
   return {
     canLoadMore,
     chats: filteredChats,

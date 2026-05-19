@@ -35,7 +35,7 @@ function resolveSessionDir() {
 
   // /var/task and similar deployment roots are read-only on many serverless hosts.
   if (process.env.NODE_ENV === "production") {
-    return path.join(os.tmpdir(), ".wwebjs_auth");
+    return "/home/ubuntu/whatsapp-session";
   }
 
   return path.resolve(process.cwd(), ".wwebjs_auth");
@@ -530,11 +530,6 @@ class WhatsAppService {
             "--disable-backgrounding-occluded-windows",
             "--disable-renderer-backgrounding",
             "--window-size=1280,800",
-
-            "--single-process", // helps on low-memory EC2 instances
-            "--no-zygote", // pairs with single-process
-            "--disable-software-rasterizer",
-            "--disable-features=VizDisplayCompositor",
           ],
         },
         webVersionCache: {
@@ -792,22 +787,44 @@ class WhatsAppService {
     this.setState(createDefaultState());
   }
 
-  private handleFatalBrowserError(error: unknown) {
-    if (isFatalBrowserError(error)) {
-      LOG(
-        "Fatal browser error detected, resetting client:",
-        (error as Error).message,
-      );
-      this.client = null;
-      this.initializingPromise = null;
-      this.setState({
-        status: "error",
-        error: "WhatsApp browser session crashed. Please reconnect.",
-        qr: null,
-        clientInfo: createDefaultState().clientInfo,
-      });
-      publishWhatsAppEvent("chats-updated");
+  private async handleFatalBrowserError(error: unknown) {
+    if (!isFatalBrowserError(error)) {
+      return;
     }
+
+    LOG(
+      "Fatal browser error detected:",
+      error instanceof Error ? error.message : String(error),
+    );
+
+    const brokenClient = this.client;
+
+    this.client = null;
+    this.initializingPromise = null;
+
+    this.setState({
+      status: "error",
+      error: "WhatsApp browser session crashed. Reconnecting...",
+      qr: null,
+      clientInfo: createDefaultState().clientInfo,
+    });
+
+    publishWhatsAppEvent("chats-updated");
+
+    if (brokenClient) {
+      try {
+        await brokenClient.destroy();
+        LOG("Destroyed broken WhatsApp client");
+      } catch (e) {
+        LOG("Failed to destroy broken client", String(e));
+      }
+    }
+
+    try {
+      cleanupStuckLockfiles();
+    } catch {}
+
+    await new Promise((r) => setTimeout(r, 3000));
   }
 
   private async getChatAvatarUrl(chat: Chat) {

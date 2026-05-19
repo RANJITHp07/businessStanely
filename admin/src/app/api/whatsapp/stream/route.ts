@@ -3,7 +3,7 @@ import { NextRequest } from "next/server";
 export const dynamic = "force-dynamic";
 
 const WHATSAPP_BACKEND_URL =
-  process.env.WHATSAPP_BACKEND_URL ?? "http://13.201.224.117";
+  process.env.WHATSAPP_BACKEND_URL ?? "http://13.201.4.152";
 const SERVICE_TOKEN = process.env.WHATSAPP_SERVICE_TOKEN ?? "";
 
 export async function GET(req: NextRequest) {

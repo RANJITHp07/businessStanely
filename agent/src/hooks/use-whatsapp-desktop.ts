@@ -30,15 +30,28 @@ async function getJson<T>(url: string, init?: RequestInit): Promise<T> {
   const isFormData =
     typeof FormData !== "undefined" && init?.body instanceof FormData;
 
+  // Get token from localStorage
+  let token: string | null = null;
+  if (typeof window !== "undefined") {
+    token = localStorage.getItem("token");
+  }
+
+  const baseHeaders = isFormData
+    ? { ...(init?.headers || {}) }
+    : {
+        "Content-Type": "application/json",
+        ...(init?.headers || {}),
+      };
+
+  // Always add Authorization header if token exists
+  const headers = token
+    ? { ...baseHeaders, Authorization: `Bearer ${token}` }
+    : baseHeaders;
+
   const response = await fetch(url, {
     ...init,
     credentials: "include",
-    headers: isFormData
-      ? { ...(init?.headers || {}) }
-      : {
-          "Content-Type": "application/json",
-          ...(init?.headers || {}),
-        },
+    headers,
     cache: "no-store",
   });
 

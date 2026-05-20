@@ -1,0 +1,23 @@
+import { NextRequest, NextResponse } from "next/server";
+
+const WHATSAPP_BACKEND_URL =
+  process.env.WHATSAPP_BACKEND_URL ?? "http://13.201.4.152";
+const SERVICE_TOKEN = process.env.WHATSAPP_SERVICE_TOKEN ?? "";
+
+export async function POST(req: NextRequest) {
+  const url = SERVICE_TOKEN
+    ? `${WHATSAPP_BACKEND_URL}/logout?token=${encodeURIComponent(SERVICE_TOKEN)}`
+    : `${WHATSAPP_BACKEND_URL}/logout`;
+
+  const upstream = await fetch(url, {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Cache-Control": "no-cache",
+    },
+    signal: req.signal,
+  });
+
+  const data = await upstream.json();
+  return NextResponse.json(data, { status: upstream.status });
+}

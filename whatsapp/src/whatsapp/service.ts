@@ -1375,8 +1375,22 @@ class WhatsAppService {
 
   async logout() {
     LOG("API: logout called");
+    const sessionPath = path.join(SESSION_DIR, "session-admin-whatsapp");
     if (!this.client) {
       LOG("logout: no client, resetting state");
+      // Clear chat cache and related state
+      this.chatsCache = [];
+      this.chatsCacheAt = 0;
+      this.chatsRefreshPromise = null;
+      // Remove session directory from disk
+      try {
+        if (fs.existsSync(sessionPath)) {
+          await fs.promises.rm(sessionPath, { recursive: true, force: true });
+          LOG("logout: removed session directory", sessionPath);
+        }
+      } catch (e) {
+        LOG("logout: failed to remove session directory", String(e));
+      }
       this.setState(createDefaultState());
       return;
     }
@@ -1391,6 +1405,19 @@ class WhatsAppService {
         cleanupStuckLockfiles();
       } catch {}
       this.client = null;
+      // Clear chat cache and related state
+      this.chatsCache = [];
+      this.chatsCacheAt = 0;
+      this.chatsRefreshPromise = null;
+      // Remove session directory from disk
+      try {
+        if (fs.existsSync(sessionPath)) {
+          await fs.promises.rm(sessionPath, { recursive: true, force: true });
+          LOG("logout: removed session directory", sessionPath);
+        }
+      } catch (e) {
+        LOG("logout: failed to remove session directory", String(e));
+      }
       this.setState({
         ...createDefaultState(),
         status: "disconnected",

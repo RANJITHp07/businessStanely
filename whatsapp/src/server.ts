@@ -11,7 +11,7 @@ import type { WhatsAppEventPayload } from "./whatsapp/types.js";
 
 const PORT = Number(process.env.PORT ?? 4001);
 const SERVICE_TOKEN = process.env.WHATSAPP_SERVICE_TOKEN ?? "";
-const ALLOWED_ORIGIN = process.env.WHATSAPP_ALLOWED_ORIGIN ?? "";
+const ALLOWED_ORIGIN = '*';
 
 let recoveryTimer: NodeJS.Timeout | null = null;
 
@@ -49,20 +49,7 @@ const app = express();
 
 app.use(
   cors({
-    origin: (origin, callback) => {
-      try {
-        console.log(
-          `[WhatsApp API] CORS check: incoming origin=${origin} allowed=${ALLOWED_ORIGIN}`,
-        );
-      } catch {}
-
-      if (!ALLOWED_ORIGIN || !origin || origin === ALLOWED_ORIGIN) {
-        callback(null, true);
-      } else {
-        console.warn(`[WhatsApp API] CORS rejected origin=${origin}`);
-        callback(new Error("CORS: origin not allowed"));
-      }
-    },
+    origin: '*',
     credentials: true,
   }),
 );

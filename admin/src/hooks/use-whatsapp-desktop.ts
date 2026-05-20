@@ -72,7 +72,7 @@ export function useWhatsAppDesktop() {
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [isBootstrapping, setIsBootstrapping] = useState(true);
-  const [isChatsLoading, setIsChatsLoading] = useState(true);
+  const [isChatsLoading, setIsChatsLoading] = useState(false);
   const [chatsError, setChatsError] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);

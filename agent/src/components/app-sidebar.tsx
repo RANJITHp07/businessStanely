@@ -214,6 +214,7 @@ export function AppSidebar() {
         title: "WhatsApp",
         url: "/whatsapp",
         icon: MessageSquare,
+        newTab: true,
       } as MenuItem,
     ],
     [],

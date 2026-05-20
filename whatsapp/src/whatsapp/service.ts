@@ -974,6 +974,10 @@ class WhatsAppService {
   }
 
   private async refreshChats(client: WhatsAppClient) {
+    if (!client) {
+      LOG("refreshChats: client is undefined or not ready");
+      throw new Error("WhatsApp is reconnecting, please wait a moment.");
+    }
     if (this.chatsRefreshPromise) {
       return this.chatsRefreshPromise;
     }
@@ -988,13 +992,6 @@ class WhatsAppService {
         : 60000;
 
       // ── Fast path ────────────────────────────────────────────────────────
-      // client.getChats() calls WWebJS.getChatModel() for EVERY chat inside
-      // the Chromium page.  getChatModel() does async work (contact lookups,
-      // profile-pic fetches, etc.) for each chat, so with 100+ chats it
-      // floods Puppeteer's CDP queue and hangs for minutes.
-      //
-      // Instead, we execute ONE pupPage.evaluate() that reads the raw
-      // WhatsApp Web in-memory store synchronously — no per-chat async ops.
       const pupPage = (client as unknown as { pupPage?: unknown }).pupPage as
         | {
             evaluate(
@@ -1020,22 +1017,12 @@ class WhatsAppService {
             lastMessageType: string | null;
           };
 
-          // IMPORTANT: the callback MUST be synchronous (no async/await).
-          // If you pass an async function, Puppeteer sets awaitPromise:true on
-          // the CDP Runtime.callFunctionOn call and waits for the Promise to
-          // settle inside the browser — subject to the Puppeteer protocolTimeout,
-          // not our own withTimeout wrapper. A synchronous callback returns
-          // immediately and never triggers that timeout.
           const raw = (await withTimeout(
             pupPage.evaluate((lim: unknown) => {
               try {
                 /* eslint-disable @typescript-eslint/no-explicit-any */
                 const store = (window as any).Store;
                 if (!store?.Chat) return null;
-
-                // models must be a synchronously-accessible array.
-                // If it's not, bail out — don't await getModelsArray() because
-                // that would require an async callback (see comment above).
                 if (!Array.isArray(store.Chat.models)) return null;
                 const models: any[] = store.Chat.models;
 
@@ -1112,8 +1099,6 @@ class WhatsAppService {
             "refreshChats: fast path returned empty/null, falling back to getChats()",
           );
         } catch (fastErr) {
-          // If the WhatsApp Web page is navigating, getChats() will throw the
-          // exact same error — skip the fallback and return stale cache instead.
           if (isContextDestroyedError(fastErr)) {
             LOG(
               "refreshChats: execution context destroyed during fast path — page is navigating",
@@ -1130,6 +1115,10 @@ class WhatsAppService {
 
       // ── Fallback: standard getChats() ────────────────────────────────────
       LOG("refreshChats: using getChats() fallback");
+      if (!client) {
+        LOG("refreshChats: client is undefined in fallback");
+        throw new Error("WhatsApp is reconnecting, please wait a moment.");
+      }
       const attemptFetch = () =>
         withTimeout(client.getChats(), timeoutMs, "WhatsApp chat fetch");
 
@@ -1137,8 +1126,6 @@ class WhatsAppService {
       try {
         chats = await attemptFetch();
       } catch (firstError) {
-        // Context-destroyed errors won't be fixed by a 5 s retry — the page
-        // is mid-navigation. Return stale cache or surface a clean message.
         if (isContextDestroyedError(firstError)) {
           LOG(
             "refreshChats: execution context destroyed in fallback — page is navigating",

@@ -72,6 +72,8 @@ export function useWhatsAppDesktop() {
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [isBootstrapping, setIsBootstrapping] = useState(true);
+  const [isChatsLoading, setIsChatsLoading] = useState(true);
+  const [chatsError, setChatsError] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [canLoadMore, setCanLoadMore] = useState(false);
@@ -113,26 +115,45 @@ export function useWhatsAppDesktop() {
     preferredChatId?: string | null,
     page = 1,
     pageSize = 50,
-  ) => {
-    const data = await getJson<{ chats: WhatsAppChatSummary[] }>(
-      `/api/whatsapp/chats?page=${page}&pageSize=${pageSize}`,
-    );
-    if (page === 1) {
-      setChats(data.chats);
-    } else {
-      setChats((prev) => [...prev, ...data.chats]);
+    retryCount = 0,
+  ): Promise<string | null> => {
+    setIsChatsLoading(true);
+    setChatsError(null);
+    try {
+      const data = await getJson<{ chats: WhatsAppChatSummary[] }>(
+        `/api/whatsapp/chats?page=${page}&pageSize=${pageSize}`,
+      );
+      if (page === 1) {
+        setChats(data.chats);
+      } else {
+        setChats((prev) => [...prev, ...data.chats]);
+      }
+      setHasMoreChats(data.chats.length === pageSize);
+
+      const nextSelectedChatId = preferredChatId ?? selectedChatIdRef.current;
+      const activeChat =
+        data.chats.find((chat) => chat.id === nextSelectedChatId) ||
+        data.chats[0] ||
+        null;
+
+      setSelectedChatId(activeChat?.id ?? null);
+      setIsChatsLoading(false);
+      setChatsError(null);
+      // If no chats, retry after delay (max 20 attempts ~20s)
+      if ((!data.chats || data.chats.length === 0) && retryCount < 20) {
+        await new Promise((res) => setTimeout(res, 1000));
+        return loadChats(preferredChatId, page, pageSize, retryCount + 1);
+      }
+      return activeChat?.id ?? null;
+    } catch (err: any) {
+      if (retryCount < 20) {
+        await new Promise((res) => setTimeout(res, 1000));
+        return loadChats(preferredChatId, page, pageSize, retryCount + 1);
+      }
+      setIsChatsLoading(false);
+      setChatsError(err?.message || "Failed to load chats.");
+      return null;
     }
-    setHasMoreChats(data.chats.length === pageSize);
-
-    const nextSelectedChatId = preferredChatId ?? selectedChatIdRef.current;
-    const activeChat =
-      data.chats.find((chat) => chat.id === nextSelectedChatId) ||
-      data.chats[0] ||
-      null;
-
-    setSelectedChatId(activeChat?.id ?? null);
-
-    return activeChat?.id ?? null;
   };
 
   // For infinite scroll or "Load more chats"
@@ -498,5 +519,7 @@ export function useWhatsAppDesktop() {
     state,
     loadMoreChats,
     hasMoreChats,
+    isChatsLoading,
+    chatsError,
   };
 }

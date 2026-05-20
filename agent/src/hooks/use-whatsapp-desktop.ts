@@ -83,6 +83,8 @@ export function useWhatsAppDesktop() {
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [isBootstrapping, setIsBootstrapping] = useState(true);
+  const [isChatsLoading, setIsChatsLoading] = useState(true);
+  const [chatsError, setChatsError] = useState<string | null>(null);
   const [isSending, setIsSending] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [canLoadMore, setCanLoadMore] = useState(false);
@@ -120,21 +122,42 @@ export function useWhatsAppDesktop() {
     return nextState;
   };
 
-  const loadChats = async (preferredChatId?: string | null) => {
-    const data = await getJson<{ chats: WhatsAppChatSummary[] }>(
-      "/api/whatsapp/chats",
-    );
-    setChats(data.chats);
+  const loadChats = async (
+    preferredChatId?: string | null,
+    retryCount = 0,
+  ): Promise<string | null> => {
+    setIsChatsLoading(true);
+    setChatsError(null);
+    try {
+      const data = await getJson<{ chats: WhatsAppChatSummary[] }>(
+        "/api/whatsapp/chats",
+      );
+      setChats(data.chats);
 
-    const nextSelectedChatId = preferredChatId ?? selectedChatIdRef.current;
-    const activeChat =
-      data.chats.find((chat) => chat.id === nextSelectedChatId) ||
-      data.chats[0] ||
-      null;
+      const nextSelectedChatId = preferredChatId ?? selectedChatIdRef.current;
+      const activeChat =
+        data.chats.find((chat) => chat.id === nextSelectedChatId) ||
+        data.chats[0] ||
+        null;
 
-    setSelectedChatId(activeChat?.id ?? null);
-
-    return activeChat?.id ?? null;
+      setSelectedChatId(activeChat?.id ?? null);
+      setIsChatsLoading(false);
+      setChatsError(null);
+      // If no chats, retry after delay (max 20 attempts ~20s)
+      if ((!data.chats || data.chats.length === 0) && retryCount < 20) {
+        await new Promise((res) => setTimeout(res, 1000));
+        return loadChats(preferredChatId, retryCount + 1);
+      }
+      return activeChat?.id ?? null;
+    } catch (err: any) {
+      if (retryCount < 20) {
+        await new Promise((res) => setTimeout(res, 1000));
+        return loadChats(preferredChatId, retryCount + 1);
+      }
+      setIsChatsLoading(false);
+      setChatsError(err?.message || "Failed to load chats.");
+      return null;
+    }
   };
 
   const loadMessages = async (chatId: string, limit = 80) => {
@@ -174,18 +197,7 @@ export function useWhatsAppDesktop() {
 
     const bootstrap = async () => {
       try {
-        const nextState = await loadStatus();
-
-        if (!active) {
-          return;
-        }
-
-        if (nextState.status === "ready") {
-          const chatId = await loadChats();
-          if (active && chatId) {
-            await loadMessages(chatId);
-          }
-        }
+        await loadStatus();
       } catch (error) {
         if (active) {
           toast.error(
@@ -219,17 +231,7 @@ export function useWhatsAppDesktop() {
         (event as MessageEvent).data,
       ) as SerializableWhatsAppState;
       setState(nextState);
-
-      if (nextState.status === "ready") {
-        try {
-          const chatId = await loadChats(selectedChatIdRef.current);
-          if (chatId) {
-            await loadMessages(chatId);
-          }
-        } catch {
-          // The route remains usable while the client warms up.
-        }
-      }
+      // Do not load chats here; wait for 'chats-updated' event after ready.
     });
 
     source.addEventListener("chats-updated", async () => {
@@ -516,5 +518,7 @@ export function useWhatsAppDesktop() {
     setSearchQuery,
     setSelectedChatId,
     state,
+    isChatsLoading,
+    chatsError,
   };
 }

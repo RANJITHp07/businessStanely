@@ -284,6 +284,8 @@ function WhatsAppDesktop() {
         state,
         loadMoreChats,
         hasMoreChats,
+        isChatsLoading,
+        chatsError,
     } = useWhatsAppDesktop();
     const [mobileSidebarOpen, setMobileSidebarOpen] = useState(true);
     const [isRetrying, setIsRetrying] = useState(false);
@@ -572,46 +574,67 @@ function WhatsAppDesktop() {
                     </div>
 
                     <div className="no-scrollbar flex-1 overflow-y-auto">
-                        {chats.map((chat) => {
-                            const isActive = chat.id === selectedChatId;
-                            return (
-                                <button
-                                    key={chat.id}
-                                    type="button"
-                                    onClick={() => {
-                                        setSelectedChatId(chat.id);
-                                        setMobileSidebarOpen(false);
-                                    }}
-                                    className={`grid w-full grid-cols-[56px_1fr_auto] gap-3 border-b border-white/6 px-4 py-3 text-left transition ${isActive ? "bg-[#2a3942]" : "hover:bg-[#202c33]"}`}
-                                >
-                                    <ChatAvatar chat={chat} sizeClassName="h-12 w-12" />
-                                    <div className="min-w-0">
-                                        <div className="flex items-center justify-between gap-3">
-                                            <p className="truncate text-[15px] font-medium text-[#e9edef]">{chat.name}</p>
-                                        </div>
-                                        <p className="mt-1 truncate text-sm text-[#8696a0]">{chat.lastMessage}</p>
-                                    </div>
-                                    <div className="flex flex-col items-end gap-2 text-xs text-[#8696a0]">
-                                        <span>{formatTime(chat.timestamp)}</span>
-                                        {chat.unreadCount > 0 ? (
-                                            <span className="flex min-h-5 min-w-5 items-center justify-center rounded-full bg-[#00a884] px-1 text-[11px] font-semibold text-[#111b21]">
-                                                {chat.unreadCount}
-                                            </span>
-                                        ) : null}
-                                    </div>
-                                </button>
-                            );
-                        })}
-                        {hasMoreChats && (
-                            <div className="flex justify-center py-2">
-                                <button
-                                    type="button"
-                                    onClick={loadMoreChats}
-                                    className="rounded-lg bg-[#202c33] px-4 py-2 text-sm text-[#00a884] hover:bg-[#2a3942]"
-                                >
-                                    Load more chats
-                                </button>
+                        {isChatsLoading ? (
+                            <div className="flex flex-col items-center justify-center h-full py-10 text-[#00a884]">
+                                <LoaderCircle className="h-8 w-8 animate-spin mb-3" />
+                                <span className="text-base font-medium">Loading chats…</span>
+                                <span className="text-xs text-[#8696a0] mt-2">This may take up to a minute on first login.</span>
                             </div>
+                        ) : chatsError ? (
+                            <div className="flex flex-col items-center justify-center h-full py-10 text-red-400">
+                                <MessageSquare className="h-8 w-8 mb-3" />
+                                <span className="text-base font-medium">{chatsError}</span>
+                                <span className="text-xs text-[#8696a0] mt-2">Please try again or refresh the page.</span>
+                            </div>
+                        ) : chats.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center h-full py-10 text-[#8696a0]">
+                                <MessageSquare className="h-8 w-8 mb-3" />
+                                <span className="text-base font-medium">No chats found</span>
+                            </div>
+                        ) : (
+                            <>
+                                {chats.map((chat) => {
+                                    const isActive = chat.id === selectedChatId;
+                                    return (
+                                        <button
+                                            key={chat.id}
+                                            type="button"
+                                            onClick={() => {
+                                                setSelectedChatId(chat.id);
+                                                setMobileSidebarOpen(false);
+                                            }}
+                                            className={`grid w-full grid-cols-[56px_1fr_auto] gap-3 border-b border-white/6 px-4 py-3 text-left transition ${isActive ? "bg-[#2a3942]" : "hover:bg-[#202c33]"}`}
+                                        >
+                                            <ChatAvatar chat={chat} sizeClassName="h-12 w-12" />
+                                            <div className="min-w-0">
+                                                <div className="flex items-center justify-between gap-3">
+                                                    <p className="truncate text-[15px] font-medium text-[#e9edef]">{chat.name}</p>
+                                                </div>
+                                                <p className="mt-1 truncate text-sm text-[#8696a0]">{chat.lastMessage}</p>
+                                            </div>
+                                            <div className="flex flex-col items-end gap-2 text-xs text-[#8696a0]">
+                                                <span>{formatTime(chat.timestamp)}</span>
+                                                {chat.unreadCount > 0 ? (
+                                                    <span className="flex min-h-5 min-w-5 items-center justify-center rounded-full bg-[#00a884] px-1 text-[11px] font-semibold text-[#111b21]">
+                                                        {chat.unreadCount}
+                                                    </span>
+                                                ) : null}
+                                            </div>
+                                        </button>
+                                    );
+                                })}
+                                {hasMoreChats && (
+                                    <div className="flex justify-center py-2">
+                                        <button
+                                            type="button"
+                                            onClick={loadMoreChats}
+                                            className="rounded-lg bg-[#202c33] px-4 py-2 text-sm text-[#00a884] hover:bg-[#2a3942]"
+                                        >
+                                            Load more chats
+                                        </button>
+                                    </div>
+                                )}
+                            </>
                         )}
                     </div>
                 </aside>

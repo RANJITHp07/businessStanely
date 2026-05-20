@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 const WHATSAPP_BACKEND_URL =
-  process.env.WHATSAPP_BACKEND_URL ?? "http://13.201.4.152";
+  process.env.WHATSAPP_BACKEND_URL ?? "https://13.201.4.152.nip.io";
 const SERVICE_TOKEN = process.env.WHATSAPP_SERVICE_TOKEN ?? "";
 
 export async function POST(req: NextRequest) {

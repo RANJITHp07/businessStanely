@@ -4,7 +4,8 @@ export const dynamic = "force-dynamic";
 
 const NEXT_PUBLIC_WHATSAPP_BACKEND_URL =
   process.env.NEXT_PUBLIC_WHATSAPP_BACKEND_URL ?? "https://13.201.4.152.nip.io";
-const SERVICE_TOKEN = process.env.NEXT_PUBLIC_WHATSAPP_SERVICE_TOKEN ?? "";
+const SERVICE_TOKEN =
+  process.env.NEXT_PUBLIC_WHATSAPP_SERVICE_TOKEN ?? "change_me";
 
 export async function GET(req: NextRequest) {
   const backendStreamUrl = SERVICE_TOKEN

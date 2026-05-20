@@ -10,8 +10,8 @@ import { subscribeWhatsAppEvent } from "./whatsapp/realtime.js";
 import type { WhatsAppEventPayload } from "./whatsapp/types.js";
 
 const PORT = Number(process.env.PORT ?? 4001);
-const SERVICE_TOKEN = process.env.WHATSAPP_SERVICE_TOKEN ?? "";
-const ALLOWED_ORIGIN = '*';
+const SERVICE_TOKEN = process.env.NEXT_PUBLIC_WHATSAPP_SERVICE_TOKEN ?? "";
+const ALLOWED_ORIGIN = "*";
 
 let recoveryTimer: NodeJS.Timeout | null = null;
 
@@ -49,7 +49,7 @@ const app = express();
 
 app.use(
   cors({
-    origin: '*',
+    origin: "*",
     credentials: true,
   }),
 );

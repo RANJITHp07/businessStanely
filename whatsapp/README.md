@@ -13,7 +13,7 @@ Standalone backend service for WhatsApp Web (whatsapp-web.js).
 
 ## Required env
 
-- `WHATSAPP_SERVICE_TOKEN`: shared token expected from frontend proxy.
+- `NEXT_PUBLIC_WHATSAPP_SERVICE_TOKEN`: shared token expected from frontend proxy.
 - `WHATSAPP_ALLOWED_ORIGIN`: frontend origin for CORS.
 - `WHATSAPP_SESSION_DIR`: local auth/session storage.
 - `WHATSAPP_HEADLESS`: use `true` in server environments.

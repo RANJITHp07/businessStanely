@@ -19,7 +19,7 @@ export async function middleware(request: NextRequest) {
 
   // Inject service token for WhatsApp backend proxy requests
   if (pathname.startsWith("/api/whatsapp")) {
-    const serviceToken = process.env.WHATSAPP_SERVICE_TOKEN ?? "";
+    const serviceToken = process.env.NEXT_PUBLIC_WHATSAPP_SERVICE_TOKEN ?? "";
     const headers = new Headers(request.headers);
     if (serviceToken) {
       headers.set("x-whatsapp-service-token", serviceToken);

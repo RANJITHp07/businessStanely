@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const WHATSAPP_BACKEND_URL =
-  process.env.WHATSAPP_BACKEND_URL ?? "https://13.201.4.152.nip.io";
-const SERVICE_TOKEN = process.env.WHATSAPP_SERVICE_TOKEN ?? "";
+const NEXT_PUBLIC_WHATSAPP_BACKEND_URL =
+  process.env.NEXT_PUBLIC_WHATSAPP_BACKEND_URL ?? "https://13.201.4.152.nip.io";
+const SERVICE_TOKEN = process.env.NEXT_PUBLIC_WHATSAPP_SERVICE_TOKEN ?? "";
 
 export async function GET(req: NextRequest) {
   const chatId = req.nextUrl.searchParams.get("chatId") ?? "";
   const limit = req.nextUrl.searchParams.get("limit") ?? "80";
   const url = SERVICE_TOKEN
-    ? `${WHATSAPP_BACKEND_URL}/messages?chatId=${encodeURIComponent(chatId)}&limit=${encodeURIComponent(limit)}&token=${encodeURIComponent(SERVICE_TOKEN)}`
-    : `${WHATSAPP_BACKEND_URL}/messages?chatId=${encodeURIComponent(chatId)}&limit=${encodeURIComponent(limit)}`;
+    ? `${NEXT_PUBLIC_WHATSAPP_BACKEND_URL}/messages?chatId=${encodeURIComponent(chatId)}&limit=${encodeURIComponent(limit)}&token=${encodeURIComponent(SERVICE_TOKEN)}`
+    : `${NEXT_PUBLIC_WHATSAPP_BACKEND_URL}/messages?chatId=${encodeURIComponent(chatId)}&limit=${encodeURIComponent(limit)}`;
 
   const upstream = await fetch(url, {
     headers: {
@@ -26,8 +26,8 @@ export async function GET(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   const body = await req.json();
   const url = SERVICE_TOKEN
-    ? `${WHATSAPP_BACKEND_URL}/messages?token=${encodeURIComponent(SERVICE_TOKEN)}`
-    : `${WHATSAPP_BACKEND_URL}/messages`;
+    ? `${NEXT_PUBLIC_WHATSAPP_BACKEND_URL}/messages?token=${encodeURIComponent(SERVICE_TOKEN)}`
+    : `${NEXT_PUBLIC_WHATSAPP_BACKEND_URL}/messages`;
 
   const upstream = await fetch(url, {
     method: "PATCH",
@@ -47,8 +47,8 @@ export async function PATCH(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   const body = await req.json();
   const url = SERVICE_TOKEN
-    ? `${WHATSAPP_BACKEND_URL}/messages?token=${encodeURIComponent(SERVICE_TOKEN)}`
-    : `${WHATSAPP_BACKEND_URL}/messages`;
+    ? `${NEXT_PUBLIC_WHATSAPP_BACKEND_URL}/messages?token=${encodeURIComponent(SERVICE_TOKEN)}`
+    : `${NEXT_PUBLIC_WHATSAPP_BACKEND_URL}/messages`;
 
   const upstream = await fetch(url, {
     method: "DELETE",

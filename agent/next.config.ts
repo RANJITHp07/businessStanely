@@ -22,8 +22,9 @@ const nextConfig: NextConfig = {
   trailingSlash: false,
   async rewrites() {
     const backendUrl =
-      process.env.WHATSAPP_BACKEND_URL ?? "https://13.201.4.152.nip.io";
-    const serviceToken = process.env.WHATSAPP_SERVICE_TOKEN ?? "";
+      process.env.NEXT_PUBLIC_WHATSAPP_BACKEND_URL ??
+      "https://13.201.4.152.nip.io";
+    const serviceToken = process.env.NEXT_PUBLIC_WHATSAPP_SERVICE_TOKEN ?? "";
     const tokenQuery = serviceToken
       ? `?token=${encodeURIComponent(serviceToken)}`
       : "";

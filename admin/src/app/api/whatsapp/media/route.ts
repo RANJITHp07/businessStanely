@@ -8,8 +8,8 @@ export async function GET(req: NextRequest) {
   }
 
   // Get backend URL and token from env
-  const backendUrl = process.env.WHATSAPP_BACKEND_URL;
-  const token = process.env.WHATSAPP_SERVICE_TOKEN || "change_me";
+  const backendUrl = process.env.NEXT_PUBLIC_WHATSAPP_BACKEND_URL;
+  const token = process.env.NEXT_PUBLIC_WHATSAPP_SERVICE_TOKEN || "change_me";
   if (!backendUrl) {
     return new Response("Backend URL not configured", { status: 500 });
   }

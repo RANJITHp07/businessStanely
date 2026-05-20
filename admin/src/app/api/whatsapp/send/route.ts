@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const WHATSAPP_BACKEND_URL =
-  process.env.WHATSAPP_BACKEND_URL ?? "https://13.201.4.152.nip.io";
-const SERVICE_TOKEN = process.env.WHATSAPP_SERVICE_TOKEN ?? "";
+const NEXT_PUBLIC_WHATSAPP_BACKEND_URL =
+  process.env.NEXT_PUBLIC_WHATSAPP_BACKEND_URL ?? "https://13.201.4.152.nip.io";
+const SERVICE_TOKEN = process.env.NEXT_PUBLIC_WHATSAPP_SERVICE_TOKEN ?? "";
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
   const url = SERVICE_TOKEN
-    ? `${WHATSAPP_BACKEND_URL}/send?token=${encodeURIComponent(SERVICE_TOKEN)}`
-    : `${WHATSAPP_BACKEND_URL}/send`;
+    ? `${NEXT_PUBLIC_WHATSAPP_BACKEND_URL}/send?token=${encodeURIComponent(SERVICE_TOKEN)}`
+    : `${NEXT_PUBLIC_WHATSAPP_BACKEND_URL}/send`;
 
   const upstream = await fetch(url, {
     method: "POST",

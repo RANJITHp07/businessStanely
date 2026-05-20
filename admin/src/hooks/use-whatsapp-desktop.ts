@@ -236,7 +236,14 @@ export function useWhatsAppDesktop() {
   }, []);
 
   useEffect(() => {
-    const source = new EventSource("/api/whatsapp/stream", {
+    // Use direct backend URL for SSE (bypass Amplify/CloudFront) and always include token
+    const backendUrl = process.env.NEXT_PUBLIC_WHATSAPP_BACKEND_URL || "https://13.201.4.152.nip.io";
+    const serviceToken = process.env.NEXT_PUBLIC_WHATSAPP_SERVICE_TOKEN || "";
+    let streamUrl = `${backendUrl.replace(/\/$/, "")}/stream`;
+    if (serviceToken) {
+      streamUrl += `?token=${encodeURIComponent(serviceToken)}`;
+    }
+    const source = new EventSource(streamUrl, {
       withCredentials: true,
     });
     eventSourceRef.current = source;

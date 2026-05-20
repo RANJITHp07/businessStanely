@@ -6,9 +6,11 @@ const SERVICE_TOKEN = process.env.WHATSAPP_SERVICE_TOKEN ?? "";
 
 export async function GET(req: NextRequest) {
   const search = req.nextUrl.searchParams.get("search") ?? "";
+  const page = req.nextUrl.searchParams.get("page") ?? "1";
+  const pageSize = req.nextUrl.searchParams.get("pageSize") ?? "50";
   const url = SERVICE_TOKEN
-    ? `${WHATSAPP_BACKEND_URL}/chats?search=${encodeURIComponent(search)}&token=${encodeURIComponent(SERVICE_TOKEN)}`
-    : `${WHATSAPP_BACKEND_URL}/chats?search=${encodeURIComponent(search)}`;
+    ? `${WHATSAPP_BACKEND_URL}/chats?search=${encodeURIComponent(search)}&page=${encodeURIComponent(page)}&pageSize=${encodeURIComponent(pageSize)}&token=${encodeURIComponent(SERVICE_TOKEN)}`
+    : `${WHATSAPP_BACKEND_URL}/chats?search=${encodeURIComponent(search)}&page=${encodeURIComponent(page)}&pageSize=${encodeURIComponent(pageSize)}`;
 
   const upstream = await fetch(url, {
     headers: {

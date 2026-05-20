@@ -141,7 +141,8 @@ const chatFetchTimeoutMs = Number(
   process.env.WHATSAPP_CHAT_FETCH_TIMEOUT_MS ?? 60000,
 );
 const chatCacheTtlMs = Number(process.env.WHATSAPP_CHAT_CACHE_TTL_MS ?? 12000);
-const chatFetchLimit = Number(process.env.WHATSAPP_CHAT_FETCH_LIMIT ?? 200);
+// Lower default chat fetch limit for performance
+const chatFetchLimit = Number(process.env.WHATSAPP_CHAT_FETCH_LIMIT ?? 50);
 const WHATSAPP_EDIT_WINDOW_MS = 15 * 60 * 1000;
 
 /**
@@ -361,7 +362,7 @@ function getMessageTypeLabel(type?: string | null, hasMedia = false) {
     return "";
   }
 
-  return SYSTEM_TYPE_LABELS[type] ?? "ℹ️ Event";
+  return SYSTEM_TYPE_LABELS[type] ?? " ";
 }
 
 function mapMessage(message: Message): WhatsAppMessage {
@@ -928,23 +929,48 @@ class WhatsAppService {
     }
   }
 
+  // Add pagination to chat list
+  // Accept page and pageSize for pagination
   private filterAndSortChats(
     chats: WhatsAppChatSummary[],
     normalizedSearch: string,
+    page: number = 1,
+    pageSize: number = chatFetchLimit,
   ) {
-    return chats
+    const filtered = chats
       .filter((chat) => {
         if (!normalizedSearch) {
           return true;
         }
-
         const searchableText = [chat.name, chat.lastMessage, chat.id]
           .join(" ")
           .toLowerCase();
-
         return searchableText.includes(normalizedSearch);
       })
       .sort((left, right) => (right.timestamp ?? 0) - (left.timestamp ?? 0));
+    const start = (page - 1) * pageSize;
+    return filtered.slice(start, start + pageSize);
+  }
+
+  // Expose a paginated chat list API
+  public async getPaginatedChats(
+    search = "",
+    page = 1,
+    pageSize = chatFetchLimit,
+  ) {
+    await this.ensureInitialized();
+    const client = await this.requireReadyClient();
+    // Use cached chats if available
+    if (!this.chatsCache.length) {
+      await this.refreshChats(client);
+    }
+    const normalizedSearch = search.trim().toLowerCase();
+    return this.filterAndSortChats(
+      this.chatsCache,
+      normalizedSearch,
+      page,
+      pageSize,
+    );
   }
 
   private async refreshChats(client: WhatsAppClient) {

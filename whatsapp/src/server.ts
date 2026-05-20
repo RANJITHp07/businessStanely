@@ -128,10 +128,17 @@ app.get("/status", auth, async (_req, res) => {
 });
 
 // --- Chats ---
+// Paginated chats endpoint
 app.get("/chats", auth, async (req, res) => {
   const search = String(req.query.search ?? "");
+  const page = Number(req.query.page ?? 1);
+  const pageSize = Number(req.query.pageSize ?? 50);
   try {
-    const chats = await whatsappService.listChats(search);
+    const chats = await whatsappService.getPaginatedChats(
+      search,
+      page,
+      pageSize,
+    );
     res.json({ chats });
   } catch (error) {
     const message =

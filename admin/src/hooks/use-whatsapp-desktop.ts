@@ -66,6 +66,8 @@ function arrayBufferToBase64(buffer: ArrayBuffer) {
 export function useWhatsAppDesktop() {
   const [state, setState] = useState<SerializableWhatsAppState>(defaultState);
   const [chats, setChats] = useState<WhatsAppChatSummary[]>([]);
+  const [chatPage, setChatPage] = useState(1);
+  const [hasMoreChats, setHasMoreChats] = useState(true);
   const [messages, setMessages] = useState<WhatsAppMessage[]>([]);
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -107,11 +109,20 @@ export function useWhatsAppDesktop() {
     return nextState;
   };
 
-  const loadChats = async (preferredChatId?: string | null) => {
+  const loadChats = async (
+    preferredChatId?: string | null,
+    page = 1,
+    pageSize = 50,
+  ) => {
     const data = await getJson<{ chats: WhatsAppChatSummary[] }>(
-      "/api/whatsapp/chats",
+      `/api/whatsapp/chats?page=${page}&pageSize=${pageSize}`,
     );
-    setChats(data.chats);
+    if (page === 1) {
+      setChats(data.chats);
+    } else {
+      setChats((prev) => [...prev, ...data.chats]);
+    }
+    setHasMoreChats(data.chats.length === pageSize);
 
     const nextSelectedChatId = preferredChatId ?? selectedChatIdRef.current;
     const activeChat =
@@ -122,6 +133,14 @@ export function useWhatsAppDesktop() {
     setSelectedChatId(activeChat?.id ?? null);
 
     return activeChat?.id ?? null;
+  };
+
+  // For infinite scroll or "Load more chats"
+  const loadMoreChats = async () => {
+    if (!hasMoreChats) return;
+    const nextPage = chatPage + 1;
+    await loadChats(undefined, nextPage);
+    setChatPage(nextPage);
   };
 
   const loadMessages = async (chatId: string, limit = 80) => {
@@ -477,5 +496,7 @@ export function useWhatsAppDesktop() {
     setSearchQuery,
     setSelectedChatId,
     state,
+    loadMoreChats,
+    hasMoreChats,
   };
 }

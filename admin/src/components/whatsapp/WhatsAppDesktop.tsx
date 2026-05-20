@@ -36,108 +36,124 @@ function formatTime(timestamp: number | null) {
     }).format(timestamp);
 }
 
-function formatDay(timestamp: number) {
-    return new Intl.DateTimeFormat("en-IN", {
-        day: "numeric",
-        month: "short",
-    }).format(timestamp);
-}
+function WhatsAppDesktop() {
 
-function initials(name: string) {
-    return name
-        .split(" ")
-        .slice(0, 2)
-        .map((part) => part[0]?.toUpperCase() || "")
-        .join("") || "WA";
-}
+    function formatDay(timestamp: number) {
+        return new Intl.DateTimeFormat("en-IN", {
+            day: "numeric",
+            month: "short",
+        }).format(timestamp);
+    }
 
-function canEditMessage(message: WhatsAppMessage) {
-    const isTextMessage = !message.hasMedia && (!message.mediaType || message.mediaType === "chat");
-    const withinEditWindow = Date.now() - message.timestamp <= WHATSAPP_EDIT_WINDOW_MS;
+    function initials(name: string) {
+        return name
+            .split(" ")
+            .slice(0, 2)
+            .map((part) => part[0]?.toUpperCase() || "")
+            .join("") || "WA";
+    }
 
-    return message.fromMe && isTextMessage && withinEditWindow;
-}
+    function canEditMessage(message: WhatsAppMessage) {
+        const isTextMessage = !message.hasMedia && (!message.mediaType || message.mediaType === "chat");
+        const withinEditWindow = Date.now() - message.timestamp <= WHATSAPP_EDIT_WINDOW_MS;
 
-function ChatAvatar({
-    chat,
-    sizeClassName,
-}: {
-    chat: Pick<WhatsAppChatSummary, "name" | "avatarUrl">;
-    sizeClassName: string;
-}) {
-    const [loadFailed, setLoadFailed] = useState(false);
+        return message.fromMe && isTextMessage && withinEditWindow;
+    }
 
-    useEffect(() => {
-        setLoadFailed(false);
-    }, [chat.avatarUrl]);
+    function ChatAvatar({
+        chat,
+        sizeClassName,
+    }: {
+        chat: Pick<WhatsAppChatSummary, "name" | "avatarUrl">;
+        sizeClassName: string;
+    }) {
+        const [loadFailed, setLoadFailed] = useState(false);
 
-    return (
-        <div className={`relative overflow-hidden rounded-full bg-[#6a7175] ${sizeClassName}`}>
-            {chat.avatarUrl && !loadFailed ? (
-                <img
-                    src={chat.avatarUrl}
-                    alt={chat.name}
-                    className="h-full w-full object-cover"
-                    loading="lazy"
-                    onError={() => setLoadFailed(true)}
-                    referrerPolicy="no-referrer"
-                />
-            ) : (
-                <div className="flex h-full w-full items-center justify-center text-sm font-semibold text-white">
-                    {initials(chat.name)}
-                </div>
-            )}
-        </div>
-    );
-}
+        useEffect(() => {
+            setLoadFailed(false);
+        }, [chat.avatarUrl]);
 
-function MessageMedia({ message }: { message: WhatsAppMessage }) {
-    const src = `/api/whatsapp/media?messageId=${encodeURIComponent(message.id)}`;
-
-    if (message.mediaType === "image" || message.mediaType === "sticker") {
         return (
-            <div>
-                <img
-                    src={src}
-                    alt={message.body || "Image"}
-                    className="max-h-64 max-w-full rounded-lg object-cover"
-                    loading="lazy"
-                />
-                {message.body ? (
-                    <p className="mt-1 wrap-break-word whitespace-pre-wrap text-[14px] leading-6">{message.body}</p>
-                ) : null}
+            <div className={`relative overflow-hidden rounded-full bg-[#6a7175] ${sizeClassName}`}>
+                {chat.avatarUrl && !loadFailed ? (
+                    <img
+                        src={chat.avatarUrl}
+                        alt={chat.name}
+                        className="h-full w-full object-cover"
+                        loading="lazy"
+                        onError={() => setLoadFailed(true)}
+                        referrerPolicy="no-referrer"
+                    />
+                ) : (
+                    <div className="flex h-full w-full items-center justify-center text-sm font-semibold text-white">
+                        {initials(chat.name)}
+                    </div>
+                )}
             </div>
         );
     }
 
-    if (message.mediaType === "video") {
-        return (
-            <div>
-                <video
+    function MessageMedia({ message }: { message: WhatsAppMessage }) {
+        const src = `/api/whatsapp/media?messageId=${encodeURIComponent(message.id)}`;
+
+        if (message.mediaType === "image" || message.mediaType === "sticker") {
+            return (
+                <div>
+                    <img
+                        src={src}
+                        alt={message.body || "Image"}
+                        className="max-h-64 max-w-full rounded-lg object-cover"
+                        loading="lazy"
+                    />
+                    {message.body ? (
+                        <p className="mt-1 wrap-break-word whitespace-pre-wrap text-[14px] leading-6">{message.body}</p>
+                    ) : null}
+                </div>
+            );
+        }
+
+        if (message.mediaType === "video") {
+            return (
+                <div>
+                    <video
+                        src={src}
+                        controls
+                        className="max-h-64 max-w-full rounded-lg"
+                        preload="metadata"
+                    />
+                    {message.body ? (
+                        <p className="mt-1 wrap-break-word whitespace-pre-wrap text-[14px] leading-6">{message.body}</p>
+                    ) : null}
+                </div>
+            );
+        }
+
+        if (message.mediaType === "audio" || message.mediaType === "ptt") {
+            return (
+                <audio
                     src={src}
                     controls
-                    className="max-h-64 max-w-full rounded-lg"
+                    className="w-full min-w-55"
                     preload="metadata"
                 />
-                {message.body ? (
-                    <p className="mt-1 wrap-break-word whitespace-pre-wrap text-[14px] leading-6">{message.body}</p>
-                ) : null}
-            </div>
-        );
-    }
+            );
+        }
 
-    if (message.mediaType === "audio" || message.mediaType === "ptt") {
-        return (
-            <audio
-                src={src}
-                controls
-                className="w-full min-w-55"
-                preload="metadata"
-            />
-        );
-    }
+        if (message.mediaType === "document") {
+            return (
+                <a
+                    href={src}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 rounded-lg bg-black/10 px-3 py-2 text-sm hover:bg-black/20 transition"
+                >
+                    <FileText className="h-4 w-4 shrink-0" />
+                    <span className="truncate">{message.filename || "Document"}</span>
+                </a>
+            );
+        }
 
-    if (message.mediaType === "document") {
+        // Fallback: generic download link
         return (
             <a
                 href={src}
@@ -146,123 +162,108 @@ function MessageMedia({ message }: { message: WhatsAppMessage }) {
                 className="flex items-center gap-2 rounded-lg bg-black/10 px-3 py-2 text-sm hover:bg-black/20 transition"
             >
                 <FileText className="h-4 w-4 shrink-0" />
-                <span className="truncate">{message.filename || "Document"}</span>
+                <span>{message.filename || "Attachment"}</span>
             </a>
         );
     }
 
-    // Fallback: generic download link
-    return (
-        <a
-            href={src}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-2 rounded-lg bg-black/10 px-3 py-2 text-sm hover:bg-black/20 transition"
-        >
-            <FileText className="h-4 w-4 shrink-0" />
-            <span>{message.filename || "Attachment"}</span>
-        </a>
-    );
-}
+    const MessageComposer = memo(function MessageComposer({
+        isSending,
+        onSend,
+    }: {
+        isSending: boolean;
+        onSend: (content: string, file?: File | null) => Promise<void>;
+    }) {
+        const [draft, setDraft] = useState("");
+        const [attachment, setAttachment] = useState<File | null>(null);
+        const fileInputRef = useRef<HTMLInputElement>(null);
 
-const MessageComposer = memo(function MessageComposer({
-    isSending,
-    onSend,
-}: {
-    isSending: boolean;
-    onSend: (content: string, file?: File | null) => Promise<void>;
-}) {
-    const [draft, setDraft] = useState("");
-    const [attachment, setAttachment] = useState<File | null>(null);
-    const fileInputRef = useRef<HTMLInputElement>(null);
+        const openFilePicker = () => {
+            fileInputRef.current?.click();
+        };
 
-    const openFilePicker = () => {
-        fileInputRef.current?.click();
-    };
+        const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+            const nextFile = event.target.files?.[0] ?? null;
+            setAttachment(nextFile);
+        };
 
-    const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const nextFile = event.target.files?.[0] ?? null;
-        setAttachment(nextFile);
-    };
+        const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+            event.preventDefault();
 
-    const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
-        event.preventDefault();
+            const content = draft.trim();
+            const pendingFile = attachment;
 
-        const content = draft.trim();
-        const pendingFile = attachment;
+            if (!content && !pendingFile) {
+                return;
+            }
 
-        if (!content && !pendingFile) {
-            return;
-        }
+            setDraft("");
+            setAttachment(null);
+            if (fileInputRef.current) {
+                fileInputRef.current.value = "";
+            }
 
-        setDraft("");
-        setAttachment(null);
-        if (fileInputRef.current) {
-            fileInputRef.current.value = "";
-        }
+            onSend(content, pendingFile).catch((error) => {
+                setDraft(content);
+                setAttachment(pendingFile || null);
+                toast.error(error instanceof Error ? error.message : "Failed to send message.");
+            });
+        };
 
-        onSend(content, pendingFile).catch((error) => {
-            setDraft(content);
-            setAttachment(pendingFile || null);
-            toast.error(error instanceof Error ? error.message : "Failed to send message.");
-        });
-    };
-
-    return (
-        <form onSubmit={handleSubmit} className="flex items-end gap-3">
-            <input
-                ref={fileInputRef}
-                type="file"
-                className="hidden"
-                onChange={handleFileChange}
-                accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,.rar"
-            />
-            <button
-                type="button"
-                onClick={openFilePicker}
-                className="flex h-11 w-11 items-center justify-center rounded-full bg-[#2a3942] text-[#aebac1] transition hover:bg-[#33454f] hover:text-white"
-                title="Attach file"
-            >
-                <Paperclip className="h-5 w-5" />
-            </button>
-            <div className="flex-1 rounded-lg bg-[#2a3942] px-4 py-3">
-                {attachment ? (
-                    <div className="mb-2 flex items-center justify-between rounded-md bg-black/20 px-2 py-1 text-xs text-[#d1d7db]">
-                        <span className="truncate pr-2">{attachment.name}</span>
-                        <button
-                            type="button"
-                            onClick={() => {
-                                setAttachment(null);
-                                if (fileInputRef.current) {
-                                    fileInputRef.current.value = "";
-                                }
-                            }}
-                            className="text-[#aebac1] hover:text-white"
-                        >
-                            Remove
-                        </button>
-                    </div>
-                ) : null}
-                <textarea
-                    value={draft}
-                    onChange={(event) => setDraft(event.target.value)}
-                    placeholder={attachment ? "Add a caption (optional)" : "Type a message"}
-                    rows={1}
-                    className="max-h-32 min-h-6 w-full resize-none bg-transparent text-sm text-white outline-none placeholder:text-[#8696a0]"
+        return (
+            <form onSubmit={handleSubmit} className="flex items-end gap-3">
+                <input
+                    ref={fileInputRef}
+                    type="file"
+                    className="hidden"
+                    onChange={handleFileChange}
+                    accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,.rar"
                 />
-            </div>
-            <button
-                type="submit"
-                disabled={isSending || (!draft.trim() && !attachment)}
-                className="flex h-11 w-11 items-center justify-center rounded-full bg-[#00a884] text-[#111b21] transition hover:bg-[#06b48f] disabled:cursor-not-allowed disabled:bg-[#8696a0]"
-            >
-                {isSending ? <LoaderCircle className="h-5 w-5 animate-spin" /> : <SendHorizonal className="h-5 w-5" />}
-            </button>
-        </form>
-    );
-});
+                <button
+                    type="button"
+                    onClick={openFilePicker}
+                    className="flex h-11 w-11 items-center justify-center rounded-full bg-[#2a3942] text-[#aebac1] transition hover:bg-[#33454f] hover:text-white"
+                    title="Attach file"
+                >
+                    <Paperclip className="h-5 w-5" />
+                </button>
+                <div className="flex-1 rounded-lg bg-[#2a3942] px-4 py-3">
+                    {attachment ? (
+                        <div className="mb-2 flex items-center justify-between rounded-md bg-black/20 px-2 py-1 text-xs text-[#d1d7db]">
+                            <span className="truncate pr-2">{attachment.name}</span>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setAttachment(null);
+                                    if (fileInputRef.current) {
+                                        fileInputRef.current.value = "";
+                                    }
+                                }}
+                                className="text-[#aebac1] hover:text-white"
+                            >
+                                Remove
+                            </button>
+                        </div>
+                    ) : null}
+                    <textarea
+                        value={draft}
+                        onChange={(event) => setDraft(event.target.value)}
+                        placeholder={attachment ? "Add a caption (optional)" : "Type a message"}
+                        rows={1}
+                        className="max-h-32 min-h-6 w-full resize-none bg-transparent text-sm text-white outline-none placeholder:text-[#8696a0]"
+                    />
+                </div>
+                <button
+                    type="submit"
+                    disabled={isSending || (!draft.trim() && !attachment)}
+                    className="flex h-11 w-11 items-center justify-center rounded-full bg-[#00a884] text-[#111b21] transition hover:bg-[#06b48f] disabled:cursor-not-allowed disabled:bg-[#8696a0]"
+                >
+                    {isSending ? <LoaderCircle className="h-5 w-5 animate-spin" /> : <SendHorizonal className="h-5 w-5" />}
+                </button>
+            </form>
+        );
+    });
 
-export function WhatsAppDesktop() {
     const {
         canLoadMore,
         chats,
@@ -281,6 +282,8 @@ export function WhatsAppDesktop() {
         setSearchQuery,
         setSelectedChatId,
         state,
+        loadMoreChats,
+        hasMoreChats,
     } = useWhatsAppDesktop();
     const [mobileSidebarOpen, setMobileSidebarOpen] = useState(true);
     const [isRetrying, setIsRetrying] = useState(false);
@@ -599,6 +602,17 @@ export function WhatsAppDesktop() {
                                 </button>
                             );
                         })}
+                        {hasMoreChats && (
+                            <div className="flex justify-center py-2">
+                                <button
+                                    type="button"
+                                    onClick={loadMoreChats}
+                                    className="rounded-lg bg-[#202c33] px-4 py-2 text-sm text-[#00a884] hover:bg-[#2a3942]"
+                                >
+                                    Load more chats
+                                </button>
+                            </div>
+                        )}
                     </div>
                 </aside>
 
@@ -763,3 +777,5 @@ export function WhatsAppDesktop() {
         </div>
     );
 }
+
+export default WhatsAppDesktop;

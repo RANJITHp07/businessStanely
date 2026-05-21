@@ -138,7 +138,7 @@ const protocolTimeoutMs = Number(
   process.env.WHATSAPP_PROTOCOL_TIMEOUT_MS ?? 180000,
 );
 const chatFetchTimeoutMs = Number(
-  process.env.WHATSAPP_CHAT_FETCH_TIMEOUT_MS ?? 60000,
+  process.env.WHATSAPP_CHAT_FETCH_TIMEOUT_MS ?? 180000,
 );
 const chatCacheTtlMs = Number(process.env.WHATSAPP_CHAT_CACHE_TTL_MS ?? 12000);
 // Lower default chat fetch limit for performance
@@ -512,7 +512,7 @@ class WhatsAppService {
           dataPath: SESSION_DIR,
         }),
         // Extra time for WhatsApp Web to inject and authenticate.
-        authTimeoutMs: 60000,
+        authTimeoutMs: 180000,
         puppeteer: {
           headless: process.env.WHATSAPP_HEADLESS !== "false",
           executablePath: chromiumExecutablePath,
@@ -989,7 +989,7 @@ class WhatsAppService {
           : 200;
       const timeoutMs = Number.isFinite(chatFetchTimeoutMs)
         ? chatFetchTimeoutMs
-        : 60000;
+        : 180000;
 
       // ── Fast path ────────────────────────────────────────────────────────
       const pupPage = (client as unknown as { pupPage?: unknown }).pupPage as

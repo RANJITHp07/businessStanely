@@ -563,9 +563,16 @@ class WhatsAppService {
 
         // Delay the initial chat fetch by 4 s so WhatsApp Web has time to
         // fully sync its internal chat list after the session becomes ready.
-        setTimeout(() => {
+        setTimeout(async () => {
+          try {
+            LOG("Pre-warming chat cache...");
+            await this.refreshChats(this.client!);
+            LOG("Chat cache pre-warmed successfully");
+          } catch (e) {
+            LOG("Chat cache pre-warm failed:", String(e));
+          }
           publishWhatsAppEvent("chats-updated");
-        }, 4000);
+        }, 15000); // wait 15s for Store to populate
       });
 
       client.on("auth_failure", (message: string) => {

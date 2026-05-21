@@ -245,9 +245,7 @@ export function useWhatsAppDesktop() {
     if (serviceToken) {
       streamUrl += `?token=${encodeURIComponent(serviceToken)}`;
     }
-    const source = new EventSource(streamUrl, {
-      withCredentials: true,
-    });
+    const source = new EventSource(streamUrl);
     eventSourceRef.current = source;
 
     source.addEventListener("state", async (event) => {

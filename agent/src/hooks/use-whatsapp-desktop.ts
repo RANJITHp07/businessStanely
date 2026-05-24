@@ -417,7 +417,8 @@ export function useWhatsAppDesktop() {
       .toString(36)
       .slice(2, 8)}`;
     const previewText = hasFile
-      ? content || (file?.type?.startsWith("image/") ? "📷 Photo" : "📎 Attachment")
+      ? content ||
+        (file?.type?.startsWith("image/") ? "📷 Photo" : "📎 Attachment")
       : content;
 
     upsertChatPreview(chatId, (existing) => ({

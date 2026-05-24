@@ -438,7 +438,9 @@ function getChatAvatarSeed(chatId: string) {
   return chatId.split("@")[0] || chatId;
 }
 
-function createOptimisticChatSummary(message: WhatsAppMessage): WhatsAppChatSummary {
+function createOptimisticChatSummary(
+  message: WhatsAppMessage,
+): WhatsAppChatSummary {
   return {
     id: message.chatId,
     name: getChatAvatarSeed(message.chatId),
@@ -777,16 +779,21 @@ class WhatsAppService {
         LOG("event: message received", message.id?._serialized ?? "<no-id>");
         try {
           const mapped = mapMessage(message);
-          let eventChat = this.chatsCache.find((c) => c.id === mapped.chatId) ?? null;
+          let eventChat =
+            this.chatsCache.find((c) => c.id === mapped.chatId) ?? null;
 
           if (!eventChat) {
             try {
-              const chat = await this.withOperationSlot(() => message.getChat());
+              const chat = await this.withOperationSlot(() =>
+                message.getChat(),
+              );
               eventChat = mapChat(chat);
             } catch (chatError) {
               LOG(
                 "message event: failed to resolve chat metadata, using optimistic summary",
-                chatError instanceof Error ? chatError.message : String(chatError),
+                chatError instanceof Error
+                  ? chatError.message
+                  : String(chatError),
               );
               eventChat = createOptimisticChatSummary(mapped);
             }
@@ -795,17 +802,23 @@ class WhatsAppService {
               ...eventChat,
               lastMessage: mapped.body,
               timestamp: mapped.timestamp,
-              unreadCount: mapped.fromMe ? 0 : Math.max(eventChat.unreadCount, 1),
+              unreadCount: mapped.fromMe
+                ? 0
+                : Math.max(eventChat.unreadCount, 1),
             });
-            eventChat = this.chatsCache.find((c) => c.id === mapped.chatId) ?? eventChat;
+            eventChat =
+              this.chatsCache.find((c) => c.id === mapped.chatId) ?? eventChat;
           } else {
             this.upsertChatSummary({
               ...eventChat,
               lastMessage: mapped.body,
               timestamp: mapped.timestamp,
-              unreadCount: mapped.fromMe ? eventChat.unreadCount : eventChat.unreadCount + 1,
+              unreadCount: mapped.fromMe
+                ? eventChat.unreadCount
+                : eventChat.unreadCount + 1,
             });
-            eventChat = this.chatsCache.find((c) => c.id === mapped.chatId) ?? eventChat;
+            eventChat =
+              this.chatsCache.find((c) => c.id === mapped.chatId) ?? eventChat;
           }
 
           publishWhatsAppEvent("message", {
@@ -827,7 +840,9 @@ class WhatsAppService {
 
         try {
           const mapped = mapMessage(message);
-          const existingChat = this.chatsCache.find((c) => c.id === mapped.chatId);
+          const existingChat = this.chatsCache.find(
+            (c) => c.id === mapped.chatId,
+          );
           const updatedChat = {
             ...(existingChat ?? createOptimisticChatSummary(mapped)),
             lastMessage: mapped.body,

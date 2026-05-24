@@ -344,71 +344,71 @@ export function useWhatsAppDesktop() {
       });
 
       source.addEventListener("message", async (event) => {
-      const payload = JSON.parse((event as MessageEvent).data) as {
-        chatId?: string;
-        chat?: WhatsAppChatSummary;
-        message?: WhatsAppMessage;
-      };
+        const payload = JSON.parse((event as MessageEvent).data) as {
+          chatId?: string;
+          chat?: WhatsAppChatSummary;
+          message?: WhatsAppMessage;
+        };
 
-      if (!payload.chatId || !payload.message) {
-        return;
-      }
-
-      if (payload.chatId === selectedChatIdRef.current) {
-        setMessages((current) => {
-          if (current.some((message) => message.id === payload.message?.id)) {
-            return current;
-          }
-
-          return [...current, payload.message!];
-        });
-      }
-
-      setChats((current) => {
-        const chatIndex = current.findIndex((c) => c.id === payload.chatId);
-        if (chatIndex === -1) {
-          if (!payload.chat) {
-            return current;
-          }
-
-          const nextChats = [
-            {
-              ...payload.chat,
-              lastMessage: payload.message!.body,
-              timestamp: payload.message!.timestamp,
-              unreadCount:
-                payload.chatId !== selectedChatIdRef.current &&
-                !payload.message!.fromMe
-                  ? Math.max(payload.chat.unreadCount || 0, 1)
-                  : 0,
-            },
-            ...current,
-          ];
-
-          return nextChats.sort(
-            (a, b) => (b.timestamp ?? 0) - (a.timestamp ?? 0),
-          );
+        if (!payload.chatId || !payload.message) {
+          return;
         }
 
-        const updated = current.map((c) =>
-          c.id === payload.chatId
-            ? {
-                ...c,
+        if (payload.chatId === selectedChatIdRef.current) {
+          setMessages((current) => {
+            if (current.some((message) => message.id === payload.message?.id)) {
+              return current;
+            }
+
+            return [...current, payload.message!];
+          });
+        }
+
+        setChats((current) => {
+          const chatIndex = current.findIndex((c) => c.id === payload.chatId);
+          if (chatIndex === -1) {
+            if (!payload.chat) {
+              return current;
+            }
+
+            const nextChats = [
+              {
+                ...payload.chat,
                 lastMessage: payload.message!.body,
                 timestamp: payload.message!.timestamp,
                 unreadCount:
-                  payload.chatId !== selectedChatIdRef.current
-                    ? (c.unreadCount || 0) + (payload.message!.fromMe ? 0 : 1)
+                  payload.chatId !== selectedChatIdRef.current &&
+                  !payload.message!.fromMe
+                    ? Math.max(payload.chat.unreadCount || 0, 1)
                     : 0,
-              }
-            : c,
-        );
+              },
+              ...current,
+            ];
 
-        return [...updated].sort(
-          (a, b) => (b.timestamp ?? 0) - (a.timestamp ?? 0),
-        );
+            return nextChats.sort(
+              (a, b) => (b.timestamp ?? 0) - (a.timestamp ?? 0),
+            );
+          }
+
+          const updated = current.map((c) =>
+            c.id === payload.chatId
+              ? {
+                  ...c,
+                  lastMessage: payload.message!.body,
+                  timestamp: payload.message!.timestamp,
+                  unreadCount:
+                    payload.chatId !== selectedChatIdRef.current
+                      ? (c.unreadCount || 0) + (payload.message!.fromMe ? 0 : 1)
+                      : 0,
+                }
+              : c,
+          );
+
+          return [...updated].sort(
+            (a, b) => (b.timestamp ?? 0) - (a.timestamp ?? 0),
+          );
+        });
       });
-    });
 
       return;
     }

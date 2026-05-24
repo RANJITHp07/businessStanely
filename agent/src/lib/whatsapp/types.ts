@@ -49,6 +49,7 @@ export type WhatsAppMessage = {
 export type WhatsAppEventPayload = {
   state?: WhatsAppState;
   chatId?: string;
+  chat?: WhatsAppChatSummary;
   message?: WhatsAppMessage;
 };
 

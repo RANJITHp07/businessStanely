@@ -177,6 +177,7 @@ function WhatsAppDesktop() {
         const [draft, setDraft] = useState("");
         const [attachment, setAttachment] = useState<File | null>(null);
         const fileInputRef = useRef<HTMLInputElement>(null);
+        const formRef = useRef<HTMLFormElement>(null);
 
         const openFilePicker = () => {
             fileInputRef.current?.click();
@@ -211,7 +212,7 @@ function WhatsAppDesktop() {
         };
 
         return (
-            <form onSubmit={handleSubmit} className="flex items-end gap-3">
+            <form ref={formRef} onSubmit={handleSubmit} className="flex items-end gap-3">
                 <input
                     ref={fileInputRef}
                     type="file"
@@ -248,6 +249,16 @@ function WhatsAppDesktop() {
                     <textarea
                         value={draft}
                         onChange={(event) => setDraft(event.target.value)}
+                        onKeyDown={(event) => {
+                            if (
+                                event.key === "Enter" &&
+                                !event.shiftKey &&
+                                !event.nativeEvent.isComposing
+                            ) {
+                                event.preventDefault();
+                                formRef.current?.requestSubmit();
+                            }
+                        }}
                         placeholder={attachment ? "Add a caption (optional)" : "Type a message"}
                         rows={1}
                         className="max-h-32 min-h-6 w-full resize-none bg-transparent text-sm text-white outline-none placeholder:text-[#8696a0]"

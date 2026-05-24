@@ -434,6 +434,25 @@ function mapChat(chat: Chat): WhatsAppChatSummary {
   };
 }
 
+function getChatAvatarSeed(chatId: string) {
+  return chatId.split("@")[0] || chatId;
+}
+
+function createOptimisticChatSummary(message: WhatsAppMessage): WhatsAppChatSummary {
+  return {
+    id: message.chatId,
+    name: getChatAvatarSeed(message.chatId),
+    lastMessage: message.body,
+    timestamp: message.timestamp,
+    unreadCount: message.fromMe ? 0 : 1,
+    avatarSeed: getChatAvatarSeed(message.chatId),
+    avatarUrl: null,
+    isGroup: message.chatId.endsWith("@g.us"),
+    isMuted: false,
+    isPinned: false,
+  };
+}
+
 class WhatsAppService {
   private client: WhatsAppClient | null = null;
   private initializingPromise: Promise<void> | null = null;
@@ -454,6 +473,15 @@ class WhatsAppService {
 
   getState() {
     return this.state;
+  }
+
+  private upsertChatSummary(chat: WhatsAppChatSummary) {
+    const nextChats = this.chatsCache.filter((entry) => entry.id !== chat.id);
+    nextChats.unshift(chat);
+    this.chatsCache = nextChats.sort(
+      (left, right) => (right.timestamp ?? 0) - (left.timestamp ?? 0),
+    );
+    this.chatsCacheAt = Date.now();
   }
 
   private setState(next: Partial<WhatsAppState>) {
@@ -749,18 +777,42 @@ class WhatsAppService {
         LOG("event: message received", message.id?._serialized ?? "<no-id>");
         try {
           const mapped = mapMessage(message);
+          let eventChat = this.chatsCache.find((c) => c.id === mapped.chatId) ?? null;
+
+          if (!eventChat) {
+            try {
+              const chat = await this.withOperationSlot(() => message.getChat());
+              eventChat = mapChat(chat);
+            } catch (chatError) {
+              LOG(
+                "message event: failed to resolve chat metadata, using optimistic summary",
+                chatError instanceof Error ? chatError.message : String(chatError),
+              );
+              eventChat = createOptimisticChatSummary(mapped);
+            }
+
+            this.upsertChatSummary({
+              ...eventChat,
+              lastMessage: mapped.body,
+              timestamp: mapped.timestamp,
+              unreadCount: mapped.fromMe ? 0 : Math.max(eventChat.unreadCount, 1),
+            });
+            eventChat = this.chatsCache.find((c) => c.id === mapped.chatId) ?? eventChat;
+          } else {
+            this.upsertChatSummary({
+              ...eventChat,
+              lastMessage: mapped.body,
+              timestamp: mapped.timestamp,
+              unreadCount: mapped.fromMe ? eventChat.unreadCount : eventChat.unreadCount + 1,
+            });
+            eventChat = this.chatsCache.find((c) => c.id === mapped.chatId) ?? eventChat;
+          }
+
           publishWhatsAppEvent("message", {
             chatId: mapped.chatId,
+            chat: eventChat,
             message: mapped,
           });
-          // Only refresh chats if this chat is not already in the cache (i.e., new chat)
-          const isNewChat = !this.chatsCache.some(
-            (c) => c.id === mapped.chatId,
-          );
-          if (isNewChat) {
-            LOG("New chat detected, refreshing chat cache...");
-            await this.refreshChats(this.client!);
-          }
           publishWhatsAppEvent("chats-updated", { chatId: mapped.chatId });
         } catch (error) {
           this.handleFatalBrowserError(error);
@@ -775,8 +827,18 @@ class WhatsAppService {
 
         try {
           const mapped = mapMessage(message);
+          const existingChat = this.chatsCache.find((c) => c.id === mapped.chatId);
+          const updatedChat = {
+            ...(existingChat ?? createOptimisticChatSummary(mapped)),
+            lastMessage: mapped.body,
+            timestamp: mapped.timestamp,
+          };
+
+          this.upsertChatSummary(updatedChat);
+
           publishWhatsAppEvent("message", {
             chatId: mapped.chatId,
+            chat: updatedChat,
             message: mapped,
           });
           publishWhatsAppEvent("chats-updated", { chatId: mapped.chatId });

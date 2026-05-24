@@ -29,10 +29,23 @@ export async function GET(req: NextRequest) {
     return new Response(await backendRes.text(), { status: backendRes.status });
   }
 
-  // Stream the media response
+  const headers = new Headers();
   const contentType =
     backendRes.headers.get("content-type") || "application/octet-stream";
+  const contentLength = backendRes.headers.get("content-length");
+  const cacheControl = backendRes.headers.get("cache-control");
+
+  headers.set("Content-Type", contentType);
+  headers.set("Content-Disposition", "inline");
+  if (contentLength) {
+    headers.set("Content-Length", contentLength);
+  }
+  if (cacheControl) {
+    headers.set("Cache-Control", cacheControl);
+  }
+
   return new Response(backendRes.body, {
     status: 200,
+    headers,
   });
 }

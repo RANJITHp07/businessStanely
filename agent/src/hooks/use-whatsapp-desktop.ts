@@ -76,6 +76,10 @@ function arrayBufferToBase64(buffer: ArrayBuffer) {
   return btoa(binary);
 }
 
+function fallbackChatName(chatId: string) {
+  return chatId.split("@")[0] || chatId;
+}
+
 export function useWhatsAppDesktop() {
   const [state, setState] = useState<SerializableWhatsAppState>(defaultState);
   const [chats, setChats] = useState<WhatsAppChatSummary[]>([]);
@@ -97,6 +101,21 @@ export function useWhatsAppDesktop() {
     () => chats.find((chat) => chat.id === selectedChatId) ?? null,
     [chats, selectedChatId],
   );
+
+  const upsertChatPreview = (
+    chatId: string,
+    update: (existing: WhatsAppChatSummary | null) => WhatsAppChatSummary,
+  ) => {
+    setChats((current) => {
+      const existing = current.find((chat) => chat.id === chatId) ?? null;
+      const nextChat = update(existing);
+      const withoutCurrent = current.filter((chat) => chat.id !== chatId);
+
+      return [nextChat, ...withoutCurrent].sort(
+        (left, right) => (right.timestamp ?? 0) - (left.timestamp ?? 0),
+      );
+    });
+  };
 
   const filteredChats = useMemo(() => {
     const normalized = searchQuery.trim().toLowerCase();
@@ -260,6 +279,7 @@ export function useWhatsAppDesktop() {
     source.addEventListener("message", async (event) => {
       const payload = JSON.parse((event as MessageEvent).data) as {
         chatId?: string;
+        chat?: WhatsAppChatSummary;
         message?: WhatsAppMessage;
       };
 
@@ -277,11 +297,50 @@ export function useWhatsAppDesktop() {
         });
       }
 
-      try {
-        await loadChats(selectedChatIdRef.current);
-      } catch {
-        // Ignore transient chat refresh failures.
-      }
+      setChats((current) => {
+        const chatIndex = current.findIndex((c) => c.id === payload.chatId);
+        if (chatIndex === -1) {
+          if (!payload.chat) {
+            return current;
+          }
+
+          const nextChats = [
+            {
+              ...payload.chat,
+              lastMessage: payload.message!.body,
+              timestamp: payload.message!.timestamp,
+              unreadCount:
+                payload.chatId !== selectedChatIdRef.current &&
+                !payload.message!.fromMe
+                  ? Math.max(payload.chat.unreadCount || 0, 1)
+                  : 0,
+            },
+            ...current,
+          ];
+
+          return nextChats.sort(
+            (a, b) => (b.timestamp ?? 0) - (a.timestamp ?? 0),
+          );
+        }
+
+        const updated = current.map((c) =>
+          c.id === payload.chatId
+            ? {
+                ...c,
+                lastMessage: payload.message!.body,
+                timestamp: payload.message!.timestamp,
+                unreadCount:
+                  payload.chatId !== selectedChatIdRef.current
+                    ? (c.unreadCount || 0) + (payload.message!.fromMe ? 0 : 1)
+                    : 0,
+              }
+            : c,
+        );
+
+        return [...updated].sort(
+          (a, b) => (b.timestamp ?? 0) - (a.timestamp ?? 0),
+        );
+      });
     });
 
     return () => {
@@ -357,6 +416,23 @@ export function useWhatsAppDesktop() {
     const optimisticId = `optimistic-${Date.now()}-${Math.random()
       .toString(36)
       .slice(2, 8)}`;
+    const previewText = hasFile
+      ? content || (file?.type?.startsWith("image/") ? "📷 Photo" : "📎 Attachment")
+      : content;
+
+    upsertChatPreview(chatId, (existing) => ({
+      id: chatId,
+      name: existing?.name || fallbackChatName(chatId),
+      lastMessage: previewText,
+      timestamp: Date.now(),
+      unreadCount: 0,
+      avatarSeed: existing?.avatarSeed || fallbackChatName(chatId),
+      avatarUrl: existing?.avatarUrl || null,
+      isGroup: existing?.isGroup || chatId.endsWith("@g.us"),
+      isMuted: existing?.isMuted || false,
+      isPinned: existing?.isPinned || false,
+    }));
+
     if (!hasFile) {
       const optimisticMessage: WhatsAppMessage = {
         id: optimisticId,
@@ -419,10 +495,18 @@ export function useWhatsAppDesktop() {
 
         return [...withoutOptimistic, data.message];
       });
-
-      loadChats(chatId).catch(() => {
-        // Keep send responsive even if chat list refresh fails.
-      });
+      upsertChatPreview(chatId, (existing) => ({
+        id: chatId,
+        name: existing?.name || fallbackChatName(chatId),
+        lastMessage: data.message.body,
+        timestamp: data.message.timestamp,
+        unreadCount: 0,
+        avatarSeed: existing?.avatarSeed || fallbackChatName(chatId),
+        avatarUrl: existing?.avatarUrl || null,
+        isGroup: existing?.isGroup || chatId.endsWith("@g.us"),
+        isMuted: existing?.isMuted || false,
+        isPinned: existing?.isPinned || false,
+      }));
     } catch (error) {
       if (!hasFile) {
         setMessages((current) =>

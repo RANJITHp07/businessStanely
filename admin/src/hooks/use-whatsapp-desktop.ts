@@ -236,81 +236,143 @@ export function useWhatsAppDesktop() {
   }, []);
 
   useEffect(() => {
-    // Use direct backend URL for SSE (bypass Amplify/CloudFront) and always include token
-    const backendUrl =
-      process.env.NEXT_PUBLIC_WHATSAPP_BACKEND_URL ||
-      "https://13.201.4.152.nip.io";
-    const serviceToken = process.env.NEXT_PUBLIC_WHATSAPP_SERVICE_TOKEN || "";
-    let streamUrl = `${backendUrl.replace(/\/$/, "")}/stream`;
-    if (serviceToken) {
-      streamUrl += `?token=${encodeURIComponent(serviceToken)}`;
-    }
-    const source = new EventSource(streamUrl);
-    eventSourceRef.current = source;
+    let disposed = false;
+    let source: EventSource | null = null;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    let backoffMs = 1000;
 
-    source.addEventListener("state", async (event) => {
-      const nextState = JSON.parse(
-        (event as MessageEvent).data,
-      ) as SerializableWhatsAppState;
-      setState(nextState);
+    function connect() {
+      if (disposed) return;
 
-      if (nextState.status === "ready") {
-        try {
-          const chatId = await loadChats(selectedChatIdRef.current);
-          if (chatId) {
-            await loadMessages(chatId);
-          }
-        } catch {
-          // The route remains usable while the client warms up.
-        }
-      }
-    });
-
-    source.addEventListener("chats-updated", async () => {
-      if (stateRef.current.status !== "ready") {
-        return;
+      // Use direct backend URL for SSE (bypass Amplify/CloudFront) and always include token
+      const backendUrl =
+        process.env.NEXT_PUBLIC_WHATSAPP_BACKEND_URL ||
+        "https://13.201.4.152.nip.io";
+      const serviceToken = process.env.NEXT_PUBLIC_WHATSAPP_SERVICE_TOKEN || "";
+      let streamUrl = `${backendUrl.replace(/\/$/, "")}/stream`;
+      if (serviceToken) {
+        streamUrl += `?token=${encodeURIComponent(serviceToken)}`;
       }
 
-      try {
-        const currentSelectedChatId = selectedChatIdRef.current;
-        const chatId = await loadChats(currentSelectedChatId);
-        if (chatId === currentSelectedChatId && chatId) {
-          await loadMessages(chatId);
-        }
-      } catch {
-        // Ignore transient refresh failures while the desktop client reconnects.
-      }
-    });
+      source = new EventSource(streamUrl);
+      eventSourceRef.current = source;
 
-    source.addEventListener("message", async (event) => {
-      const payload = JSON.parse((event as MessageEvent).data) as {
-        chatId?: string;
-        message?: WhatsAppMessage;
+      // Reset backoff once the connection is established
+      source.onopen = () => {
+        backoffMs = 1000;
       };
 
-      if (!payload.chatId || !payload.message) {
-        return;
-      }
+      // Exponential backoff + jitter on disconnect to prevent thundering herd
+      // when all agents reconnect simultaneously after a WhatsApp restart
+      source.onerror = () => {
+        if (disposed) return;
+        source?.close();
+        source = null;
+        eventSourceRef.current = null;
+        const jitter = Math.floor(Math.random() * 1000);
+        reconnectTimer = setTimeout(() => {
+          if (!disposed) {
+            backoffMs = Math.min(backoffMs * 2, 30000);
+            connect();
+          }
+        }, backoffMs + jitter);
+      };
 
-      if (payload.chatId === selectedChatIdRef.current) {
-        setMessages((current) => {
-          if (current.some((message) => message.id === payload.message?.id)) {
+      source.addEventListener("state", async (event) => {
+        const nextState = JSON.parse(
+          (event as MessageEvent).data,
+        ) as SerializableWhatsAppState;
+        setState(nextState);
+
+        if (nextState.status === "ready") {
+          try {
+            const chatId = await loadChats(selectedChatIdRef.current);
+            if (chatId) {
+              // Randomise the message-load start time (0–3 s) so that all agents
+              // reconnecting at once don't all hit fetchMessages simultaneously
+              await new Promise<void>((r) =>
+                setTimeout(r, Math.floor(Math.random() * 3000)),
+              );
+              await loadMessages(chatId);
+            }
+          } catch {
+            // The route remains usable while the client warms up.
+          }
+        }
+      });
+
+      source.addEventListener("chats-updated", async () => {
+        if (stateRef.current.status !== "ready") {
+          return;
+        }
+
+        try {
+          await loadChats(selectedChatIdRef.current);
+          // Do NOT reload messages here. Messages stay in sync via the
+          // 'message' SSE event below. Calling loadMessages on every
+          // chats-updated event causes N-agents × M-messages Puppeteer
+          // fetches simultaneously, which overwhelms the browser and
+          // causes WhatsApp to log out.
+        } catch {
+          // Ignore transient refresh failures while the desktop client reconnects.
+        }
+      });
+
+      source.addEventListener("message", async (event) => {
+        const payload = JSON.parse((event as MessageEvent).data) as {
+          chatId?: string;
+          message?: WhatsAppMessage;
+        };
+
+        if (!payload.chatId || !payload.message) {
+          return;
+        }
+
+        // Append the incoming message to the active chat view
+        if (payload.chatId === selectedChatIdRef.current) {
+          setMessages((current) => {
+            if (current.some((message) => message.id === payload.message?.id)) {
+              return current;
+            }
+            return [...current, payload.message!];
+          });
+        }
+
+        // Update the chat list preview locally — no network round-trip needed.
+        // The backend will also emit chats-updated which triggers a full reload
+        // for genuinely new chats not yet in the list.
+        setChats((current) => {
+          const chatIndex = current.findIndex((c) => c.id === payload.chatId);
+          if (chatIndex === -1) {
+            // Unknown chat — the chats-updated event will add it
             return current;
           }
-
-          return [...current, payload.message!];
+          const updated = current.map((c) =>
+            c.id === payload.chatId
+              ? {
+                  ...c,
+                  lastMessage: payload.message!.body,
+                  timestamp: payload.message!.timestamp,
+                  unreadCount:
+                    payload.chatId !== selectedChatIdRef.current
+                      ? (c.unreadCount || 0) + (payload.message!.fromMe ? 0 : 1)
+                      : 0,
+                }
+              : c,
+          );
+          return [...updated].sort(
+            (a, b) => (b.timestamp ?? 0) - (a.timestamp ?? 0),
+          );
         });
-      }
+      });
+    }
 
-      try {
-        await loadChats(selectedChatIdRef.current);
-      } catch {
-        // Ignore transient chat refresh failures.
-      }
-    });
+    connect();
 
     return () => {
-      source.close();
+      disposed = true;
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      source?.close();
       eventSourceRef.current = null;
     };
   }, []);

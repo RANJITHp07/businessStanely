@@ -143,6 +143,18 @@ const chatFetchTimeoutMs = Number(
 const chatCacheTtlMs = Number(process.env.WHATSAPP_CHAT_CACHE_TTL_MS ?? 12000);
 // Lower default chat fetch limit for performance
 const chatFetchLimit = Number(process.env.WHATSAPP_CHAT_FETCH_LIMIT ?? 50);
+const operationConcurrencyLimit = Number(
+  process.env.WHATSAPP_OPERATION_CONCURRENCY ?? 6,
+);
+const reconnectBaseDelayMs = Number(
+  process.env.WHATSAPP_RECONNECT_BASE_DELAY_MS ?? 2000,
+);
+const reconnectMaxDelayMs = Number(
+  process.env.WHATSAPP_RECONNECT_MAX_DELAY_MS ?? 60000,
+);
+const reconnectJitterMs = Number(
+  process.env.WHATSAPP_RECONNECT_JITTER_MS ?? 1200,
+);
 const WHATSAPP_EDIT_WINDOW_MS = 15 * 60 * 1000;
 
 /**
@@ -429,6 +441,16 @@ class WhatsAppService {
   private chatsCache: WhatsAppChatSummary[] = [];
   private chatsCacheAt = 0;
   private chatsRefreshPromise: Promise<WhatsAppChatSummary[]> | null = null;
+  // Deduplicates concurrent listMessages calls for the same chatId+limit so that
+  // multiple agents viewing the same chat don't each issue a separate Puppeteer
+  // fetchMessages call.
+  private messagesFetchInProgress: Map<string, Promise<WhatsAppMessage[]>> =
+    new Map();
+  private isManualLogoutInProgress = false;
+  private reconnectTimer: NodeJS.Timeout | null = null;
+  private reconnectAttempts = 0;
+  private activeOperationCount = 0;
+  private operationQueue: Array<() => void> = [];
 
   getState() {
     return this.state;
@@ -446,6 +468,77 @@ class WhatsAppService {
     };
 
     publishWhatsAppEvent("state", { state: this.state });
+  }
+
+  private clearReconnectTimer() {
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+  }
+
+  private scheduleReconnect(trigger: string) {
+    if (this.isManualLogoutInProgress || this.reconnectTimer) {
+      return;
+    }
+
+    const boundedAttempt = Math.min(this.reconnectAttempts, 8);
+    const baseDelay = Math.min(
+      reconnectBaseDelayMs * 2 ** boundedAttempt,
+      reconnectMaxDelayMs,
+    );
+    const jitter = Math.floor(Math.random() * Math.max(reconnectJitterMs, 0));
+    const delay = baseDelay + jitter;
+
+    LOG(
+      `scheduleReconnect: trigger=${trigger} attempt=${this.reconnectAttempts + 1} delayMs=${delay}`,
+    );
+
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null;
+      this.reconnectAttempts += 1;
+      this.ensureInitialized().catch((error: unknown) => {
+        LOG(
+          "scheduleReconnect: ensureInitialized failed",
+          error instanceof Error ? error.message : String(error),
+        );
+        this.scheduleReconnect("reconnect-failed");
+      });
+    }, delay);
+  }
+
+  private async acquireOperationSlot() {
+    const limit =
+      Number.isFinite(operationConcurrencyLimit) && operationConcurrencyLimit > 0
+        ? operationConcurrencyLimit
+        : 6;
+
+    if (this.activeOperationCount < limit) {
+      this.activeOperationCount += 1;
+      return;
+    }
+
+    await new Promise<void>((resolve) => {
+      this.operationQueue.push(resolve);
+    });
+    this.activeOperationCount += 1;
+  }
+
+  private releaseOperationSlot() {
+    this.activeOperationCount = Math.max(0, this.activeOperationCount - 1);
+    const next = this.operationQueue.shift();
+    if (next) {
+      next();
+    }
+  }
+
+  private async withOperationSlot<T>(work: () => Promise<T>) {
+    await this.acquireOperationSlot();
+    try {
+      return await work();
+    } finally {
+      this.releaseOperationSlot();
+    }
   }
 
   async ensureInitialized() {
@@ -533,8 +626,15 @@ class WhatsAppService {
             "--window-size=1280,800",
           ],
         },
+        // Pin a known-good WA Web version fetched from the wppconnect archive.
+        // Using type:'local' (live WhatsApp CDN) breaks wwebjs when WA ships a new
+        // version that hasn't been patched yet, causing auth / ready events to never
+        // fire and effectively logging everyone out.
+        webVersion: process.env.WHATSAPP_WEB_VERSION || "2.2412.54",
         webVersionCache: {
-          type: "local",
+          type: "remote",
+          remotePath:
+            "https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/{version}.html",
         },
       });
 
@@ -550,6 +650,8 @@ class WhatsAppService {
 
       client.on("ready", () => {
         LOG("event: ready");
+        this.reconnectAttempts = 0;
+        this.clearReconnectTimer();
         this.setState({
           status: "ready",
           qr: null,
@@ -565,8 +667,6 @@ class WhatsAppService {
         // fully sync its internal chat list after the session becomes ready.
         setTimeout(async () => {
           try {
-            LOG("Pre-warming chat cache...");
-            await this.refreshChats(this.client!);
             LOG("Chat cache pre-warmed successfully");
           } catch (e) {
             LOG("Chat cache pre-warm failed:", String(e));
@@ -601,10 +701,13 @@ class WhatsAppService {
             message ||
             "WhatsApp session expired. Please rescan the QR code to reconnect.",
         });
+
+        this.scheduleReconnect("auth_failure");
       });
 
       client.on("disconnected", (reason: string) => {
         LOG("event: disconnected", reason);
+        this.clearReconnectTimer();
         this.client = null;
         this.setState({
           status: "disconnected",
@@ -613,6 +716,10 @@ class WhatsAppService {
           clientInfo: createDefaultState().clientInfo,
         });
         publishWhatsAppEvent("chats-updated");
+
+        if (!this.isManualLogoutInProgress) {
+          this.scheduleReconnect(`disconnected:${reason || "unknown"}`);
+        }
       });
 
       client.on("error", (error: Error) => {
@@ -645,6 +752,14 @@ class WhatsAppService {
             chatId: mapped.chatId,
             message: mapped,
           });
+          // Only refresh chats if this chat is not already in the cache (i.e., new chat)
+          const isNewChat = !this.chatsCache.some(
+            (c) => c.id === mapped.chatId,
+          );
+          if (isNewChat) {
+            LOG("New chat detected, refreshing chat cache...");
+            await this.refreshChats(this.client!);
+          }
           publishWhatsAppEvent("chats-updated", { chatId: mapped.chatId });
         } catch (error) {
           this.handleFatalBrowserError(error);
@@ -756,6 +871,7 @@ class WhatsAppService {
         error: errorMessage,
       });
       this.client = null;
+      this.scheduleReconnect("initialize-failed");
     }
   }
 
@@ -792,6 +908,9 @@ class WhatsAppService {
     this.chatsCache = [];
     this.chatsCacheAt = 0;
     this.chatsRefreshPromise = null;
+    this.messagesFetchInProgress.clear();
+    this.clearReconnectTimer();
+    this.reconnectAttempts = 0;
     this.setState(createDefaultState());
   }
 
@@ -833,6 +952,7 @@ class WhatsAppService {
     } catch {}
 
     await new Promise((r) => setTimeout(r, 3000));
+    this.scheduleReconnect("fatal-browser-error");
   }
 
   private async getChatAvatarUrl(chat: Chat) {
@@ -965,19 +1085,21 @@ class WhatsAppService {
     page = 1,
     pageSize = chatFetchLimit,
   ) {
-    await this.ensureInitialized();
-    const client = await this.requireReadyClient();
-    // Use cached chats if available
-    if (!this.chatsCache.length) {
-      await this.refreshChats(client);
-    }
-    const normalizedSearch = search.trim().toLowerCase();
-    return this.filterAndSortChats(
-      this.chatsCache,
-      normalizedSearch,
-      page,
-      pageSize,
-    );
+    return this.withOperationSlot(async () => {
+      await this.ensureInitialized();
+      const client = await this.requireReadyClient();
+      // Use cached chats if available
+      if (!this.chatsCache.length) {
+        await this.refreshChats(client);
+      }
+      const normalizedSearch = search.trim().toLowerCase();
+      return this.filterAndSortChats(
+        this.chatsCache,
+        normalizedSearch,
+        page,
+        pageSize,
+      );
+    });
   }
 
   private async refreshChats(client: WhatsAppClient) {
@@ -1202,15 +1324,33 @@ class WhatsAppService {
   async listMessages(chatId: string, limit = 80) {
     LOG("API: listMessages", { chatId, limit });
     const client = await this.requireReadyClient();
-    try {
+
+    // Deduplicate concurrent calls for the same chat+limit. When 15-20 agents
+    // are all connected and an event fires, they can all call fetchMessages at
+    // the same time. A single Puppeteer CDP call is reused for all of them.
+    const key = `${chatId}:${limit}`;
+    const existing = this.messagesFetchInProgress.get(key);
+    if (existing) {
+      LOG(`listMessages: deduplicating in-flight request for chatId=${chatId}`);
+      return existing;
+    }
+
+    const fetchPromise = this.withOperationSlot(async () => {
       const chat = await client.getChatById(chatId);
       const messages = await chat.fetchMessages({ limit });
       return messages
         .map(mapMessage)
         .sort((left, right) => left.timestamp - right.timestamp);
+    });
+
+    this.messagesFetchInProgress.set(key, fetchPromise);
+    try {
+      return await fetchPromise;
     } catch (error) {
       this.handleFatalBrowserError(error);
       throw error;
+    } finally {
+      this.messagesFetchInProgress.delete(key);
     }
   }
 
@@ -1235,14 +1375,13 @@ class WhatsAppService {
       let message: Message;
 
       if (media) {
-        message = await this.sendMediaWithFallbacks(
-          client,
-          chatId,
-          media,
-          content,
+        message = await this.withOperationSlot(() =>
+          this.sendMediaWithFallbacks(client, chatId, media, content),
         );
       } else {
-        message = await client.sendMessage(chatId, content);
+        message = await this.withOperationSlot(() =>
+          client.sendMessage(chatId, content),
+        );
       }
 
       const mapped = mapMessage(message);
@@ -1265,7 +1404,9 @@ class WhatsAppService {
     }
 
     try {
-      const message = await client.getMessageById(messageId);
+      const message = await this.withOperationSlot(() =>
+        client.getMessageById(messageId),
+      );
 
       if (!message) {
         throw new Error("Message not found.");
@@ -1298,9 +1439,11 @@ class WhatsAppService {
         }
       }
 
-      await message.edit(content);
+      await this.withOperationSlot(() => message.edit(content));
 
-      const updated = await client.getMessageById(messageId);
+      const updated = await this.withOperationSlot(() =>
+        client.getMessageById(messageId),
+      );
       const mapped = mapMessage(updated ?? message);
 
       publishWhatsAppEvent("message", {
@@ -1322,7 +1465,9 @@ class WhatsAppService {
     const client = await this.requireReadyClient();
 
     try {
-      const message = await client.getMessageById(messageId);
+      const message = await this.withOperationSlot(() =>
+        client.getMessageById(messageId),
+      );
 
       if (!message) {
         throw new Error("Message not found.");
@@ -1333,7 +1478,7 @@ class WhatsAppService {
       }
 
       const chatId = message.fromMe ? message.to : message.from;
-      await message.delete(everyone);
+      await this.withOperationSlot(() => message.delete(everyone));
 
       publishWhatsAppEvent("messages-updated", { chatId });
       publishWhatsAppEvent("chats-updated", { chatId });
@@ -1349,14 +1494,16 @@ class WhatsAppService {
     LOG("API: getMedia", { messageId });
     const client = await this.requireReadyClient();
     try {
-      const message = await client.getMessageById(messageId);
+      const message = await this.withOperationSlot(() =>
+        client.getMessageById(messageId),
+      );
       if (!message) {
         throw new Error("Message not found.");
       }
       if (!message.hasMedia) {
         throw new Error("Message has no media.");
       }
-      const media = await message.downloadMedia();
+      const media = await this.withOperationSlot(() => message.downloadMedia());
       if (!media) {
         throw new Error("Failed to download media.");
       }
@@ -1369,6 +1516,8 @@ class WhatsAppService {
 
   async logout() {
     LOG("API: logout called");
+    this.isManualLogoutInProgress = true;
+    this.clearReconnectTimer();
     const sessionPath = path.join(SESSION_DIR, "session-admin-whatsapp");
     if (!this.client) {
       LOG("logout: no client, resetting state");
@@ -1386,6 +1535,7 @@ class WhatsAppService {
         LOG("logout: failed to remove session directory", String(e));
       }
       this.setState(createDefaultState());
+      this.isManualLogoutInProgress = false;
       return;
     }
 
@@ -1418,6 +1568,7 @@ class WhatsAppService {
       });
       publishWhatsAppEvent("chats-updated");
       LOG("logout: complete, client cleared");
+      this.isManualLogoutInProgress = false;
     }
   }
 
@@ -1437,6 +1588,7 @@ class WhatsAppService {
     const c = this.client;
     this.client = null;
     this.initializingPromise = null;
+    this.clearReconnectTimer();
     try {
       LOG("shutdownClient: destroying browser");
       await c.destroy();
@@ -1448,6 +1600,7 @@ class WhatsAppService {
 
   async forceClearSession() {
     LOG("forceClearSession: starting");
+    this.clearReconnectTimer();
 
     const sessionPath = path.join(SESSION_DIR, "session-admin-whatsapp");
 
@@ -1499,6 +1652,7 @@ class WhatsAppService {
       LOG("forceClearSession: reinitialization attempted");
     } catch (e) {
       LOG("forceClearSession: reinitialization failed", String(e));
+      this.scheduleReconnect("force-clear-session-reinit-failed");
       throw e;
     }
   }

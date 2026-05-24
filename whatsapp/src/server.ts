@@ -14,6 +14,45 @@ const SERVICE_TOKEN = process.env.NEXT_PUBLIC_WHATSAPP_SERVICE_TOKEN ?? "";
 const ALLOWED_ORIGIN = "*";
 
 let recoveryTimer: NodeJS.Timeout | null = null;
+let qrDataUrlCache: { qr: string; dataUrl: string } | null = null;
+let qrDataUrlInFlight: Promise<string | null> | null = null;
+
+async function getQrCodeDataUrl(qr: string | null) {
+  if (!qr) {
+    qrDataUrlCache = null;
+    qrDataUrlInFlight = null;
+    return null;
+  }
+
+  if (qrDataUrlCache?.qr === qr) {
+    return qrDataUrlCache.dataUrl;
+  }
+
+  if (qrDataUrlInFlight) {
+    return qrDataUrlInFlight;
+  }
+
+  qrDataUrlInFlight = QRCode.toDataURL(qr, { margin: 1, width: 320 })
+    .then((dataUrl) => {
+      qrDataUrlCache = { qr, dataUrl };
+      return dataUrl;
+    })
+    .catch((error) => {
+      console.error("[WhatsApp Backend] Failed generating QR data URL:", error);
+      return null;
+    })
+    .finally(() => {
+      qrDataUrlInFlight = null;
+    });
+
+  return qrDataUrlInFlight;
+}
+
+async function getStatePayload() {
+  const state = whatsappService.getState();
+  const qrCodeDataUrl = await getQrCodeDataUrl(state.qr);
+  return { ...state, qrCodeDataUrl };
+}
 
 function isRecoverableBrowserError(error: unknown) {
   const message = error instanceof Error ? error.message : String(error ?? "");
@@ -107,11 +146,8 @@ app.get("/status", auth, async (_req, res) => {
   whatsappService.ensureInitialized().catch((err: unknown) => {
     console.error("[WhatsApp Backend] ensureInitialized(/status) failed:", err);
   });
-  const state = whatsappService.getState();
-  const qrCodeDataUrl = state.qr
-    ? await QRCode.toDataURL(state.qr, { margin: 1, width: 320 })
-    : null;
-  res.json({ ...state, qrCodeDataUrl });
+  const payload = await getStatePayload();
+  res.json(payload);
 });
 
 // --- Chats ---
@@ -279,20 +315,14 @@ app.get("/stream", auth, async (req, res) => {
     }
   };
 
-  const state = whatsappService.getState();
-  const qrCodeDataUrl = state.qr
-    ? await QRCode.toDataURL(state.qr, { margin: 1, width: 320 })
-    : null;
-  send("state", { ...state, qrCodeDataUrl });
+  const initialPayload = await getStatePayload();
+  send("state", initialPayload);
 
   const unsubState = subscribeWhatsAppEvent("state", () => {
     void (async () => {
       try {
-        const s = whatsappService.getState();
-        const qr = s.qr
-          ? await QRCode.toDataURL(s.qr, { margin: 1, width: 320 })
-          : null;
-        send("state", { ...s, qrCodeDataUrl: qr });
+        const payload = await getStatePayload();
+        send("state", payload);
       } catch (error) {
         console.error(
           "[WhatsApp Backend] Failed to publish stream state:",
@@ -349,6 +379,18 @@ const server = app.listen(PORT, () => {
     console.error("[WhatsApp Backend] Failed to initialize service:", err);
   });
 });
+
+// EC2 / ALB keep-alive fix.
+// AWS ALB default idle timeout is 60 s. Node.js default keepAliveTimeout is
+// 5 s, so ALB reuses a connection that Node has already closed → 502 errors.
+// keepAliveTimeout must be > ALB idle timeout; headersTimeout must be >
+// keepAliveTimeout. Adjust WHATSAPP_KEEP_ALIVE_TIMEOUT_MS if your ALB timeout
+// is customised (e.g. 3600 s for long-lived SSE sessions).
+const keepAliveTimeoutMs = Number(
+  process.env.WHATSAPP_KEEP_ALIVE_TIMEOUT_MS ?? 65000,
+);
+server.keepAliveTimeout = keepAliveTimeoutMs;
+server.headersTimeout = keepAliveTimeoutMs + 1000;
 
 server.on("error", (err: NodeJS.ErrnoException) => {
   if (err.code === "EADDRINUSE") {

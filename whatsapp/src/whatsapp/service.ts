@@ -509,7 +509,8 @@ class WhatsAppService {
 
   private async acquireOperationSlot() {
     const limit =
-      Number.isFinite(operationConcurrencyLimit) && operationConcurrencyLimit > 0
+      Number.isFinite(operationConcurrencyLimit) &&
+      operationConcurrencyLimit > 0
         ? operationConcurrencyLimit
         : 6;
 

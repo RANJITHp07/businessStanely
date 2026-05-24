@@ -259,6 +259,39 @@ export function useWhatsAppDesktop() {
     let source: EventSource | null = null;
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
     let backoffMs = 1000;
+    let chatsRefreshTimer: ReturnType<typeof setTimeout> | null = null;
+    let chatsRefreshInFlight = false;
+    let chatsRefreshQueued = false;
+
+    const triggerChatsRefresh = () => {
+      if (chatsRefreshTimer) {
+        clearTimeout(chatsRefreshTimer);
+      }
+
+      chatsRefreshTimer = setTimeout(async () => {
+        if (disposed) {
+          return;
+        }
+
+        if (chatsRefreshInFlight) {
+          chatsRefreshQueued = true;
+          return;
+        }
+
+        chatsRefreshInFlight = true;
+        try {
+          await loadChats(selectedChatIdRef.current);
+        } catch {
+          // Ignore transient refresh failures while the desktop client reconnects.
+        } finally {
+          chatsRefreshInFlight = false;
+          if (chatsRefreshQueued && !disposed) {
+            chatsRefreshQueued = false;
+            triggerChatsRefresh();
+          }
+        }
+      }, 350);
+    };
 
     function connect() {
       if (disposed) return;
@@ -325,16 +358,10 @@ export function useWhatsAppDesktop() {
           return;
         }
 
-        try {
-          await loadChats(selectedChatIdRef.current);
-          // Do NOT reload messages here. Messages stay in sync via the
-          // 'message' SSE event below. Calling loadMessages on every
-          // chats-updated event causes N-agents × M-messages Puppeteer
-          // fetches simultaneously, which overwhelms the browser and
-          // causes WhatsApp to log out.
-        } catch {
-          // Ignore transient refresh failures while the desktop client reconnects.
-        }
+        // Do NOT reload messages here. Messages stay in sync via the
+        // 'message' SSE event below. Debounce chat refreshes to avoid
+        // hammering /chats when events arrive in bursts.
+        triggerChatsRefresh();
       });
 
       source.addEventListener("message", async (event) => {
@@ -410,6 +437,7 @@ export function useWhatsAppDesktop() {
 
     return () => {
       disposed = true;
+      if (chatsRefreshTimer) clearTimeout(chatsRefreshTimer);
       if (reconnectTimer) clearTimeout(reconnectTimer);
       source?.close();
       eventSourceRef.current = null;

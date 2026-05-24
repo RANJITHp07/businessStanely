@@ -240,43 +240,110 @@ export function useWhatsAppDesktop() {
   }, []);
 
   useEffect(() => {
-    // Use direct backend URL for SSE (bypass Amplify/CloudFront) and always include token
-    const backendUrl =
-      process.env.NEXT_PUBLIC_WHATSAPP_BACKEND_URL ||
-      "https://13.201.4.152.nip.io";
-    const serviceToken = process.env.NEXT_PUBLIC_WHATSAPP_SERVICE_TOKEN || "";
-    let streamUrl = `${backendUrl.replace(/\/$/, "")}/stream`;
-    if (serviceToken) {
-      streamUrl += `?token=${encodeURIComponent(serviceToken)}`;
-    }
-    const source = new EventSource(streamUrl);
-    eventSourceRef.current = source;
+    let disposed = false;
+    let source: EventSource | null = null;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    let backoffMs = 1000;
+    let chatsRefreshTimer: ReturnType<typeof setTimeout> | null = null;
+    let chatsRefreshInFlight = false;
+    let chatsRefreshQueued = false;
 
-    source.addEventListener("state", async (event) => {
-      const nextState = JSON.parse(
-        (event as MessageEvent).data,
-      ) as SerializableWhatsAppState;
-      setState(nextState);
-      // Do not load chats here; wait for 'chats-updated' event after ready.
-    });
-
-    source.addEventListener("chats-updated", async () => {
-      if (stateRef.current.status !== "ready") {
-        return;
+    const triggerChatsRefresh = () => {
+      if (chatsRefreshTimer) {
+        clearTimeout(chatsRefreshTimer);
       }
 
-      try {
-        const currentSelectedChatId = selectedChatIdRef.current;
-        const chatId = await loadChats(currentSelectedChatId);
-        if (chatId === currentSelectedChatId && chatId) {
-          await loadMessages(chatId);
+      chatsRefreshTimer = setTimeout(async () => {
+        if (disposed) {
+          return;
         }
-      } catch {
-        // Ignore transient refresh failures while the desktop client reconnects.
-      }
-    });
 
-    source.addEventListener("message", async (event) => {
+        if (chatsRefreshInFlight) {
+          chatsRefreshQueued = true;
+          return;
+        }
+
+        chatsRefreshInFlight = true;
+        try {
+          await loadChats(selectedChatIdRef.current);
+        } catch {
+          // Ignore transient refresh failures while the desktop client reconnects.
+        } finally {
+          chatsRefreshInFlight = false;
+          if (chatsRefreshQueued && !disposed) {
+            chatsRefreshQueued = false;
+            triggerChatsRefresh();
+          }
+        }
+      }, 350);
+    };
+
+    function connect() {
+      if (disposed) return;
+
+      // Use direct backend URL for SSE (bypass Amplify/CloudFront) and always include token
+      const backendUrl =
+        process.env.NEXT_PUBLIC_WHATSAPP_BACKEND_URL ||
+        "https://13.201.4.152.nip.io";
+      const serviceToken = process.env.NEXT_PUBLIC_WHATSAPP_SERVICE_TOKEN || "";
+      let streamUrl = `${backendUrl.replace(/\/$/, "")}/stream`;
+      if (serviceToken) {
+        streamUrl += `?token=${encodeURIComponent(serviceToken)}`;
+      }
+
+      source = new EventSource(streamUrl);
+      eventSourceRef.current = source;
+
+      source.onopen = () => {
+        backoffMs = 1000;
+      };
+
+      source.onerror = () => {
+        if (disposed) return;
+        source?.close();
+        source = null;
+        eventSourceRef.current = null;
+        const jitter = Math.floor(Math.random() * 1000);
+        reconnectTimer = setTimeout(() => {
+          if (!disposed) {
+            backoffMs = Math.min(backoffMs * 2, 30000);
+            connect();
+          }
+        }, backoffMs + jitter);
+      };
+
+      source.addEventListener("state", async (event) => {
+        const nextState = JSON.parse(
+          (event as MessageEvent).data,
+        ) as SerializableWhatsAppState;
+        setState(nextState);
+
+        if (nextState.status === "ready") {
+          try {
+            const chatId = await loadChats(selectedChatIdRef.current);
+            if (chatId) {
+              // Stagger message loads so many reconnecting agents do not stampede backend.
+              await new Promise<void>((resolve) =>
+                setTimeout(resolve, Math.floor(Math.random() * 3000)),
+              );
+              await loadMessages(chatId);
+            }
+          } catch {
+            // The route remains usable while the client warms up.
+          }
+        }
+      });
+
+      source.addEventListener("chats-updated", async () => {
+        if (stateRef.current.status !== "ready") {
+          return;
+        }
+
+        // Debounced refresh collapses bursts of events into one /chats call.
+        triggerChatsRefresh();
+      });
+
+      source.addEventListener("message", async (event) => {
       const payload = JSON.parse((event as MessageEvent).data) as {
         chatId?: string;
         chat?: WhatsAppChatSummary;
@@ -343,8 +410,16 @@ export function useWhatsAppDesktop() {
       });
     });
 
+      return;
+    }
+
+    connect();
+
     return () => {
-      source.close();
+      disposed = true;
+      if (chatsRefreshTimer) clearTimeout(chatsRefreshTimer);
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      source?.close();
       eventSourceRef.current = null;
     };
   }, []);
@@ -377,7 +452,7 @@ export function useWhatsAppDesktop() {
       }
     };
 
-    const interval = setInterval(poll, 3000);
+    const interval = setInterval(poll, 10000);
     return () => {
       active = false;
       clearInterval(interval);

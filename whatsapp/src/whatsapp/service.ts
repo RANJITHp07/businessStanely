@@ -1055,6 +1055,24 @@ class WhatsAppService {
     }
   }
 
+  async getChatAvatarUrlById(chatId: string): Promise<string | null> {
+    LOG("API: getChatAvatarUrlById", { chatId });
+    const client = await this.requireReadyClient();
+    try {
+      const wClient = client as WhatsAppClient & {
+        getProfilePicUrl?: (contactId: string) => Promise<string | undefined>;
+      };
+      if (typeof wClient.getProfilePicUrl !== "function") {
+        return null;
+      }
+      const url = await wClient.getProfilePicUrl(chatId);
+      if (!url || typeof url !== "string") return null;
+      return url.trim() || null;
+    } catch {
+      return null;
+    }
+  }
+
   private async sendMediaWithFallbacks(
     client: WhatsAppClient,
     chatId: string,

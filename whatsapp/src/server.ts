@@ -283,6 +283,23 @@ app.post("/force-clear-session", auth, async (_req, res) => {
   }
 });
 
+// --- Chat Avatar ---
+app.get("/chat-avatar", auth, async (req, res) => {
+  const chatId = String(req.query.chatId ?? "");
+  if (!chatId) {
+    res.status(400).json({ error: "chatId is required." });
+    return;
+  }
+  try {
+    const url = await whatsappService.getChatAvatarUrlById(chatId);
+    res.json({ url });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Failed to fetch avatar.";
+    res.status(500).json({ error: message });
+  }
+});
+
 // --- SSE Stream ---
 app.get("/stream", auth, async (req, res) => {
   whatsappService.ensureInitialized().catch((err: unknown) => {

@@ -136,7 +136,10 @@ export function useWhatsAppDesktop() {
     pageSize = 50,
     retryCount = 0,
   ): Promise<string | null> => {
-    setIsChatsLoading(true);
+    const isInitialLoad = page === 1;
+    if (isInitialLoad) {
+      setIsChatsLoading(true);
+    }
     setChatsError(null);
     try {
       const data = await getJson<{ chats: WhatsAppChatSummary[] }>(
@@ -151,12 +154,19 @@ export function useWhatsAppDesktop() {
 
       const nextSelectedChatId = preferredChatId ?? selectedChatIdRef.current;
       const activeChat =
-        data.chats.find((chat) => chat.id === nextSelectedChatId) ||
-        data.chats[0] ||
-        null;
+        page === 1
+          ? data.chats.find((chat) => chat.id === nextSelectedChatId) ||
+            data.chats[0] ||
+            null
+          : chats.find((chat) => chat.id === nextSelectedChatId) ?? null;
 
-      setSelectedChatId(activeChat?.id ?? null);
-      setIsChatsLoading(false);
+      if (page === 1) {
+        setSelectedChatId(activeChat?.id ?? null);
+      }
+
+      if (isInitialLoad) {
+        setIsChatsLoading(false);
+      }
       setChatsError(null);
       // If no chats, retry after delay (max 20 attempts ~20s)
       if ((!data.chats || data.chats.length === 0) && retryCount < 20) {
@@ -169,7 +179,9 @@ export function useWhatsAppDesktop() {
         await new Promise((res) => setTimeout(res, 1000));
         return loadChats(preferredChatId, page, pageSize, retryCount + 1);
       }
-      setIsChatsLoading(false);
+      if (isInitialLoad) {
+        setIsChatsLoading(false);
+      }
       setChatsError(err?.message || "Failed to load chats.");
       return null;
     }
@@ -334,9 +346,10 @@ export function useWhatsAppDesktop() {
         const nextState = JSON.parse(
           (event as MessageEvent).data,
         ) as SerializableWhatsAppState;
+        const wasReady = stateRef.current.status === "ready";
         setState(nextState);
 
-        if (nextState.status === "ready") {
+        if (nextState.status === "ready" && !wasReady) {
           try {
             const chatId = await loadChats(selectedChatIdRef.current);
             if (chatId) {
@@ -358,10 +371,9 @@ export function useWhatsAppDesktop() {
           return;
         }
 
-        // Do NOT reload messages here. Messages stay in sync via the
-        // 'message' SSE event below. Debounce chat refreshes to avoid
-        // hammering /chats when events arrive in bursts.
-        triggerChatsRefresh();
+        // Chats are updated locally from 'message' events and message actions.
+        // Avoid automatic refetches here so the sidebar does not keep toggling
+        // into a loading state during normal traffic.
       });
 
       source.addEventListener("message", async (event) => {
@@ -506,7 +518,24 @@ export function useWhatsAppDesktop() {
         method: "DELETE",
         body: JSON.stringify({ messageId, everyone: true }),
       });
-      await loadChats(chatId);
+      const remainingMessages = previousMessages.filter(
+        (message) => message.id !== messageId,
+      );
+      const latestMessage = remainingMessages[remainingMessages.length - 1];
+      if (latestMessage) {
+        upsertChatPreview(chatId, (existing) => ({
+          id: chatId,
+          name: existing?.name || fallbackChatName(chatId),
+          lastMessage: latestMessage.body || existing?.lastMessage || "",
+          timestamp: latestMessage.timestamp,
+          unreadCount: existing?.unreadCount || 0,
+          avatarSeed: existing?.avatarSeed || fallbackChatName(chatId),
+          avatarUrl: existing?.avatarUrl || null,
+          isGroup: existing?.isGroup || chatId.endsWith("@g.us"),
+          isMuted: existing?.isMuted || false,
+          isPinned: existing?.isPinned || false,
+        }));
+      }
     } catch (error) {
       setMessages(previousMessages);
       throw error;
@@ -537,7 +566,18 @@ export function useWhatsAppDesktop() {
           message.id === messageId ? data.message : message,
         ),
       );
-      await loadChats(chatId);
+      upsertChatPreview(chatId, (existing) => ({
+        id: chatId,
+        name: existing?.name || fallbackChatName(chatId),
+        lastMessage: data.message.body || existing?.lastMessage || "",
+        timestamp: data.message.timestamp || existing?.timestamp || Date.now(),
+        unreadCount: existing?.unreadCount || 0,
+        avatarSeed: existing?.avatarSeed || fallbackChatName(chatId),
+        avatarUrl: existing?.avatarUrl || null,
+        isGroup: existing?.isGroup || chatId.endsWith("@g.us"),
+        isMuted: existing?.isMuted || false,
+        isPinned: existing?.isPinned || false,
+      }));
     } catch (error) {
       setMessages(previousMessages);
       throw error;

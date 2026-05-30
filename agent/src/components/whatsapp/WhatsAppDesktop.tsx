@@ -62,20 +62,31 @@ function ChatAvatar({
     chat,
     sizeClassName,
 }: {
-    chat: Pick<WhatsAppChatSummary, "name" | "avatarUrl">;
+    chat: Pick<WhatsAppChatSummary, "name" | "avatarUrl" | "id">;
     sizeClassName: string;
 }) {
+    const [resolvedUrl, setResolvedUrl] = useState<string | null>(chat.avatarUrl);
     const [loadFailed, setLoadFailed] = useState(false);
 
     useEffect(() => {
+        setResolvedUrl(chat.avatarUrl);
         setLoadFailed(false);
-    }, [chat.avatarUrl]);
+        if (chat.avatarUrl || !chat.id) return;
+        let cancelled = false;
+        fetch(`/api/whatsapp/chat-avatar?chatId=${encodeURIComponent(chat.id)}`)
+            .then((r) => r.json())
+            .then((data: { url?: string | null }) => {
+                if (!cancelled && data.url) setResolvedUrl(data.url);
+            })
+            .catch(() => {});
+        return () => { cancelled = true; };
+    }, [chat.id, chat.avatarUrl]);
 
     return (
         <div className={`relative overflow-hidden rounded-full bg-[#6a7175] ${sizeClassName}`}>
-            {chat.avatarUrl && !loadFailed ? (
+            {resolvedUrl && !loadFailed ? (
                 <img
-                    src={chat.avatarUrl}
+                    src={resolvedUrl}
                     alt={chat.name}
                     className="h-full w-full object-cover"
                     loading="lazy"

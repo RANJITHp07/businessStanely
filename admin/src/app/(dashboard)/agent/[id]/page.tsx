@@ -983,7 +983,15 @@ export default function AgentDetails() {
           </div>
           {
             agent.status == "active" &&
-            <div className="flex justify-end">
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                className="mt-5 md:mt-0"
+                onClick={() => window.open(`/agent/${agent?.id}/diary`, "_blank")}
+              >
+                <FileText className="h-4 w-4 mr-2" />
+                Open Diary
+              </Button>
               <Link href={`/agent/${agent?.id}/edit`}>
                 <Button className="mt-[20px] md:mt-0 w-fit bg-[#003459] hover:bg-[#003459] text-white rounded-lg px-4 py-2 flex items-center gap-2 cursor-pointer shadow-none hover:shadow-md transition-shadow duration-300">
                   <Edit className="h-4 w-4" />

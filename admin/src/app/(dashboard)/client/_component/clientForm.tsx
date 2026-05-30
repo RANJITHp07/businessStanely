@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea"
 import { Calendar } from "@/components/ui/calendar"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { CalendarIcon, User, Building2, Phone, Mail, MapPin, MessageSquare } from "lucide-react"
+import { CalendarIcon, User, Building2, Phone, Mail, MapPin, MessageSquare, FileText } from "lucide-react"
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
 
@@ -157,7 +157,20 @@ export default function ClientForm({ client }: ClientFormProps) {
     return (
         <div className="container mx-auto p-6 max-w-7xl">
             <div className="mb-8">
-                <h1 className="text-3xl font-bold">{client ? "Edit Client" : "Create New Client"}</h1>
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    <h1 className="text-3xl font-bold">{client ? "Edit Client" : "Create New Client"}</h1>
+                    {client?.id && (
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => window.open(`/client/${client.id}/diary`, "_blank")}
+                            className="w-full md:w-auto"
+                        >
+                            <FileText className="h-4 w-4 mr-2" />
+                            Client Diary
+                        </Button>
+                    )}
+                </div>
                 <p className="text-muted-foreground mt-2">
                     {client ? "Update the client's details." : "Add a new client to your system with complete contact and legal information."}
                 </p>

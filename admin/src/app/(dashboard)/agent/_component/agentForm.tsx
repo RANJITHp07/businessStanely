@@ -362,7 +362,6 @@ export default function AgentForm({ agent }: AgentFormProps) {
   const filteredAdvisorAgents = allAgents.filter((existingAgent) => {
     if (agent && existingAgent.id === agent.id) return false;
     if (existingAgent.agentType !== "Client Advisor") return false;
-    if (selectedSubordinates.includes(existingAgent.id)) return false;
     if (
       allSubordinateIds.includes(existingAgent.id) &&
       !selectedAdvisorSubordinates.includes(existingAgent.id)

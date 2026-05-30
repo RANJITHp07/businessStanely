@@ -316,9 +316,10 @@ export function useWhatsAppDesktop() {
         const nextState = JSON.parse(
           (event as MessageEvent).data,
         ) as SerializableWhatsAppState;
+        const wasReady = stateRef.current.status === "ready";
         setState(nextState);
 
-        if (nextState.status === "ready") {
+        if (nextState.status === "ready" && !wasReady) {
           try {
             const chatId = await loadChats(selectedChatIdRef.current);
             if (chatId) {
@@ -339,8 +340,8 @@ export function useWhatsAppDesktop() {
           return;
         }
 
-        // Debounced refresh collapses bursts of events into one /chats call.
-        triggerChatsRefresh();
+        // Chats are already updated locally from message events and local
+        // actions. Avoid automatic refetches so the list stays stable.
       });
 
       source.addEventListener("message", async (event) => {
@@ -625,8 +626,18 @@ export function useWhatsAppDesktop() {
           message.id === messageId ? data.message : message,
         ),
       );
-
-      await loadChats(chatId);
+      upsertChatPreview(chatId, (existing) => ({
+        id: chatId,
+        name: existing?.name || fallbackChatName(chatId),
+        lastMessage: data.message.body || existing?.lastMessage || "",
+        timestamp: data.message.timestamp || existing?.timestamp || Date.now(),
+        unreadCount: existing?.unreadCount || 0,
+        avatarSeed: existing?.avatarSeed || fallbackChatName(chatId),
+        avatarUrl: existing?.avatarUrl || null,
+        isGroup: existing?.isGroup || chatId.endsWith("@g.us"),
+        isMuted: existing?.isMuted || false,
+        isPinned: existing?.isPinned || false,
+      }));
     } catch (error) {
       setMessages(previousMessages);
       throw error;
@@ -650,8 +661,24 @@ export function useWhatsAppDesktop() {
         method: "DELETE",
         body: JSON.stringify({ messageId, everyone: true }),
       });
-
-      await loadChats(chatId);
+      const remainingMessages = previousMessages.filter(
+        (message) => message.id !== messageId,
+      );
+      const latestMessage = remainingMessages[remainingMessages.length - 1];
+      if (latestMessage) {
+        upsertChatPreview(chatId, (existing) => ({
+          id: chatId,
+          name: existing?.name || fallbackChatName(chatId),
+          lastMessage: latestMessage.body || existing?.lastMessage || "",
+          timestamp: latestMessage.timestamp,
+          unreadCount: existing?.unreadCount || 0,
+          avatarSeed: existing?.avatarSeed || fallbackChatName(chatId),
+          avatarUrl: existing?.avatarUrl || null,
+          isGroup: existing?.isGroup || chatId.endsWith("@g.us"),
+          isMuted: existing?.isMuted || false,
+          isPinned: existing?.isPinned || false,
+        }));
+      }
     } catch (error) {
       setMessages(previousMessages);
       throw error;

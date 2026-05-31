@@ -37,6 +37,13 @@ export function TaskDetailDialog({ entry, open, onOpenChange }: TaskDetailDialog
   if (!entry) return null
 
   const isLoginLogout = entry.type === "login" || entry.type === "logout"
+  const logoutLabel = entry.type === "logout"
+    ? entry.logoutReason === "session"
+      ? "Session Logout Entry"
+      : entry.logoutReason === "force"
+        ? "Force Logout Entry"
+        : "Logout Entry"
+    : "Login Entry"
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -50,7 +57,7 @@ export function TaskDetailDialog({ entry, open, onOpenChange }: TaskDetailDialog
                 ) : (
                   <LogOut className="h-5 w-5 text-red-500" />
                 )}
-                {entry.type === "login" ? "Login Entry" : "Logout Entry"}
+                {logoutLabel}
               </>
             ) : (
               <>

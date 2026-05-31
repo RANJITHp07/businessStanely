@@ -10,8 +10,21 @@ import { subscribeWhatsAppEvent } from "./whatsapp/realtime.js";
 import type { WhatsAppEventPayload } from "./whatsapp/types.js";
 
 const PORT = Number(process.env.PORT ?? 4001);
-const SERVICE_TOKEN = process.env.NEXT_PUBLIC_WHATSAPP_SERVICE_TOKEN ?? "";
-const ALLOWED_ORIGIN = "*";
+const SERVICE_TOKEN =
+  process.env.WHATSAPP_SERVICE_TOKEN?.trim() ||
+  process.env.NEXT_PUBLIC_WHATSAPP_SERVICE_TOKEN?.trim() ||
+  "";
+const ALLOWED_ORIGINS = (process.env.WHATSAPP_ALLOWED_ORIGIN ?? "")
+  .split(",")
+  .map((value) => value.trim())
+  .filter(Boolean);
+
+if (!SERVICE_TOKEN) {
+  console.error(
+    "[WhatsApp Backend] Missing WHATSAPP_SERVICE_TOKEN (or NEXT_PUBLIC_WHATSAPP_SERVICE_TOKEN fallback). Refusing to start.",
+  );
+  process.exit(1);
+}
 
 let recoveryTimer: NodeJS.Timeout | null = null;
 let qrDataUrlCache: { qr: string; dataUrl: string } | null = null;
@@ -86,12 +99,25 @@ function scheduleClientRecovery(trigger: string) {
 
 const app = express();
 
-app.use(
-  cors({
-    origin: "*",
-    credentials: true,
-  }),
-);
+const corsOptions: cors.CorsOptions = {
+  credentials: true,
+  origin: (origin, callback) => {
+    // Allow non-browser clients (no Origin header).
+    if (!origin) {
+      callback(null, true);
+      return;
+    }
+
+    if (ALLOWED_ORIGINS.length === 0 || ALLOWED_ORIGINS.includes(origin)) {
+      callback(null, true);
+      return;
+    }
+
+    callback(new Error("Origin not allowed by CORS"));
+  },
+};
+
+app.use(cors(corsOptions));
 app.use(express.json({ limit: "50mb" }));
 
 // Simple request logger to show which APIs are hit and key params
@@ -123,10 +149,6 @@ function auth(
   res: express.Response,
   next: express.NextFunction,
 ) {
-  if (!SERVICE_TOKEN) {
-    next();
-    return;
-  }
   const headerToken = req.headers["x-whatsapp-service-token"];
   const authHeader = req.headers["authorization"];
   const bearerToken =

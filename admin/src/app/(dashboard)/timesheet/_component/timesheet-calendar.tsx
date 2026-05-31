@@ -68,6 +68,12 @@ const colorClasses: Record<string, { bg: string; text: string; border: string }>
   default: { bg: "bg-gray-100", text: "text-gray-900", border: "border border-gray-400" },
 }
 
+const logoutVariants = {
+  manual: { bg: "bg-red-500", text: "text-white", border: "border border-white", label: "Logout" },
+  session: { bg: "bg-amber-500", text: "text-white", border: "border border-white", label: "Session Logout" },
+  force: { bg: "bg-violet-600", text: "text-white", border: "border border-white", label: "Force Logout" },
+} as const
+
 function parseTime(timeStr: string): { hours: number; minutes: number } {
   const [time, modifier] = timeStr.split(" ")
   let [hours, minutes] = time.split(":").map(Number)
@@ -152,7 +158,7 @@ export function TimesheetCalendar({
 
   return (
     <div className="flex-1 overflow-auto">
-      <div className="min-w-[800px]">
+      <div style={{ minWidth: 800 }}>
         {/* Header */}
         <div className="sticky top-0 z-10 bg-card border-b border-border">
           <div className="grid" style={{ gridTemplateColumns: `60px repeat(${daysToShow}, 1fr)` }}>
@@ -180,7 +186,7 @@ export function TimesheetCalendar({
             {/* Time Labels */}
             <div className="border-r border-border">
               {timeSlots.map((slot, index) => (
-                <div key={index} className="h-[60px] px-2 py-1 text-xs text-muted-foreground text-right border-b">
+                <div key={index} className="px-2 py-1 text-xs text-muted-foreground text-right border-b" style={{ height: 60 }}>
                   {slot}
                 </div>
               ))}
@@ -197,7 +203,7 @@ export function TimesheetCalendar({
                 <div key={dayIndex} className={`relative border-r border-border ${isToday ? "bg-primary/5" : ""}`}>
                   {/* Hour Lines */}
                   {timeSlots.map((_, index) => (
-                    <div key={index} className="h-[60px] border-b border-border/50" />
+                    <div key={index} className="border-b border-border/50" style={{ height: 60 }} />
                   ))}
 
                   {/* Current Time Indicator */}
@@ -214,9 +220,13 @@ export function TimesheetCalendar({
                   {/* Entries */}
                   {dayEntries.map((entry) => {
                     const { top, height } = getPositionAndHeight(entry.startTime, entry.endTime)
-                    const colors = colorClasses[entry.status] || colorClasses.default
                     const isLoginLogout = entry.type === "login" || entry.type === "logout"
                     const lane = loginLogoutLanes.get(entry.id)
+                    const logoutVariant = entry.type === "logout" ? logoutVariants[entry.logoutReason ?? "manual"] : null
+                    const logoutLabel = entry.type === "logout" ? logoutVariant?.label ?? "Logout" : "Login"
+                    const colors = entry.type === "logout"
+                      ? logoutVariant ?? logoutVariants.manual
+                      : (colorClasses[entry.status] || colorClasses.default)
 
                     const laneStyle = isLoginLogout && lane
                       ? {
@@ -242,7 +252,7 @@ export function TimesheetCalendar({
                           <div className="flex items-center gap-1.5 text-xs font-medium">
                             {entry.type === "login" ? <LogIn className="h-3 w-3" /> : <LogOut className="h-3 w-3" />}
                             <span>{entry.startTime}</span>
-                            <span>{entry.type === "login" ? "Login" : "Logout"}</span>
+                            <span>{logoutLabel}</span>
                           </div>
                         ) : (
                           <>

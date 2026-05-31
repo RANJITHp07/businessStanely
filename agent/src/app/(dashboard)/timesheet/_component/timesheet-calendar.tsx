@@ -133,6 +133,12 @@ const colorClasses: Record<string, { bg: string; text: string; border: string }>
   },
 }
 
+const logoutVariants = {
+  manual: { bg: "bg-red-500", text: "text-white", border: "border border-white", label: "Logout" },
+  session: { bg: "bg-amber-500", text: "text-white", border: "border border-white", label: "Session Logout" },
+  force: { bg: "bg-violet-600", text: "text-white", border: "border border-white", label: "Force Logout" },
+} as const
+
 function parseTime(timeStr: string): { hours: number; minutes: number } {
   const [time, modifier] = timeStr.split(" ")
   let [hours, minutes] = time.split(":").map(Number)
@@ -311,9 +317,13 @@ export function TimesheetCalendar({
                   {/* Entries */}
                   {dayEntries.map((entry) => {
                     const { top, height } = getPositionAndHeight(entry.startTime, entry.endTime)
-                    const colors = colorClasses[entry.status] || colorClasses.default
                     const isLoginLogout = entry.type === "login" || entry.type === "logout"
                     const lane = loginLogoutLanes.get(entry.id)
+                    const logoutVariant = entry.type === "logout" ? logoutVariants[entry.logoutReason ?? "manual"] : null
+                    const logoutLabel = entry.type === "logout" ? logoutVariant?.label ?? "Logout" : "Login"
+                    const colors = entry.type === "logout"
+                      ? logoutVariant ?? logoutVariants.manual
+                      : (colorClasses[entry.status] || colorClasses.default)
 
                     const laneStyle = isLoginLogout && lane
                       ? {
@@ -343,7 +353,7 @@ export function TimesheetCalendar({
                           <div className="flex items-center gap-1.5 text-xs font-medium">
                             {entry.type === "login" ? <LogIn className="h-3 w-3" /> : <LogOut className="h-3 w-3" />}
                             <span>{entry.startTime}</span>
-                            <span className="">{entry.type === "login" ? "Login" : "Logout"}</span>
+                            <span className="">{logoutLabel}</span>
                           </div>
                         ) : (
                           <>

@@ -155,6 +155,14 @@ const reconnectMaxDelayMs = Number(
 const reconnectJitterMs = Number(
   process.env.WHATSAPP_RECONNECT_JITTER_MS ?? 1200,
 );
+const autoClearSessionOnAuthFailure =
+  process.env.WHATSAPP_CLEAR_SESSION_ON_AUTH_FAILURE === "true";
+const authFailureClearThreshold = Number(
+  process.env.WHATSAPP_AUTH_FAILURE_CLEAR_THRESHOLD ?? 3,
+);
+const authFailureWindowMs = Number(
+  process.env.WHATSAPP_AUTH_FAILURE_WINDOW_MS ?? 10 * 60 * 1000,
+);
 const WHATSAPP_EDIT_WINDOW_MS = 15 * 60 * 1000;
 
 /**
@@ -377,6 +385,27 @@ function getMessageTypeLabel(type?: string | null, hasMedia = false) {
   return SYSTEM_TYPE_LABELS[type] ?? " ";
 }
 
+function normalizeWhatsAppIdentifier(value: string | null | undefined) {
+  if (!value) {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  // JIDs can be like 9198xxxxxxx@c.us or 9198xxxxxxx:12@c.us.
+  // For UI labels, show the contact number/identifier part only.
+  if (trimmed.includes("@")) {
+    const jidHead = trimmed.split("@")[0] || trimmed;
+    const normalized = jidHead.split(":")[0] || jidHead;
+    return normalized || trimmed;
+  }
+
+  return trimmed;
+}
+
 function mapMessage(message: Message): WhatsAppMessage {
   const internalData = message as Message & {
     _data?: MessageInternalData;
@@ -391,7 +420,9 @@ function mapMessage(message: Message): WhatsAppMessage {
     body: rawBody || fallbackLabel || "Unsupported message",
     timestamp: Number(message.timestamp ?? 0) * 1000,
     fromMe: message.fromMe,
-    author: internalData._data?.notifyName || message.author || null,
+    author: normalizeWhatsAppIdentifier(
+      internalData._data?.notifyName || message.author || null,
+    ),
     ack: typeof message.ack === "number" ? message.ack : undefined,
     hasMedia: Boolean(message.hasMedia),
     mediaType: message.type || null,
@@ -419,10 +450,12 @@ function mapChat(chat: Chat): WhatsAppChatSummary {
   const lastTimestamp =
     typeof chat.timestamp === "number" ? chat.timestamp * 1000 : null;
   const lastMessage = getLastMessagePreview(chat.lastMessage as MessageLike);
+  const displayName = normalizeWhatsAppIdentifier(chat.name);
+  const displayIdUser = normalizeWhatsAppIdentifier(chat.id.user);
 
   return {
     id: chat.id._serialized,
-    name: chat.name || chat.id.user || "Unknown contact",
+    name: displayName || displayIdUser || "Unknown contact",
     lastMessage,
     timestamp: lastTimestamp,
     unreadCount: chat.unreadCount ?? 0,
@@ -470,6 +503,7 @@ class WhatsAppService {
   private isManualLogoutInProgress = false;
   private reconnectTimer: NodeJS.Timeout | null = null;
   private reconnectAttempts = 0;
+  private authFailureTimestamps: number[] = [];
   private activeOperationCount = 0;
   private operationQueue: Array<() => void> = [];
 
@@ -505,6 +539,33 @@ class WhatsAppService {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
     }
+  }
+
+  private clearAuthFailureHistory() {
+    this.authFailureTimestamps = [];
+  }
+
+  private registerAuthFailureAndShouldClearSession() {
+    const now = Date.now();
+    const windowMs =
+      Number.isFinite(authFailureWindowMs) && authFailureWindowMs > 0
+        ? authFailureWindowMs
+        : 10 * 60 * 1000;
+
+    this.authFailureTimestamps = this.authFailureTimestamps.filter(
+      (ts) => now - ts <= windowMs,
+    );
+    this.authFailureTimestamps.push(now);
+
+    const threshold =
+      Number.isFinite(authFailureClearThreshold) &&
+      authFailureClearThreshold > 0
+        ? authFailureClearThreshold
+        : 3;
+
+    return autoClearSessionOnAuthFailure
+      ? true
+      : this.authFailureTimestamps.length >= threshold;
   }
 
   private scheduleReconnect(trigger: string) {
@@ -676,11 +737,13 @@ class WhatsAppService {
 
       client.on("authenticated", () => {
         LOG("event: authenticated");
+        this.clearAuthFailureHistory();
         this.setState({ status: "authenticated", error: null });
       });
 
       client.on("ready", () => {
         LOG("event: ready");
+        this.clearAuthFailureHistory();
         this.reconnectAttempts = 0;
         this.clearReconnectTimer();
         this.setState({
@@ -708,30 +771,51 @@ class WhatsAppService {
 
       client.on("auth_failure", (message: string) => {
         LOG("event: auth_failure", message);
+        const shouldClearSession =
+          this.registerAuthFailureAndShouldClearSession();
 
-        // The saved session is invalid (device delinked, session expired, etc.).
-        // Clear it from disk so the next initialization generates a fresh QR
-        // instead of looping on auth_failure forever.
-        const sessionPath = path.join(SESSION_DIR, "session-admin-whatsapp");
-        try {
-          if (fs.existsSync(sessionPath)) {
-            fs.rmSync(sessionPath, { recursive: true, force: true });
-            LOG("auth_failure: cleared stale session directory");
-          }
-        } catch (e) {
-          LOG("auth_failure: failed to clear session directory", String(e));
-        }
-
-        // Null the client so ensureInitialized() creates a fresh one (new QR).
+        const brokenClient = this.client;
         this.client = null;
         this.initializingPromise = null;
 
-        this.setState({
-          status: "error",
-          error:
-            message ||
-            "WhatsApp session expired. Please rescan the QR code to reconnect.",
-        });
+        if (brokenClient) {
+          brokenClient.destroy().catch(() => {
+            // Ignore destroy errors on auth failure.
+          });
+        }
+
+        const sessionPath = path.join(SESSION_DIR, "session-admin-whatsapp");
+
+        if (shouldClearSession) {
+          // Repeated auth failures usually mean the linked device/session is
+          // truly invalid, so clear it and force a fresh QR.
+          try {
+            if (fs.existsSync(sessionPath)) {
+              fs.rmSync(sessionPath, { recursive: true, force: true });
+              LOG("auth_failure: cleared stale session directory");
+            }
+          } catch (e) {
+            LOG("auth_failure: failed to clear session directory", String(e));
+          }
+
+          this.setState({
+            status: "error",
+            error:
+              message ||
+              "WhatsApp session expired. Please rescan the QR code to reconnect.",
+          });
+        } else {
+          // Single auth_failure events can be transient. Keep session files and
+          // attempt reconnect before forcing a logout.
+          this.setState({
+            status: "disconnected",
+            qr: null,
+            error:
+              message ||
+              "Authentication hiccup detected. Reconnecting automatically...",
+            clientInfo: createDefaultState().clientInfo,
+          });
+        }
 
         this.scheduleReconnect("auth_failure");
       });
@@ -1062,12 +1146,53 @@ class WhatsAppService {
       const wClient = client as WhatsAppClient & {
         getProfilePicUrl?: (contactId: string) => Promise<string | undefined>;
       };
-      if (typeof wClient.getProfilePicUrl !== "function") {
-        return null;
+
+      // Fast path: supported on most whatsapp-web.js versions.
+      if (typeof wClient.getProfilePicUrl === "function") {
+        const directUrl = await wClient.getProfilePicUrl(chatId);
+        if (directUrl && typeof directUrl === "string") {
+          const normalized = directUrl.trim();
+          if (normalized) {
+            return normalized;
+          }
+        }
       }
-      const url = await wClient.getProfilePicUrl(chatId);
-      if (!url || typeof url !== "string") return null;
-      return url.trim() || null;
+
+      // Fallback 1: resolve chat then attempt chat/profile methods.
+      const chat = await this.withOperationSlot(() =>
+        client.getChatById(chatId),
+      );
+      const chatUrl = await this.getChatAvatarUrl(chat);
+      if (chatUrl) {
+        return chatUrl;
+      }
+
+      // Fallback 2: resolve contact from chat for versions where the chat
+      // object doesn't expose getProfilePicUrl directly.
+      const chatWithContact = chat as Chat & {
+        getContact?: () => Promise<{
+          getProfilePicUrl?: () => Promise<string | null | undefined>;
+        }>;
+      };
+
+      if (typeof chatWithContact.getContact === "function") {
+        const contact = await this.withOperationSlot(() =>
+          chatWithContact.getContact!(),
+        );
+        if (typeof contact.getProfilePicUrl === "function") {
+          const contactUrl = await this.withOperationSlot(() =>
+            contact.getProfilePicUrl!(),
+          );
+          if (contactUrl && typeof contactUrl === "string") {
+            const normalized = contactUrl.trim();
+            if (normalized) {
+              return normalized;
+            }
+          }
+        }
+      }
+
+      return null;
     } catch {
       return null;
     }

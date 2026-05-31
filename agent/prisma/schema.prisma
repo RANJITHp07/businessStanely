@@ -233,6 +233,7 @@ model LoginHistory {
 
   loginAt   DateTime @default(now())
   logoutAt  DateTime?
+  logoutReason String?
 
   createdAt DateTime @default(now())
 }

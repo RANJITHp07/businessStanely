@@ -77,7 +77,8 @@ function arrayBufferToBase64(buffer: ArrayBuffer) {
 }
 
 function fallbackChatName(chatId: string) {
-  return chatId.split("@")[0] || chatId;
+  const normalized = chatId.split("@")[0]?.split(":")[0];
+  return normalized || chatId;
 }
 
 export function useWhatsAppDesktop() {
@@ -281,17 +282,7 @@ export function useWhatsAppDesktop() {
     function connect() {
       if (disposed) return;
 
-      // Use direct backend URL for SSE (bypass Amplify/CloudFront) and always include token
-      const backendUrl =
-        process.env.NEXT_PUBLIC_WHATSAPP_BACKEND_URL ||
-        "https://13.201.4.152.nip.io";
-      const serviceToken = process.env.NEXT_PUBLIC_WHATSAPP_SERVICE_TOKEN || "";
-      let streamUrl = `${backendUrl.replace(/\/$/, "")}/stream`;
-      if (serviceToken) {
-        streamUrl += `?token=${encodeURIComponent(serviceToken)}`;
-      }
-
-      source = new EventSource(streamUrl);
+      source = new EventSource("/api/whatsapp/stream");
       eventSourceRef.current = source;
 
       source.onopen = () => {

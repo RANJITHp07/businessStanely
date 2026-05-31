@@ -310,10 +310,16 @@ export async function GET(req: NextRequest) {
 
       if (log.logoutAt) {
         const logoutDate = new Date(log.logoutAt);
+        const logoutReason = log.logoutReason ?? "manual";
 
         timeEntries.push({
           id: `logout-${log.id}`,
-          title: "Logout",
+          title:
+            logoutReason === "session"
+              ? "Session Logout"
+              : logoutReason === "force"
+                ? "Force Logout"
+                : "Logout",
           project: "System",
           userId: log.agentId,
           date: logoutDate,
@@ -331,6 +337,7 @@ export async function GET(req: NextRequest) {
           }),
           status: "logout",
           type: "logout",
+          logoutReason,
         });
       }
     });

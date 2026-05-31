@@ -27,6 +27,7 @@ export interface TimeEntry {
     userId: string
     userName: string
     type: "task" | "login" | "logout"
+    logoutReason?: "manual" | "session" | "force"
 }
 
 export interface User {

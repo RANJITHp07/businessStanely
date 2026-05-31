@@ -158,8 +158,11 @@ export async function GET(req: NextRequest) {
     loginHistory.forEach((log) => {
       const loginDate = new Date(log.loginAt);
       const logoutDate = log.logoutAt ? new Date(log.logoutAt) : null;
+      const logoutReason = log.logoutReason ?? "manual";
       const syntheticSameTimeLogout =
-        logoutDate && logoutDate.getTime() - loginDate.getTime() <= 5000;
+        logoutDate &&
+        logoutReason === "manual" &&
+        logoutDate.getTime() - loginDate.getTime() <= 5000;
 
       if (loginDate >= startDate && loginDate <= endDate) {
         timeEntries.push({
@@ -189,7 +192,12 @@ export async function GET(req: NextRequest) {
         if (logoutDate >= startDate && logoutDate <= endDate) {
           timeEntries.push({
             id: `logout-${log.id}`,
-            title: "Logout",
+            title:
+              logoutReason === "session"
+                ? "Session Logout"
+                : logoutReason === "force"
+                  ? "Force Logout"
+                  : "Logout",
             project: "System",
             userId: log.agentId,
             date: logoutDate,
@@ -207,6 +215,7 @@ export async function GET(req: NextRequest) {
             }),
             status: "logout",
             type: "logout",
+            logoutReason,
           });
         }
       }

@@ -1,5 +1,14 @@
 import { NextRequest } from "next/server";
 
+const WHATSAPP_BACKEND_URL =
+  process.env.WHATSAPP_BACKEND_URL ??
+  process.env.NEXT_PUBLIC_WHATSAPP_BACKEND_URL ??
+  "";
+const SERVICE_TOKEN =
+  process.env.WHATSAPP_SERVICE_TOKEN ??
+  process.env.NEXT_PUBLIC_WHATSAPP_SERVICE_TOKEN ??
+  "";
+
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const messageId = searchParams.get("messageId");
@@ -8,20 +17,17 @@ export async function GET(req: NextRequest) {
   }
 
   // Get backend URL and token from env
-  const backendUrl = process.env.NEXT_PUBLIC_WHATSAPP_BACKEND_URL;
-  const token = process.env.NEXT_PUBLIC_WHATSAPP_SERVICE_TOKEN || "change_me";
-  if (!backendUrl) {
+  if (!WHATSAPP_BACKEND_URL) {
     return new Response("Backend URL not configured", { status: 500 });
   }
 
-  // Build backend media URL
-  const url = `${backendUrl.replace(/\/$/, "")}/media?messageId=${encodeURIComponent(messageId)}&token=${encodeURIComponent(token)}`;
+  const url = `${WHATSAPP_BACKEND_URL.replace(/\/$/, "")}/media?messageId=${encodeURIComponent(messageId)}`;
 
   // Proxy the request to backend
   const backendRes = await fetch(url, {
     method: "GET",
     headers: {
-      // Forward cookies or auth headers if needed
+      ...(SERVICE_TOKEN ? { "x-whatsapp-service-token": SERVICE_TOKEN } : {}),
     },
   });
 

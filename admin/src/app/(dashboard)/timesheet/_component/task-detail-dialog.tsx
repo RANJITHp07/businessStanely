@@ -5,7 +5,7 @@ import { Clock, Calendar, User, Tag, FileText, LogIn, LogOut } from "lucide-reac
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
-import type { TimeEntry } from "@/lib/timesheet-data"
+import type { TimeEntry } from "../page"
 import { useRouter } from "next/navigation"
 
 interface TaskDetailDialogProps {
@@ -26,10 +26,17 @@ export function TaskDetailDialog({ entry, open, onOpenChange }: TaskDetailDialog
   if (!entry) return null
 
   const isLoginLogout = entry.type === "login" || entry.type === "logout"
+  const logoutLabel = entry.type === "logout"
+    ? entry.logoutReason === "session"
+      ? "Session Logout Entry"
+      : entry.logoutReason === "force"
+        ? "Force Logout Entry"
+        : "Logout Entry"
+    : "Login Entry"
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-125">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             {isLoginLogout ? (
@@ -39,7 +46,7 @@ export function TaskDetailDialog({ entry, open, onOpenChange }: TaskDetailDialog
                 ) : (
                   <LogOut className="h-5 w-5 text-red-500" />
                 )}
-                {entry.type === "login" ? "Login Entry" : "Logout Entry"}
+                {logoutLabel}
               </>
             ) : (
               <>

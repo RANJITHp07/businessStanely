@@ -1,19 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const NEXT_PUBLIC_WHATSAPP_BACKEND_URL =
-  process.env.NEXT_PUBLIC_WHATSAPP_BACKEND_URL ?? "https://13.201.4.152.nip.io";
-const SERVICE_TOKEN = process.env.NEXT_PUBLIC_WHATSAPP_SERVICE_TOKEN ?? "";
+const WHATSAPP_BACKEND_URL =
+  process.env.WHATSAPP_BACKEND_URL ??
+  process.env.NEXT_PUBLIC_WHATSAPP_BACKEND_URL ??
+  "https://13.201.4.152.nip.io";
+const SERVICE_TOKEN =
+  process.env.WHATSAPP_SERVICE_TOKEN ??
+  process.env.NEXT_PUBLIC_WHATSAPP_SERVICE_TOKEN ??
+  "";
 
 export async function POST(req: NextRequest) {
-  const url = SERVICE_TOKEN
-    ? `${NEXT_PUBLIC_WHATSAPP_BACKEND_URL}/logout?token=${encodeURIComponent(SERVICE_TOKEN)}`
-    : `${NEXT_PUBLIC_WHATSAPP_BACKEND_URL}/logout`;
+  const url = `${WHATSAPP_BACKEND_URL}/logout`;
 
   const upstream = await fetch(url, {
     method: "POST",
     headers: {
       Accept: "application/json",
       "Cache-Control": "no-cache",
+      ...(SERVICE_TOKEN ? { "x-whatsapp-service-token": SERVICE_TOKEN } : {}),
     },
     signal: req.signal,
   });

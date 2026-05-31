@@ -55,11 +55,13 @@ export async function POST(req: NextRequest) {
       if (lastLogin) {
         // Use expiryTime if provided, otherwise use current date
         const logoutTime = expiryTime ? new Date(expiryTime) : new Date();
+        const logoutReason = expiryTime ? "session" : "manual";
 
         await prisma.loginHistory.update({
           where: { id: lastLogin.id },
           data: {
             logoutAt: logoutTime,
+            logoutReason,
           },
         });
       }

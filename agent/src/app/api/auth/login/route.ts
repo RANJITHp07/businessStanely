@@ -165,7 +165,10 @@ export async function POST(req: NextRequest) {
       // This ensures logout time is visible in the timesheet.
       await prisma.loginHistory.update({
         where: { id: openLoginHistory.id },
-        data: { logoutAt: new Date() },
+        data: {
+          logoutAt: new Date(),
+          logoutReason: force ? "force" : "session",
+        },
       });
     }
 

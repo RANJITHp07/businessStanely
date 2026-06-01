@@ -33,6 +33,9 @@ export async function GET(req: NextRequest) {
         });
 
         if (!upstream.ok || !upstream.body) {
+          console.error(
+            `[WhatsApp stream] Backend returned ${upstream.status} for ${backendStreamUrl}`,
+          );
           controller.enqueue(
             encoder.encode(
               `event: error\ndata: ${JSON.stringify({ error: "WhatsApp backend unavailable" })}\n\n`,
@@ -62,6 +65,7 @@ export async function GET(req: NextRequest) {
             (err.message === "" && err.name !== "Error"));
 
         if (!isDisconnect) {
+          console.error("[WhatsApp stream] Upstream error:", err);
           try {
             controller.enqueue(
               new TextEncoder().encode(

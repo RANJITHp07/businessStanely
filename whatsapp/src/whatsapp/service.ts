@@ -140,7 +140,7 @@ const protocolTimeoutMs = Number(
 const chatFetchTimeoutMs = Number(
   process.env.WHATSAPP_CHAT_FETCH_TIMEOUT_MS ?? 180000,
 );
-const chatCacheTtlMs = Number(process.env.WHATSAPP_CHAT_CACHE_TTL_MS ?? 12000);
+const chatCacheTtlMs = Number(process.env.WHATSAPP_CHAT_CACHE_TTL_MS ?? 60000);
 // Lower default chat fetch limit for performance
 const chatFetchLimit = Number(process.env.WHATSAPP_CHAT_FETCH_LIMIT ?? 50);
 const operationConcurrencyLimit = Number(
@@ -760,10 +760,12 @@ class WhatsAppService {
           },
         });
 
-        // Delay the initial chat fetch by 4 s so WhatsApp Web has time to
-        // fully sync its internal chat list after the session becomes ready.
+        // Delay the initial chat fetch so WhatsApp Web has time to fully
+        // sync its internal chat list after the session becomes ready.
+        // We fire-and-forget so it never blocks the ready event itself.
         setTimeout(async () => {
           try {
+            await this.refreshChats(client);
             LOG("Chat cache pre-warmed successfully");
           } catch (e) {
             LOG("Chat cache pre-warm failed:", String(e));
@@ -1174,7 +1176,9 @@ class WhatsAppService {
               // Plain object (newer wwebjs) or Backbone model (.get accessor)
               return (
                 result.eurl ||
-                (typeof result.get === "function" ? result.get("eurl") : null) ||
+                (typeof result.get === "function"
+                  ? result.get("eurl")
+                  : null) ||
                 null
               );
             } catch {
@@ -1340,10 +1344,23 @@ class WhatsAppService {
     return this.withOperationSlot(async () => {
       await this.ensureInitialized();
       const client = await this.requireReadyClient();
-      // Use cached chats if available
-      if (!this.chatsCache.length) {
+
+      const hasCachedData = this.chatsCache.length > 0;
+      const hasFreshCache =
+        hasCachedData && Date.now() - this.chatsCacheAt <= chatCacheTtlMs;
+
+      if (!hasCachedData) {
+        // Cold start — must wait for the first fetch before we can respond.
         await this.refreshChats(client);
+      } else if (!hasFreshCache) {
+        // Stale cache — return immediately and refresh in the background so
+        // the next request gets fresh data without blocking this one.
+        this.refreshChats(client).catch((e) =>
+          LOG("background chat refresh failed:", String(e)),
+        );
       }
+      // hasFreshCache — serve from cache with no background work needed.
+
       const normalizedSearch = search.trim().toLowerCase();
       return this.filterAndSortChats(
         this.chatsCache,

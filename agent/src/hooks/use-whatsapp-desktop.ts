@@ -326,15 +326,33 @@ export function useWhatsAppDesktop() {
         }
       });
 
-      source.addEventListener("chats-updated", async () => {
+      source.addEventListener("chats-updated", async (event) => {
         if (stateRef.current.status !== "ready") {
           return;
         }
 
-        // Chats are already updated locally from message events and local
-        // actions. Avoid automatic refetches so the list stays stable.
+        const payload = JSON.parse((event as MessageEvent).data) as {
+          chatId?: string;
+          at?: number;
+        };
+        if (payload.chatId) {
+          triggerChatsRefresh();
+        }
       });
 
+      source.addEventListener("messages-updated", async (event) => {
+        const payload = JSON.parse((event as MessageEvent).data) as {
+          chatId?: string;
+        };
+        if (!payload.chatId) return;
+        if (payload.chatId === selectedChatIdRef.current) {
+          try {
+            await loadMessages(payload.chatId, messageLimitRef.current);
+          } catch {
+            // ignore
+          }
+        }
+      });
       source.addEventListener("message", async (event) => {
         const payload = JSON.parse((event as MessageEvent).data) as {
           chatId?: string;

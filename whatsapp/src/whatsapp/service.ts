@@ -766,20 +766,43 @@ class WhatsAppService {
         // Use this.client (live reference) not the captured local variable —
         // if the session reconnects before the 15 s fires, the captured
         // client would be a destroyed object whose internals are undefined.
-        setTimeout(async () => {
+        // Pre-warm the chat cache after WhatsApp Web has had time to load
+        // its full chat list. Retries up to 3 times (at 15 s, 30 s, 45 s)
+        // if the Store hasn't populated enough real chats yet.
+        const warmCache = async (attempt: number) => {
+          const liveClient = this.client;
+          if (!liveClient || this.state.status !== "ready") {
+            LOG("Chat cache pre-warm skipped: client no longer ready");
+            return;
+          }
           try {
-            const liveClient = this.client;
-            if (liveClient && this.state.status === "ready") {
-              await this.refreshChats(liveClient);
-              LOG("Chat cache pre-warmed successfully");
+            // Clear any partial cache before retrying so refreshChats
+            // doesn't short-circuit with the stale 1-chat result.
+            if (this.chatsCache.length <= 1) {
+              this.chatsCache = [];
+              this.chatsCacheAt = 0;
+              this.chatsRefreshPromise = null;
+            }
+            await this.refreshChats(liveClient);
+            if (this.chatsCache.length <= 1 && attempt < 3) {
+              LOG(
+                `Chat cache pre-warm attempt ${attempt}: only ${this.chatsCache.length} chat(s) loaded, retrying in 15 s`,
+              );
+              setTimeout(() => warmCache(attempt + 1), 15000);
             } else {
-              LOG("Chat cache pre-warm skipped: client no longer ready");
+              LOG(
+                `Chat cache pre-warmed successfully (${this.chatsCache.length} chats, attempt ${attempt})`,
+              );
+              publishWhatsAppEvent("chats-updated");
             }
           } catch (e) {
-            LOG("Chat cache pre-warm failed:", String(e));
+            LOG(`Chat cache pre-warm attempt ${attempt} failed:`, String(e));
+            if (attempt < 3) {
+              setTimeout(() => warmCache(attempt + 1), 15000);
+            }
           }
-          publishWhatsAppEvent("chats-updated");
-        }, 15000); // wait 15s for Store to populate
+        };
+        setTimeout(() => warmCache(1), 15000); // first attempt after 15 s
       });
 
       client.on("auth_failure", (message: string) => {
@@ -1354,11 +1377,15 @@ class WhatsAppService {
       const client = await this.requireReadyClient();
 
       const hasCachedData = this.chatsCache.length > 0;
+      // Treat a cache that only has system/broadcast entries (≤1 real chat)
+      // as effectively empty — it means WhatsApp Web hadn't finished loading
+      // when the cache was last populated.
+      const hasUsableCachedData = this.chatsCache.length > 1;
       const hasFreshCache =
-        hasCachedData && Date.now() - this.chatsCacheAt <= chatCacheTtlMs;
+        hasUsableCachedData && Date.now() - this.chatsCacheAt <= chatCacheTtlMs;
 
-      if (!hasCachedData) {
-        // Cold start — must wait for the first fetch before we can respond.
+      if (!hasUsableCachedData) {
+        // Cold start or partial-load cache — must wait for a proper fetch.
         await this.refreshChats(client);
       } else if (!hasFreshCache) {
         // Stale cache — return immediately and refresh in the background.
@@ -1560,7 +1587,10 @@ class WhatsAppService {
       }
 
       const filteredChats = chats
-        .filter((chat) => chat.id.server !== "status")
+        .filter(
+          (chat) =>
+            chat.id.server !== "status" && chat.id.server !== "broadcast",
+        )
         .slice(0, limit);
       const mappedChats = filteredChats.map((chat) => mapChat(chat));
 

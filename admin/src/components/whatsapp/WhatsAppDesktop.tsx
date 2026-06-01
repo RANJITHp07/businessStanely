@@ -80,7 +80,7 @@ function WhatsAppDesktop() {
                 .then((data: { url?: string | null }) => {
                     if (!cancelled && data.url) setResolvedUrl(data.url);
                 })
-                .catch(() => {});
+                .catch(() => { });
             return () => { cancelled = true; };
         }, [chat.id, chat.avatarUrl]);
 
@@ -315,6 +315,24 @@ function WhatsAppDesktop() {
     const [editingDraft, setEditingDraft] = useState("");
     const messagesContainerRef = useRef<HTMLDivElement>(null);
     const suppressNextScrollRef = useRef(false);
+    const [myProfilePicUrl, setMyProfilePicUrl] = useState<string | null>(null);
+    const [myProfilePicLoadFailed, setMyProfilePicLoadFailed] = useState(false);
+
+    useEffect(() => {
+        if (state.status !== "ready" || !state.clientInfo.wid) {
+            setMyProfilePicUrl(null);
+            setMyProfilePicLoadFailed(false);
+            return;
+        }
+        let cancelled = false;
+        fetch(`/api/whatsapp/chat-avatar?chatId=${encodeURIComponent(state.clientInfo.wid)}`)
+            .then((r) => r.json())
+            .then((data: { url?: string | null }) => {
+                if (!cancelled && data.url) setMyProfilePicUrl(data.url);
+            })
+            .catch(() => { });
+        return () => { cancelled = true; };
+    }, [state.status, state.clientInfo.wid]);
 
     // Scroll to bottom when new messages arrive, but NOT when loading older ones.
     useEffect(() => {
@@ -558,8 +576,20 @@ function WhatsAppDesktop() {
                 <aside className={`${mobileSidebarOpen ? "flex" : "hidden"} w-full max-w-full flex-col border-r border-white/6 bg-[#111b21] md:flex md:max-w-md`}>
                     <div className="flex items-center justify-between bg-[#202c33] px-4 py-3">
                         <div className="flex items-center gap-3">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#6a7175] text-sm font-semibold text-white">
-                                {initials(state.clientInfo.pushname || "WhatsApp")}
+                            <div className="relative h-10 w-10 overflow-hidden rounded-full bg-[#6a7175]">
+                                {myProfilePicUrl && !myProfilePicLoadFailed ? (
+                                    <img
+                                        src={myProfilePicUrl}
+                                        alt={state.clientInfo.pushname || "WhatsApp"}
+                                        className="h-full w-full object-cover"
+                                        onError={() => setMyProfilePicLoadFailed(true)}
+                                        referrerPolicy="no-referrer"
+                                    />
+                                ) : (
+                                    <div className="flex h-full w-full items-center justify-center text-sm font-semibold text-white">
+                                        {initials(state.clientInfo.pushname || "WhatsApp")}
+                                    </div>
+                                )}
                             </div>
                             <div>
                                 <p className="text-sm font-medium">{state.clientInfo.pushname || "WhatsApp"}</p>

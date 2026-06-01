@@ -150,7 +150,7 @@ export function useWhatsAppDesktop() {
     setChatsError(null);
     try {
       const data = await getJson<{ chats: WhatsAppChatSummary[] }>(
-        "/api/whatsapp/chats",
+        "/api/whatsapp/chats?pageSize=15",
       );
       setChats(data.chats);
 

@@ -1145,60 +1145,88 @@ class WhatsAppService {
   async getChatAvatarUrlById(chatId: string): Promise<string | null> {
     LOG("API: getChatAvatarUrlById", { chatId });
     const client = await this.requireReadyClient();
+
+    const pupPage = (client as unknown as { pupPage?: unknown }).pupPage as
+      | {
+          evaluate(
+            fn: (...a: unknown[]) => unknown,
+            ...args: unknown[]
+          ): Promise<unknown>;
+        }
+      | undefined;
+
+    // Primary: direct Puppeteer Store evaluation.
+    // wwebjs wraps profilePicFind results in a Backbone model whose attributes
+    // live under .get() — accessing .eurl directly returns undefined on some
+    // versions. This evaluate handles both plain-object and Backbone-model
+    // shapes and works for own WID (no chat needed).
+    if (pupPage?.evaluate) {
+      try {
+        const storeUrl = await withTimeout(
+          pupPage.evaluate(async (id: unknown) => {
+            try {
+              /* eslint-disable @typescript-eslint/no-explicit-any */
+              const store = (window as any).Store;
+              if (!store?.WidFactory || !store?.ProfilePic) return null;
+              const wid = store.WidFactory.createWid(id as string);
+              const result = await store.ProfilePic.profilePicFind(wid);
+              if (!result) return null;
+              // Plain object (newer wwebjs) or Backbone model (.get accessor)
+              return (
+                result.eurl ||
+                (typeof result.get === "function" ? result.get("eurl") : null) ||
+                null
+              );
+            } catch {
+              return null;
+            }
+          }, chatId) as Promise<string | null>,
+          10000,
+          `profilePicFind(${chatId})`,
+        );
+        if (storeUrl && typeof storeUrl === "string") {
+          const normalized = storeUrl.trim();
+          if (normalized) {
+            LOG("getChatAvatarUrlById: store eval succeeded", chatId);
+            return normalized;
+          }
+        }
+      } catch (e) {
+        LOG(
+          "getChatAvatarUrlById: store eval failed",
+          e instanceof Error ? e.message : String(e),
+        );
+      }
+    }
+
+    // Fallback: wwebjs wrapper (may still succeed on some versions / contacts).
     try {
       const wClient = client as WhatsAppClient & {
         getProfilePicUrl?: (contactId: string) => Promise<string | undefined>;
       };
-
-      // Fast path: supported on most whatsapp-web.js versions.
       if (typeof wClient.getProfilePicUrl === "function") {
-        const directUrl = await wClient.getProfilePicUrl(chatId);
+        const directUrl = await withTimeout(
+          wClient.getProfilePicUrl(chatId),
+          8000,
+          `wClient.getProfilePicUrl(${chatId})`,
+        );
         if (directUrl && typeof directUrl === "string") {
           const normalized = directUrl.trim();
           if (normalized) {
+            LOG("getChatAvatarUrlById: wClient fallback succeeded", chatId);
             return normalized;
           }
         }
       }
-
-      // Fallback 1: resolve chat then attempt chat/profile methods.
-      const chat = await this.withOperationSlot(() =>
-        client.getChatById(chatId),
+    } catch (e) {
+      LOG(
+        "getChatAvatarUrlById: wClient fallback failed",
+        e instanceof Error ? e.message : String(e),
       );
-      const chatUrl = await this.getChatAvatarUrl(chat);
-      if (chatUrl) {
-        return chatUrl;
-      }
-
-      // Fallback 2: resolve contact from chat for versions where the chat
-      // object doesn't expose getProfilePicUrl directly.
-      const chatWithContact = chat as Chat & {
-        getContact?: () => Promise<{
-          getProfilePicUrl?: () => Promise<string | null | undefined>;
-        }>;
-      };
-
-      if (typeof chatWithContact.getContact === "function") {
-        const contact = await this.withOperationSlot(() =>
-          chatWithContact.getContact!(),
-        );
-        if (typeof contact.getProfilePicUrl === "function") {
-          const contactUrl = await this.withOperationSlot(() =>
-            contact.getProfilePicUrl!(),
-          );
-          if (contactUrl && typeof contactUrl === "string") {
-            const normalized = contactUrl.trim();
-            if (normalized) {
-              return normalized;
-            }
-          }
-        }
-      }
-
-      return null;
-    } catch {
-      return null;
     }
+
+    LOG("getChatAvatarUrlById: all methods returned null for", chatId);
+    return null;
   }
 
   private async sendMediaWithFallbacks(

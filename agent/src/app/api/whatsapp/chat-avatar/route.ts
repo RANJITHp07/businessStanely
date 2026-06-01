@@ -17,17 +17,23 @@ export async function GET(req: NextRequest) {
 
   const url = `${WHATSAPP_BACKEND_URL}/chat-avatar?chatId=${encodeURIComponent(chatId)}`;
 
+  const timeoutController = new AbortController();
+  const timeoutId = setTimeout(() => timeoutController.abort(), 12000);
+  req.signal.addEventListener("abort", () => timeoutController.abort());
+
   try {
     const upstream = await fetch(url, {
       headers: {
         Accept: "application/json",
         ...(SERVICE_TOKEN ? { "x-whatsapp-service-token": SERVICE_TOKEN } : {}),
       },
-      signal: req.signal,
+      signal: timeoutController.signal,
     });
     const data = await upstream.json();
     return NextResponse.json(data, { status: upstream.status });
   } catch {
     return NextResponse.json({ url: null });
+  } finally {
+    clearTimeout(timeoutId);
   }
 }

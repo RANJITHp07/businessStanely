@@ -134,7 +134,7 @@ export function useWhatsAppDesktop() {
   const loadChats = async (
     preferredChatId?: string | null,
     page = 1,
-    pageSize = 50,
+    pageSize = 15,
     retryCount = 0,
   ): Promise<string | null> => {
     const isInitialLoad = page === 1;
@@ -151,7 +151,7 @@ export function useWhatsAppDesktop() {
       } else {
         setChats((prev) => [...prev, ...data.chats]);
       }
-      setHasMoreChats(data.chats.length === pageSize);
+      setHasMoreChats(data.chats.length >= pageSize);
 
       const nextSelectedChatId = preferredChatId ?? selectedChatIdRef.current;
       const activeChat =

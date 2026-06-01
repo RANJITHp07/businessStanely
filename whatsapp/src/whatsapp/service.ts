@@ -763,10 +763,18 @@ class WhatsAppService {
         // Delay the initial chat fetch so WhatsApp Web has time to fully
         // sync its internal chat list after the session becomes ready.
         // We fire-and-forget so it never blocks the ready event itself.
+        // Use this.client (live reference) not the captured local variable —
+        // if the session reconnects before the 15 s fires, the captured
+        // client would be a destroyed object whose internals are undefined.
         setTimeout(async () => {
           try {
-            await this.refreshChats(client);
-            LOG("Chat cache pre-warmed successfully");
+            const liveClient = this.client;
+            if (liveClient && this.state.status === "ready") {
+              await this.refreshChats(liveClient);
+              LOG("Chat cache pre-warmed successfully");
+            } else {
+              LOG("Chat cache pre-warm skipped: client no longer ready");
+            }
           } catch (e) {
             LOG("Chat cache pre-warm failed:", String(e));
           }
@@ -1353,11 +1361,15 @@ class WhatsAppService {
         // Cold start — must wait for the first fetch before we can respond.
         await this.refreshChats(client);
       } else if (!hasFreshCache) {
-        // Stale cache — return immediately and refresh in the background so
-        // the next request gets fresh data without blocking this one.
-        this.refreshChats(client).catch((e) =>
-          LOG("background chat refresh failed:", String(e)),
-        );
+        // Stale cache — return immediately and refresh in the background.
+        // Re-read this.client at the time the background task runs so we
+        // never pass a stale/destroyed client reference into refreshChats().
+        const capturedClient = this.client;
+        if (capturedClient && this.state.status === "ready") {
+          this.refreshChats(capturedClient).catch((e) =>
+            LOG("background chat refresh failed:", String(e)),
+          );
+        }
       }
       // hasFreshCache — serve from cache with no background work needed.
 
@@ -1515,6 +1527,14 @@ class WhatsAppService {
       LOG("refreshChats: using getChats() fallback");
       if (!client) {
         LOG("refreshChats: client is undefined in fallback");
+        throw new Error("WhatsApp is reconnecting, please wait a moment.");
+      }
+      // Guard: if client was destroyed between the fast-path and fallback
+      // (e.g. reconnect happened), bail out rather than calling getChats()
+      // on a dead object whose internals are undefined.
+      if (!this.client || this.state.status !== "ready") {
+        LOG("refreshChats: client disconnected before fallback could run");
+        if (this.chatsCache.length > 0) return this.chatsCache;
         throw new Error("WhatsApp is reconnecting, please wait a moment.");
       }
       const attemptFetch = () =>

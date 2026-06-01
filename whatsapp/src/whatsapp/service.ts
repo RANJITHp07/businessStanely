@@ -144,7 +144,7 @@ const chatCacheTtlMs = Number(process.env.WHATSAPP_CHAT_CACHE_TTL_MS ?? 12000);
 // Lower default chat fetch limit for performance
 const chatFetchLimit = Number(process.env.WHATSAPP_CHAT_FETCH_LIMIT ?? 50);
 const operationConcurrencyLimit = Number(
-  process.env.WHATSAPP_OPERATION_CONCURRENCY ?? 6,
+  process.env.WHATSAPP_OPERATION_CONCURRENCY ?? 12,
 );
 const reconnectBaseDelayMs = Number(
   process.env.WHATSAPP_RECONNECT_BASE_DELAY_MS ?? 2000,
@@ -715,6 +715,9 @@ class WhatsAppService {
             "--disable-background-timer-throttling",
             "--disable-backgrounding-occluded-windows",
             "--disable-renderer-backgrounding",
+            // Disable site-isolation to keep Chromium in a single renderer
+            // process — saves ~100 MB RAM on memory-constrained instances.
+            "--disable-features=site-per-process",
             "--window-size=1280,800",
           ],
         },

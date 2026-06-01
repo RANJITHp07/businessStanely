@@ -9,7 +9,7 @@ const globalRealtime = globalThis as typeof globalThis & {
 const realtimeEmitter =
   globalRealtime.__adminWhatsAppRealtime ?? new EventEmitter();
 
-realtimeEmitter.setMaxListeners(100);
+realtimeEmitter.setMaxListeners(200);
 
 if (!globalRealtime.__adminWhatsAppRealtime) {
   globalRealtime.__adminWhatsAppRealtime = realtimeEmitter;

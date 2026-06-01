@@ -333,10 +333,9 @@ app.get("/stream", auth, async (req, res) => {
     "Cache-Control": "no-cache, no-transform",
     Connection: "keep-alive",
     "X-Accel-Buffering": "no",
-    // CORS headers for SSE
-    "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Credentials": "true",
-    // You can restrict the origin by replacing * with your frontend URL
+    // CORS is already handled by the express cors() middleware above.
+    // Do NOT set Access-Control-Allow-Origin here: combining a wildcard with
+    // credentials:true is rejected by browsers and would break SSE connections.
   });
   res.flushHeaders();
 

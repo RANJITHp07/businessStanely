@@ -42,7 +42,6 @@ import {
   Eye,
   CheckCircle,
   Clock,
-  AlertTriangle,
   TrendingUp,
 } from "lucide-react";
 import { Agent, Prospect, Task } from "@/types";
@@ -73,7 +72,7 @@ function groupActivitiesByDate(activities: AgentActivity[]) {
     return acc;
   }, {} as Record<string, AgentActivity[]>);
 }
-function formatDateDMY(dateString: string) {
+function formatDateDMY(dateString?: string) {
   if (!dateString) return "-";
   const d = new Date(dateString);
   if (isNaN(d.getTime())) return "-";
@@ -99,6 +98,23 @@ function sectionLabelToStatus(label: string) {
   if (l.includes("completed")) return "Completed";
   if (l.includes("hold")) return "Hold";
   return "To Do";
+}
+
+function parseTaskResponse(data: unknown): Task[] {
+  if (Array.isArray(data)) {
+    return data as Task[];
+  }
+
+  if (
+    data &&
+    typeof data === "object" &&
+    "tasks" in data &&
+    Array.isArray((data as { tasks?: unknown }).tasks)
+  ) {
+    return (data as { tasks: Task[] }).tasks;
+  }
+
+  return [];
 }
 
 function mergeTeamMembers(agentData: Agent) {
@@ -129,9 +145,17 @@ interface SectionTableProps {
   label: string;
   tasks: Task[];
   agentId: string;
+  retainershipTasks?: boolean;
+  trigger?: boolean;
 }
 
-function SectionTable({ label, tasks, agentId }: SectionTableProps) {
+function SectionTable({
+  label,
+  tasks,
+  agentId,
+  retainershipTasks,
+  trigger,
+}: SectionTableProps) {
   const labelColor = (() => {
     const l = label.toLowerCase();
     if (l.includes("progress")) return "text-sky-600";
@@ -463,7 +487,7 @@ function SectionTable({ label, tasks, agentId }: SectionTableProps) {
         <Link
           href={`/task?status=${encodeURIComponent(
             sectionLabelToStatus(label)
-          )}&assignedToId=${agentId}`}
+          )}&assignedToId=${agentId}${retainershipTasks ? "&retainershipTasks=true" : ""}${trigger ? "&trigger=true" : ""}`}
           className="bg-[#002fff] cursor-pointer text-white text-[14px] py-[10px] mt-[10px] px-[10px] rounded-[5px] inline-block"
         >
           View more
@@ -476,9 +500,11 @@ function SectionTable({ label, tasks, agentId }: SectionTableProps) {
 export default function AgentDetails() {
   const params = useParams();
   const searchParams = useSearchParams();
-  const id = params.id as string;
+  const id = String(params.id ?? "");
   const [agent, setAgent] = useState<Agent | null>(null);
   const [agentTasks, setAgentTasks] = useState<Task[]>([]);
+  const [agentRetainershipTasks, setAgentRetainershipTasks] = useState<Task[]>([]);
+  const [agentTriggerTasks, setAgentTriggerTasks] = useState<Task[]>([]);
   const [agentLeads, setAgentLeads] = useState<Prospect[]>([]);
   const [agentOpportunities, setAgentOpportunities] = useState<OpportunityRecord[]>([]);
   const [teamMembers, setTeamMembers] = useState<Agent[]>([]);
@@ -488,6 +514,7 @@ export default function AgentDetails() {
   const [activitiesLoading, setActivitiesLoading] = useState(true);
 
   const [activeTab, setActiveTab] = useState<string>(searchParams.get("tab") || "details");
+  const [taskOverviewTab, setTaskOverviewTab] = useState("standard-tasks");
 
   // Keep activeTab in sync with the tab query param
   useEffect(() => {
@@ -522,10 +549,72 @@ export default function AgentDetails() {
                   const tasksResponse = await fetch(`/api/tasks?assignedToId=${id}`);
                   if (tasksResponse.ok) {
                     const tasksData = await tasksResponse.json();
-                    setAgentTasks(tasksData.tasks || []);
+                    setAgentTasks(parseTaskResponse(tasksData));
+                  } else {
+                    setAgentTasks([]);
                   }
                 } catch (error) {
                   console.error("Error fetching team member tasks:", error);
+                  setAgentTasks([]);
+                }
+              })(),
+            );
+
+            requests.push(
+              (async () => {
+                try {
+                  const retainershipTasksResponse = await fetch(
+                    `/api/tasks?assignedToId=${id}&retainershipTasks=true`,
+                  );
+                  if (retainershipTasksResponse.ok) {
+                    const retainershipTasksData =
+                      await retainershipTasksResponse.json();
+                    setAgentRetainershipTasks(
+                      parseTaskResponse(retainershipTasksData),
+                    );
+                  } else {
+                    setAgentRetainershipTasks([]);
+                  }
+                } catch (error) {
+                  console.error(
+                    "Error fetching team member retainership tasks:",
+                    error,
+                  );
+                  setAgentRetainershipTasks([]);
+                }
+              })(),
+            );
+
+            requests.push(
+              (async () => {
+                try {
+                  const [triggerResponse, completedResponse] = await Promise.all([
+                    fetch(`/api/tasks?assignedToId=${id}&trigger=true`),
+                    fetch(
+                      `/api/tasks?assignedToId=${id}&retainershipTasks=true&status=Completed`,
+                    ),
+                  ]);
+
+                  const pendingTriggerTasks = triggerResponse.ok
+                    ? parseTaskResponse(await triggerResponse.json())
+                    : [];
+                  const completedTriggerTasks = completedResponse.ok
+                    ? parseTaskResponse(await completedResponse.json()).filter(
+                      (task) => Boolean(task.triggerDate),
+                    )
+                    : [];
+
+                  const mergedTriggerTasks = [
+                    ...pendingTriggerTasks,
+                    ...completedTriggerTasks,
+                  ];
+                  const uniqueTriggerTasks = Array.from(
+                    new Map(mergedTriggerTasks.map((task) => [task.id, task])).values(),
+                  );
+                  setAgentTriggerTasks(uniqueTriggerTasks);
+                } catch (error) {
+                  console.error("Error fetching team member trigger tasks:", error);
+                  setAgentTriggerTasks([]);
                 }
               })(),
             );
@@ -594,60 +683,6 @@ export default function AgentDetails() {
     };
     fetchAgentActivities();
   }, [id, searchParams]);
-
-  const getPriorityBadge = (priority: string) => {
-    const colors = {
-      Low: "bg-green-100 text-green-800 border-green-200",
-      Medium: "bg-yellow-100 text-yellow-800 border-yellow-200",
-      High: "bg-red-100 text-red-800 border-red-200",
-      low: "bg-green-100 text-green-800 border-green-200",
-      medium: "bg-yellow-100 text-yellow-800 border-yellow-200",
-      high: "bg-red-100 text-red-800 border-red-200",
-    };
-
-    return (
-      <Badge
-        className={`${colors[priority as keyof typeof colors] ||
-          "bg-gray-100 text-gray-800 border-gray-200"
-          } border`}
-      >
-        {priority.charAt(0).toUpperCase() + priority.slice(1)}
-      </Badge>
-    );
-  };
-
-  const getStatusBadge = (status: string) => {
-    const colors = {
-      "To Do": "bg-gray-100 text-gray-800 border-gray-200",
-      "In Progress": "bg-blue-100 text-blue-800 border-blue-200",
-      Completed: "bg-green-100 text-green-800 border-green-200",
-      Done: "bg-green-100 text-green-800 border-green-200",
-      Pending: "bg-yellow-100 text-yellow-800 border-yellow-200",
-      Overdue: "bg-red-100 text-red-800 border-red-200",
-    };
-
-    const icons = {
-      "To Do": <Clock className="w-3 h-3 mr-1" />,
-      "In Progress": <AlertTriangle className="w-3 h-3 mr-1" />,
-      Completed: <CheckCircle className="w-3 h-3 mr-1" />,
-      Done: <CheckCircle className="w-3 h-3 mr-1" />,
-      Pending: <Clock className="w-3 h-3 mr-1" />,
-      Overdue: <AlertTriangle className="w-3 h-3 mr-1" />,
-    };
-
-    return (
-      <Badge
-        className={`${colors[status as keyof typeof colors] ||
-          "bg-gray-100 text-gray-800 border-gray-200"
-          } border`}
-      >
-        {icons[status as keyof typeof icons] || (
-          <Clock className="w-3 h-3 mr-1" />
-        )}
-        {status}
-      </Badge>
-    );
-  };
 
   const getAgentTypeBadge = (type: string) => {
     const colors = {
@@ -872,7 +907,7 @@ export default function AgentDetails() {
             <TabsTrigger value="tasks" className="flex items-center gap-2">
               <FileText className="h-4 w-4 hidden md:block" />
               <p className="text-[12px] md:text-[14px]">
-                Tasks ({agentTasks.length})
+                Tasks ({agentTasks.length + agentRetainershipTasks.length + agentTriggerTasks.length})
               </p>
             </TabsTrigger>
           )}
@@ -1065,7 +1100,7 @@ export default function AgentDetails() {
               <div>
                 <h2 className="text-xl font-semibold">Task Management</h2>
                 <p className="text-muted-foreground text-sm">
-                  Manage and track tasks assigned to {agent.name}
+                  Manage and track standard, retainership, and future-trigger tasks assigned to {agent.name}
                 </p>
               </div>
             </div>
@@ -1074,37 +1109,122 @@ export default function AgentDetails() {
               <div className="flex justify-center items-center py-16 text-muted-foreground">
                 <Clock className="h-6 w-6 animate-spin mr-2" /> Loading tasks...
               </div>
-            ) : agentTasks.length === 0 ? (
-              <Card>
-                <CardContent className="text-center py-8">
-                  <p className="text-muted-foreground">
-                    No tasks assigned to this agent.
-                  </p>
-                </CardContent>
-              </Card>
             ) : (
-              <div className="space-y-[40px]">
-                <SectionTable
-                  label="New Task"
-                  tasks={agentTasks.filter((t) => ["todo"].includes(statusKey(t.status))).slice(0, 3)}
-                  agentId={id}
-                />
-                <SectionTable
-                  label="In Progress"
-                  tasks={agentTasks.filter((t) => ["inprogress"].includes(statusKey(t.status))).slice(0, 3)}
-                  agentId={id}
-                />
-                <SectionTable
-                  label="Completed"
-                  tasks={agentTasks.filter((t) => ["completed"].includes(statusKey(t.status))).slice(0, 3)}
-                  agentId={id}
-                />
-                <SectionTable
-                  label="Hold"
-                  tasks={agentTasks.filter((t) => ["hold"].includes(statusKey(t.status))).slice(0, 3)}
-                  agentId={id}
-                />
-              </div>
+              <Tabs
+                value={taskOverviewTab}
+                onValueChange={setTaskOverviewTab}
+                className="space-y-6"
+              >
+                <TabsList className="grid h-auto w-full grid-cols-3">
+                  <TabsTrigger value="standard-tasks" className="flex items-center gap-2 px-2 py-3 text-[11px] md:text-sm">
+                    <FileText className="h-4 w-4 hidden md:block" />
+                    Standard Tasks ({agentTasks.length})
+                  </TabsTrigger>
+                  <TabsTrigger value="retainership-tasks" className="flex items-center gap-2 px-2 py-3 text-[11px] md:text-sm">
+                    <CheckCircle className="h-4 w-4 hidden md:block" />
+                    Retainership Tasks ({agentRetainershipTasks.length})
+                  </TabsTrigger>
+                  <TabsTrigger value="future-triggers" className="flex items-center gap-2 px-2 py-3 text-[11px] md:text-sm">
+                    <Clock className="h-4 w-4 hidden md:block" />
+                    Future Triggers ({agentTriggerTasks.length})
+                  </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="standard-tasks" className="space-y-6">
+                  {agentTasks.length === 0 ? (
+                    <Card>
+                      <CardContent className="text-center py-8">
+                        <p className="text-muted-foreground">
+                          No standard tasks assigned to this agent.
+                        </p>
+                      </CardContent>
+                    </Card>
+                  ) : (
+                    <div className="space-y-[40px]">
+                      <SectionTable
+                        label="New Task"
+                        tasks={agentTasks.filter((t) => ["todo"].includes(statusKey(t.status))).slice(0, 3)}
+                        agentId={id}
+                      />
+                      <SectionTable
+                        label="In Progress"
+                        tasks={agentTasks.filter((t) => ["inprogress"].includes(statusKey(t.status))).slice(0, 3)}
+                        agentId={id}
+                      />
+                      <SectionTable
+                        label="Completed"
+                        tasks={agentTasks.filter((t) => ["completed"].includes(statusKey(t.status))).slice(0, 3)}
+                        agentId={id}
+                      />
+                      <SectionTable
+                        label="Hold"
+                        tasks={agentTasks.filter((t) => ["hold"].includes(statusKey(t.status))).slice(0, 3)}
+                        agentId={id}
+                      />
+                    </div>
+                  )}
+                </TabsContent>
+
+                <TabsContent value="retainership-tasks" className="space-y-6">
+                  {agentRetainershipTasks.length === 0 ? (
+                    <Card>
+                      <CardContent className="text-center py-8">
+                        <p className="text-muted-foreground">
+                          No retainership tasks assigned to this agent.
+                        </p>
+                      </CardContent>
+                    </Card>
+                  ) : (
+                    <div className="space-y-[40px]">
+                      <SectionTable
+                        label="New Task"
+                        tasks={agentRetainershipTasks.filter((t) => ["todo"].includes(statusKey(t.status))).slice(0, 3)}
+                        agentId={id}
+                        retainershipTasks={true}
+                      />
+                      <SectionTable
+                        label="In Progress"
+                        tasks={agentRetainershipTasks.filter((t) => ["inprogress"].includes(statusKey(t.status))).slice(0, 3)}
+                        agentId={id}
+                        retainershipTasks={true}
+                      />
+                      <SectionTable
+                        label="Completed"
+                        tasks={agentRetainershipTasks.filter((t) => ["completed"].includes(statusKey(t.status))).slice(0, 3)}
+                        agentId={id}
+                        retainershipTasks={true}
+                      />
+                      <SectionTable
+                        label="Hold"
+                        tasks={agentRetainershipTasks.filter((t) => ["hold"].includes(statusKey(t.status))).slice(0, 3)}
+                        agentId={id}
+                        retainershipTasks={true}
+                      />
+                    </div>
+                  )}
+                </TabsContent>
+
+                <TabsContent value="future-triggers" className="space-y-6">
+                  {agentTriggerTasks.length === 0 ? (
+                    <Card>
+                      <CardContent className="text-center py-8">
+                        <p className="text-muted-foreground">
+                          No future-trigger tasks assigned to this agent.
+                        </p>
+                      </CardContent>
+                    </Card>
+                  ) : (
+                    <div className="space-y-[40px]">
+                      <SectionTable
+                        label="New Task"
+                        tasks={agentTriggerTasks.slice(0, 3)}
+                        agentId={id}
+                        trigger={true}
+                      />
+                    </div>
+                  )}
+                </TabsContent>
+              </Tabs>
             )}
           </TabsContent>
         )}

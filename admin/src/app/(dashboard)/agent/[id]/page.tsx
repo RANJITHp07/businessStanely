@@ -1752,25 +1752,7 @@ export default function AgentDetails() {
                     <div className="space-y-[40px]">
                       <SectionTable
                         label="New Task"
-                        tasks={agentTriggerTasks.filter((task) => statusKey(task.status) === "todo").slice(0, 3)}
-                        agentId={id}
-                        trigger={true}
-                      />
-                      <SectionTable
-                        label="In Progress"
-                        tasks={agentTriggerTasks.filter((task) => statusKey(task.status) === "inprogress").slice(0, 3)}
-                        agentId={id}
-                        trigger={true}
-                      />
-                      <SectionTable
-                        label="Completed"
-                        tasks={agentTriggerTasks.filter((task) => statusKey(task.status) === "completed").slice(0, 3)}
-                        agentId={id}
-                        trigger={true}
-                      />
-                      <SectionTable
-                        label="Hold"
-                        tasks={agentTriggerTasks.filter((task) => statusKey(task.status) === "hold").slice(0, 3)}
+                        tasks={agentTriggerTasks.slice(0, 3)}
                         agentId={id}
                         trigger={true}
                       />

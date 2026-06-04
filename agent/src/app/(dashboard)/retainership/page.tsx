@@ -643,7 +643,7 @@ export default function RetainershipTable() {
                             <div className="space-y-3">
                                 <SectionTable
                                     label="New Task"
-                                    tasks={triggerTask.filter((t) => ["todo"].includes(statusKey(t.status))).slice(0, 3)}
+                                    tasks={triggerTask.slice(0, 3)}
                                     trigger={true}
                                 />
                             </div>

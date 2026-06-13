@@ -134,6 +134,15 @@ function ensureSessionDirectoryWritable() {
 
 const chromiumExecutablePath =
   process.env.WHATSAPP_CHROMIUM_EXECUTABLE_PATH?.trim() || undefined;
+// Bound Chromium's on-disk HTTP/media cache so the session profile under
+// WHATSAPP_SESSION_DIR can't grow unbounded over weeks of use. Default 64 MB
+// each; override via env if needed. 0 disables Chromium caching entirely.
+const chromiumDiskCacheBytes = Number(
+  process.env.WHATSAPP_DISK_CACHE_BYTES ?? 64 * 1024 * 1024,
+);
+const chromiumMediaCacheBytes = Number(
+  process.env.WHATSAPP_MEDIA_CACHE_BYTES ?? 64 * 1024 * 1024,
+);
 const protocolTimeoutMs = Number(
   process.env.WHATSAPP_PROTOCOL_TIMEOUT_MS ?? 180000,
 );
@@ -718,6 +727,15 @@ class WhatsAppService {
             // Disable site-isolation to keep Chromium in a single renderer
             // process — saves ~100 MB RAM on memory-constrained instances.
             "--disable-features=site-per-process",
+            // Cap the on-disk HTTP/media cache so the session profile cannot
+            // grow without bound (the main disk-space risk for a long-lived
+            // shared session). Values are bytes; see chromiumDiskCacheBytes.
+            ...(Number.isFinite(chromiumDiskCacheBytes)
+              ? [`--disk-cache-size=${chromiumDiskCacheBytes}`]
+              : []),
+            ...(Number.isFinite(chromiumMediaCacheBytes)
+              ? [`--media-cache-size=${chromiumMediaCacheBytes}`]
+              : []),
             "--window-size=1280,800",
           ],
         },

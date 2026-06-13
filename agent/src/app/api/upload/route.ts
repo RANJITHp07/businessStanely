@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { getPresignedUploadUrl } from "@/lib/aws";
+import { resolveUploadContentType } from "@/lib/uploadValidation";
 
 type UploadRequest = {
   fileName?: string;
@@ -13,43 +14,18 @@ export async function POST(request: NextRequest) {
     const body = (await request.json()) as UploadRequest;
     const fileName = body.fileName?.trim();
     const fileSize = body.fileSize;
-    const contentType = body.contentType;
-    const parsedContentType = contentType?.split(";")[0]?.trim()?.toLowerCase();
-    const normalizedContentType =
-      parsedContentType === "mp4" ? "audio/mp4" : parsedContentType;
 
-    if (!fileName || !normalizedContentType || typeof fileSize !== "number") {
+    const resolved = resolveUploadContentType(fileName, body.contentType);
+    if (!resolved.ok) {
+      return NextResponse.json({ error: resolved.error }, { status: 400 });
+    }
+    if (!fileName || typeof fileSize !== "number") {
       return NextResponse.json(
         { error: "Invalid upload payload" },
         { status: 400 },
       );
     }
-
-    const allowedTypes = [
-      "image/jpeg",
-      "image/png",
-      "image/gif",
-      "image/webp",
-      "application/pdf",
-      "text/plain",
-      "audio/mp4",
-    ];
-
-    const isAllowedAudio = normalizedContentType.startsWith("audio/");
-    const isAllowedMp4Container =
-      normalizedContentType === "video/mp4" ||
-      normalizedContentType === "application/mp4";
-
-    if (
-      !allowedTypes.includes(normalizedContentType) &&
-      !isAllowedAudio &&
-      !isAllowedMp4Container
-    ) {
-      return NextResponse.json(
-        { error: "File type not allowed" },
-        { status: 400 },
-      );
-    }
+    const normalizedContentType = resolved.contentType;
 
     const maxSize = 50 * 1024 * 1024; // 50MB
     if (fileSize > maxSize) {

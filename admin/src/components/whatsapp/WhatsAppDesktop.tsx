@@ -22,6 +22,7 @@ import {
 
 import { useWhatsAppDesktop } from "@/hooks/use-whatsapp-desktop";
 import type { WhatsAppChatSummary, WhatsAppMessage } from "@/lib/whatsapp/types";
+import { getCachedAvatar, resolveAvatar } from "@/lib/whatsapp/avatar-cache";
 
 const WHATSAPP_EDIT_WINDOW_MS = 15 * 60 * 1000;
 
@@ -36,9 +37,7 @@ function formatTime(timestamp: number | null) {
     }).format(timestamp);
 }
 
-function WhatsAppDesktop() {
-
-    function formatDay(timestamp: number) {
+function formatDay(timestamp: number) {
         return new Intl.DateTimeFormat("en-IN", {
             day: "numeric",
             month: "short",
@@ -67,21 +66,37 @@ function WhatsAppDesktop() {
         chat: Pick<WhatsAppChatSummary, "name" | "avatarUrl" | "id">;
         sizeClassName: string;
     }) {
-        const [resolvedUrl, setResolvedUrl] = useState<string | null>(chat.avatarUrl);
+        const [resolvedUrl, setResolvedUrl] = useState<string | null>(
+            () => chat.avatarUrl ?? getCachedAvatar(chat.id) ?? null,
+        );
         const [loadFailed, setLoadFailed] = useState(false);
 
         useEffect(() => {
-            setResolvedUrl(chat.avatarUrl);
             setLoadFailed(false);
-            if (chat.avatarUrl || !chat.id) return;
+
+            if (chat.avatarUrl) {
+                setResolvedUrl(chat.avatarUrl);
+                return;
+            }
+            if (!chat.id) {
+                setResolvedUrl(null);
+                return;
+            }
+
+            // Serve a cached result instantly; only hit the network on a miss.
+            const cached = getCachedAvatar(chat.id);
+            if (cached !== undefined) {
+                setResolvedUrl(cached);
+                return;
+            }
+
             let cancelled = false;
-            fetch(`/api/whatsapp/chat-avatar?chatId=${encodeURIComponent(chat.id)}`)
-                .then((r) => r.json())
-                .then((data: { url?: string | null }) => {
-                    if (!cancelled && data.url) setResolvedUrl(data.url);
-                })
-                .catch(() => { });
-            return () => { cancelled = true; };
+            resolveAvatar(chat.id).then((url) => {
+                if (!cancelled) setResolvedUrl(url);
+            });
+            return () => {
+                cancelled = true;
+            };
         }, [chat.id, chat.avatarUrl]);
 
         return (
@@ -286,6 +301,7 @@ function WhatsAppDesktop() {
         );
     });
 
+function WhatsAppDesktop() {
     const {
         canLoadMore,
         chats,
@@ -325,12 +341,9 @@ function WhatsAppDesktop() {
             return;
         }
         let cancelled = false;
-        fetch(`/api/whatsapp/chat-avatar?chatId=${encodeURIComponent(state.clientInfo.wid)}`)
-            .then((r) => r.json())
-            .then((data: { url?: string | null }) => {
-                if (!cancelled && data.url) setMyProfilePicUrl(data.url);
-            })
-            .catch(() => { });
+        resolveAvatar(state.clientInfo.wid).then((url) => {
+            if (!cancelled && url) setMyProfilePicUrl(url);
+        });
         return () => { cancelled = true; };
     }, [state.status, state.clientInfo.wid]);
 

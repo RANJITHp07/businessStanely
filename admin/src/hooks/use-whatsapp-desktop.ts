@@ -26,6 +26,8 @@ const defaultState: SerializableWhatsAppState = {
   lastUpdatedAt: new Date(0).toISOString(),
 };
 
+const CHATS_PAGE_SIZE = 15;
+
 async function getJson<T>(url: string, init?: RequestInit): Promise<T> {
   const isFormData =
     typeof FormData !== "undefined" && init?.body instanceof FormData;
@@ -71,7 +73,6 @@ function fallbackChatName(chatId: string) {
 export function useWhatsAppDesktop() {
   const [state, setState] = useState<SerializableWhatsAppState>(defaultState);
   const [chats, setChats] = useState<WhatsAppChatSummary[]>([]);
-  const [chatPage, setChatPage] = useState(1);
   const [hasMoreChats, setHasMoreChats] = useState(true);
   const [messages, setMessages] = useState<WhatsAppMessage[]>([]);
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
@@ -83,6 +84,7 @@ export function useWhatsAppDesktop() {
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [canLoadMore, setCanLoadMore] = useState(false);
   const messageLimitRef = useRef(80);
+  const chatPageRef = useRef(1);
   const eventSourceRef = useRef<EventSource | null>(null);
   const selectedChatIdRef = useRef<string | null>(null);
   const stateRef = useRef<SerializableWhatsAppState>(defaultState);
@@ -131,69 +133,95 @@ export function useWhatsAppDesktop() {
     return nextState;
   };
 
+  // Fetch a single page of chats from the API (no state mutation).
+  const fetchChatsPage = async (page: number, pageSize: number) => {
+    const data = await getJson<{ chats: WhatsAppChatSummary[] }>(
+      `/api/whatsapp/chats?page=${page}&pageSize=${pageSize}`,
+    );
+    return data.chats ?? [];
+  };
+
+  // Initial load. Retries while the backend is still warming up its chat list.
   const loadChats = async (
     preferredChatId?: string | null,
-    page = 1,
-    pageSize = 15,
     retryCount = 0,
   ): Promise<string | null> => {
-    const isInitialLoad = page === 1;
-    if (isInitialLoad) {
-      setIsChatsLoading(true);
-    }
+    setIsChatsLoading(true);
     setChatsError(null);
     try {
-      const data = await getJson<{ chats: WhatsAppChatSummary[] }>(
-        `/api/whatsapp/chats?page=${page}&pageSize=${pageSize}`,
-      );
-      if (page === 1) {
-        setChats(data.chats);
-      } else {
-        setChats((prev) => [...prev, ...data.chats]);
-      }
-      setHasMoreChats(data.chats.length >= pageSize);
+      const chatList = await fetchChatsPage(1, CHATS_PAGE_SIZE);
+      setChats(chatList);
+      chatPageRef.current = 1;
+      setHasMoreChats(chatList.length >= CHATS_PAGE_SIZE);
 
       const nextSelectedChatId = preferredChatId ?? selectedChatIdRef.current;
       const activeChat =
-        page === 1
-          ? data.chats.find((chat) => chat.id === nextSelectedChatId) ||
-            data.chats[0] ||
-            null
-          : (chats.find((chat) => chat.id === nextSelectedChatId) ?? null);
+        chatList.find((chat) => chat.id === nextSelectedChatId) ||
+        chatList[0] ||
+        null;
+      setSelectedChatId(activeChat?.id ?? null);
+      setIsChatsLoading(false);
 
-      if (page === 1) {
-        setSelectedChatId(activeChat?.id ?? null);
-      }
-
-      if (isInitialLoad) {
-        setIsChatsLoading(false);
-      }
-      setChatsError(null);
-      // If no chats, retry after delay (max 20 attempts ~20s)
-      if ((!data.chats || data.chats.length === 0) && retryCount < 20) {
+      // While the session is freshly ready, WhatsApp Web may not have synced its
+      // chat list yet — retry a few times before giving up.
+      if (chatList.length === 0 && retryCount < 20) {
         await new Promise((res) => setTimeout(res, 1000));
-        return loadChats(preferredChatId, page, pageSize, retryCount + 1);
+        return loadChats(preferredChatId, retryCount + 1);
       }
       return activeChat?.id ?? null;
     } catch (err: any) {
       if (retryCount < 20) {
         await new Promise((res) => setTimeout(res, 1000));
-        return loadChats(preferredChatId, page, pageSize, retryCount + 1);
+        return loadChats(preferredChatId, retryCount + 1);
       }
-      if (isInitialLoad) {
-        setIsChatsLoading(false);
-      }
+      setIsChatsLoading(false);
       setChatsError(err?.message || "Failed to load chats.");
       return null;
     }
   };
 
-  // For infinite scroll or "Load more chats"
+  // Background refresh triggered by realtime events. Re-fetches every page the
+  // user has already loaded in a single request so "Load more" results survive
+  // (a plain page-1 reload would shrink the list back to the first page). Never
+  // shows the loading spinner and never retries on transient failures.
+  const refreshChats = async (preferredChatId?: string | null) => {
+    const loadedPages = Math.max(1, chatPageRef.current);
+    const pageSize = loadedPages * CHATS_PAGE_SIZE;
+    try {
+      const chatList = await fetchChatsPage(1, pageSize);
+      if (chatList.length === 0) return; // keep current list on a transient empty
+      setChats(chatList);
+      setHasMoreChats(chatList.length >= pageSize);
+      const sel = preferredChatId ?? selectedChatIdRef.current;
+      if (!sel) {
+        setSelectedChatId(chatList[0]?.id ?? null);
+      }
+    } catch {
+      // Ignore — the existing list stays on screen until the next event.
+    }
+  };
+
+  // "Load more chats" — fetches the next page and appends (de-duplicated).
   const loadMoreChats = async () => {
-    if (!hasMoreChats) return;
-    const nextPage = chatPage + 1;
-    await loadChats(undefined, nextPage);
-    setChatPage(nextPage);
+    if (!hasMoreChats || isChatsLoading) return;
+    const nextPage = chatPageRef.current + 1;
+    try {
+      const chatList = await fetchChatsPage(nextPage, CHATS_PAGE_SIZE);
+      if (chatList.length > 0) {
+        setChats((prev) => {
+          const seen = new Set(prev.map((chat) => chat.id));
+          const merged = [...prev];
+          for (const chat of chatList) {
+            if (!seen.has(chat.id)) merged.push(chat);
+          }
+          return merged;
+        });
+        chatPageRef.current = nextPage;
+      }
+      setHasMoreChats(chatList.length >= CHATS_PAGE_SIZE);
+    } catch {
+      // Leave hasMoreChats as-is so the user can try again.
+    }
   };
 
   const loadMessages = async (chatId: string, limit = 80) => {
@@ -293,7 +321,7 @@ export function useWhatsAppDesktop() {
 
         chatsRefreshInFlight = true;
         try {
-          await loadChats(selectedChatIdRef.current);
+          await refreshChats(selectedChatIdRef.current);
         } catch {
           // Ignore transient refresh failures while the desktop client reconnects.
         } finally {

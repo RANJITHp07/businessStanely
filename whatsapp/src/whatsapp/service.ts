@@ -150,6 +150,16 @@ const chatFetchTimeoutMs = Number(
   process.env.WHATSAPP_CHAT_FETCH_TIMEOUT_MS ?? 180000,
 );
 const chatCacheTtlMs = Number(process.env.WHATSAPP_CHAT_CACHE_TTL_MS ?? 60000);
+// Cache resolved profile-picture URLs so repeated /chat-avatar requests (one per
+// chat row, per browser) don't each trigger an expensive Puppeteer evaluation.
+// Found avatars are cached for hours; "no avatar" results for only a few minutes
+// so a contact that later adds a photo still shows up reasonably soon.
+const avatarCacheOkTtlMs = Number(
+  process.env.WHATSAPP_AVATAR_CACHE_TTL_MS ?? 6 * 60 * 60 * 1000,
+);
+const avatarCacheNullTtlMs = Number(
+  process.env.WHATSAPP_AVATAR_NULL_CACHE_TTL_MS ?? 5 * 60 * 1000,
+);
 // Lower default chat fetch limit for performance
 const chatFetchLimit = Number(process.env.WHATSAPP_CHAT_FETCH_LIMIT ?? 50);
 const operationConcurrencyLimit = Number(
@@ -504,6 +514,12 @@ class WhatsAppService {
   private chatsCache: WhatsAppChatSummary[] = [];
   private chatsCacheAt = 0;
   private chatsRefreshPromise: Promise<WhatsAppChatSummary[]> | null = null;
+  // chatId -> resolved avatar URL (or null when the contact has no picture).
+  private avatarCache: Map<string, { url: string | null; at: number }> =
+    new Map();
+  // Deduplicates concurrent avatar lookups for the same chatId.
+  private avatarFetchInProgress: Map<string, Promise<string | null>> =
+    new Map();
   // Deduplicates concurrent listMessages calls for the same chatId+limit so that
   // multiple agents viewing the same chat don't each issue a separate Puppeteer
   // fetchMessages call.
@@ -1125,6 +1141,8 @@ class WhatsAppService {
     this.chatsCacheAt = 0;
     this.chatsRefreshPromise = null;
     this.messagesFetchInProgress.clear();
+    this.avatarCache.clear();
+    this.avatarFetchInProgress.clear();
     this.clearReconnectTimer();
     this.reconnectAttempts = 0;
     this.setState(createDefaultState());
@@ -1194,6 +1212,37 @@ class WhatsAppService {
   }
 
   async getChatAvatarUrlById(chatId: string): Promise<string | null> {
+    // Serve from cache when fresh — avoids a Puppeteer round-trip per request.
+    const cached = this.avatarCache.get(chatId);
+    if (cached) {
+      const ttl = cached.url ? avatarCacheOkTtlMs : avatarCacheNullTtlMs;
+      if (Date.now() - cached.at <= ttl) {
+        return cached.url;
+      }
+    }
+
+    // Collapse concurrent lookups for the same chat into one in-flight request.
+    const inFlight = this.avatarFetchInProgress.get(chatId);
+    if (inFlight) {
+      return inFlight;
+    }
+
+    const promise = this.resolveChatAvatarUrlById(chatId)
+      .then((url) => {
+        this.avatarCache.set(chatId, { url, at: Date.now() });
+        return url;
+      })
+      .finally(() => {
+        this.avatarFetchInProgress.delete(chatId);
+      });
+
+    this.avatarFetchInProgress.set(chatId, promise);
+    return promise;
+  }
+
+  private async resolveChatAvatarUrlById(
+    chatId: string,
+  ): Promise<string | null> {
     LOG("API: getChatAvatarUrlById", { chatId });
     const client = await this.requireReadyClient();
 
@@ -1862,6 +1911,8 @@ class WhatsAppService {
       this.chatsCache = [];
       this.chatsCacheAt = 0;
       this.chatsRefreshPromise = null;
+      this.avatarCache.clear();
+      this.avatarFetchInProgress.clear();
       // Remove session directory from disk
       try {
         if (fs.existsSync(sessionPath)) {
@@ -1890,6 +1941,8 @@ class WhatsAppService {
       this.chatsCache = [];
       this.chatsCacheAt = 0;
       this.chatsRefreshPromise = null;
+      this.avatarCache.clear();
+      this.avatarFetchInProgress.clear();
       // Remove session directory from disk
       try {
         if (fs.existsSync(sessionPath)) {

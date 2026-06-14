@@ -451,6 +451,19 @@ function digitsOnly(value: string | null | undefined) {
   return String(value ?? "").replace(/\D/g, "");
 }
 
+// Prefix a dialable phone number with "+" so the country code is visible in the
+// UI. Idempotent (skips values already starting with "+"), and intentionally
+// leaves WhatsApp lid-style ids untouched: real E.164 numbers carry a country
+// code and run 8–13 digits, while lids are ~15+ and are not dialable.
+function formatPhoneNumberForDisplay(value: string | null | undefined) {
+  if (!value) return value ?? null;
+  const str = String(value);
+  if (str.startsWith("+")) return str;
+  const digits = digitsOnly(str);
+  if (digits.length >= 8 && digits.length <= 13) return `+${digits}`;
+  return str;
+}
+
 function getPhoneNumberFromChatId(chatId: string | null | undefined) {
   const normalized = normalizeWhatsAppIdentifier(chatId);
   if (!normalized) {
@@ -458,7 +471,7 @@ function getPhoneNumberFromChatId(chatId: string | null | undefined) {
   }
 
   const digits = digitsOnly(normalized);
-  return digits || normalized;
+  return formatPhoneNumberForDisplay(digits || normalized);
 }
 
 function isLikelyLidIdentifier(value: string | null | undefined) {
@@ -584,7 +597,9 @@ function applyResolvedChatIdentity(
     return chat;
   }
 
-  const phoneNumber = resolved.phoneNumber || chat.phoneNumber;
+  const phoneNumber = formatPhoneNumberForDisplay(
+    resolved.phoneNumber || chat.phoneNumber,
+  );
   return {
     ...chat,
     phoneNumber,
@@ -592,7 +607,8 @@ function applyResolvedChatIdentity(
       [resolved.name, chat.name, phoneNumber],
       phoneNumber,
     ),
-    avatarSeed: phoneNumber || chat.avatarSeed,
+    // Avatar lookups key off the raw number, so keep "+" out of the seed.
+    avatarSeed: digitsOnly(phoneNumber) || chat.avatarSeed,
   };
 }
 
@@ -2201,19 +2217,28 @@ class WhatsAppService {
                     : phone
                       ? `${phone}@c.us`
                       : ct.id._serialized;
-                if (ct.id.server !== "c.us" && !phone) continue;
+                // A lid contact whose phone isn't cached locally (search skips
+                // the server lookup) still matched by name — surface it under
+                // its lid id, which is a valid openable chat id, instead of
+                // dropping it. Only skip rows with no usable identifier at all.
+                if (!resultId) continue;
                 if (seen.has(ct.id._serialized) || seen.has(resultId))
                   continue;
-                // Saved name when available; otherwise the phone number.
-                const name =
-                  saved && typeof ct.name === "string" && ct.name.trim()
-                    ? ct.name.trim()
-                    : phone || ct.id?.user || "";
+                // idUser is only a real phone number for c.us contacts; for a
+                // lid it's the (non-dialable) lid id, so don't fall back to it.
+                const realNumber =
+                  phone || (ct.id.server === "c.us" ? ct.id?.user : "") || "";
+                // Prefer any human label (saved name, push name, formatted
+                // name); fall back to the number only when no label exists.
+                const label = [ct.name, ct.pushname, ct.formattedName]
+                  .map((v: any) => (typeof v === "string" ? v.trim() : ""))
+                  .find((v: string) => v);
+                const name = label || realNumber || "";
                 out.push({
                   id: resultId,
-                  name: name || phone || ct.id?.user || "",
+                  name,
                   idUser: ct.id?.user || "",
-                  phoneNumber: phone || ct.id?.user || null,
+                  phoneNumber: realNumber || null,
                   timestamp: null,
                   unreadCount: 0,
                   isGroup: false,

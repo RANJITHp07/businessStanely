@@ -2309,16 +2309,66 @@ class WhatsAppService {
 
       const searchTerm = search.trim().toLowerCase();
       if (searchTerm) {
-        // Search the full WhatsApp store (every loaded chat + contact), not just
-        // the cached page, so a contact that hasn't been loaded into the sidebar
-        // still matches.
-        const matches = await this.searchChatsAndContacts(
-          client,
+        const limit = Math.max(pageSize * page, 50);
+
+        // The in-page contact search (searchChatsAndContacts) depends on
+        // volatile WhatsApp Web internals and can silently return nothing.
+        // Always also filter the already-loaded chat cache — which is populated
+        // by the reliable refreshChats fast path and resolves saved names and
+        // +country phone numbers — so searching existing conversations works
+        // regardless of whether the live store search succeeds. Warm the cache
+        // first if it's cold so a search right after login still finds chats.
+        if (this.chatsCache.length <= 1) {
+          const refresh = this.refreshChats(client).catch((e) => {
+            LOG("getPaginatedChats: search cold refresh failed:", String(e));
+            return this.chatsCache;
+          });
+          await Promise.race([
+            refresh,
+            new Promise((resolve) => setTimeout(resolve, coldChatWaitMs)),
+          ]);
+        }
+
+        const cachedMatches = this.filterAndSortChats(
+          this.chatsCache,
           searchTerm,
-          Math.max(pageSize * page, 50),
+          1,
+          limit,
         );
+
+        // Search the full WhatsApp store too (every loaded chat + contact), so a
+        // contact that hasn't been loaded into the sidebar still matches.
+        let liveMatches: WhatsAppChatSummary[] = [];
+        try {
+          liveMatches = await this.searchChatsAndContacts(
+            client,
+            searchTerm,
+            limit,
+          );
+        } catch (e) {
+          LOG(
+            "getPaginatedChats: live search failed, using cache only:",
+            String(e),
+          );
+        }
+
+        // Merge, de-duplicating by id and by phone number (the same person can
+        // surface under both a @lid and a @c.us id). Cached chats come first so
+        // existing conversations keep their last-message preview and ranking.
+        const merged: WhatsAppChatSummary[] = [];
+        const seenIds = new Set<string>();
+        const seenPhones = new Set<string>();
+        for (const chat of [...cachedMatches, ...liveMatches]) {
+          if (!chat?.id || seenIds.has(chat.id)) continue;
+          const phoneDigits = digitsOnly(chat.phoneNumber);
+          if (phoneDigits && seenPhones.has(phoneDigits)) continue;
+          seenIds.add(chat.id);
+          if (phoneDigits) seenPhones.add(phoneDigits);
+          merged.push(chat);
+        }
+
         const start = (page - 1) * pageSize;
-        return matches.slice(start, start + pageSize);
+        return merged.slice(start, start + pageSize);
       }
 
       const hasCachedData = this.chatsCache.length > 0;
@@ -2868,6 +2918,11 @@ class WhatsAppService {
       // For group chats, label each sender with their saved contact name, or
       // their phone number if not saved — never the raw JID / LID.
       let labelMap: Record<string, string> = {};
+      // phone digits -> saved contact name, sourced from the chat cache which
+      // already resolves saved names for direct chats. Used as a fallback so a
+      // group sender who is a saved contact (but whose name the per-participant
+      // lookup missed, e.g. an @lid sender) still shows their name.
+      const savedNameByPhone = new Map<string, string>();
       if (isGroup) {
         const authorJids = Array.from(
           new Set(
@@ -2877,6 +2932,14 @@ class WhatsAppService {
           ),
         );
         labelMap = await this.resolveGroupSenderLabels(client, authorJids);
+
+        for (const cached of this.chatsCache) {
+          if (cached.isGroup) continue;
+          const digits = digitsOnly(cached.phoneNumber);
+          if (!digits || !cached.name) continue;
+          if (isPhoneLikeLabel(cached.name, cached.phoneNumber)) continue;
+          savedNameByPhone.set(digits, cached.name);
+        }
       }
 
       return messages
@@ -2885,8 +2948,22 @@ class WhatsAppService {
           if (isGroup) {
             const authorJid = (m as Message & { author?: string }).author;
             if (authorJid) {
-              mapped.author =
+              const resolved =
                 labelMap[authorJid] || normalizeWhatsAppIdentifier(authorJid);
+              // resolveGroupSenderLabels returns a saved name when it has one,
+              // otherwise a bare phone number. If we only got a number, try the
+              // cache (saved name by phone) before falling back to showing the
+              // number with its country code (+...).
+              if (resolved && isPhoneLikeLabel(resolved, null)) {
+                const digits = digitsOnly(resolved);
+                const cachedName = digits
+                  ? savedNameByPhone.get(digits)
+                  : undefined;
+                mapped.author =
+                  cachedName || formatPhoneNumberForDisplay(resolved);
+              } else {
+                mapped.author = resolved;
+              }
             }
           } else if (!mapped.fromMe) {
             mapped.author =

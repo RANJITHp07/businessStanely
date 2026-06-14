@@ -40,6 +40,14 @@ function readStoredTheme(): "dark" | "light" {
 import { useWhatsAppDesktop } from "@/hooks/use-whatsapp-desktop";
 import type { WhatsAppChatSummary, WhatsAppMessage } from "@/lib/whatsapp/types";
 import { getCachedAvatar, resolveAvatar } from "@/lib/whatsapp/avatar-cache";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
 
 const WHATSAPP_EDIT_WINDOW_MS = 15 * 60 * 1000;
 
@@ -361,6 +369,9 @@ function WhatsAppDesktop() {
     const [isRetrying, setIsRetrying] = useState(false);
     const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
     const [editingDraft, setEditingDraft] = useState("");
+    const [messageToDelete, setMessageToDelete] = useState<WhatsAppMessage | null>(null);
+    const [isSavingEdit, setIsSavingEdit] = useState(false);
+    const [isDeletingMessage, setIsDeletingMessage] = useState(false);
     const messagesContainerRef = useRef<HTMLDivElement>(null);
     const suppressNextScrollRef = useRef(false);
     const [myProfilePicUrl, setMyProfilePicUrl] = useState<string | null>(null);
@@ -445,6 +456,7 @@ function WhatsAppDesktop() {
             return groups;
         }, []);
     }, [messages]);
+    const editingMessage = messages.find((message) => message.id === editingMessageId) ?? null;
 
     const startEdit = (message: WhatsAppMessage) => {
         if (message.hasMedia || (message.mediaType && message.mediaType !== "chat")) {
@@ -462,6 +474,9 @@ function WhatsAppDesktop() {
     };
 
     const cancelEdit = () => {
+        if (isSavingEdit) {
+            return;
+        }
         setEditingMessageId(null);
         setEditingDraft("");
     };
@@ -485,27 +500,33 @@ function WhatsAppDesktop() {
         }
 
         try {
+            setIsSavingEdit(true);
             await editMessage(editingMessageId, content);
-            cancelEdit();
+            setEditingMessageId(null);
+            setEditingDraft("");
         } catch (error) {
             toast.error(error instanceof Error ? error.message : "Failed to edit message.");
+        } finally {
+            setIsSavingEdit(false);
         }
     };
 
-    const handleDelete = async (messageId: string) => {
-        const confirmed = window.confirm("Delete this message for everyone?");
-
-        if (!confirmed) {
+    const handleDelete = async () => {
+        if (!messageToDelete) {
             return;
         }
 
         try {
-            await deleteMessage(messageId);
-            if (editingMessageId === messageId) {
+            setIsDeletingMessage(true);
+            await deleteMessage(messageToDelete.id);
+            if (editingMessageId === messageToDelete.id) {
                 cancelEdit();
             }
+            setMessageToDelete(null);
         } catch (error) {
             toast.error(error instanceof Error ? error.message : "Failed to delete message.");
+        } finally {
+            setIsDeletingMessage(false);
         }
     };
 
@@ -825,38 +846,13 @@ function WhatsAppDesktop() {
                                                                 <p className="mb-1 text-xs font-medium text-[#667781]">{message.author}</p>
                                                             ) : null}
 
-                                                            {editingMessageId === message.id ? (
-                                                                <div className="space-y-2">
-                                                                    <textarea
-                                                                        value={editingDraft}
-                                                                        onChange={(event) => setEditingDraft(event.target.value)}
-                                                                        rows={2}
-                                                                        className="w-full resize-y rounded-md border border-[#b8c4cc] bg-white/70 px-2 py-1 text-sm outline-none focus:border-[#00a884]"
-                                                                    />
-                                                                    <div className="flex items-center justify-end gap-2">
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={cancelEdit}
-                                                                            className="rounded-md px-2 py-1 text-xs text-[#54656f] hover:bg-black/10"
-                                                                        >
-                                                                            Cancel
-                                                                        </button>
-                                                                        <button
-                                                                            type="button"
-                                                                            onClick={saveEdit}
-                                                                            className="rounded-md bg-[#00a884] px-2 py-1 text-xs font-medium text-[#111b21] hover:bg-[#06b48f]"
-                                                                        >
-                                                                            Save
-                                                                        </button>
-                                                                    </div>
-                                                                </div>
-                                                            ) : message.hasMedia ? (
+                                                            {message.hasMedia ? (
                                                                 <MessageMedia message={message} />
                                                             ) : (
                                                                 <p className="wrap-break-word whitespace-pre-wrap text-[14px] leading-6">{message.body || "Unsupported message"}</p>
                                                             )}
 
-                                                            {message.fromMe && editingMessageId !== message.id ? (
+                                                            {message.fromMe ? (
                                                                 <div className="mt-1 flex justify-end gap-1 opacity-0 transition group-hover:opacity-100">
                                                                     <button
                                                                         type="button"
@@ -869,7 +865,7 @@ function WhatsAppDesktop() {
                                                                     </button>
                                                                     <button
                                                                         type="button"
-                                                                        onClick={() => handleDelete(message.id)}
+                                                                        onClick={() => setMessageToDelete(message)}
                                                                         className="rounded p-1 text-[#54656f] hover:bg-black/10"
                                                                         title="Delete message"
                                                                     >
@@ -916,6 +912,91 @@ function WhatsAppDesktop() {
                     )}
                 </section>
             </div>
+            <Dialog
+                open={Boolean(editingMessageId)}
+                onOpenChange={(open) => {
+                    if (!open) cancelEdit();
+                }}
+            >
+                <DialogContent className="w-[min(92vw,760px)] sm:max-w-[760px]">
+                    <DialogHeader>
+                        <DialogTitle>Edit message</DialogTitle>
+                        <DialogDescription>
+                            Update this sent text message. WhatsApp allows edits only within the edit window.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-3">
+                        {editingMessage ? (
+                            <div className="rounded-md border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+                                Sent {formatTime(editingMessage.timestamp)}
+                            </div>
+                        ) : null}
+                        <textarea
+                            value={editingDraft}
+                            onChange={(event) => setEditingDraft(event.target.value)}
+                            rows={8}
+                            className="min-h-[220px] w-full resize-y rounded-md border border-[#b8c4cc] bg-white px-3 py-3 text-sm leading-6 text-[#111b21] outline-none focus:border-[#00a884] focus:ring-2 focus:ring-[#00a884]/20"
+                            autoFocus
+                        />
+                    </div>
+                    <DialogFooter>
+                        <button
+                            type="button"
+                            onClick={cancelEdit}
+                            disabled={isSavingEdit}
+                            className="rounded-md border border-[#d1d7db] px-4 py-2 text-sm font-medium text-[#54656f] hover:bg-[#f0f2f5] disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="button"
+                            onClick={saveEdit}
+                            disabled={isSavingEdit}
+                            className="rounded-md bg-[#00a884] px-4 py-2 text-sm font-medium text-white hover:bg-[#029b7d] disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                            {isSavingEdit ? "Updating..." : "Update"}
+                        </button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+            <Dialog
+                open={Boolean(messageToDelete)}
+                onOpenChange={(open) => {
+                    if (!open && !isDeletingMessage) setMessageToDelete(null);
+                }}
+            >
+                <DialogContent className="w-[min(92vw,520px)] sm:max-w-[520px]">
+                    <DialogHeader>
+                        <DialogTitle>Delete message?</DialogTitle>
+                        <DialogDescription>
+                            This will delete the message for everyone in this chat.
+                        </DialogDescription>
+                    </DialogHeader>
+                    {messageToDelete ? (
+                        <div className="max-h-40 overflow-y-auto rounded-md border bg-[#f0f2f5] px-3 py-2 text-sm leading-6 text-[#111b21]">
+                            {messageToDelete.body || "Selected message"}
+                        </div>
+                    ) : null}
+                    <DialogFooter>
+                        <button
+                            type="button"
+                            onClick={() => setMessageToDelete(null)}
+                            disabled={isDeletingMessage}
+                            className="rounded-md border border-[#d1d7db] px-4 py-2 text-sm font-medium text-[#54656f] hover:bg-[#f0f2f5] disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleDelete}
+                            disabled={isDeletingMessage}
+                            className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                            {isDeletingMessage ? "Deleting..." : "Delete"}
+                        </button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

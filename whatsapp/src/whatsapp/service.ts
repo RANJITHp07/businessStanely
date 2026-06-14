@@ -171,6 +171,12 @@ const avatarCacheNullTtlMs = Number(
 );
 // Lower default chat fetch limit for performance
 const chatFetchLimit = Number(process.env.WHATSAPP_CHAT_FETCH_LIMIT ?? 50);
+// How many times the background chat-cache pre-warm retries while WhatsApp Web
+// is still syncing its store on a cold start. ~8 attempts (5s + 7×8s ≈ 60s)
+// covers a slow first sync without spinning forever.
+const WARM_CACHE_MAX_ATTEMPTS = Number(
+  process.env.WHATSAPP_WARM_CACHE_MAX_ATTEMPTS ?? 8,
+);
 const operationConcurrencyLimit = Number(
   process.env.WHATSAPP_OPERATION_CONCURRENCY ?? 12,
 );
@@ -455,6 +461,12 @@ function getPhoneNumberFromChatId(chatId: string | null | undefined) {
   return digits || normalized;
 }
 
+function isLikelyLidIdentifier(value: string | null | undefined) {
+  const normalized = normalizeWhatsAppIdentifier(value);
+  if (!normalized) return false;
+  return String(value ?? "").includes("@lid") || digitsOnly(normalized).length > 11;
+}
+
 function isPhoneLikeLabel(value: string, phoneNumber: string | null) {
   const valueDigits = digitsOnly(value);
   const phoneDigits = digitsOnly(phoneNumber);
@@ -558,6 +570,26 @@ function mapChat(chat: Chat): WhatsAppChatSummary {
   };
 }
 
+function applyResolvedChatIdentity(
+  chat: WhatsAppChatSummary,
+  resolved: { phoneNumber?: string | null; name?: string | null } | null,
+) {
+  if (!resolved?.phoneNumber && !resolved?.name) {
+    return chat;
+  }
+
+  const phoneNumber = resolved.phoneNumber || chat.phoneNumber;
+  return {
+    ...chat,
+    phoneNumber,
+    name: getDisplayNameFromCandidates(
+      [resolved.name, chat.name, phoneNumber],
+      phoneNumber,
+    ),
+    avatarSeed: phoneNumber || chat.avatarSeed,
+  };
+}
+
 function getChatAvatarSeed(chatId: string) {
   return chatId.split("@")[0] || chatId;
 }
@@ -640,8 +672,18 @@ class WhatsAppService {
             name: getDisplayNameFromCandidates([chat.name], phoneNumber),
           };
         });
+        const containsLidLabels = this.chatsCache.some(
+          (chat) =>
+            !chat.isGroup &&
+            (isLikelyLidIdentifier(chat.id) ||
+              isLikelyLidIdentifier(chat.phoneNumber)),
+        );
         this.chatsCacheAt =
-          typeof parsed.chatsAt === "number" ? parsed.chatsAt : 0;
+          containsLidLabels
+            ? 0
+            : typeof parsed.chatsAt === "number"
+              ? parsed.chatsAt
+              : 0;
       }
 
       if (Array.isArray(parsed.avatars)) {
@@ -713,6 +755,127 @@ class WhatsAppService {
     );
     this.chatsCacheAt = Date.now();
     this.persistCachesDebounced();
+  }
+
+  private async resolveChatIdentities(
+    client: WhatsAppClient,
+    chats: WhatsAppChatSummary[],
+  ) {
+    const ids = chats
+      .filter(
+        (chat) =>
+          !chat.isGroup &&
+          (isLikelyLidIdentifier(chat.id) ||
+            isLikelyLidIdentifier(chat.phoneNumber)),
+      )
+      .map((chat) => chat.id);
+
+    if (ids.length === 0) {
+      return chats;
+    }
+
+    const pupPage = (client as unknown as { pupPage?: unknown }).pupPage as
+      | {
+          evaluate(
+            fn: (...a: unknown[]) => unknown,
+            ...args: unknown[]
+          ): Promise<unknown>;
+        }
+      | undefined;
+
+    if (!pupPage?.evaluate) {
+      return chats;
+    }
+
+    try {
+      const resolved = (await withTimeout(
+        pupPage.evaluate((chatIds: unknown) => {
+          /* eslint-disable @typescript-eslint/no-explicit-any */
+          const store = (window as any).Store;
+          const out: Record<
+            string,
+            { phoneNumber: string | null; name: string | null }
+          > = {};
+          const onlyDigits = (s: any) =>
+            typeof s === "string" ? s.replace(/[^0-9]/g, "") : "";
+
+          const getContact = (jid: string) => {
+            try {
+              const c = store?.Contact?.get?.(jid);
+              if (c) return c;
+            } catch {}
+            try {
+              return (
+                store?.Contact?.models?.find(
+                  (m: any) => m?.id?._serialized === jid,
+                ) ?? null
+              );
+            } catch {
+              return null;
+            }
+          };
+
+          const phoneFromContact = (jid: string, c: any) => {
+            const pn = c?.phoneNumber;
+            if (pn) {
+              if (typeof pn === "object" && pn.user) return onlyDigits(pn.user);
+              if (typeof pn === "string") {
+                const d = onlyDigits(pn.split("@")[0]);
+                if (d) return d;
+              }
+            }
+            try {
+              const wid = store?.LidUtils?.getPhoneNumber?.(c?.id ?? jid);
+              if (wid?.user) return onlyDigits(wid.user);
+              if (typeof wid === "string") {
+                const d = onlyDigits(wid.split("@")[0]);
+                if (d) return d;
+              }
+            } catch {}
+            if (c?.id?.server === "c.us" && c.id.user)
+              return onlyDigits(c.id.user);
+            return "";
+          };
+
+          for (const jid of chatIds as string[]) {
+            try {
+              const c = getContact(jid);
+              const phone =
+                jid.includes("@c.us")
+                  ? onlyDigits(jid.split("@")[0])
+                  : phoneFromContact(jid, c);
+              const isSaved = Boolean(
+                c && (c.isAddressBookContact ?? c.isMyContact),
+              );
+              const name =
+                isSaved && typeof c?.name === "string" && c.name.trim()
+                  ? c.name.trim()
+                  : null;
+              out[jid] = {
+                phoneNumber: phone || null,
+                name,
+              };
+            } catch {
+              out[jid] = { phoneNumber: null, name: null };
+            }
+          }
+
+          return out;
+          /* eslint-enable @typescript-eslint/no-explicit-any */
+        }, ids) as Promise<
+          Record<string, { phoneNumber: string | null; name: string | null }>
+        >,
+        8000,
+        "resolveChatIdentities",
+      )) as Record<string, { phoneNumber: string | null; name: string | null }>;
+
+      return chats.map((chat) =>
+        applyResolvedChatIdentity(chat, resolved?.[chat.id] ?? null),
+      );
+    } catch (error) {
+      LOG("resolveChatIdentities failed:", String(error));
+      return chats;
+    }
   }
 
   private setState(next: Partial<WhatsAppState>) {
@@ -989,14 +1152,18 @@ class WhatsAppService {
               this.chatsCacheAt = 0;
               this.chatsRefreshPromise = null;
             }
-            await this.refreshChats(liveClient);
-            if (this.chatsCache.length <= 1 && attempt < 3) {
+            // Background pre-warm can afford the slow, reliable getChats()
+            // read (it doesn't block any HTTP request), so on a cold start it
+            // actually pulls the chat list instead of waiting for WhatsApp
+            // Web's store to lazily populate on its own.
+            await this.refreshChats(liveClient, { allowSlowFallback: true });
+            if (this.chatsCache.length <= 1 && attempt < WARM_CACHE_MAX_ATTEMPTS) {
               LOG(
                 `Chat cache pre-warm attempt ${attempt}: only ${this.chatsCache.length} chat(s) loaded, retrying shortly`,
               );
               setTimeout(
                 () => warmCache(attempt + 1),
-                attempt === 1 ? 6000 : 12000,
+                attempt === 1 ? 5000 : 8000,
               );
             } else {
               LOG(
@@ -1006,10 +1173,10 @@ class WhatsAppService {
             }
           } catch (e) {
             LOG(`Chat cache pre-warm attempt ${attempt} failed:`, String(e));
-            if (attempt < 3) {
+            if (attempt < WARM_CACHE_MAX_ATTEMPTS) {
               setTimeout(
                 () => warmCache(attempt + 1),
-                attempt === 1 ? 6000 : 12000,
+                attempt === 1 ? 5000 : 8000,
               );
             }
           }
@@ -1113,13 +1280,25 @@ class WhatsAppService {
           const mapped = mapMessage(message);
           let eventChat =
             this.chatsCache.find((c) => c.id === mapped.chatId) ?? null;
+          if (
+            eventChat &&
+            !eventChat.isGroup &&
+            (isLikelyLidIdentifier(eventChat.id) ||
+              isLikelyLidIdentifier(eventChat.phoneNumber))
+          ) {
+            eventChat =
+              (await this.resolveChatIdentities(client, [eventChat]))[0] ??
+              eventChat;
+          }
 
           if (!eventChat) {
             try {
               const chat = await this.withOperationSlot(() =>
                 message.getChat(),
               );
-              eventChat = mapChat(chat);
+              eventChat =
+                (await this.resolveChatIdentities(client, [mapChat(chat)]))[0] ??
+                mapChat(chat);
             } catch (chatError) {
               LOG(
                 "message event: failed to resolve chat metadata, using optimistic summary",
@@ -1175,8 +1354,16 @@ class WhatsAppService {
           const existingChat = this.chatsCache.find(
             (c) => c.id === mapped.chatId,
           );
+          const baseChat = existingChat ?? createOptimisticChatSummary(mapped);
+          const resolvedBaseChat =
+            baseChat.isGroup ||
+            (!isLikelyLidIdentifier(baseChat.id) &&
+              !isLikelyLidIdentifier(baseChat.phoneNumber))
+              ? baseChat
+              : (await this.resolveChatIdentities(client, [baseChat]))[0] ??
+                baseChat;
           const updatedChat = {
-            ...(existingChat ?? createOptimisticChatSummary(mapped)),
+            ...resolvedBaseChat,
             lastMessage: mapped.body,
             timestamp: mapped.timestamp,
           };
@@ -1632,15 +1819,33 @@ class WhatsAppService {
     page: number = 1,
     pageSize: number = chatFetchLimit,
   ) {
+    const searchDigits = digitsOnly(normalizedSearch);
     const filtered = chats
       .filter((chat) => {
         if (!normalizedSearch) {
           return true;
         }
-        const searchableText = [chat.name, chat.phoneNumber, chat.lastMessage, chat.id]
+        const searchableValues = [
+          chat.name,
+          chat.phoneNumber,
+          chat.lastMessage,
+          chat.id,
+          chat.avatarSeed,
+        ];
+        const searchableText = searchableValues
           .join(" ")
           .toLowerCase();
-        return searchableText.includes(normalizedSearch);
+        if (searchableText.includes(normalizedSearch)) {
+          return true;
+        }
+
+        if (!searchDigits) {
+          return false;
+        }
+
+        return searchableValues.some((value) =>
+          digitsOnly(value).includes(searchDigits),
+        );
       })
       .sort((left, right) => (right.timestamp ?? 0) - (left.timestamp ?? 0));
     const start = (page - 1) * pageSize;
@@ -1689,10 +1894,69 @@ class WhatsAppService {
           (rawQuery: unknown, rawLimit: unknown) => {
             /* eslint-disable @typescript-eslint/no-explicit-any */
             const store = (window as any).Store;
-            const q = String(rawQuery);
+            const onlyDigits = (value: any) =>
+              String(value ?? "").replace(/[^0-9]/g, "");
+            const q = String(rawQuery ?? "").toLowerCase();
+            const qDigits = onlyDigits(q);
             const max = (rawLimit as number) || 50;
             const out: any[] = [];
             const seen = new Set<string>();
+            const textMatches = (...values: any[]) =>
+              values.some((value) => {
+                const text = String(value ?? "").toLowerCase();
+                if (text.includes(q)) return true;
+                return Boolean(qDigits && onlyDigits(value).includes(qDigits));
+              });
+            const getContact = (jid: string) => {
+              try {
+                const contact = store?.Contact?.get?.(jid);
+                if (contact) return contact;
+              } catch {}
+              try {
+                return (
+                  store?.Contact?.models?.find(
+                    (model: any) => model?.id?._serialized === jid,
+                  ) ?? null
+                );
+              } catch {
+                return null;
+              }
+            };
+            const phoneFromContact = (jid: string, contact: any) => {
+              const phoneNumber = contact?.phoneNumber;
+              if (phoneNumber) {
+                if (typeof phoneNumber === "object" && phoneNumber.user) {
+                  const digits = onlyDigits(phoneNumber.user);
+                  if (digits) return digits;
+                }
+                if (typeof phoneNumber === "string") {
+                  const digits = onlyDigits(phoneNumber.split("@")[0]);
+                  if (digits) return digits;
+                }
+              }
+              try {
+                const wid = store?.LidUtils?.getPhoneNumber?.(
+                  contact?.id ?? jid,
+                );
+                if (wid?.user) {
+                  const digits = onlyDigits(wid.user);
+                  if (digits) return digits;
+                }
+                if (typeof wid === "string") {
+                  const digits = onlyDigits(wid.split("@")[0]);
+                  if (digits) return digits;
+                }
+              } catch {}
+              if (contact?.id?.server === "c.us" && contact.id.user) {
+                const digits = onlyDigits(contact.id.user);
+                if (digits) return digits;
+              }
+              if (String(jid).includes("@c.us")) {
+                const digits = onlyDigits(String(jid).split("@")[0]);
+                if (digits) return digits;
+              }
+              return "";
+            };
 
             // 1) Existing chats (so matches keep their last-message preview).
             // Each model is guarded individually — a single chat with a throwing
@@ -1706,7 +1970,8 @@ class WhatsAppService {
                 if (!c?.id?._serialized) continue;
                 if (c.id.server === "status" || c.id.server === "broadcast")
                   continue;
-                const contact = store?.Contact?.get?.(c.id._serialized);
+                const contact = getContact(c.id._serialized);
+                const phone = phoneFromContact(c.id._serialized, contact);
                 const saved = Boolean(
                   contact?.isAddressBookContact ?? contact?.isMyContact,
                 );
@@ -1714,11 +1979,18 @@ class WhatsAppService {
                   saved && typeof contact?.name === "string"
                     ? contact.name.trim()
                     : "";
-                const name = String(
-                  savedName || c.formattedTitle || c.name || c.id?.user || "",
-                ).toLowerCase();
-                const num = String(c.id?.user || "").toLowerCase();
-                if (!name.includes(q) && !num.includes(q)) continue;
+                if (
+                  !textMatches(
+                    savedName,
+                    c.formattedTitle,
+                    c.name,
+                    contact?.pushname,
+                    contact?.formattedName,
+                    c.id?.user,
+                    phone,
+                  )
+                )
+                  continue;
                 let lm: any = null;
                 try {
                   lm = c.lastMessage ?? c.msgs?.last ?? null;
@@ -1729,7 +2001,7 @@ class WhatsAppService {
                   id: c.id._serialized,
                   name: savedName || c.formattedTitle || c.name || c.id?.user || "",
                   idUser: c.id?.user || "",
-                  phoneNumber: c.id?.user || null,
+                  phoneNumber: phone || c.id?.user || null,
                   timestamp: typeof c.t === "number" ? c.t : null,
                   unreadCount:
                     typeof c.unreadCount === "number" ? c.unreadCount : 0,
@@ -1756,31 +2028,40 @@ class WhatsAppService {
               if (out.length >= max) break;
               try {
                 if (!ct?.id?._serialized) continue;
-                if (ct.id.server !== "c.us") continue;
+                const phone = phoneFromContact(ct.id._serialized, ct);
+                const resultId =
+                  ct.id.server === "c.us"
+                    ? ct.id._serialized
+                    : phone
+                      ? `${phone}@c.us`
+                      : ct.id._serialized;
+                if (ct.id.server !== "c.us" && !phone) continue;
                 if (ct.isMe) continue;
-                if (seen.has(ct.id._serialized)) continue;
+                if (seen.has(ct.id._serialized) || seen.has(resultId))
+                  continue;
                 const saved = Boolean(
                   ct.isAddressBookContact ?? ct.isMyContact,
                 );
-                const display = String(
-                  ct.name ||
-                    ct.pushname ||
-                    ct.formattedName ||
-                    ct.id?.user ||
-                    "",
-                ).toLowerCase();
-                const num = String(ct.id?.user || "").toLowerCase();
-                if (!display.includes(q) && !num.includes(q)) continue;
+                if (
+                  !textMatches(
+                    ct.name,
+                    ct.pushname,
+                    ct.formattedName,
+                    ct.id?.user,
+                    phone,
+                  )
+                )
+                  continue;
                 // Saved name when available; otherwise the phone number.
                 const name =
                   saved && typeof ct.name === "string" && ct.name.trim()
                     ? ct.name.trim()
-                    : ct.id?.user || "";
+                    : phone || ct.id?.user || "";
                 out.push({
-                  id: ct.id._serialized,
-                  name: name || ct.id?.user || "",
+                  id: resultId,
+                  name: name || phone || ct.id?.user || "",
                   idUser: ct.id?.user || "",
-                  phoneNumber: ct.id?.user || null,
+                  phoneNumber: phone || ct.id?.user || null,
                   timestamp: null,
                   unreadCount: 0,
                   isGroup: false,
@@ -1791,6 +2072,7 @@ class WhatsAppService {
                   lastMessageType: null,
                 });
                 seen.add(ct.id._serialized);
+                seen.add(resultId);
               } catch {
                 // Skip this contact and keep searching.
               }
@@ -1908,7 +2190,11 @@ class WhatsAppService {
     });
   }
 
-  private async refreshChats(client: WhatsAppClient) {
+  private async refreshChats(
+    client: WhatsAppClient,
+    options: { allowSlowFallback?: boolean } = {},
+  ) {
+    const { allowSlowFallback = false } = options;
     if (!client) {
       LOG("refreshChats: client is undefined or not ready");
       throw new Error("WhatsApp is reconnecting, please wait a moment.");
@@ -2047,14 +2333,27 @@ class WhatsAppService {
               isMuted: r.isMuted,
               isPinned: r.isPinned,
             }));
+            const resolvedChats = await this.resolveChatIdentities(
+              client,
+              mappedChats,
+            );
 
-            this.chatsCache = mappedChats;
+            this.chatsCache = resolvedChats;
             this.chatsCacheAt = Date.now();
             this.persistCachesDebounced();
-            notifyIfNowPopulated(mappedChats);
-            return mappedChats;
+            notifyIfNowPopulated(resolvedChats);
+            return resolvedChats;
           }
 
+          if (cacheWasEmpty && !allowSlowFallback) {
+            // Request path (must stay under the frontend proxy timeout): don't
+            // block on the slow getChats() read. The background pre-warm calls
+            // this with allowSlowFallback=true and will fetch them shortly.
+            LOG(
+              "refreshChats: cold fast path is empty; skipping slow getChats fallback",
+            );
+            return this.chatsCache;
+          }
           LOG(
             "refreshChats: fast path returned empty/null, falling back to getChats()",
           );
@@ -2115,7 +2414,10 @@ class WhatsAppService {
             chat.id.server !== "status" && chat.id.server !== "broadcast",
         )
         .slice(0, limit);
-      const mappedChats = filteredChats.map((chat) => mapChat(chat));
+      const mappedChats = await this.resolveChatIdentities(
+        client,
+        filteredChats.map((chat) => mapChat(chat)),
+      );
 
       this.chatsCache = mappedChats;
       this.chatsCacheAt = Date.now();
@@ -2306,6 +2608,10 @@ class WhatsAppService {
     const fetchPromise = this.withOperationSlot(async () => {
       const chat = await client.getChatById(chatId);
       const messages = await chat.fetchMessages({ limit });
+      const directChatIdentity = isGroup
+        ? null
+        : (await this.resolveChatIdentities(client, [mapChat(chat)]))[0] ??
+          null;
 
       // For group chats, label each sender with their saved contact name, or
       // their phone number if not saved — never the raw JID / LID.
@@ -2330,6 +2636,11 @@ class WhatsAppService {
               mapped.author =
                 labelMap[authorJid] || normalizeWhatsAppIdentifier(authorJid);
             }
+          } else if (!mapped.fromMe) {
+            mapped.author =
+              directChatIdentity?.phoneNumber ||
+              directChatIdentity?.name ||
+              getPhoneNumberFromChatId(mapped.chatId);
           }
           return mapped;
         })

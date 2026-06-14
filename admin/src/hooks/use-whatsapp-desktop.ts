@@ -108,6 +108,13 @@ export function useWhatsAppDesktop() {
   const eventSourceRef = useRef<EventSource | null>(null);
   const selectedChatIdRef = useRef<string | null>(null);
   const stateRef = useRef<SerializableWhatsAppState>(defaultState);
+  const deletedMessageIdsRef = useRef<Set<string>>(new Set());
+  const editedMessagesRef = useRef<Map<string, WhatsAppMessage>>(new Map());
+
+  const reconcileMessages = (incoming: WhatsAppMessage[]) =>
+    incoming
+      .filter((message) => !deletedMessageIdsRef.current.has(message.id))
+      .map((message) => editedMessagesRef.current.get(message.id) ?? message);
 
   const selectedChat = useMemo(
     () =>
@@ -282,7 +289,8 @@ export function useWhatsAppDesktop() {
     const data = await getJson<{ messages: WhatsAppMessage[] }>(
       `/api/whatsapp/messages?chatId=${encodeURIComponent(chatId)}&limit=${limit}`,
     );
-    setMessages(data.messages);
+    const nextMessages = reconcileMessages(data.messages);
+    setMessages(nextMessages);
     setCanLoadMore(data.messages.length >= limit);
   };
 
@@ -493,10 +501,19 @@ export function useWhatsAppDesktop() {
         // Append the incoming message to the active chat view
         if (payload.chatId === selectedChatIdRef.current) {
           setMessages((current) => {
-            if (current.some((message) => message.id === payload.message?.id)) {
+            if (deletedMessageIdsRef.current.has(payload.message!.id)) {
               return current;
             }
-            return [...current, payload.message!];
+
+            const editedMessage =
+              editedMessagesRef.current.get(payload.message!.id) ??
+              payload.message!;
+            if (current.some((message) => message.id === editedMessage.id)) {
+              return current.map((message) =>
+                message.id === editedMessage.id ? editedMessage : message,
+              );
+            }
+            return [...current, editedMessage];
           });
         }
 
@@ -613,6 +630,7 @@ export function useWhatsAppDesktop() {
     const chatId = selectedChatIdRef.current;
     if (!chatId) return;
     const previousMessages = messages;
+    deletedMessageIdsRef.current.add(messageId);
     setMessages((current) =>
       current.filter((message) => message.id !== messageId),
     );
@@ -641,6 +659,7 @@ export function useWhatsAppDesktop() {
         }));
       }
     } catch (error) {
+      deletedMessageIdsRef.current.delete(messageId);
       setMessages(previousMessages);
       throw error;
     }
@@ -652,6 +671,7 @@ export function useWhatsAppDesktop() {
     const content = body.trim();
     if (!chatId || !content) return;
     const previousMessages = messages;
+    const previousEditedMessage = editedMessagesRef.current.get(messageId);
     setMessages((current) =>
       current.map((message) =>
         message.id === messageId ? { ...message, body: content } : message,
@@ -665,6 +685,7 @@ export function useWhatsAppDesktop() {
           body: JSON.stringify({ messageId, body: content }),
         },
       );
+      editedMessagesRef.current.set(messageId, data.message);
       setMessages((current) =>
         current.map((message) =>
           message.id === messageId ? data.message : message,
@@ -684,6 +705,11 @@ export function useWhatsAppDesktop() {
         isPinned: existing?.isPinned || false,
       }));
     } catch (error) {
+      if (previousEditedMessage) {
+        editedMessagesRef.current.set(messageId, previousEditedMessage);
+      } else {
+        editedMessagesRef.current.delete(messageId);
+      }
       setMessages(previousMessages);
       throw error;
     }

@@ -34,8 +34,10 @@ const INITIAL_MESSAGE_LIMIT = 30;
 const MESSAGE_LOAD_MORE_CHUNK = 50;
 // The backend pushes a `chats-updated` SSE event the moment its chat list first
 // populates, so the initial fetch no longer needs to poll aggressively. These
-// are just a gentle safety net in case the stream is unavailable.
-const CHATS_EMPTY_RETRY_LIMIT = 4;
+// are a safety net in case the stream is unavailable. The limit is generous so
+// the sidebar keeps showing the loading state (not an empty "No chats found")
+// while WhatsApp Web finishes its first cold-start sync, which can take a while.
+const CHATS_EMPTY_RETRY_LIMIT = 40;
 const CHATS_EMPTY_RETRY_DELAY_MS = 3000;
 
 async function getJson<T>(url: string, init?: RequestInit): Promise<T> {
@@ -118,6 +120,13 @@ export function useWhatsAppDesktop() {
   const eventSourceRef = useRef<EventSource | null>(null);
   const selectedChatIdRef = useRef<string | null>(null);
   const stateRef = useRef<SerializableWhatsAppState>(defaultState);
+  const deletedMessageIdsRef = useRef<Set<string>>(new Set());
+  const editedMessagesRef = useRef<Map<string, WhatsAppMessage>>(new Map());
+
+  const reconcileMessages = (incoming: WhatsAppMessage[]) =>
+    incoming
+      .filter((message) => !deletedMessageIdsRef.current.has(message.id))
+      .map((message) => editedMessagesRef.current.get(message.id) ?? message);
 
   const selectedChat = useMemo(
     () =>
@@ -240,7 +249,8 @@ export function useWhatsAppDesktop() {
     const data = await getJson<{ messages: WhatsAppMessage[] }>(
       `/api/whatsapp/messages?chatId=${encodeURIComponent(chatId)}&limit=${limit}`,
     );
-    setMessages(data.messages);
+    const nextMessages = reconcileMessages(data.messages);
+    setMessages(nextMessages);
     setCanLoadMore(data.messages.length >= limit);
   };
 
@@ -433,11 +443,20 @@ export function useWhatsAppDesktop() {
 
         if (payload.chatId === selectedChatIdRef.current) {
           setMessages((current) => {
-            if (current.some((message) => message.id === payload.message?.id)) {
+            if (deletedMessageIdsRef.current.has(payload.message!.id)) {
               return current;
             }
 
-            return [...current, payload.message!];
+            const editedMessage =
+              editedMessagesRef.current.get(payload.message!.id) ??
+              payload.message!;
+            if (current.some((message) => message.id === editedMessage.id)) {
+              return current.map((message) =>
+                message.id === editedMessage.id ? editedMessage : message,
+              );
+            }
+
+            return [...current, editedMessage];
           });
         }
 
@@ -683,6 +702,7 @@ export function useWhatsAppDesktop() {
     }
 
     const previousMessages = messages;
+    const previousEditedMessage = editedMessagesRef.current.get(messageId);
 
     setMessages((current) =>
       current.map((message) =>
@@ -699,6 +719,7 @@ export function useWhatsAppDesktop() {
         },
       );
 
+      editedMessagesRef.current.set(messageId, data.message);
       setMessages((current) =>
         current.map((message) =>
           message.id === messageId ? data.message : message,
@@ -718,6 +739,11 @@ export function useWhatsAppDesktop() {
         isPinned: existing?.isPinned || false,
       }));
     } catch (error) {
+      if (previousEditedMessage) {
+        editedMessagesRef.current.set(messageId, previousEditedMessage);
+      } else {
+        editedMessagesRef.current.delete(messageId);
+      }
       setMessages(previousMessages);
       throw error;
     }
@@ -731,6 +757,7 @@ export function useWhatsAppDesktop() {
     }
 
     const previousMessages = messages;
+    deletedMessageIdsRef.current.add(messageId);
     setMessages((current) =>
       current.filter((message) => message.id !== messageId),
     );
@@ -760,6 +787,7 @@ export function useWhatsAppDesktop() {
         }));
       }
     } catch (error) {
+      deletedMessageIdsRef.current.delete(messageId);
       setMessages(previousMessages);
       throw error;
     }

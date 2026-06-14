@@ -29,6 +29,7 @@ export async function GET(req: NextRequest) {
     const status = searchParams.get("status");
     const priority = searchParams.get("priority");
     const categoryId = searchParams.get("categoryId");
+    const retainershipId = searchParams.get("retainershipId");
     const trigger = searchParams.get("trigger");
     const retainershipTasks = searchParams.get("retainershipTasks");
     const clientUpdateFilter = searchParams.get("clientUpdate");
@@ -117,6 +118,9 @@ export async function GET(req: NextRequest) {
 
     if (priority) {
       where.priority = priority;
+    }
+    if (retainershipId) {
+      where.retainershipId = retainershipId;
     }
 
     const appendAndFilter = (filter: Prisma.TaskWhereInput) => {

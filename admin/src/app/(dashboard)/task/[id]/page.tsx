@@ -746,6 +746,14 @@ export default function TaskDetails() {
     return content.replace(/^\[(CLIENT_UPDATE|NORMAL)\]\s*/, "");
   };
 
+  const isAudioAttachment = (attachment: { name?: string; url?: string; type?: string }) =>
+    Boolean(
+      attachment.type?.startsWith("audio/") ||
+        /\.(mp3|wav|ogg|m4a|aac|webm)$/i.test(
+          attachment.name || attachment.url || "",
+        ),
+    );
+
   useEffect(() => {
     if (startTime && duration > 0) {
       setEndTime(addMinutes(startTime, duration));
@@ -1644,11 +1652,11 @@ export default function TaskDetails() {
                           htmlFor="interaction-client-update"
                           className="text-sm font-medium cursor-pointer"
                         >
-                          Mark as Client Update Interaction
+                          I Updated the Client
                         </Label>
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        Keep this unchecked for a normal internal interaction. Check this only when this comment is a direct update to the client.
+                        Click here if updating the client was necessary and you have updated the client.
                       </p>
                     </div>
 
@@ -1896,13 +1904,24 @@ export default function TaskDetails() {
                                             <a href={getAttachmentUrl(att.url)} className="text-blue-600 hover:text-blue-800 underline ml-auto" target="_blank" rel="noopener noreferrer">View</a>
                                           </div>
                                         </div>
+                                      ) : isAudioAttachment(att) ? (
+                                        <div className="flex flex-col gap-1 text-xs text-muted-foreground bg-muted p-2 rounded border">
+                                          <div className="flex items-center gap-2">
+                                            <Paperclip className="h-3 w-3" />
+                                            <span className="font-medium">{att.name}</span>
+                                            <span>({(att.size / 1024).toFixed(1)} KB)</span>
+                                          </div>
+                                          <audio controls className="w-full">
+                                            <source src={getAttachmentUrl(att.url)} />
+                                            Your browser does not support the audio element.
+                                          </audio>
+                                        </div>
                                       ) : (
                                         <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted p-2 rounded border">
                                           <Paperclip className="h-3 w-3" />
                                           <span className="font-medium">{att.name}</span>
                                           <span>({(att.size / 1024).toFixed(1)} KB)</span>
                                           <div className="ml-auto flex items-center gap-2">
-                                            <a href={getAttachmentUrl(att.url)} className="text-blue-600 hover:text-blue-800 underline" target="_blank" rel="noopener noreferrer">View</a>
                                             <a href={getAttachmentUrl(att.url)} className="text-blue-600 hover:text-blue-800 underline" target="_blank" rel="noopener noreferrer">View</a>
                                           </div>
                                         </div>
@@ -1932,8 +1951,24 @@ export default function TaskDetails() {
                                         <span className="font-medium">{comment.attachmentName}</span>
                                         <span>({(comment.attachmentSize! / 1024).toFixed(1)} KB)</span>
                                         <a href={getAttachmentUrl(comment.attachmentUrl)} className="text-blue-600 hover:text-blue-800 underline ml-auto" target="_blank" rel="noopener noreferrer">View</a>
-                                        <a href={getAttachmentUrl(comment.attachmentUrl)} className="text-blue-600 hover:text-blue-800 underline" target="_blank" rel="noopener noreferrer">View</a>
                                       </div>
+                                    </div>
+                                  ) : comment.attachmentUrl &&
+                                    isAudioAttachment({
+                                      name: comment.attachmentName,
+                                      url: comment.attachmentUrl,
+                                      type: comment.attachmentType,
+                                    }) ? (
+                                    <div className="flex flex-col gap-1 text-xs text-muted-foreground bg-muted p-2 rounded border">
+                                      <div className="flex items-center gap-2">
+                                        <Paperclip className="h-3 w-3" />
+                                        <span className="font-medium">{comment.attachmentName}</span>
+                                        <span>({((comment.attachmentSize ?? 0) / 1024).toFixed(1)} KB)</span>
+                                      </div>
+                                      <audio controls className="w-full">
+                                        <source src={getAttachmentUrl(comment.attachmentUrl)} />
+                                        Your browser does not support the audio element.
+                                      </audio>
                                     </div>
                                   ) : (
                                     <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted p-2 rounded border">
@@ -1942,7 +1977,6 @@ export default function TaskDetails() {
                                       <span>({(comment.attachmentSize! / 1024).toFixed(1)} KB)</span>
                                       {comment.attachmentUrl && (
                                         <div className="ml-auto flex items-center gap-2">
-                                          <a href={getAttachmentUrl(comment.attachmentUrl)} className="text-blue-600 hover:text-blue-800 underline" target="_blank" rel="noopener noreferrer">View</a>
                                           <a href={getAttachmentUrl(comment.attachmentUrl)} className="text-blue-600 hover:text-blue-800 underline" target="_blank" rel="noopener noreferrer">View</a>
                                         </div>
                                       )}

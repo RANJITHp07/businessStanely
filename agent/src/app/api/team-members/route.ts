@@ -15,37 +15,54 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const agentId = searchParams.get("agentId") || agent.id;
 
-    // Fetch subordinates using AgentSuperior join table (recommended logic)
-    const subordinatesLinks = await prisma.agentSuperior.findMany({
-      where: {
-        superiorId: agentId,
-        subordinate: { status: "active" },
-        ...(teamType === "advisor"
-          ? { teamType: "advisor" }
-          : teamType === "execution"
-            ? { teamType: { not: "advisor" } }
-            : {}),
-      },
-      include: {
-        subordinate: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            agentType: true,
-            phoneNumber: true,
-            jurisdiction: true,
-            specializations: true,
-            photo: true,
-            status: true,
-            agentRole: true,
-            executionAgentType: true,
-            advisorAgentType: true,
+    const teamFilter =
+      teamType === "advisor"
+        ? { teamType: "advisor" }
+        : teamType === "execution"
+          ? { teamType: { not: "advisor" } }
+          : {};
+
+    const visited = new Set<string>([agentId]);
+    const teamMembers = [];
+    let frontier = [agentId];
+
+    while (frontier.length > 0) {
+      const links = await prisma.agentSuperior.findMany({
+        where: {
+          superiorId: { in: frontier },
+          subordinate: { status: "active" },
+          ...teamFilter,
+        },
+        include: {
+          subordinate: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              agentType: true,
+              phoneNumber: true,
+              jurisdiction: true,
+              specializations: true,
+              photo: true,
+              status: true,
+              agentRole: true,
+              executionAgentType: true,
+              advisorAgentType: true,
+            },
           },
         },
-      },
-    });
-    const teamMembers = subordinatesLinks.map((link) => link.subordinate);
+      });
+
+      const nextFrontier: string[] = [];
+      for (const link of links) {
+        if (visited.has(link.subordinate.id)) continue;
+        visited.add(link.subordinate.id);
+        teamMembers.push(link.subordinate);
+        nextFrontier.push(link.subordinate.id);
+      }
+      frontier = nextFrontier;
+    }
+
     return NextResponse.json(teamMembers);
   } catch {
     return NextResponse.json(

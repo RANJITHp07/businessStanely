@@ -91,9 +91,11 @@ export default function TasksTable() {
     const params = new URLSearchParams();
     const assignedToId = searchParams.get("assignedToId");
     const retainershipTasks = searchParams.get("retainershipTasks");
+    const retainershipId = searchParams.get("retainershipId");
     const trigger = searchParams.get("trigger");
     if (assignedToId) params.set("assignedToId", assignedToId);
     if (retainershipTasks) params.set("retainershipTasks", retainershipTasks);
+    if (retainershipId) params.set("retainershipId", retainershipId);
     if (trigger) params.set("trigger", trigger);
     if (search) params.set("search", search);
     if (priorities.length > 0) params.set("priorities", priorities.join(","));
@@ -140,6 +142,7 @@ export default function TasksTable() {
         const statuses = searchParams.get("statuses");
         const statusCheckDuration = searchParams.get("statusCheckDuration");
         const retainershipTasks = searchParams.get("retainershipTasks");
+        const retainershipId = searchParams.get("retainershipId");
         const trigger = searchParams.get("trigger");
         const clientUpdate = searchParams.get("clientUpdate");
         let url = "/api/tasks";
@@ -149,13 +152,14 @@ export default function TasksTable() {
         if (statuses) params.push(`statuses=${encodeURIComponent(statuses)}`);
         if (statusCheckDuration) params.push(`statusCheckDuration=${encodeURIComponent(statusCheckDuration)}`);
         if (retainershipTasks) params.push(`retainershipTasks=${encodeURIComponent(retainershipTasks)}`);
+        if (retainershipId) params.push(`retainershipId=${encodeURIComponent(retainershipId)}`);
         if (trigger) params.push(`trigger=${encodeURIComponent(trigger)}`);
         if (clientUpdate) params.push(`clientUpdate=${encodeURIComponent(clientUpdate)}`);
         if (params.length > 0) url += `?${params.join("&")}`;
         const response = await fetchWithAuth(url);
         if (response.ok) {
           const data = await response.json();
-          setTasks(data);
+          setTasks(data.tasks || data);
         } else {
           console.error("Failed to fetch tasks");
           setTasks([]);

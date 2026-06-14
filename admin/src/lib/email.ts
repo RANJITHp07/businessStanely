@@ -13,8 +13,9 @@ export const createTransporter = () => {
 function getPortalLoginUrl(
   portalUrl: string | undefined,
   fallbackUrl: string | undefined,
+  defaultUrl = "http://localhost:3000",
 ) {
-  const rawBase = (portalUrl || fallbackUrl || "http://localhost:3000").trim();
+  const rawBase = (portalUrl || fallbackUrl || defaultUrl).trim();
   const base = rawBase.replace(/\/+$/, "").replace(/\/login$/i, "");
   return `${base}/login`;
 }
@@ -374,6 +375,11 @@ export async function sendAgentInviteEmail({
 }: SendAgentInviteEmailProps) {
   try {
     const transporter = createTransporter();
+    const agentLoginUrl = getPortalLoginUrl(
+      process.env.AGENT_PORTAL_URL,
+      process.env.NEXTAUTH_URL,
+      "https://agent.legalstanley.com",
+    );
 
     const mailOptions = {
       from: `"${process.env.COMPANY_NAME || "LegalStanley"}" <${
@@ -413,11 +419,7 @@ export async function sendAgentInviteEmail({
             </p>
 
             <div style="text-align: center; margin: 30px 0;">
-              <a href="${
-                process.env.AGENT_PORTAL_URL ||
-                process.env.NEXTAUTH_URL ||
-                "http://localhost:3000"
-              }/login" style="background: #4c51bf; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-weight: bold;">
+              <a href="${agentLoginUrl}" style="background: #4c51bf; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-weight: bold;">
                 Login to Agent Portal
               </a>
             </div>
@@ -447,7 +449,7 @@ export async function sendAgentInviteEmail({
         
         Please login to your agent portal using your email and the password above. For security purposes, we recommend changing your password after logging in.
         
-        Login now: ${process.env.AGENT_PORTAL_URL || process.env.NEXTAUTH_URL || "http://localhost:3000"}/login
+        Login now: ${agentLoginUrl}
         
         For security reasons, please change your password after logging in for the first time.
         

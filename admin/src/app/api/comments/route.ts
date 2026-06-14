@@ -20,6 +20,30 @@ export async function POST(req: NextRequest) {
       endTime,
     } = body;
 
+    const normalizedAttachments = Array.isArray(attachments)
+      ? attachments
+          .filter((attachment) => attachment && typeof attachment === "object")
+          .map((attachment) => {
+            const item = attachment as {
+              name?: unknown;
+              url?: unknown;
+              size?: unknown;
+              type?: unknown;
+            };
+
+            return {
+              name: typeof item.name === "string" ? item.name : "",
+              url: typeof item.url === "string" ? item.url : "",
+              size:
+                typeof item.size === "number"
+                  ? item.size
+                  : Number(item.size) || 0,
+              type: typeof item.type === "string" ? item.type : "",
+            };
+          })
+          .filter((attachment) => attachment.name && attachment.url)
+      : [];
+
     if (!content || !taskId || !authorId) {
       return NextResponse.json(
         { error: "Content, taskId, and authorId are required" },
@@ -57,9 +81,15 @@ export async function POST(req: NextRequest) {
       commentData.attachmentUrl = attachmentUrl;
       commentData.attachmentSize = attachmentSize;
       commentData.attachmentType = attachmentType;
+    } else if (normalizedAttachments.length > 0) {
+      const firstAttachment = normalizedAttachments[0];
+      commentData.attachmentName = firstAttachment.name;
+      commentData.attachmentUrl = firstAttachment.url;
+      commentData.attachmentSize = firstAttachment.size;
+      commentData.attachmentType = firstAttachment.type;
     }
-    if (attachments && Array.isArray(attachments) && attachments.length > 0) {
-      (commentData as any).attachments = attachments;
+    if (normalizedAttachments.length > 0) {
+      (commentData as any).attachments = normalizedAttachments;
     }
 
     // Add timesheet fields if provided
@@ -185,9 +215,17 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: "Comment not found" }, { status: 404 });
     }
 
-    if (comment.attachmentUrl) {
+    const attachments = Array.isArray(comment.attachments)
+      ? (comment.attachments as { url?: string }[])
+      : [];
+    const urlsToDelete = [
+      comment.attachmentUrl,
+      ...attachments.map((attachment) => attachment.url),
+    ].filter((url): url is string => Boolean(url));
+
+    for (const url of [...new Set(urlsToDelete)]) {
       try {
-        await deleteFromS3(comment.attachmentUrl);
+        await deleteFromS3(url);
       } catch (error) {
         console.error("Error deleting file from S3:", error);
       }

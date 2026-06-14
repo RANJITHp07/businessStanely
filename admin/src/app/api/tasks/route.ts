@@ -127,6 +127,7 @@ export async function GET(req: NextRequest) {
     const assignedToId = searchParams.get("assignedToId");
     const clientId = searchParams.get("clientId");
     const categoryId = searchParams.get("categoryId");
+    const retainershipId = searchParams.get("retainershipId");
     const status = searchParams.get("status");
     const trigger = searchParams.get("trigger");
     const retainershipTasks = searchParams.get("retainershipTasks");
@@ -178,6 +179,9 @@ export async function GET(req: NextRequest) {
     }
     if (clientId) {
       whereClause.clientId = clientId;
+    }
+    if (retainershipId) {
+      whereClause.retainershipId = retainershipId;
     }
     if (statusesArray && statusesArray.length > 0) {
       whereClause.status = { in: statusesArray };

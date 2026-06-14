@@ -134,6 +134,7 @@ export default function TasksTable() {
         const assignedToId = searchParams?.get('assignedToId');
         const status = searchParams?.get('status');
         const retainershipTasks = searchParams?.get("retainershipTasks")
+        const retainershipId = searchParams?.get("retainershipId")
         const trigger = searchParams?.get("trigger")
         const statuses = searchParams?.get("statuses");
         const statusCheckDuration = searchParams?.get("statusCheckDuration");
@@ -142,6 +143,7 @@ export default function TasksTable() {
         const params = [];
         if (assignedToId) params.push(`assignedToId=${assignedToId}`);
         if (retainershipTasks) params.push(`retainershipTasks=${retainershipTasks}`);
+        if (retainershipId) params.push(`retainershipId=${encodeURIComponent(retainershipId)}`);
         if (trigger) params.push(`trigger=${trigger}`);
         // Trigger tasks are completed/inactive occurrences; a status filter
         // (e.g. the "New Task" section's "To Do") would wrongly empty the list.
@@ -239,9 +241,11 @@ export default function TasksTable() {
     const params = new URLSearchParams();
     const assignedToId = searchParams.get("assignedToId");
     const retainershipTasks = searchParams?.get("retainershipTasks")
+    const retainershipId = searchParams?.get("retainershipId")
     const trigger = searchParams?.get("trigger")
     if (assignedToId) params.set("assignedToId", assignedToId);
     if (retainershipTasks) params.set("retainershipTasks", retainershipTasks);
+    if (retainershipId) params.set("retainershipId", retainershipId);
     if (trigger) params.set("trigger", trigger);
     if (search) params.set("search", search);
     if (priorities.length > 0) params.set("priorities", priorities.join(","));

@@ -815,6 +815,43 @@ class WhatsAppService {
             }
           };
 
+          // Turn a jid string (or existing Wid) into a real Wid object. The
+          // LidUtils phone-number lookup only works with a proper Wid, not a
+          // raw "<num>@lid" string, so unsaved lid contacts fail unless we
+          // build one here.
+          const toWid = (val: any) => {
+            if (!val) return null;
+            if (typeof val === "object" && (val.user || val._serialized))
+              return val;
+            const wf = store?.WidFactory;
+            for (const m of ["createWid", "createWidFromWidLike", "createWidFromWid"]) {
+              try {
+                const w = wf?.[m]?.(val);
+                if (w) return w;
+              } catch {}
+            }
+            return null;
+          };
+
+          const phoneFromLid = (wid: any) => {
+            try {
+              const pnWid = store?.LidUtils?.getPhoneNumber?.(wid);
+              if (pnWid?.user) return onlyDigits(pnWid.user);
+              if (typeof pnWid === "string") {
+                const d = onlyDigits(pnWid.split("@")[0]);
+                if (d) return d;
+              }
+              // The lookup may return only a serialized pn jid; resolve its
+              // contact to read the phone-form id.
+              if (pnWid?._serialized) {
+                const pnc = getContact(pnWid._serialized);
+                if (pnc?.id?.server === "c.us" && pnc.id.user)
+                  return onlyDigits(pnc.id.user);
+              }
+            } catch {}
+            return "";
+          };
+
           const phoneFromContact = (jid: string, c: any) => {
             const pn = c?.phoneNumber;
             if (pn) {
@@ -824,14 +861,12 @@ class WhatsAppService {
                 if (d) return d;
               }
             }
-            try {
-              const wid = store?.LidUtils?.getPhoneNumber?.(c?.id ?? jid);
-              if (wid?.user) return onlyDigits(wid.user);
-              if (typeof wid === "string") {
-                const d = onlyDigits(wid.split("@")[0]);
-                if (d) return d;
-              }
-            } catch {}
+            // Try the lid → phone mapping with a real Wid (contact id first,
+            // then one built from the jid string).
+            for (const cand of [c?.id, toWid(jid)]) {
+              const d = cand && phoneFromLid(cand);
+              if (d) return d;
+            }
             if (c?.id?.server === "c.us" && c.id.user)
               return onlyDigits(c.id.user);
             return "";
@@ -1922,6 +1957,42 @@ class WhatsAppService {
                 return null;
               }
             };
+            const toWid = (val: any) => {
+              if (!val) return null;
+              if (typeof val === "object" && (val.user || val._serialized))
+                return val;
+              const wf = store?.WidFactory;
+              for (const m of [
+                "createWid",
+                "createWidFromWidLike",
+                "createWidFromWid",
+              ]) {
+                try {
+                  const w = wf?.[m]?.(val);
+                  if (w) return w;
+                } catch {}
+              }
+              return null;
+            };
+            const lidToPhone = (wid: any) => {
+              try {
+                const pnWid = store?.LidUtils?.getPhoneNumber?.(wid);
+                if (pnWid?.user) {
+                  const digits = onlyDigits(pnWid.user);
+                  if (digits) return digits;
+                }
+                if (typeof pnWid === "string") {
+                  const digits = onlyDigits(pnWid.split("@")[0]);
+                  if (digits) return digits;
+                }
+                if (pnWid?._serialized) {
+                  const pnc = getContact(pnWid._serialized);
+                  if (pnc?.id?.server === "c.us" && pnc.id.user)
+                    return onlyDigits(pnc.id.user);
+                }
+              } catch {}
+              return "";
+            };
             const phoneFromContact = (jid: string, contact: any) => {
               const phoneNumber = contact?.phoneNumber;
               if (phoneNumber) {
@@ -1934,19 +2005,6 @@ class WhatsAppService {
                   if (digits) return digits;
                 }
               }
-              try {
-                const wid = store?.LidUtils?.getPhoneNumber?.(
-                  contact?.id ?? jid,
-                );
-                if (wid?.user) {
-                  const digits = onlyDigits(wid.user);
-                  if (digits) return digits;
-                }
-                if (typeof wid === "string") {
-                  const digits = onlyDigits(wid.split("@")[0]);
-                  if (digits) return digits;
-                }
-              } catch {}
               if (contact?.id?.server === "c.us" && contact.id.user) {
                 const digits = onlyDigits(contact.id.user);
                 if (digits) return digits;
@@ -1954,6 +2012,12 @@ class WhatsAppService {
               if (String(jid).includes("@c.us")) {
                 const digits = onlyDigits(String(jid).split("@")[0]);
                 if (digits) return digits;
+              }
+              // Lid resolution is the expensive part — try it last so cheap
+              // c.us paths win first.
+              for (const cand of [contact?.id, toWid(jid)]) {
+                const d = cand && lidToPhone(cand);
+                if (d) return d;
               }
               return "";
             };
@@ -1971,7 +2035,6 @@ class WhatsAppService {
                 if (c.id.server === "status" || c.id.server === "broadcast")
                   continue;
                 const contact = getContact(c.id._serialized);
-                const phone = phoneFromContact(c.id._serialized, contact);
                 const saved = Boolean(
                   contact?.isAddressBookContact ?? contact?.isMyContact,
                 );
@@ -1979,18 +2042,25 @@ class WhatsAppService {
                   saved && typeof contact?.name === "string"
                     ? contact.name.trim()
                     : "";
-                if (
-                  !textMatches(
-                    savedName,
-                    c.formattedTitle,
-                    c.name,
-                    contact?.pushname,
-                    contact?.formattedName,
-                    c.id?.user,
-                    phone,
-                  )
-                )
-                  continue;
+                // Cheap text match first (no lid resolution). Resolve the phone
+                // number only when it's actually needed — for display on a
+                // match, or to test a digit query that didn't match by name.
+                const cheapMatch = textMatches(
+                  savedName,
+                  c.formattedTitle,
+                  c.name,
+                  contact?.pushname,
+                  contact?.formattedName,
+                  c.id?.user,
+                );
+                let phone = "";
+                let matched = cheapMatch;
+                if (cheapMatch || qDigits) {
+                  phone = phoneFromContact(c.id._serialized, contact);
+                  if (!matched && qDigits && onlyDigits(phone).includes(qDigits))
+                    matched = true;
+                }
+                if (!matched) continue;
                 let lm: any = null;
                 try {
                   lm = c.lastMessage ?? c.msgs?.last ?? null;
@@ -2028,7 +2098,25 @@ class WhatsAppService {
               if (out.length >= max) break;
               try {
                 if (!ct?.id?._serialized) continue;
-                const phone = phoneFromContact(ct.id._serialized, ct);
+                if (ct.isMe) continue;
+                const saved = Boolean(
+                  ct.isAddressBookContact ?? ct.isMyContact,
+                );
+                // Cheap text match first; resolve the phone lazily (see above).
+                const cheapMatch = textMatches(
+                  ct.name,
+                  ct.pushname,
+                  ct.formattedName,
+                  ct.id?.user,
+                );
+                let phone = "";
+                let matched = cheapMatch;
+                if (cheapMatch || qDigits) {
+                  phone = phoneFromContact(ct.id._serialized, ct);
+                  if (!matched && qDigits && onlyDigits(phone).includes(qDigits))
+                    matched = true;
+                }
+                if (!matched) continue;
                 const resultId =
                   ct.id.server === "c.us"
                     ? ct.id._serialized
@@ -2036,21 +2124,7 @@ class WhatsAppService {
                       ? `${phone}@c.us`
                       : ct.id._serialized;
                 if (ct.id.server !== "c.us" && !phone) continue;
-                if (ct.isMe) continue;
                 if (seen.has(ct.id._serialized) || seen.has(resultId))
-                  continue;
-                const saved = Boolean(
-                  ct.isAddressBookContact ?? ct.isMyContact,
-                );
-                if (
-                  !textMatches(
-                    ct.name,
-                    ct.pushname,
-                    ct.formattedName,
-                    ct.id?.user,
-                    phone,
-                  )
-                )
                   continue;
                 // Saved name when available; otherwise the phone number.
                 const name =
@@ -2528,6 +2602,40 @@ class WhatsAppService {
             }
           };
 
+          // Build a real Wid from a jid string (or pass through an existing
+          // Wid). LidUtils.getPhoneNumber needs a Wid object, not a raw
+          // "<num>@lid" string, so unsaved lid senders fail without this.
+          const toWid = (val: any) => {
+            if (!val) return null;
+            if (typeof val === "object" && (val.user || val._serialized))
+              return val;
+            const wf = store?.WidFactory;
+            for (const m of ["createWid", "createWidFromWidLike", "createWidFromWid"]) {
+              try {
+                const w = wf?.[m]?.(val);
+                if (w) return w;
+              } catch {}
+            }
+            return null;
+          };
+
+          const lidToPhone = (wid: any) => {
+            try {
+              const pnWid = store?.LidUtils?.getPhoneNumber?.(wid);
+              if (pnWid?.user) return onlyDigits(pnWid.user);
+              if (typeof pnWid === "string") {
+                const d = onlyDigits(pnWid.split("@")[0]);
+                if (d) return d;
+              }
+              if (pnWid?._serialized) {
+                const pnc = getContact(pnWid._serialized);
+                if (pnc?.id?.server === "c.us" && pnc.id.user)
+                  return onlyDigits(pnc.id.user);
+              }
+            } catch {}
+            return "";
+          };
+
           // Map an @lid id back to its phone number using whatever the current
           // WhatsApp Web build exposes.
           const phoneFromLid = (jid: string, c: any) => {
@@ -2539,10 +2647,10 @@ class WhatsAppService {
                 if (d) return d;
               }
             }
-            try {
-              const wid = store?.LidUtils?.getPhoneNumber?.(c?.id ?? jid);
-              if (wid?.user) return onlyDigits(wid.user);
-            } catch {}
+            for (const cand of [c?.id, toWid(jid)]) {
+              const d = cand && lidToPhone(cand);
+              if (d) return d;
+            }
             // The resolved contact's own id may already be a phone number.
             if (c?.id?.server === "c.us" && c.id.user)
               return onlyDigits(c.id.user);

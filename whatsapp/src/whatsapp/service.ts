@@ -1637,6 +1637,15 @@ class WhatsAppService {
       return this.chatsRefreshPromise;
     }
 
+    // When the list is currently empty we want to push a one-time SSE signal as
+    // soon as it populates, so the frontend can fetch once instead of polling.
+    const cacheWasEmpty = this.chatsCache.length <= 1;
+    const notifyIfNowPopulated = (chats: WhatsAppChatSummary[]) => {
+      if (cacheWasEmpty && chats.length > 1) {
+        publishWhatsAppEvent("chats-updated");
+      }
+    };
+
     this.chatsRefreshPromise = (async () => {
       const limit =
         Number.isFinite(chatFetchLimit) && chatFetchLimit > 0
@@ -1748,6 +1757,7 @@ class WhatsAppService {
             this.chatsCache = mappedChats;
             this.chatsCacheAt = Date.now();
             this.persistCachesDebounced();
+            notifyIfNowPopulated(mappedChats);
             return mappedChats;
           }
 
@@ -1816,6 +1826,7 @@ class WhatsAppService {
       this.chatsCache = mappedChats;
       this.chatsCacheAt = Date.now();
       this.persistCachesDebounced();
+      notifyIfNowPopulated(mappedChats);
       return mappedChats;
     })();
 

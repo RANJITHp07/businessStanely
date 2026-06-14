@@ -29,6 +29,11 @@ const defaultState: SerializableWhatsAppState = {
 };
 
 const CHATS_PAGE_SIZE = 15;
+// The backend pushes a `chats-updated` SSE event the moment its chat list first
+// populates, so the initial fetch no longer needs to poll aggressively. These
+// are just a gentle safety net in case the stream is unavailable.
+const CHATS_EMPTY_RETRY_LIMIT = 4;
+const CHATS_EMPTY_RETRY_DELAY_MS = 3000;
 // Smaller first fetch paints the conversation faster; "Load older messages"
 // pulls more on demand.
 const INITIAL_MESSAGE_LIMIT = 30;
@@ -91,6 +96,7 @@ export function useWhatsAppDesktop() {
   const [canLoadMore, setCanLoadMore] = useState(false);
   const messageLimitRef = useRef(INITIAL_MESSAGE_LIMIT);
   const chatPageRef = useRef(1);
+  const chatsCountRef = useRef(0);
   const eventSourceRef = useRef<EventSource | null>(null);
   const selectedChatIdRef = useRef<string | null>(null);
   const stateRef = useRef<SerializableWhatsAppState>(defaultState);
@@ -167,18 +173,23 @@ export function useWhatsAppDesktop() {
         chatList[0] ||
         null;
       setSelectedChatId(activeChat?.id ?? null);
-      setIsChatsLoading(false);
 
       // While the session is freshly ready, WhatsApp Web may not have synced its
-      // chat list yet — retry a few times before giving up.
-      if (chatList.length === 0 && retryCount < 20) {
-        await new Promise((res) => setTimeout(res, 1000));
+      // chat list yet. Keep the loading state on and retry gently — but normally
+      // the `chats-updated` SSE event delivers the list before these fire.
+      if (chatList.length === 0 && retryCount < CHATS_EMPTY_RETRY_LIMIT) {
+        await new Promise((res) =>
+          setTimeout(res, CHATS_EMPTY_RETRY_DELAY_MS),
+        );
         return loadChats(preferredChatId, retryCount + 1);
       }
+      setIsChatsLoading(false);
       return activeChat?.id ?? null;
     } catch (err: any) {
-      if (retryCount < 20) {
-        await new Promise((res) => setTimeout(res, 1000));
+      if (retryCount < CHATS_EMPTY_RETRY_LIMIT) {
+        await new Promise((res) =>
+          setTimeout(res, CHATS_EMPTY_RETRY_DELAY_MS),
+        );
         return loadChats(preferredChatId, retryCount + 1);
       }
       setIsChatsLoading(false);
@@ -264,6 +275,10 @@ export function useWhatsAppDesktop() {
   useEffect(() => {
     stateRef.current = state;
   }, [state]);
+
+  useEffect(() => {
+    chatsCountRef.current = chats.length;
+  }, [chats]);
 
   useEffect(() => {
     let active = true;
@@ -403,15 +418,15 @@ export function useWhatsAppDesktop() {
           return;
         }
 
-        // Only trigger a full reload when the backend explicitly says the list
-        // changed (payload has chatId = new unknown contact). Local message
-        // events already update the sidebar for known chats.
+        // Reload the list when the backend says it changed (payload has a
+        // chatId = new unknown contact) OR when we don't have any chats yet —
+        // the latter is the warm-up push the backend fires the moment its chat
+        // list first populates, which lets us fetch once instead of polling.
         const payload = JSON.parse((event as MessageEvent).data) as {
           chatId?: string;
           at?: number;
         };
-        if (payload.chatId) {
-          // New/unknown chat arrived — reload the list so it appears
+        if (payload.chatId || chatsCountRef.current === 0) {
           triggerChatsRefresh();
         }
       });

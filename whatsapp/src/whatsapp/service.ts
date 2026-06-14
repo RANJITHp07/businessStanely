@@ -42,6 +42,10 @@ function resolveSessionDir() {
 }
 
 const SESSION_DIR = resolveSessionDir();
+// Last-known chat list + avatar URLs are mirrored here so a process restart can
+// serve a warm cache immediately instead of waiting ~30–60s for Puppeteer to
+// re-read WhatsApp Web's store. Lives next to the session so it survives deploys.
+const CACHE_FILE = path.join(SESSION_DIR, "wa-cache.json");
 
 /**
  * Clean up stuck lockfiles from crashed sessions (useful for local dev)
@@ -150,6 +154,11 @@ const chatFetchTimeoutMs = Number(
   process.env.WHATSAPP_CHAT_FETCH_TIMEOUT_MS ?? 180000,
 );
 const chatCacheTtlMs = Number(process.env.WHATSAPP_CHAT_CACHE_TTL_MS ?? 60000);
+// Max time the /chats request will block on a cold cache before returning what
+// it has (usually empty) and letting the refresh finish in the background. Kept
+// well under the frontend proxy's 25s abort so a slow Puppeteer read returns a
+// fast 200 (which the frontend retries) instead of timing out as a 503.
+const coldChatWaitMs = Number(process.env.WHATSAPP_COLD_CHAT_WAIT_MS ?? 8000);
 // Cache resolved profile-picture URLs so repeated /chat-avatar requests (one per
 // chat row, per browser) don't each trigger an expensive Puppeteer evaluation.
 // Found avatars are cached for hours; "no avatar" results for only a few minutes
@@ -531,9 +540,94 @@ class WhatsAppService {
   private authFailureTimestamps: number[] = [];
   private activeOperationCount = 0;
   private operationQueue: Array<() => void> = [];
+  private cachePersistTimer: NodeJS.Timeout | null = null;
+
+  constructor() {
+    // Warm the in-memory caches from disk at startup so the very first /chats
+    // after a restart is served instantly while the browser reconnects.
+    this.loadPersistedCaches();
+  }
 
   getState() {
     return this.state;
+  }
+
+  private loadPersistedCaches() {
+    try {
+      if (!fs.existsSync(CACHE_FILE)) {
+        return;
+      }
+      const parsed = JSON.parse(fs.readFileSync(CACHE_FILE, "utf8")) as {
+        chats?: WhatsAppChatSummary[];
+        chatsAt?: number;
+        avatars?: Array<[string, { url: string | null; at: number }]>;
+      };
+
+      if (Array.isArray(parsed.chats) && parsed.chats.length > 0) {
+        this.chatsCache = parsed.chats;
+        this.chatsCacheAt =
+          typeof parsed.chatsAt === "number" ? parsed.chatsAt : 0;
+      }
+
+      if (Array.isArray(parsed.avatars)) {
+        const now = Date.now();
+        for (const [id, entry] of parsed.avatars) {
+          if (!entry) continue;
+          const ttl = entry.url ? avatarCacheOkTtlMs : avatarCacheNullTtlMs;
+          if (now - entry.at <= ttl) {
+            this.avatarCache.set(id, entry);
+          }
+        }
+      }
+
+      LOG(
+        `loadPersistedCaches: restored ${this.chatsCache.length} chats, ${this.avatarCache.size} avatars`,
+      );
+    } catch (e) {
+      LOG("loadPersistedCaches: failed", String(e));
+    }
+  }
+
+  // Debounced so a burst of updates results in a single write.
+  private persistCachesDebounced() {
+    if (this.cachePersistTimer) {
+      return;
+    }
+    this.cachePersistTimer = setTimeout(() => {
+      this.cachePersistTimer = null;
+      this.persistCachesNow();
+    }, 2000);
+  }
+
+  private persistCachesNow() {
+    try {
+      fs.mkdirSync(SESSION_DIR, { recursive: true });
+      fs.writeFileSync(
+        CACHE_FILE,
+        JSON.stringify({
+          savedAt: Date.now(),
+          chats: this.chatsCache,
+          chatsAt: this.chatsCacheAt,
+          avatars: Array.from(this.avatarCache.entries()),
+        }),
+      );
+    } catch (e) {
+      LOG("persistCachesNow: failed", String(e));
+    }
+  }
+
+  private deletePersistedCaches() {
+    try {
+      if (this.cachePersistTimer) {
+        clearTimeout(this.cachePersistTimer);
+        this.cachePersistTimer = null;
+      }
+      if (fs.existsSync(CACHE_FILE)) {
+        fs.unlinkSync(CACHE_FILE);
+      }
+    } catch {
+      // Best-effort.
+    }
   }
 
   private upsertChatSummary(chat: WhatsAppChatSummary) {
@@ -543,6 +637,7 @@ class WhatsAppService {
       (left, right) => (right.timestamp ?? 0) - (left.timestamp ?? 0),
     );
     this.chatsCacheAt = Date.now();
+    this.persistCachesDebounced();
   }
 
   private setState(next: Partial<WhatsAppState>) {
@@ -801,8 +896,10 @@ class WhatsAppService {
         // if the session reconnects before the 15 s fires, the captured
         // client would be a destroyed object whose internals are undefined.
         // Pre-warm the chat cache after WhatsApp Web has had time to load
-        // its full chat list. Retries up to 3 times (at 15 s, 30 s, 45 s)
-        // if the Store hasn't populated enough real chats yet.
+        // its full chat list. Retries up to 3 times (first at 3 s, then 6 s,
+        // 12 s) if the Store hasn't populated enough real chats yet. Starting
+        // at 3 s (instead of 15 s) gets chats on screen much sooner; the disk
+        // cache already covers the gap before the Store is ready.
         const warmCache = async (attempt: number) => {
           const liveClient = this.client;
           if (!liveClient || this.state.status !== "ready") {
@@ -820,9 +917,12 @@ class WhatsAppService {
             await this.refreshChats(liveClient);
             if (this.chatsCache.length <= 1 && attempt < 3) {
               LOG(
-                `Chat cache pre-warm attempt ${attempt}: only ${this.chatsCache.length} chat(s) loaded, retrying in 15 s`,
+                `Chat cache pre-warm attempt ${attempt}: only ${this.chatsCache.length} chat(s) loaded, retrying shortly`,
               );
-              setTimeout(() => warmCache(attempt + 1), 15000);
+              setTimeout(
+                () => warmCache(attempt + 1),
+                attempt === 1 ? 6000 : 12000,
+              );
             } else {
               LOG(
                 `Chat cache pre-warmed successfully (${this.chatsCache.length} chats, attempt ${attempt})`,
@@ -832,11 +932,14 @@ class WhatsAppService {
           } catch (e) {
             LOG(`Chat cache pre-warm attempt ${attempt} failed:`, String(e));
             if (attempt < 3) {
-              setTimeout(() => warmCache(attempt + 1), 15000);
+              setTimeout(
+                () => warmCache(attempt + 1),
+                attempt === 1 ? 6000 : 12000,
+              );
             }
           }
         };
-        setTimeout(() => warmCache(1), 15000); // first attempt after 15 s
+        setTimeout(() => warmCache(1), 3000); // first attempt after 3 s
       });
 
       client.on("auth_failure", (message: string) => {
@@ -1145,6 +1248,9 @@ class WhatsAppService {
     this.avatarFetchInProgress.clear();
     this.clearReconnectTimer();
     this.reconnectAttempts = 0;
+    // Recovery (not logout): re-warm from the last persisted snapshot so the UI
+    // has chats/avatars to show while the browser reconnects.
+    this.loadPersistedCaches();
     this.setState(createDefaultState());
   }
 
@@ -1230,6 +1336,7 @@ class WhatsAppService {
     const promise = this.resolveChatAvatarUrlById(chatId)
       .then((url) => {
         this.avatarCache.set(chatId, { url, at: Date.now() });
+        this.persistCachesDebounced();
         return url;
       })
       .finally(() => {
@@ -1238,6 +1345,38 @@ class WhatsAppService {
 
     this.avatarFetchInProgress.set(chatId, promise);
     return promise;
+  }
+
+  // Resolve many avatars in one call (used by the frontend's batch prefetch so
+  // a chat list issues a single request instead of one per row). Cached ids are
+  // instant; misses are resolved with limited concurrency so we don't flood the
+  // single Puppeteer page.
+  async getChatAvatarUrlsByIds(
+    chatIds: string[],
+  ): Promise<Record<string, string | null>> {
+    const result: Record<string, string | null> = {};
+    const concurrency = 4;
+    let index = 0;
+
+    const worker = async () => {
+      while (index < chatIds.length) {
+        const id = chatIds[index++];
+        if (!id) continue;
+        try {
+          result[id] = await this.getChatAvatarUrlById(id);
+        } catch {
+          result[id] = null;
+        }
+      }
+    };
+
+    await Promise.all(
+      Array.from({ length: Math.min(concurrency, chatIds.length) }, () =>
+        worker(),
+      ),
+    );
+
+    return result;
   }
 
   private async resolveChatAvatarUrlById(
@@ -1452,8 +1591,20 @@ class WhatsAppService {
         hasUsableCachedData && Date.now() - this.chatsCacheAt <= chatCacheTtlMs;
 
       if (!hasUsableCachedData) {
-        // Cold start or partial-load cache — must wait for a proper fetch.
-        await this.refreshChats(client);
+        // Cold start or partial-load cache. Kick off a refresh, but only wait a
+        // bounded time for it — a slow Puppeteer read must not block past the
+        // frontend's 25s proxy timeout (which surfaces as a 503). If it's slow,
+        // return what we have (likely empty) and let the refresh complete in the
+        // background; the frontend retries on an empty list and picks up the
+        // chats on a subsequent fast request.
+        const refresh = this.refreshChats(client).catch((e) => {
+          LOG("getPaginatedChats: cold refresh failed:", String(e));
+          return this.chatsCache;
+        });
+        await Promise.race([
+          refresh,
+          new Promise((resolve) => setTimeout(resolve, coldChatWaitMs)),
+        ]);
       } else if (!hasFreshCache) {
         // Stale cache — return immediately and refresh in the background.
         // Re-read this.client at the time the background task runs so we
@@ -1596,6 +1747,7 @@ class WhatsAppService {
 
             this.chatsCache = mappedChats;
             this.chatsCacheAt = Date.now();
+            this.persistCachesDebounced();
             return mappedChats;
           }
 
@@ -1663,6 +1815,7 @@ class WhatsAppService {
 
       this.chatsCache = mappedChats;
       this.chatsCacheAt = Date.now();
+      this.persistCachesDebounced();
       return mappedChats;
     })();
 
@@ -1913,6 +2066,7 @@ class WhatsAppService {
       this.chatsRefreshPromise = null;
       this.avatarCache.clear();
       this.avatarFetchInProgress.clear();
+      this.deletePersistedCaches();
       // Remove session directory from disk
       try {
         if (fs.existsSync(sessionPath)) {
@@ -1943,6 +2097,7 @@ class WhatsAppService {
       this.chatsRefreshPromise = null;
       this.avatarCache.clear();
       this.avatarFetchInProgress.clear();
+      this.deletePersistedCaches();
       // Remove session directory from disk
       try {
         if (fs.existsSync(sessionPath)) {
@@ -2006,6 +2161,12 @@ class WhatsAppService {
 
     this.client = null;
     this.initializingPromise = null;
+    this.chatsCache = [];
+    this.chatsCacheAt = 0;
+    this.chatsRefreshPromise = null;
+    this.avatarCache.clear();
+    this.avatarFetchInProgress.clear();
+    this.deletePersistedCaches();
 
     try {
       cleanupStuckLockfiles();

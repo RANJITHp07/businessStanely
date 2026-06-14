@@ -7,6 +7,7 @@ import Navigator from "@/components/navigator";
 import { ToastContainer } from "react-toastify";
 import { AuthGuard } from "@/components/AuthGuard";
 import AuthSessionTimeout from "@/components/AuthSessionTimeout";
+import WhatsAppPrefetcher from "@/components/whatsapp/WhatsAppPrefetcher";
 
 export default function RootLayout({
   children,
@@ -16,6 +17,7 @@ export default function RootLayout({
   return (
     <AuthGuard>
       <AuthSessionTimeout />
+      <WhatsAppPrefetcher />
       <div className={`overflow-auto flex w-full`}>
         <SidebarProvider>
           <AppSidebar />

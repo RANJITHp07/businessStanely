@@ -8,6 +8,8 @@ import type {
   WhatsAppMessage,
   WhatsAppState,
 } from "@/lib/whatsapp/types";
+import { resolveAvatarsBatch } from "@/lib/whatsapp/avatar-cache";
+import { openWhatsAppStream } from "@/lib/whatsapp/stream";
 
 type SerializableWhatsAppState = WhatsAppState & {
   qrCodeDataUrl: string | null;
@@ -25,6 +27,11 @@ const defaultState: SerializableWhatsAppState = {
   error: null,
   lastUpdatedAt: new Date(0).toISOString(),
 };
+
+// Smaller first fetch paints the conversation faster; "Load older messages"
+// pulls more on demand.
+const INITIAL_MESSAGE_LIMIT = 30;
+const MESSAGE_LOAD_MORE_CHUNK = 50;
 
 async function getJson<T>(url: string, init?: RequestInit): Promise<T> {
   const isFormData =
@@ -93,7 +100,7 @@ export function useWhatsAppDesktop() {
   const [isSending, setIsSending] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [canLoadMore, setCanLoadMore] = useState(false);
-  const messageLimitRef = useRef(80);
+  const messageLimitRef = useRef(INITIAL_MESSAGE_LIMIT);
   const eventSourceRef = useRef<EventSource | null>(null);
   const selectedChatIdRef = useRef<string | null>(null);
   const stateRef = useRef<SerializableWhatsAppState>(defaultState);
@@ -153,6 +160,7 @@ export function useWhatsAppDesktop() {
         "/api/whatsapp/chats?pageSize=15",
       );
       setChats(data.chats);
+      resolveAvatarsBatch(data.chats.map((chat) => chat.id));
 
       const nextSelectedChatId = preferredChatId ?? selectedChatIdRef.current;
       const activeChat =
@@ -180,7 +188,7 @@ export function useWhatsAppDesktop() {
     }
   };
 
-  const loadMessages = async (chatId: string, limit = 80) => {
+  const loadMessages = async (chatId: string, limit = INITIAL_MESSAGE_LIMIT) => {
     const data = await getJson<{ messages: WhatsAppMessage[] }>(
       `/api/whatsapp/messages?chatId=${encodeURIComponent(chatId)}&limit=${limit}`,
     );
@@ -191,13 +199,13 @@ export function useWhatsAppDesktop() {
   const loadMoreMessages = async () => {
     const chatId = selectedChatIdRef.current;
     if (!chatId || isLoadingMore) return;
-    const nextLimit = messageLimitRef.current + 80;
+    const nextLimit = messageLimitRef.current + MESSAGE_LOAD_MORE_CHUNK;
     messageLimitRef.current = nextLimit;
     setIsLoadingMore(true);
     try {
       await loadMessages(chatId, nextLimit);
     } catch {
-      messageLimitRef.current -= 80;
+      messageLimitRef.current -= MESSAGE_LOAD_MORE_CHUNK;
       toast.error("Failed to load older messages.");
     } finally {
       setIsLoadingMore(false);
@@ -279,10 +287,14 @@ export function useWhatsAppDesktop() {
       }, 350);
     };
 
-    function connect() {
+    async function connect() {
       if (disposed) return;
 
-      source = new EventSource("/api/whatsapp/stream");
+      source = await openWhatsAppStream();
+      if (disposed) {
+        source.close();
+        return;
+      }
       eventSourceRef.current = source;
 
       source.onopen = () => {
@@ -473,12 +485,12 @@ export function useWhatsAppDesktop() {
     if (!selectedChatId || state.status !== "ready") {
       setMessages([]);
       setCanLoadMore(false);
-      messageLimitRef.current = 80;
+      messageLimitRef.current = INITIAL_MESSAGE_LIMIT;
       return;
     }
 
-    messageLimitRef.current = 80;
-    loadMessages(selectedChatId, 80).catch(() => {
+    messageLimitRef.current = INITIAL_MESSAGE_LIMIT;
+    loadMessages(selectedChatId, INITIAL_MESSAGE_LIMIT).catch(() => {
       toast.error("Failed to load messages.");
     });
   }, [selectedChatId, state.status]); // eslint-disable-line react-hooks/exhaustive-deps

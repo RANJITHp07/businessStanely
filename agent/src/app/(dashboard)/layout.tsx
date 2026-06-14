@@ -7,6 +7,7 @@ import Navigator from "@/components/navigator";
 import { ToastContainer } from "react-toastify";
 import { AuthGuard } from "@/components/AuthGuard";
 import AuthSessionTimeout from "@/components/AuthSessionTimeout";
+import WhatsAppPrefetcher from "@/components/whatsapp/WhatsAppPrefetcher";
 import { Plus, FileText, User, Layers, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -23,6 +24,7 @@ export default function RootLayout({
   return (
     <AuthGuard>
       <AuthSessionTimeout />
+      <WhatsAppPrefetcher />
       <div className="overflow-auto flex w-full">
         <SidebarProvider>
           <AppSidebar />

@@ -99,3 +99,59 @@ export function resolveAvatar(chatId: string): Promise<string | null> {
   inFlight.set(chatId, request);
   return request;
 }
+
+/**
+ * Prefetches avatars for a list of chats in a single request. Only the ids that
+ * aren't already cached or in-flight are requested. Each resolved id is written
+ * to the cache and registered in `inFlight`, so a subsequent `resolveAvatar(id)`
+ * (e.g. from a chat row) reuses this batch instead of firing its own request.
+ *
+ * Call this when a page of chats loads — it turns N per-row requests into one.
+ */
+export function resolveAvatarsBatch(chatIds: string[]): void {
+  const missing = Array.from(
+    new Set(
+      chatIds.filter(
+        (id) => id && getCachedAvatar(id) === undefined && !inFlight.has(id),
+      ),
+    ),
+  );
+  if (missing.length === 0) return;
+
+  const batch = (async () => {
+    try {
+      const response = await fetch("/api/whatsapp/chat-avatars", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chatIds: missing }),
+      });
+      const data = (await response.json()) as {
+        urls?: Record<string, string | null>;
+      };
+      const urls = data?.urls ?? {};
+      const now = Date.now();
+      for (const id of missing) {
+        const url = urls[id] ?? null;
+        const entry: AvatarEntry = {
+          url,
+          expiresAt: now + (url ? TTL_FOUND_MS : TTL_NONE_MS),
+        };
+        memoryCache.set(id, entry);
+        writeStorage(id, entry);
+      }
+      return urls;
+    } catch {
+      return {} as Record<string, string | null>;
+    } finally {
+      for (const id of missing) inFlight.delete(id);
+    }
+  })();
+
+  // Register each id's slice of the batch so concurrent single-id lookups reuse it.
+  for (const id of missing) {
+    inFlight.set(
+      id,
+      batch.then((urls) => urls[id] ?? getCachedAvatar(id) ?? null),
+    );
+  }
+}

@@ -1,8 +1,10 @@
 import "dotenv/config";
+import crypto from "node:crypto";
 import fs from "fs";
 import path from "path";
 import express from "express";
 import cors from "cors";
+import compression from "compression";
 import QRCode from "qrcode";
 
 import { whatsappService } from "./whatsapp/service.js";
@@ -117,6 +119,25 @@ const corsOptions: cors.CorsOptions = {
   },
 };
 
+// Gzip/brotli JSON responses (/chats, /messages can be large). The SSE stream
+// must never be buffered/compressed — exclude text/event-stream so realtime
+// events flush immediately. /media already sets its own headers and is mostly
+// already-compressed binary, so we skip it too.
+app.use(
+  compression({
+    filter: (req, res) => {
+      if (req.path === "/stream") return false;
+      const contentType = res.getHeader("Content-Type");
+      if (
+        typeof contentType === "string" &&
+        contentType.includes("text/event-stream")
+      ) {
+        return false;
+      }
+      return compression.filter(req, res);
+    },
+  }),
+);
 app.use(cors(corsOptions));
 app.use(express.json({ limit: "50mb" }));
 
@@ -160,6 +181,60 @@ function auth(
     next();
     return;
   }
+  res.status(401).json({ error: "Unauthorized" });
+}
+
+// Short-lived, HMAC-signed token used by the browser's EventSource to connect
+// to /stream directly (Amplify/CloudFront can't proxy SSE). Format:
+// "<expiryEpochMs>.<hmacSHA256(expiry, SERVICE_TOKEN)>". The frontend mints these
+// server-side via its own /api/whatsapp/stream-token route, so the real
+// SERVICE_TOKEN never reaches the browser — only a 60s read-only stream token.
+function verifyStreamToken(value: unknown): boolean {
+  if (typeof value !== "string" || !value.includes(".")) {
+    return false;
+  }
+  const [payload, signature] = value.split(".");
+  if (!payload || !signature) {
+    return false;
+  }
+  const exp = Number(payload);
+  if (!Number.isFinite(exp) || Date.now() > exp) {
+    return false;
+  }
+  const expected = crypto
+    .createHmac("sha256", SERVICE_TOKEN)
+    .update(payload)
+    .digest("hex");
+  const a = Buffer.from(signature);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length) {
+    return false;
+  }
+  return crypto.timingSafeEqual(a, b);
+}
+
+// Auth for the SSE stream: accept either the static service token (used by the
+// same-origin Next proxy in local/non-Amplify setups) or a valid short-lived
+// stream token in ?token= (used by the direct browser EventSource on Amplify).
+function streamAuth(
+  req: express.Request,
+  res: express.Response,
+  next: express.NextFunction,
+) {
+  const headerToken = req.headers["x-whatsapp-service-token"];
+  const authHeader = req.headers["authorization"];
+  const bearerToken =
+    typeof authHeader === "string" && authHeader.startsWith("Bearer ")
+      ? authHeader.slice(7).trim()
+      : undefined;
+  const queryToken = req.query["token"];
+  const staticToken = headerToken ?? bearerToken ?? queryToken;
+
+  if (staticToken === SERVICE_TOKEN || verifyStreamToken(queryToken)) {
+    next();
+    return;
+  }
+
   res.status(401).json({ error: "Unauthorized" });
 }
 
@@ -322,8 +397,27 @@ app.get("/chat-avatar", auth, async (req, res) => {
   }
 });
 
+// --- Chat Avatars (batch) ---
+app.post("/chat-avatars", auth, async (req, res) => {
+  const chatIds = Array.isArray(req.body?.chatIds)
+    ? (req.body.chatIds as unknown[]).map(String).filter(Boolean).slice(0, 100)
+    : [];
+  if (chatIds.length === 0) {
+    res.json({ urls: {} });
+    return;
+  }
+  try {
+    const urls = await whatsappService.getChatAvatarUrlsByIds(chatIds);
+    res.json({ urls });
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Failed to fetch avatars.";
+    res.status(500).json({ error: message });
+  }
+});
+
 // --- SSE Stream ---
-app.get("/stream", auth, async (req, res) => {
+app.get("/stream", streamAuth, async (req, res) => {
   whatsappService.ensureInitialized().catch((err: unknown) => {
     console.error("[WhatsApp Backend] ensureInitialized(/stream) failed:", err);
   });

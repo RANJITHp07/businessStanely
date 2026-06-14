@@ -30,7 +30,12 @@ export async function GET(req: NextRequest) {
       signal: timeoutController.signal,
     });
     const data = await upstream.json();
-    return NextResponse.json(data, { status: upstream.status });
+    return NextResponse.json(data, {
+      status: upstream.status,
+      // Let the browser disk-cache the avatar URL briefly too, on top of the
+      // in-memory + sessionStorage caches.
+      headers: { "Cache-Control": "private, max-age=300" },
+    });
   } catch {
     return NextResponse.json({ url: null });
   } finally {

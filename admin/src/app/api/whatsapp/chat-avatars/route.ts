@@ -9,35 +9,36 @@ const SERVICE_TOKEN =
   process.env.NEXT_PUBLIC_WHATSAPP_SERVICE_TOKEN ??
   "";
 
-export async function GET(req: NextRequest) {
-  const chatId = req.nextUrl.searchParams.get("chatId") ?? "";
-  if (!chatId) {
-    return NextResponse.json({ error: "chatId is required." }, { status: 400 });
+// Batch avatar resolution — one request for a whole page of chats instead of
+// one request per chat row.
+export async function POST(req: NextRequest) {
+  const body = await req.json().catch(() => null);
+  const chatIds = Array.isArray(body?.chatIds) ? body.chatIds : [];
+  if (chatIds.length === 0) {
+    return NextResponse.json({ urls: {} });
   }
 
-  const url = `${WHATSAPP_BACKEND_URL}/chat-avatar?chatId=${encodeURIComponent(chatId)}`;
+  const url = `${WHATSAPP_BACKEND_URL}/chat-avatars`;
 
   const timeoutController = new AbortController();
-  const timeoutId = setTimeout(() => timeoutController.abort(), 12000);
+  const timeoutId = setTimeout(() => timeoutController.abort(), 20000);
   req.signal.addEventListener("abort", () => timeoutController.abort());
 
   try {
     const upstream = await fetch(url, {
+      method: "POST",
       headers: {
+        "Content-Type": "application/json",
         Accept: "application/json",
         ...(SERVICE_TOKEN ? { "x-whatsapp-service-token": SERVICE_TOKEN } : {}),
       },
+      body: JSON.stringify({ chatIds }),
       signal: timeoutController.signal,
     });
     const data = await upstream.json();
-    return NextResponse.json(data, {
-      status: upstream.status,
-      // Let the browser disk-cache the avatar URL briefly too, on top of the
-      // in-memory + sessionStorage caches.
-      headers: { "Cache-Control": "private, max-age=300" },
-    });
+    return NextResponse.json(data, { status: upstream.status });
   } catch {
-    return NextResponse.json({ url: null });
+    return NextResponse.json({ urls: {} });
   } finally {
     clearTimeout(timeoutId);
   }

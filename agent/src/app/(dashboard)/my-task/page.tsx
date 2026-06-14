@@ -362,24 +362,31 @@ export function SectionTable({ label, tasks, retainershipTasks, trigger }: { lab
                               </div>
                             </TableCell>
 
-                            <TableCell
-                              className="truncate max-w-[160px] align-top"
-                              title={
-                                retainershipTasks || trigger
-                                  ? formatDate(t.triggerDate ?? t.nextDueDate)
-                                  : statusLabel
-                              }
-                            >
-                              <div className="font-medium truncate">
-                                {retainershipTasks || trigger ? (
-                                  <span className="inline-flex items-center gap-2">
-                                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                            <TableCell className="max-w-[160px] align-top">
+                              {trigger ? (
+                                <div className="flex flex-col gap-0.5 text-xs">
+                                  <span className="text-muted-foreground">Next task period:</span>
+                                  <span className="font-medium">
+                                    {formatDate(t.currentPeriodStart ?? t.triggerDate)} to{" "}
                                     {formatDate(t.triggerDate ?? t.nextDueDate)}
                                   </span>
-                                ) : (
-                                  statusLabel
-                                )}
-                              </div>
+                                  <span className="text-muted-foreground mt-1">
+                                    Next Due Date:{" "}
+                                    <span className="font-medium text-foreground">
+                                      {formatDate(t.nextDueDate ?? t.triggerDate)}
+                                    </span>
+                                  </span>
+                                </div>
+                              ) : retainershipTasks ? (
+                                <div className="font-medium inline-flex items-center gap-2">
+                                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                                  {formatDate(t.triggerDate ?? t.nextDueDate)}
+                                </div>
+                              ) : (
+                                <div className="font-medium truncate" title={statusLabel}>
+                                  {statusLabel}
+                                </div>
+                              )}
                             </TableCell>
 
                             <TableCell className="text-right align-top">
@@ -507,9 +514,17 @@ export function SectionTable({ label, tasks, retainershipTasks, trigger }: { lab
 
                           <div className="col-span-2">
                             <div className="font-medium text-foreground">
-                              {retainershipTasks || trigger ? "Next Trigger Date" : "Progress"}
+                              {trigger ? "Trigger" : retainershipTasks ? "Next Trigger Date" : "Progress"}
                             </div>
-                            {retainershipTasks || trigger ? (
+                            {trigger ? (
+                              <div className="mt-1 flex flex-col gap-0.5">
+                                <span>
+                                  Next task period: {formatDate(t.currentPeriodStart ?? t.triggerDate)} to{" "}
+                                  {formatDate(t.triggerDate ?? t.nextDueDate)}
+                                </span>
+                                <span>Next Due Date: {formatDate(t.nextDueDate ?? t.triggerDate)}</span>
+                              </div>
+                            ) : retainershipTasks ? (
                               <div className="mt-1 flex items-center gap-2">
                                 <Calendar className="h-4 w-4 text-muted-foreground" />
                                 <span>{formatDate(t.triggerDate ?? t.nextDueDate)}</span>

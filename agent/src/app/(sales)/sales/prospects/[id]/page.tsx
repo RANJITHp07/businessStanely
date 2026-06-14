@@ -468,19 +468,40 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
                                             <p className="text-sm leading-relaxed">{comment.content}</p>
                                             {comment.attachments && comment.attachments.length > 0 && (
                                                 <div className="mt-2 flex flex-wrap gap-2">
-                                                    {comment.attachments.map((att, idx) => (
-                                                        <a
-                                                            key={idx}
-                                                            href={getAttachmentUrl(att.url)}
-                                                            target="_blank"
-                                                            rel="noopener noreferrer"
-                                                            className="flex items-center gap-2 text-xs text-muted-foreground bg-muted px-2 py-1 rounded border hover:bg-muted/80 transition-colors"
-                                                        >
-                                                            <Paperclip className="h-3 w-3 shrink-0" />
-                                                            <span className="max-w-[150px] truncate font-medium">{att.name}</span>
-                                                            <span>({(att.size / 1024).toFixed(1)} KB)</span>
-                                                        </a>
-                                                    ))}
+                                                    {comment.attachments.map((att, idx) => {
+                                                        const isAudio =
+                                                            att.type?.startsWith("audio/") ||
+                                                            /\.(mp3|wav|ogg|m4a|aac|webm)$/i.test(att.name || att.url);
+                                                        if (isAudio) {
+                                                            return (
+                                                                <div
+                                                                    key={idx}
+                                                                    className="flex w-full flex-col gap-1 bg-muted px-2 py-1.5 rounded border"
+                                                                >
+                                                                    <span className="text-xs text-muted-foreground font-medium truncate">
+                                                                        {att.name}
+                                                                    </span>
+                                                                    <audio controls className="w-full">
+                                                                        <source src={getAttachmentUrl(att.url)} />
+                                                                        Your browser does not support the audio element.
+                                                                    </audio>
+                                                                </div>
+                                                            );
+                                                        }
+                                                        return (
+                                                            <a
+                                                                key={idx}
+                                                                href={getAttachmentUrl(att.url)}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                className="flex items-center gap-2 text-xs text-muted-foreground bg-muted px-2 py-1 rounded border hover:bg-muted/80 transition-colors"
+                                                            >
+                                                                <Paperclip className="h-3 w-3 shrink-0" />
+                                                                <span className="max-w-[150px] truncate font-medium">{att.name}</span>
+                                                                <span>({(att.size / 1024).toFixed(1)} KB)</span>
+                                                            </a>
+                                                        );
+                                                    })}
                                                 </div>
                                             )}
                                             {!comment.attachments && comment.attachmentName && (

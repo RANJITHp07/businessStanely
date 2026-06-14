@@ -1622,9 +1622,14 @@ class WhatsAppService {
             const seen = new Set<string>();
 
             // 1) Existing chats (so matches keep their last-message preview).
-            if (Array.isArray(store?.Chat?.models)) {
-              for (const c of store.Chat.models) {
-                if (out.length >= max) break;
+            // Each model is guarded individually — a single chat with a throwing
+            // getter must not abort the whole search.
+            const chatModels = Array.isArray(store?.Chat?.models)
+              ? store.Chat.models
+              : [];
+            for (const c of chatModels) {
+              if (out.length >= max) break;
+              try {
                 if (!c?.id?._serialized) continue;
                 if (c.id.server === "status" || c.id.server === "broadcast")
                   continue;
@@ -1633,7 +1638,12 @@ class WhatsAppService {
                 ).toLowerCase();
                 const num = String(c.id?.user || "").toLowerCase();
                 if (!name.includes(q) && !num.includes(q)) continue;
-                const lm = c.lastMessage ?? c.msgs?.last ?? null;
+                let lm: any = null;
+                try {
+                  lm = c.lastMessage ?? c.msgs?.last ?? null;
+                } catch {
+                  lm = null;
+                }
                 out.push({
                   id: c.id._serialized,
                   name: c.formattedTitle || c.name || c.id?.user || "",
@@ -1651,13 +1661,18 @@ class WhatsAppService {
                     typeof lm?.type === "string" ? lm.type : null,
                 });
                 seen.add(c.id._serialized);
+              } catch {
+                // Skip this chat and keep searching.
               }
             }
 
             // 2) Contacts without an existing chat (startable results).
-            if (Array.isArray(store?.Contact?.models)) {
-              for (const ct of store.Contact.models) {
-                if (out.length >= max) break;
+            const contactModels = Array.isArray(store?.Contact?.models)
+              ? store.Contact.models
+              : [];
+            for (const ct of contactModels) {
+              if (out.length >= max) break;
+              try {
                 if (!ct?.id?._serialized) continue;
                 if (ct.id.server !== "c.us") continue;
                 if (ct.isMe) continue;
@@ -1666,7 +1681,11 @@ class WhatsAppService {
                   ct.isAddressBookContact ?? ct.isMyContact,
                 );
                 const display = String(
-                  ct.name || ct.pushname || ct.formattedName || ct.id?.user || "",
+                  ct.name ||
+                    ct.pushname ||
+                    ct.formattedName ||
+                    ct.id?.user ||
+                    "",
                 ).toLowerCase();
                 const num = String(ct.id?.user || "").toLowerCase();
                 if (!display.includes(q) && !num.includes(q)) continue;
@@ -1689,6 +1708,8 @@ class WhatsAppService {
                   lastMessageType: null,
                 });
                 seen.add(ct.id._serialized);
+              } catch {
+                // Skip this contact and keep searching.
               }
             }
 
@@ -2044,12 +2065,13 @@ class WhatsAppService {
   }
 
   /**
-   * Resolves saved contact names for a set of participant JIDs (used to label
-   * senders in group chats). Returns a map of JID -> saved name, omitting any
-   * JID that isn't a saved address-book contact (callers fall back to the phone
-   * number, never the raw JID). Cached for 10 minutes per JID.
+   * Resolves a display label for a set of group participant ids. Returns a map
+   * of id -> label, where the label is the saved contact name if the sender is
+   * in the address book, otherwise their phone number. Handles WhatsApp's newer
+   * "@lid" participant ids by mapping them back to the real phone number, so the
+   * UI never shows a raw JID or an opaque LID. Cached for 10 minutes per id.
    */
-  private async resolveSavedContactNames(
+  private async resolveGroupSenderLabels(
     client: WhatsAppClient,
     jids: string[],
   ): Promise<Record<string, string>> {
@@ -2084,23 +2106,63 @@ class WhatsAppService {
           /* eslint-disable @typescript-eslint/no-explicit-any */
           const store = (window as any).Store;
           const out: Record<string, string | null> = {};
-          for (const jid of ids as string[]) {
+          const onlyDigits = (s: any) =>
+            typeof s === "string" ? s.replace(/[^0-9]/g, "") : "";
+
+          const getContact = (jid: string) => {
             try {
-              const c =
-                store?.Contact?.get?.(jid) ??
+              const c = store?.Contact?.get?.(jid);
+              if (c) return c;
+            } catch {}
+            try {
+              return (
                 store?.Contact?.models?.find(
                   (m: any) => m?.id?._serialized === jid,
-                );
-              if (!c) {
-                out[jid] = null;
-                continue;
+                ) ?? null
+              );
+            } catch {
+              return null;
+            }
+          };
+
+          // Map an @lid id back to its phone number using whatever the current
+          // WhatsApp Web build exposes.
+          const phoneFromLid = (jid: string, c: any) => {
+            const pn = c?.phoneNumber;
+            if (pn) {
+              if (typeof pn === "object" && pn.user) return onlyDigits(pn.user);
+              if (typeof pn === "string") {
+                const d = onlyDigits(pn.split("@")[0]);
+                if (d) return d;
               }
-              const isSaved = Boolean(c.isAddressBookContact ?? c.isMyContact);
+            }
+            try {
+              const wid = store?.LidUtils?.getPhoneNumber?.(c?.id ?? jid);
+              if (wid?.user) return onlyDigits(wid.user);
+            } catch {}
+            // The resolved contact's own id may already be a phone number.
+            if (c?.id?.server === "c.us" && c.id.user)
+              return onlyDigits(c.id.user);
+            return "";
+          };
+
+          for (const jid of ids as string[]) {
+            try {
+              const c = getContact(jid);
+              const isSaved = Boolean(
+                c && (c.isAddressBookContact ?? c.isMyContact),
+              );
               const savedName =
-                typeof c.name === "string" && c.name.trim()
+                isSaved && typeof c?.name === "string" && c.name.trim()
                   ? c.name.trim()
                   : null;
-              out[jid] = isSaved ? savedName : null;
+
+              const phone =
+                jid.indexOf("@c.us") !== -1
+                  ? onlyDigits(jid.split("@")[0])
+                  : phoneFromLid(jid, c);
+
+              out[jid] = savedName || (phone ? phone : null);
             } catch {
               out[jid] = null;
             }
@@ -2109,16 +2171,16 @@ class WhatsAppService {
           /* eslint-enable @typescript-eslint/no-explicit-any */
         }, missing) as Promise<Record<string, string | null>>,
         8000,
-        "resolveSavedContactNames",
+        "resolveGroupSenderLabels",
       )) as Record<string, string | null>;
 
       for (const jid of missing) {
-        const name = resolved?.[jid] ?? null;
-        this.contactNameCache.set(jid, { name, at: now });
-        if (name) result[jid] = name;
+        const label = resolved?.[jid] ?? null;
+        this.contactNameCache.set(jid, { name: label, at: now });
+        if (label) result[jid] = label;
       }
     } catch (e) {
-      LOG("resolveSavedContactNames failed:", String(e));
+      LOG("resolveGroupSenderLabels failed:", String(e));
     }
 
     return result;
@@ -2145,8 +2207,8 @@ class WhatsAppService {
       const messages = await chat.fetchMessages({ limit });
 
       // For group chats, label each sender with their saved contact name, or
-      // their phone number if not saved — never the raw JID.
-      let nameMap: Record<string, string> = {};
+      // their phone number if not saved — never the raw JID / LID.
+      let labelMap: Record<string, string> = {};
       if (isGroup) {
         const authorJids = Array.from(
           new Set(
@@ -2155,7 +2217,7 @@ class WhatsAppService {
               .filter((a): a is string => Boolean(a)),
           ),
         );
-        nameMap = await this.resolveSavedContactNames(client, authorJids);
+        labelMap = await this.resolveGroupSenderLabels(client, authorJids);
       }
 
       return messages
@@ -2165,7 +2227,7 @@ class WhatsAppService {
             const authorJid = (m as Message & { author?: string }).author;
             if (authorJid) {
               mapped.author =
-                nameMap[authorJid] || normalizeWhatsAppIdentifier(authorJid);
+                labelMap[authorJid] || normalizeWhatsAppIdentifier(authorJid);
             }
           }
           return mapped;

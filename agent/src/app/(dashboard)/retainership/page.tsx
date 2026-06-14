@@ -97,6 +97,7 @@ export default function RetainershipTable() {
     const [myRetainerships, setMyRetainerships] = useState<DashboardRetainership[]>([]);
     const [triggerTask, setTriggerTask] = useState<any>([])
     const [myClients, setMyClients] = useState<DashboardRetainership[]>([]);
+    const [teamRetainerships, setTeamRetainerships] = useState<DashboardRetainership[]>([]);
 
     const router = useRouter()
 
@@ -160,11 +161,31 @@ export default function RetainershipTable() {
                 setTriggerTask(triggerData.tasks || [])
                 setMyClients(clientsData || []);
                 setMyLegislations(legislationsData || []);
-                console.log(legislationsData)
+
+                // Team members' retainership tasks (#12): fetch the logged-in
+                // agent's team, then aggregate each member's retainership tasks.
+                try {
+                    const teamRes = await fetchWithAuth("/api/team-members");
+                    const team = teamRes.ok ? await teamRes.json() : [];
+                    const teamTaskResults = await Promise.all(
+                        (Array.isArray(team) ? team : []).map(async (member: { id: string }) => {
+                            const r = await fetchWithAuth(
+                                `/api/tasks?retainershipTasks=true&assignedToId=${member.id}`,
+                            );
+                            if (!r.ok) return [];
+                            const d = await r.json();
+                            return d.tasks || [];
+                        }),
+                    );
+                    setTeamRetainerships(teamTaskResults.flat());
+                } catch {
+                    setTeamRetainerships([]);
+                }
             } catch (error) {
                 setMyRetainerships([]);
                 setMyClients([]);
                 setMyLegislations([]);
+                setTeamRetainerships([]);
             } finally {
                 setLoading(false);
             }
@@ -330,7 +351,7 @@ export default function RetainershipTable() {
 
             {/* Retainerships Table with Tabs */}
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-                <TabsList className="grid w-full grid-cols-4">
+                <TabsList className="grid w-full grid-cols-2 md:grid-cols-5">
                     <TabsTrigger value="approved" className="flex items-center gap-2">
                         <CheckCircle className="h-4 w-4" />
                         My Legislation ({myLegislations.length})
@@ -342,6 +363,10 @@ export default function RetainershipTable() {
                     <TabsTrigger value="my-trigger" className="flex items-center gap-2">
                         <CheckCircle className="h-4 w-4" />
                         My Task Trigger Retainer ({triggerTask.length})
+                    </TabsTrigger>
+                    <TabsTrigger value="team-retainerships" className="flex items-center gap-2">
+                        <CheckCircle className="h-4 w-4" />
+                        Team Retainership ({teamRetainerships.length})
                     </TabsTrigger>
                     <TabsTrigger value="my-clients" className="flex items-center gap-2">
                         <CheckCircle className="h-4 w-4" />
@@ -623,6 +648,52 @@ export default function RetainershipTable() {
                                 <SectionTable
                                     label="Hold"
                                     tasks={myRetainerships.filter((t) => ["hold"].includes(statusKey(t.status))).slice(0, 3)}
+                                    retainershipTasks={true}
+                                />
+                                <SectionTable
+                                    label="Future"
+                                    tasks={myRetainerships
+                                        .filter((t) => {
+                                            const next = (t as DashboardRetainership & { triggerDate?: string; nextDueDate?: string });
+                                            const when = next.triggerDate ?? next.nextDueDate;
+                                            return when ? new Date(when) > new Date() : false;
+                                        })
+                                        .slice(0, 3)}
+                                    retainershipTasks={true}
+                                />
+                            </div>
+                        </div>
+                    )}
+                </TabsContent>
+
+                <TabsContent value="team-retainerships">
+                    {loading ? (
+                        <div className="flex justify-center items-center py-8">
+                            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                        </div>
+                    ) : teamRetainerships.length === 0 ? (
+                        <p className="text-center text-muted-foreground">No retainership task found for your team.</p>
+                    ) : (
+                        <div className="">
+                            <div className="space-y-3">
+                                <SectionTable
+                                    label="New Task"
+                                    tasks={teamRetainerships.filter((t) => ["todo"].includes(statusKey(t.status))).slice(0, 3)}
+                                    retainershipTasks={true}
+                                />
+                                <SectionTable
+                                    label="In Progress"
+                                    tasks={teamRetainerships.filter((t) => ["inprogress"].includes(statusKey(t.status))).slice(0, 3)}
+                                    retainershipTasks={true}
+                                />
+                                <SectionTable
+                                    label="Completed"
+                                    tasks={teamRetainerships.filter((t) => ["completed"].includes(statusKey(t.status))).slice(0, 3)}
+                                    retainershipTasks={true}
+                                />
+                                <SectionTable
+                                    label="Hold"
+                                    tasks={teamRetainerships.filter((t) => ["hold"].includes(statusKey(t.status))).slice(0, 3)}
                                     retainershipTasks={true}
                                 />
                             </div>

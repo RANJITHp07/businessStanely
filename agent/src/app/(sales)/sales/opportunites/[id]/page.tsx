@@ -530,19 +530,38 @@ export default function OppurtunitiesDetailPage() {
                                             )}
                                             {comment.attachments && comment.attachments.length > 0 && (
                                                 <div className="flex flex-wrap gap-2 pt-2">
-                                                    {comment.attachments.map((att, idx) => (
-                                                        <a
-                                                            key={idx}
-                                                            href={getAttachmentUrl(att.url)}
-                                                            target="_blank"
-                                                            rel="noopener noreferrer"
-                                                            className="flex items-center gap-2 px-3 py-1.5 bg-muted rounded-md text-sm hover:bg-muted/80 transition-colors"
-                                                        >
-                                                            <Paperclip className="h-3 w-3 shrink-0" />
-                                                            <span className="max-w-[150px] truncate">{att.name}</span>
-                                                            <span className="text-xs text-muted-foreground">({(att.size / 1024).toFixed(1)} KB)</span>
-                                                        </a>
-                                                    ))}
+                                                    {comment.attachments.map((att, idx) => {
+                                                        const isAudio =
+                                                            att.type?.startsWith("audio/") ||
+                                                            /\.(mp3|wav|ogg|m4a|aac|webm)$/i.test(att.name || att.url);
+                                                        if (isAudio) {
+                                                            return (
+                                                                <div
+                                                                    key={idx}
+                                                                    className="flex w-full flex-col gap-1 px-2 py-1.5 bg-muted rounded-md text-sm"
+                                                                >
+                                                                    <span className="text-xs text-muted-foreground truncate">{att.name}</span>
+                                                                    <audio controls className="w-full">
+                                                                        <source src={getAttachmentUrl(att.url)} />
+                                                                        Your browser does not support the audio element.
+                                                                    </audio>
+                                                                </div>
+                                                            );
+                                                        }
+                                                        return (
+                                                            <a
+                                                                key={idx}
+                                                                href={getAttachmentUrl(att.url)}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                className="flex items-center gap-2 px-3 py-1.5 bg-muted rounded-md text-sm hover:bg-muted/80 transition-colors"
+                                                            >
+                                                                <Paperclip className="h-3 w-3 shrink-0" />
+                                                                <span className="max-w-[150px] truncate">{att.name}</span>
+                                                                <span className="text-xs text-muted-foreground">({(att.size / 1024).toFixed(1)} KB)</span>
+                                                            </a>
+                                                        );
+                                                    })}
                                                 </div>
                                             )}
                                             {!comment.attachments && comment.attachmentUrl && (

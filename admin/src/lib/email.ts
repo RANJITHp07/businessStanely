@@ -403,7 +403,9 @@ export async function sendAgentInviteEmail({
 
             <div style="text-align: center; margin: 30px 0;">
               <a href="${
-                process.env.AGENT_PORTAL_URL || "http://localhost:3000"
+                process.env.AGENT_PORTAL_URL ||
+                process.env.NEXTAUTH_URL ||
+                "http://localhost:3000"
               }/login" style="background: #4c51bf; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-weight: bold;">
                 Login to Agent Portal
               </a>
@@ -434,7 +436,7 @@ export async function sendAgentInviteEmail({
         
         Please login to your agent portal using your email and the password above. For security purposes, we recommend changing your password after logging in.
         
-        Login now: ${process.env.AGENT_PORTAL_URL || "http://localhost:3000"}/login
+        Login now: ${process.env.AGENT_PORTAL_URL || process.env.NEXTAUTH_URL || "http://localhost:3000"}/login
         
         For security reasons, please change your password after logging in for the first time.
         

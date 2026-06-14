@@ -1757,19 +1757,34 @@ export default function TaskDetails() {
                                       </div>
                                     ) : null}
 
-                                    <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted p-2 rounded border">
-                                      <Paperclip className="h-3 w-3" />
-                                      <span className="font-medium">{attachment.name}</span>
-                                      <span>({(attachment.size / 1024).toFixed(1)} KB)</span>
-                                      <a
-                                        href={getAttachmentUrl(attachment.url)}
-                                        className="text-blue-600 hover:text-blue-800 underline ml-auto"
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                      >
-                                        View
-                                      </a>
-                                    </div>
+                                    {attachment.type?.startsWith("audio/") ||
+                                    /\.(mp3|wav|ogg|m4a|aac|webm)$/i.test(attachment.name || attachment.url) ? (
+                                      <div className="flex flex-col gap-1 text-xs text-muted-foreground bg-muted p-2 rounded border">
+                                        <div className="flex items-center gap-2">
+                                          <Paperclip className="h-3 w-3" />
+                                          <span className="font-medium">{attachment.name}</span>
+                                          <span>({(attachment.size / 1024).toFixed(1)} KB)</span>
+                                        </div>
+                                        <audio controls className="w-full">
+                                          <source src={getAttachmentUrl(attachment.url)} />
+                                          Your browser does not support the audio element.
+                                        </audio>
+                                      </div>
+                                    ) : (
+                                      <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted p-2 rounded border">
+                                        <Paperclip className="h-3 w-3" />
+                                        <span className="font-medium">{attachment.name}</span>
+                                        <span>({(attachment.size / 1024).toFixed(1)} KB)</span>
+                                        <a
+                                          href={getAttachmentUrl(attachment.url)}
+                                          className="text-blue-600 hover:text-blue-800 underline ml-auto"
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                        >
+                                          View
+                                        </a>
+                                      </div>
+                                    )}
                                   </div>
                                 ))}
                               </div>

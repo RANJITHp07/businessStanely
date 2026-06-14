@@ -231,25 +231,29 @@ export default function TaskDetails() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Use subordinates from assignedTo if available (from API)
-  // Type guard for subordinates
-  function hasSubordinates(
-    obj: unknown
-  ): obj is { subordinates: TeamMember[] } {
-    return (
-      typeof obj === "object" &&
-      obj !== null &&
-      Array.isArray((obj as { subordinates?: unknown }).subordinates)
-    );
-  }
-
+  // Reassignment candidates must be the *logged-in* agent's own team, not the
+  // current assignee's sub-team. A superior should be able to (re)assign a task
+  // to anyone in their team regardless of who currently holds it.
   useEffect(() => {
-    if (task && task.assignedTo && hasSubordinates(task.assignedTo)) {
-      setTeamMembers(task.assignedTo.subordinates);
-    } else {
-      setTeamMembers([]);
-    }
-  }, [task]);
+    let cancelled = false;
+    const loadTeam = async () => {
+      try {
+        const res = await fetch("/api/team-members");
+        if (!res.ok) {
+          if (!cancelled) setTeamMembers([]);
+          return;
+        }
+        const members: TeamMember[] = await res.json();
+        if (!cancelled) setTeamMembers(Array.isArray(members) ? members : []);
+      } catch {
+        if (!cancelled) setTeamMembers([]);
+      }
+    };
+    loadTeam();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Filtered members for search: only show results when searching
   const filteredMembers = searchQuery.trim()
@@ -751,7 +755,7 @@ export default function TaskDetails() {
 
   // Dropdown options for durations
   const durationOptions = [
-    { value: "None", label: "None" },
+    { value: "None", label: "Working" },
     { value: "24hr", label: "24 Hours" },
     { value: "48hr", label: "48 Hours" },
     { value: "1w", label: "1 Week" },
@@ -1051,7 +1055,7 @@ export default function TaskDetails() {
                     onValueChange={handleFollowUpDurationChange}
                   >
                     <SelectTrigger id="follow-up-duration" className="w-28">
-                      <SelectValue placeholder="None" />
+                      <SelectValue placeholder="Working" />
                     </SelectTrigger>
                     <SelectContent>
                       {durationOptions.map(opt => (
@@ -1070,7 +1074,7 @@ export default function TaskDetails() {
                     disabled
                   >
                     <SelectTrigger id="status-check-duration" className="w-28">
-                      <SelectValue placeholder="None" />
+                      <SelectValue placeholder="Working" />
                     </SelectTrigger>
                     <SelectContent>
                       {durationOptions.map(opt => (
@@ -1478,11 +1482,11 @@ export default function TaskDetails() {
                           htmlFor="interaction-client-update"
                           className="text-sm font-medium cursor-pointer"
                         >
-                          Mark as Client Update Interaction
+                          I updated the Client
                         </Label>
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        Keep this unchecked for a normal internal interaction. Check this only when this comment is a direct update to the client.
+                        Click here if updating the client was necessary and you have updated the client.
                       </p>
                     </div>
 

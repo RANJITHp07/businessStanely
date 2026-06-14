@@ -1,0 +1,26 @@
+/* WhatsApp UI theme tokens. Dark is the default; `[data-wa-theme="light"]`
+   overrides them. The component references these via Tailwind arbitrary values
+   (e.g. bg-[var(--wa-panel)]), so a single attribute flip re-themes the UI. */
+.wa-root {
+  --wa-bg: #0b141a;
+  --wa-panel: #111b21;
+  --wa-header: #202c33;
+  --wa-input: #2a3942;
+  --wa-text: #e9edef;
+  --wa-muted: #8696a0;
+  --wa-muted2: #aebac1;
+  --wa-border: rgba(255, 255, 255, 0.06);
+  --wa-hover: rgba(255, 255, 255, 0.08);
+}
+
+.wa-root[data-wa-theme="light"] {
+  --wa-bg: #d1d7db;
+  --wa-panel: #ffffff;
+  --wa-header: #f0f2f5;
+  --wa-input: #e9edef;
+  --wa-text: #111b21;
+  --wa-muted: #667781;
+  --wa-muted2: #54656f;
+  --wa-border: rgba(0, 0, 0, 0.08);
+  --wa-hover: rgba(0, 0, 0, 0.05);
+}

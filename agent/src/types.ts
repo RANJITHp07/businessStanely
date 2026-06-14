@@ -148,6 +148,8 @@ export interface Task {
   triggerDate?: string; // Added triggerDate property to Task interface
   recurringType?: string;
   lastCompletedDate?: string;
+  nextDueDate?: string;
+  currentPeriodStart?: string;
 }
 
 export interface Comment {

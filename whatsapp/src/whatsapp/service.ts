@@ -529,6 +529,9 @@ class WhatsAppService {
   // Deduplicates concurrent avatar lookups for the same chatId.
   private avatarFetchInProgress: Map<string, Promise<string | null>> =
     new Map();
+  // participant JID -> saved contact name (null when not a saved contact).
+  private contactNameCache: Map<string, { name: string | null; at: number }> =
+    new Map();
   // Deduplicates concurrent listMessages calls for the same chatId+limit so that
   // multiple agents viewing the same chat don't each issue a separate Puppeteer
   // fetchMessages call.
@@ -1572,6 +1575,161 @@ class WhatsAppService {
     return filtered.slice(start, start + pageSize);
   }
 
+  /**
+   * Searches the full WhatsApp Web store — every loaded chat AND every known
+   * contact — by name, saved name, push name, or phone number. Contacts that
+   * have no existing chat are returned as startable chat summaries so the user
+   * can open a fresh conversation from search results.
+   */
+  private async searchChatsAndContacts(
+    client: WhatsAppClient,
+    query: string,
+    limit: number,
+  ): Promise<WhatsAppChatSummary[]> {
+    const pupPage = (client as unknown as { pupPage?: unknown }).pupPage as
+      | {
+          evaluate(
+            fn: (...a: unknown[]) => unknown,
+            ...args: unknown[]
+          ): Promise<unknown>;
+        }
+      | undefined;
+    if (!pupPage?.evaluate) return [];
+
+    type RawHit = {
+      id: string;
+      name: string;
+      idUser: string;
+      timestamp: number | null;
+      unreadCount: number;
+      isGroup: boolean;
+      isMuted: boolean;
+      isPinned: boolean;
+      lastMessageBody: string | null;
+      lastMessageHasMedia: boolean;
+      lastMessageType: string | null;
+    };
+
+    try {
+      const raw = (await withTimeout(
+        pupPage.evaluate(
+          (rawQuery: unknown, rawLimit: unknown) => {
+            /* eslint-disable @typescript-eslint/no-explicit-any */
+            const store = (window as any).Store;
+            const q = String(rawQuery);
+            const max = (rawLimit as number) || 50;
+            const out: any[] = [];
+            const seen = new Set<string>();
+
+            // 1) Existing chats (so matches keep their last-message preview).
+            if (Array.isArray(store?.Chat?.models)) {
+              for (const c of store.Chat.models) {
+                if (out.length >= max) break;
+                if (!c?.id?._serialized) continue;
+                if (c.id.server === "status" || c.id.server === "broadcast")
+                  continue;
+                const name = String(
+                  c.formattedTitle || c.name || c.id?.user || "",
+                ).toLowerCase();
+                const num = String(c.id?.user || "").toLowerCase();
+                if (!name.includes(q) && !num.includes(q)) continue;
+                const lm = c.lastMessage ?? c.msgs?.last ?? null;
+                out.push({
+                  id: c.id._serialized,
+                  name: c.formattedTitle || c.name || c.id?.user || "",
+                  idUser: c.id?.user || "",
+                  timestamp: typeof c.t === "number" ? c.t : null,
+                  unreadCount:
+                    typeof c.unreadCount === "number" ? c.unreadCount : 0,
+                  isGroup: Boolean(c.isGroup),
+                  isMuted: Boolean(c.mute?.expiration),
+                  isPinned: Boolean(c.pin),
+                  lastMessageBody:
+                    typeof lm?.body === "string" ? lm.body : null,
+                  lastMessageHasMedia: Boolean(lm?.hasMedia),
+                  lastMessageType:
+                    typeof lm?.type === "string" ? lm.type : null,
+                });
+                seen.add(c.id._serialized);
+              }
+            }
+
+            // 2) Contacts without an existing chat (startable results).
+            if (Array.isArray(store?.Contact?.models)) {
+              for (const ct of store.Contact.models) {
+                if (out.length >= max) break;
+                if (!ct?.id?._serialized) continue;
+                if (ct.id.server !== "c.us") continue;
+                if (ct.isMe) continue;
+                if (seen.has(ct.id._serialized)) continue;
+                const saved = Boolean(
+                  ct.isAddressBookContact ?? ct.isMyContact,
+                );
+                const display = String(
+                  ct.name || ct.pushname || ct.formattedName || ct.id?.user || "",
+                ).toLowerCase();
+                const num = String(ct.id?.user || "").toLowerCase();
+                if (!display.includes(q) && !num.includes(q)) continue;
+                // Saved name when available; otherwise the phone number.
+                const name =
+                  saved && typeof ct.name === "string" && ct.name.trim()
+                    ? ct.name.trim()
+                    : ct.id?.user || "";
+                out.push({
+                  id: ct.id._serialized,
+                  name: name || ct.id?.user || "",
+                  idUser: ct.id?.user || "",
+                  timestamp: null,
+                  unreadCount: 0,
+                  isGroup: false,
+                  isMuted: false,
+                  isPinned: false,
+                  lastMessageBody: null,
+                  lastMessageHasMedia: false,
+                  lastMessageType: null,
+                });
+                seen.add(ct.id._serialized);
+              }
+            }
+
+            return out.slice(0, max);
+            /* eslint-enable @typescript-eslint/no-explicit-any */
+          },
+          query,
+          limit,
+        ) as Promise<RawHit[] | null>,
+        Number.isFinite(chatFetchTimeoutMs) ? chatFetchTimeoutMs : 180000,
+        "WhatsApp chat/contact search",
+      )) as RawHit[] | null;
+
+      if (!Array.isArray(raw)) return [];
+
+      return raw.map((r) => ({
+        id: r.id,
+        name: r.name || r.idUser || "Unknown contact",
+        lastMessage: getLastMessagePreview(
+          r.lastMessageBody !== null || r.lastMessageHasMedia
+            ? {
+                body: r.lastMessageBody,
+                hasMedia: r.lastMessageHasMedia,
+                type: r.lastMessageType,
+              }
+            : null,
+        ),
+        timestamp: r.timestamp !== null ? r.timestamp * 1000 : null,
+        unreadCount: r.unreadCount,
+        avatarSeed: r.idUser || r.id,
+        avatarUrl: null,
+        isGroup: r.isGroup,
+        isMuted: r.isMuted,
+        isPinned: r.isPinned,
+      }));
+    } catch (e) {
+      LOG("searchChatsAndContacts failed:", String(e));
+      return [];
+    }
+  }
+
   // Expose a paginated chat list API
   public async getPaginatedChats(
     search = "",
@@ -1581,6 +1739,20 @@ class WhatsAppService {
     return this.withOperationSlot(async () => {
       await this.ensureInitialized();
       const client = await this.requireReadyClient();
+
+      const searchTerm = search.trim().toLowerCase();
+      if (searchTerm) {
+        // Search the full WhatsApp store (every loaded chat + contact), not just
+        // the cached page, so a contact that hasn't been loaded into the sidebar
+        // still matches.
+        const matches = await this.searchChatsAndContacts(
+          client,
+          searchTerm,
+          Math.max(pageSize * page, 50),
+        );
+        const start = (page - 1) * pageSize;
+        return matches.slice(start, start + pageSize);
+      }
 
       const hasCachedData = this.chatsCache.length > 0;
       // Treat a cache that only has system/broadcast entries (≤1 real chat)
@@ -1871,6 +2043,87 @@ class WhatsAppService {
     }
   }
 
+  /**
+   * Resolves saved contact names for a set of participant JIDs (used to label
+   * senders in group chats). Returns a map of JID -> saved name, omitting any
+   * JID that isn't a saved address-book contact (callers fall back to the phone
+   * number, never the raw JID). Cached for 10 minutes per JID.
+   */
+  private async resolveSavedContactNames(
+    client: WhatsAppClient,
+    jids: string[],
+  ): Promise<Record<string, string>> {
+    const result: Record<string, string> = {};
+    const now = Date.now();
+    const ttl = 10 * 60 * 1000;
+
+    const missing: string[] = [];
+    for (const jid of jids) {
+      const cached = this.contactNameCache.get(jid);
+      if (cached && now - cached.at <= ttl) {
+        if (cached.name) result[jid] = cached.name;
+      } else {
+        missing.push(jid);
+      }
+    }
+    if (missing.length === 0) return result;
+
+    const pupPage = (client as unknown as { pupPage?: unknown }).pupPage as
+      | {
+          evaluate(
+            fn: (...a: unknown[]) => unknown,
+            ...args: unknown[]
+          ): Promise<unknown>;
+        }
+      | undefined;
+    if (!pupPage?.evaluate) return result;
+
+    try {
+      const resolved = (await withTimeout(
+        pupPage.evaluate((ids: unknown) => {
+          /* eslint-disable @typescript-eslint/no-explicit-any */
+          const store = (window as any).Store;
+          const out: Record<string, string | null> = {};
+          for (const jid of ids as string[]) {
+            try {
+              const c =
+                store?.Contact?.get?.(jid) ??
+                store?.Contact?.models?.find(
+                  (m: any) => m?.id?._serialized === jid,
+                );
+              if (!c) {
+                out[jid] = null;
+                continue;
+              }
+              const isSaved = Boolean(c.isAddressBookContact ?? c.isMyContact);
+              const savedName =
+                typeof c.name === "string" && c.name.trim()
+                  ? c.name.trim()
+                  : null;
+              out[jid] = isSaved ? savedName : null;
+            } catch {
+              out[jid] = null;
+            }
+          }
+          return out;
+          /* eslint-enable @typescript-eslint/no-explicit-any */
+        }, missing) as Promise<Record<string, string | null>>,
+        8000,
+        "resolveSavedContactNames",
+      )) as Record<string, string | null>;
+
+      for (const jid of missing) {
+        const name = resolved?.[jid] ?? null;
+        this.contactNameCache.set(jid, { name, at: now });
+        if (name) result[jid] = name;
+      }
+    } catch (e) {
+      LOG("resolveSavedContactNames failed:", String(e));
+    }
+
+    return result;
+  }
+
   async listMessages(chatId: string, limit = 80) {
     LOG("API: listMessages", { chatId, limit });
     const client = await this.requireReadyClient();
@@ -1885,11 +2138,38 @@ class WhatsAppService {
       return existing;
     }
 
+    const isGroup = chatId.endsWith("@g.us");
+
     const fetchPromise = this.withOperationSlot(async () => {
       const chat = await client.getChatById(chatId);
       const messages = await chat.fetchMessages({ limit });
+
+      // For group chats, label each sender with their saved contact name, or
+      // their phone number if not saved — never the raw JID.
+      let nameMap: Record<string, string> = {};
+      if (isGroup) {
+        const authorJids = Array.from(
+          new Set(
+            messages
+              .map((m) => (m as Message & { author?: string }).author)
+              .filter((a): a is string => Boolean(a)),
+          ),
+        );
+        nameMap = await this.resolveSavedContactNames(client, authorJids);
+      }
+
       return messages
-        .map(mapMessage)
+        .map((m) => {
+          const mapped = mapMessage(m);
+          if (isGroup) {
+            const authorJid = (m as Message & { author?: string }).author;
+            if (authorJid) {
+              mapped.author =
+                nameMap[authorJid] || normalizeWhatsAppIdentifier(authorJid);
+            }
+          }
+          return mapped;
+        })
         .sort((left, right) => left.timestamp - right.timestamp);
     });
 

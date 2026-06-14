@@ -8,6 +8,11 @@ interface TaskWithAdditionalFields {
   progress?: number | null;
   followUpRequired?: boolean;
   completed?: boolean;
+  recurringType?: string | null;
+  triggerDate?: Date | null;
+  nextDueDate?: Date | null;
+  currentPeriodStart?: Date | null;
+  lastCompletedDate?: Date | null;
 }
 
 export async function GET(req: NextRequest) {
@@ -253,6 +258,11 @@ export async function GET(req: NextRequest) {
       followUpRequired: (task as TaskWithAdditionalFields).followUpRequired,
       completed: (task as TaskWithAdditionalFields).completed,
       recurring: task.recurring,
+      recurringType: (task as TaskWithAdditionalFields).recurringType,
+      triggerDate: (task as TaskWithAdditionalFields).triggerDate,
+      nextDueDate: (task as TaskWithAdditionalFields).nextDueDate,
+      currentPeriodStart: (task as TaskWithAdditionalFields).currentPeriodStart,
+      lastCompletedDate: (task as TaskWithAdditionalFields).lastCompletedDate,
       createdAt: task.createdAt,
       updatedAt: task.updatedAt,
       client: task.client

@@ -94,6 +94,8 @@ export function useWhatsAppDesktop() {
   const [isSending, setIsSending] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [canLoadMore, setCanLoadMore] = useState(false);
+  const [searchResults, setSearchResults] = useState<WhatsAppChatSummary[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
   const messageLimitRef = useRef(INITIAL_MESSAGE_LIMIT);
   const chatPageRef = useRef(1);
   const chatsCountRef = useRef(0);
@@ -102,8 +104,11 @@ export function useWhatsAppDesktop() {
   const stateRef = useRef<SerializableWhatsAppState>(defaultState);
 
   const selectedChat = useMemo(
-    () => chats.find((chat) => chat.id === selectedChatId) ?? null,
-    [chats, selectedChatId],
+    () =>
+      chats.find((chat) => chat.id === selectedChatId) ??
+      searchResults.find((chat) => chat.id === selectedChatId) ??
+      null,
+    [chats, searchResults, selectedChatId],
   );
 
   const upsertChatPreview = (
@@ -121,21 +126,44 @@ export function useWhatsAppDesktop() {
     });
   };
 
-  const filteredChats = useMemo(() => {
-    const normalized = searchQuery.trim().toLowerCase();
+  // When searching, show backend results (which span ALL chats + contacts, not
+  // just the loaded sidebar); otherwise show the loaded chat list.
+  const displayChats = useMemo(
+    () => (searchQuery.trim() ? searchResults : chats),
+    [searchQuery, searchResults, chats],
+  );
 
-    if (!normalized) {
-      return chats;
+  // Debounced backend search across every chat and contact in WhatsApp.
+  useEffect(() => {
+    const term = searchQuery.trim();
+    if (!term) {
+      setSearchResults([]);
+      setIsSearching(false);
+      return;
     }
 
-    return chats.filter((chat) => {
-      const searchableText = [chat.name, chat.lastMessage, chat.id]
-        .join(" ")
-        .toLowerCase();
+    let cancelled = false;
+    setIsSearching(true);
+    const handle = setTimeout(async () => {
+      try {
+        const data = await getJson<{ chats: WhatsAppChatSummary[] }>(
+          `/api/whatsapp/chats?search=${encodeURIComponent(term)}&page=1&pageSize=30`,
+        );
+        if (cancelled) return;
+        setSearchResults(data.chats ?? []);
+        resolveAvatarsBatch((data.chats ?? []).map((chat) => chat.id));
+      } catch {
+        if (!cancelled) setSearchResults([]);
+      } finally {
+        if (!cancelled) setIsSearching(false);
+      }
+    }, 300);
 
-      return searchableText.includes(normalized);
-    });
-  }, [chats, searchQuery]);
+    return () => {
+      cancelled = true;
+      clearTimeout(handle);
+    };
+  }, [searchQuery]);
 
   const loadStatus = async () => {
     const nextState = await getJson<SerializableWhatsAppState>(
@@ -773,12 +801,13 @@ export function useWhatsAppDesktop() {
   // --- RETURN HOOK API ---
   return {
     canLoadMore,
-    chats: filteredChats,
+    chats: displayChats,
     deleteMessage,
     editMessage,
     isBootstrapping,
     isLoadingMore,
     isSending,
+    isSearching,
     loadMoreMessages,
     logout,
     messages,

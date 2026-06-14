@@ -100,6 +100,13 @@ export async function PUT(
         data: { active: false },
       });
 
+      // Transfer task ownership too — a deleted agent must not remain as the
+      // owner of any task. Reassign ownership for every task they own.
+      await tx.task.updateMany({
+        where: { ownerShipId: agentId },
+        data: { ownerShipId: transferAgentId },
+      });
+
       const [assignedQuoteRequests, createdQuoteRequests, diaryEntries] =
         await Promise.all([
           tx.quoteRequest.findMany({

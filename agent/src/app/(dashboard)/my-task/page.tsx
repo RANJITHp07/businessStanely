@@ -198,7 +198,9 @@ export function SectionTable({ label, tasks, retainershipTasks, trigger }: { lab
                       <TableHead className="text-white">Assigned To</TableHead>
                       <TableHead className="text-white">Priority</TableHead>
                       <TableHead className="text-white">Due Date</TableHead>
-                      <TableHead className="text-white">Progress</TableHead>
+                      <TableHead className="text-white">
+                        {retainershipTasks || trigger ? "Next Trigger Date" : "Progress"}
+                      </TableHead>
                       <TableHead className="text-right text-white">
                         Actions
                       </TableHead>
@@ -362,10 +364,21 @@ export function SectionTable({ label, tasks, retainershipTasks, trigger }: { lab
 
                             <TableCell
                               className="truncate max-w-[160px] align-top"
-                              title={statusLabel}
+                              title={
+                                retainershipTasks || trigger
+                                  ? formatDate(t.triggerDate ?? t.nextDueDate)
+                                  : statusLabel
+                              }
                             >
                               <div className="font-medium truncate">
-                                {statusLabel}
+                                {retainershipTasks || trigger ? (
+                                  <span className="inline-flex items-center gap-2">
+                                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                                    {formatDate(t.triggerDate ?? t.nextDueDate)}
+                                  </span>
+                                ) : (
+                                  statusLabel
+                                )}
                               </div>
                             </TableCell>
 
@@ -494,11 +507,18 @@ export function SectionTable({ label, tasks, retainershipTasks, trigger }: { lab
 
                           <div className="col-span-2">
                             <div className="font-medium text-foreground">
-                              Progress
+                              {retainershipTasks || trigger ? "Next Trigger Date" : "Progress"}
                             </div>
-                            <div className="mt-1 w-full">
-                              <Progress value={t.progress ?? 0} />
-                            </div>
+                            {retainershipTasks || trigger ? (
+                              <div className="mt-1 flex items-center gap-2">
+                                <Calendar className="h-4 w-4 text-muted-foreground" />
+                                <span>{formatDate(t.triggerDate ?? t.nextDueDate)}</span>
+                              </div>
+                            ) : (
+                              <div className="mt-1 w-full">
+                                <Progress value={t.progress ?? 0} />
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>

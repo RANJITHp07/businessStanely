@@ -2,6 +2,8 @@
 
 import { FormEvent, memo, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "react-toastify";
+
+import "./whatsapp-theme.css";
 import {
     Paperclip,
     ArrowLeft,
@@ -12,13 +14,28 @@ import {
     LogOut,
     MessageSquare,
     MoreVertical,
+    Moon,
     Pencil,
     Phone,
+    Play,
     Search,
     SendHorizonal,
+    Sun,
     Trash2,
     Video,
 } from "lucide-react";
+
+const WHATSAPP_THEME_KEY = "wa-theme";
+
+function readStoredTheme(): "dark" | "light" {
+    if (typeof window === "undefined") return "dark";
+    try {
+        const saved = window.localStorage.getItem(WHATSAPP_THEME_KEY);
+        return saved === "light" ? "light" : "dark";
+    } catch {
+        return "dark";
+    }
+}
 
 import { useWhatsAppDesktop } from "@/hooks/use-whatsapp-desktop";
 import type { WhatsAppChatSummary, WhatsAppMessage } from "@/lib/whatsapp/types";
@@ -125,12 +142,14 @@ function formatDay(timestamp: number) {
         if (message.mediaType === "image" || message.mediaType === "sticker") {
             return (
                 <div>
-                    <img
-                        src={src}
-                        alt={message.body || "Image"}
-                        className="max-h-64 max-w-full rounded-lg object-cover"
-                        loading="lazy"
-                    />
+                    <a href={src} target="_blank" rel="noopener noreferrer" title="Open in new tab">
+                        <img
+                            src={src}
+                            alt={message.body || "Image"}
+                            className="max-h-64 max-w-full cursor-pointer rounded-lg object-cover transition hover:opacity-90"
+                            loading="lazy"
+                        />
+                    </a>
                     {message.body ? (
                         <p className="mt-1 wrap-break-word whitespace-pre-wrap text-[14px] leading-6">{message.body}</p>
                     ) : null}
@@ -141,12 +160,25 @@ function formatDay(timestamp: number) {
         if (message.mediaType === "video") {
             return (
                 <div>
-                    <video
-                        src={src}
-                        controls
-                        className="max-h-64 max-w-full rounded-lg"
-                        preload="metadata"
-                    />
+                    <a
+                        href={src}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title="Open in new tab"
+                        className="relative block w-fit cursor-pointer"
+                    >
+                        <video
+                            src={src}
+                            className="pointer-events-none max-h-64 max-w-full rounded-lg"
+                            preload="metadata"
+                            muted
+                        />
+                        <span className="absolute inset-0 flex items-center justify-center">
+                            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-black/55 text-white">
+                                <Play className="h-6 w-6" />
+                            </span>
+                        </span>
+                    </a>
                     {message.body ? (
                         <p className="mt-1 wrap-break-word whitespace-pre-wrap text-[14px] leading-6">{message.body}</p>
                     ) : null}
@@ -249,12 +281,12 @@ function formatDay(timestamp: number) {
                 <button
                     type="button"
                     onClick={openFilePicker}
-                    className="flex h-11 w-11 items-center justify-center rounded-full bg-[#2a3942] text-[#aebac1] transition hover:bg-[#33454f] hover:text-white"
+                    className="flex h-11 w-11 items-center justify-center rounded-full bg-[var(--wa-input)] text-[var(--wa-muted2)] transition hover:bg-[#33454f] hover:text-white"
                     title="Attach file"
                 >
                     <Paperclip className="h-5 w-5" />
                 </button>
-                <div className="flex-1 rounded-lg bg-[#2a3942] px-4 py-3">
+                <div className="flex-1 rounded-lg bg-[var(--wa-input)] px-4 py-3">
                     {attachment ? (
                         <div className="mb-2 flex items-center justify-between rounded-md bg-black/20 px-2 py-1 text-xs text-[#d1d7db]">
                             <span className="truncate pr-2">{attachment.name}</span>
@@ -266,7 +298,7 @@ function formatDay(timestamp: number) {
                                         fileInputRef.current.value = "";
                                     }
                                 }}
-                                className="text-[#aebac1] hover:text-white"
+                                className="text-[var(--wa-muted2)] hover:text-white"
                             >
                                 Remove
                             </button>
@@ -287,7 +319,7 @@ function formatDay(timestamp: number) {
                         }}
                         placeholder={attachment ? "Add a caption (optional)" : "Type a message"}
                         rows={1}
-                        className="max-h-32 min-h-6 w-full resize-none bg-transparent text-sm text-white outline-none placeholder:text-[#8696a0]"
+                        className="max-h-32 min-h-6 w-full resize-none bg-transparent text-sm text-white outline-none placeholder:text-[var(--wa-muted)]"
                     />
                 </div>
                 <button
@@ -333,6 +365,24 @@ function WhatsAppDesktop() {
     const suppressNextScrollRef = useRef(false);
     const [myProfilePicUrl, setMyProfilePicUrl] = useState<string | null>(null);
     const [myProfilePicLoadFailed, setMyProfilePicLoadFailed] = useState(false);
+    const [theme, setTheme] = useState<"dark" | "light">("dark");
+
+    // Load the saved theme on mount (kept in localStorage so it persists).
+    useEffect(() => {
+        setTheme(readStoredTheme());
+    }, []);
+
+    const toggleTheme = () => {
+        setTheme((current) => {
+            const next = current === "dark" ? "light" : "dark";
+            try {
+                window.localStorage.setItem(WHATSAPP_THEME_KEY, next);
+            } catch {
+                // ignore persistence failures
+            }
+            return next;
+        });
+    };
 
     useEffect(() => {
         if (state.status !== "ready" || !state.clientInfo.wid) {
@@ -471,18 +521,18 @@ function WhatsAppDesktop() {
         const currentMessage = statusMessages[state.status] || "Starting WhatsApp desktop session...";
 
         return (
-            <div className="flex min-h-screen w-full items-center justify-center overflow-hidden bg-[#111b21] text-white">
+            <div className="wa-root flex min-h-screen w-full items-center justify-center overflow-hidden bg-[var(--wa-panel)] text-white" data-wa-theme={theme}>
                 <div className="flex w-full max-w-md flex-col items-center gap-6 px-6">
                     <div className="flex items-center gap-4 rounded-2xl bg-white/5 px-6 py-4 backdrop-blur border border-white/10 w-full justify-center">
                         <LoaderCircle className="h-6 w-6 animate-spin text-[#00a884] shrink-0" />
                         <div className="flex flex-col gap-1 min-w-0">
-                            <span className="text-sm font-medium text-[#e9edef]">{currentMessage}</span>
-                            <span className="text-xs text-[#8696a0]">This may take up to 60 seconds on first load...</span>
+                            <span className="text-sm font-medium text-[var(--wa-text)]">{currentMessage}</span>
+                            <span className="text-xs text-[var(--wa-muted)]">This may take up to 60 seconds on first load...</span>
                         </div>
                     </div>
 
                     <div className="flex w-full flex-col gap-2">
-                        <div className="text-xs text-[#8696a0] space-y-1">
+                        <div className="text-xs text-[var(--wa-muted)] space-y-1">
                             <div className={`flex items-center gap-2 ${state.status !== "idle" ? "text-[#00a884]" : ""}`}>
                                 <div className={`h-2 w-2 rounded-full ${state.status !== "idle" ? "bg-[#00a884]" : "bg-[#3b4a54]"}`} />
                                 <span>Initializing browser</span>
@@ -510,17 +560,17 @@ function WhatsAppDesktop() {
 
     if (state.status !== "ready") {
         return (
-            <div className="relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-[#0b141a] px-6 py-12 text-white">
+            <div className="wa-root relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-[var(--wa-bg)] px-6 py-12 text-white" data-wa-theme={theme}>
                 <div className="absolute inset-x-0 top-0 h-56 bg-[#00a884]" />
-                <div className="relative z-10 grid w-full max-w-5xl overflow-hidden rounded-[28px] border border-white/10 bg-[#111b21] shadow-[0_20px_80px_rgba(0,0,0,0.45)] lg:grid-cols-[1.1fr_1fr]">
+                <div className="relative z-10 grid w-full max-w-5xl overflow-hidden rounded-[28px] border border-white/10 bg-[var(--wa-panel)] shadow-[0_20px_80px_rgba(0,0,0,0.45)] lg:grid-cols-[1.1fr_1fr]">
                     <div className="flex flex-col justify-between gap-10 p-10">
                         <div>
-                            <div className="mb-8 flex items-center gap-3 text-[#e9edef]">
+                            <div className="mb-8 flex items-center gap-3 text-[var(--wa-text)]">
                                 <div className="rounded-2xl bg-white/8 p-3">
                                     <MessageSquare className="h-7 w-7 text-[#00a884]" />
                                 </div>
                                 <div>
-                                    <p className="text-sm uppercase tracking-[0.3em] text-[#8696a0]">Admin only</p>
+                                    <p className="text-sm uppercase tracking-[0.3em] text-[var(--wa-muted)]">Admin only</p>
                                     <h1 className="text-3xl font-semibold">WhatsApp Desktop</h1>
                                 </div>
                             </div>
@@ -530,7 +580,7 @@ function WhatsAppDesktop() {
                             </p>
                         </div>
 
-                        <ol className="space-y-5 text-sm text-[#aebac1]">
+                        <ol className="space-y-5 text-sm text-[var(--wa-muted2)]">
                             <li className="flex gap-4"><span className="text-[#00a884]">1</span><span>Open WhatsApp on your phone.</span></li>
                             <li className="flex gap-4"><span className="text-[#00a884]">2</span><span>Tap Menu or Settings and choose Linked devices.</span></li>
                             <li className="flex gap-4"><span className="text-[#00a884]">3</span><span>Tap Link a device and scan this code.</span></li>
@@ -550,7 +600,7 @@ function WhatsAppDesktop() {
                         )}
                     </div>
 
-                    <div className="flex items-center justify-center border-l border-white/6 bg-[#0f1a20] p-10">
+                    <div className="flex items-center justify-center border-l border-[var(--wa-border)] bg-[#0f1a20] p-10">
                         <div className="w-full max-w-sm rounded-3xl bg-[#f7f8fa] p-8 text-[#111b21] shadow-2xl">
                             {state.status === "authenticated" ? (
                                 <div className="mx-auto flex h-72 w-72 flex-col items-center justify-center gap-4 rounded-2xl bg-white text-[#5e6b72]">
@@ -584,10 +634,10 @@ function WhatsAppDesktop() {
     }
 
     return (
-        <div className="flex min-h-screen w-full bg-[#0b141a] text-[#e9edef]">
-            <div className="mx-auto flex h-screen w-full max-w-screen-2xl overflow-hidden border-x border-white/5 bg-[#111b21] shadow-[0_20px_80px_rgba(0,0,0,0.35)]">
-                <aside className={`${mobileSidebarOpen ? "flex" : "hidden"} w-full max-w-full flex-col border-r border-white/6 bg-[#111b21] md:flex md:max-w-md`}>
-                    <div className="flex items-center justify-between bg-[#202c33] px-4 py-3">
+        <div className="wa-root flex min-h-screen w-full bg-[var(--wa-bg)] text-[var(--wa-text)]" data-wa-theme={theme}>
+            <div className="mx-auto flex h-screen w-full max-w-screen-2xl overflow-hidden border-x border-[var(--wa-border)] bg-[var(--wa-panel)] shadow-[0_20px_80px_rgba(0,0,0,0.35)]">
+                <aside className={`${mobileSidebarOpen ? "flex" : "hidden"} w-full max-w-full flex-col border-r border-[var(--wa-border)] bg-[var(--wa-panel)] md:flex md:w-80 md:max-w-[20rem] md:shrink-0`}>
+                    <div className="flex items-center justify-between bg-[var(--wa-header)] px-4 py-3">
                         <div className="flex items-center gap-3">
                             <div className="relative h-10 w-10 overflow-hidden rounded-full bg-[#6a7175]">
                                 {myProfilePicUrl && !myProfilePicLoadFailed ? (
@@ -606,18 +656,23 @@ function WhatsAppDesktop() {
                             </div>
                             <div>
                                 <p className="text-sm font-medium">{state.clientInfo.pushname || "WhatsApp"}</p>
-                                <p className="text-xs text-[#8696a0]">{state.clientInfo.wid || "Connected device"}</p>
+                                <p className="text-xs text-[var(--wa-muted)]">{state.clientInfo.wid || "Connected device"}</p>
                             </div>
                         </div>
 
                         <div className="flex items-center gap-2">
-                            <button type="button" className="rounded-full p-2 text-[#aebac1] transition hover:bg-white/8 hover:text-white">
-                                <Search className="h-5 w-5" />
+                            <button
+                                type="button"
+                                onClick={toggleTheme}
+                                className="rounded-full p-2 text-[var(--wa-muted2)] transition hover:bg-[var(--wa-hover)] hover:text-white"
+                                title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+                            >
+                                {theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
                             </button>
                             <button
                                 type="button"
                                 onClick={logout}
-                                className="rounded-full p-2 text-[#aebac1] transition hover:bg-white/8 hover:text-white"
+                                className="rounded-full p-2 text-[var(--wa-muted2)] transition hover:bg-[var(--wa-hover)] hover:text-white"
                                 title="Log out WhatsApp session"
                             >
                                 <LogOut className="h-5 w-5" />
@@ -625,15 +680,15 @@ function WhatsAppDesktop() {
                         </div>
                     </div>
 
-                    <div className="border-b border-white/6 px-3 py-3">
-                        <label className="flex items-center gap-3 rounded-lg bg-[#202c33] px-4 py-2.5 text-sm text-[#8696a0] focus-within:ring-1 focus-within:ring-[#00a884]">
+                    <div className="border-b border-[var(--wa-border)] px-3 py-3">
+                        <label className="flex items-center gap-3 rounded-lg bg-[var(--wa-header)] px-4 py-2.5 text-sm text-[var(--wa-muted)] focus-within:ring-1 focus-within:ring-[#00a884]">
                             <Search className="h-4 w-4" />
                             <input
                                 type="text"
                                 value={searchQuery}
                                 onChange={(event) => setSearchQuery(event.target.value)}
                                 placeholder="Search chats"
-                                className="w-full bg-transparent text-sm text-[#e9edef] outline-none placeholder:text-[#8696a0]"
+                                className="w-full bg-transparent text-sm text-[var(--wa-text)] outline-none placeholder:text-[var(--wa-muted)]"
                             />
                         </label>
                     </div>
@@ -643,16 +698,16 @@ function WhatsAppDesktop() {
                             <div className="flex flex-col items-center justify-center h-full py-10 text-[#00a884]">
                                 <LoaderCircle className="h-8 w-8 animate-spin mb-3" />
                                 <span className="text-base font-medium">Loading chats…</span>
-                                <span className="text-xs text-[#8696a0] mt-2">This may take up to a minute on first login.</span>
+                                <span className="text-xs text-[var(--wa-muted)] mt-2">This may take up to a minute on first login.</span>
                             </div>
                         ) : chatsError ? (
                             <div className="flex flex-col items-center justify-center h-full py-10 text-red-400">
                                 <MessageSquare className="h-8 w-8 mb-3" />
                                 <span className="text-base font-medium">{chatsError}</span>
-                                <span className="text-xs text-[#8696a0] mt-2">Please try again or refresh the page.</span>
+                                <span className="text-xs text-[var(--wa-muted)] mt-2">Please try again or refresh the page.</span>
                             </div>
                         ) : chats.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center h-full py-10 text-[#8696a0]">
+                            <div className="flex flex-col items-center justify-center h-full py-10 text-[var(--wa-muted)]">
                                 <MessageSquare className="h-8 w-8 mb-3" />
                                 <span className="text-base font-medium">No chats found</span>
                             </div>
@@ -668,16 +723,16 @@ function WhatsAppDesktop() {
                                                 setSelectedChatId(chat.id);
                                                 setMobileSidebarOpen(false);
                                             }}
-                                            className={`grid w-full grid-cols-[56px_1fr_auto] gap-3 border-b border-white/6 px-4 py-3 text-left transition ${isActive ? "bg-[#2a3942]" : "hover:bg-[#202c33]"}`}
+                                            className={`grid w-full grid-cols-[56px_1fr_auto] gap-3 border-b border-[var(--wa-border)] px-4 py-3 text-left transition ${isActive ? "bg-[var(--wa-input)]" : "hover:bg-[var(--wa-header)]"}`}
                                         >
                                             <ChatAvatar chat={chat} sizeClassName="h-12 w-12" />
                                             <div className="min-w-0">
                                                 <div className="flex items-center justify-between gap-3">
-                                                    <p className="truncate text-[15px] font-medium text-[#e9edef]">{chat.name}</p>
+                                                    <p className="truncate text-[15px] font-medium text-[var(--wa-text)]">{chat.name}</p>
                                                 </div>
-                                                <p className="mt-1 truncate text-sm text-[#8696a0]">{chat.lastMessage}</p>
+                                                <p className="mt-1 truncate text-sm text-[var(--wa-muted)]">{chat.lastMessage}</p>
                                             </div>
-                                            <div className="flex flex-col items-end gap-2 text-xs text-[#8696a0]">
+                                            <div className="flex flex-col items-end gap-2 text-xs text-[var(--wa-muted)]">
                                                 <span>{formatTime(chat.timestamp)}</span>
                                                 {chat.unreadCount > 0 ? (
                                                     <span className="flex min-h-5 min-w-5 items-center justify-center rounded-full bg-[#00a884] px-1 text-[11px] font-semibold text-[#111b21]">
@@ -693,7 +748,7 @@ function WhatsAppDesktop() {
                                         <button
                                             type="button"
                                             onClick={loadMoreChats}
-                                            className="rounded-lg bg-[#202c33] px-4 py-2 text-sm text-[#00a884] hover:bg-[#2a3942]"
+                                            className="rounded-lg bg-[var(--wa-header)] px-4 py-2 text-sm text-[#00a884] hover:bg-[var(--wa-input)]"
                                         >
                                             Load more chats
                                         </button>
@@ -704,30 +759,30 @@ function WhatsAppDesktop() {
                     </div>
                 </aside>
 
-                <section className={`${mobileSidebarOpen ? "hidden" : "flex"} min-w-0 flex-1 flex-col bg-[#0b141a] md:flex`}>
+                <section className={`${mobileSidebarOpen ? "hidden" : "flex"} min-w-0 flex-1 flex-col bg-[var(--wa-bg)] md:flex`}>
                     {selectedChat ? (
                         <>
-                            <header className="flex items-center justify-between bg-[#202c33] px-4 py-3">
+                            <header className="flex items-center justify-between bg-[var(--wa-header)] px-4 py-3">
                                 <div className="flex items-center gap-3">
                                     <button
                                         type="button"
                                         onClick={() => setMobileSidebarOpen(true)}
-                                        className="rounded-full p-2 text-[#aebac1] transition hover:bg-white/8 hover:text-white md:hidden"
+                                        className="rounded-full p-2 text-[var(--wa-muted2)] transition hover:bg-[var(--wa-hover)] hover:text-white md:hidden"
                                     >
                                         <ArrowLeft className="h-5 w-5" />
                                     </button>
                                     <ChatAvatar chat={selectedChat} sizeClassName="h-10 w-10" />
                                     <div>
                                         <p className="text-sm font-medium">{selectedChat.name}</p>
-                                        <p className="text-xs text-[#8696a0]">{selectedChat.isGroup ? "Group" : "Click here for contact info"}</p>
+                                        <p className="text-xs text-[var(--wa-muted)]">{selectedChat.isGroup ? "Group" : (selectedChat.id.split("@")[0]?.split(":")[0] || "")}</p>
                                     </div>
                                 </div>
 
-                                <div className="flex items-center gap-2 text-[#aebac1]">
-                                    <button type="button" className="rounded-full p-2 transition hover:bg-white/8 hover:text-white"><Video className="h-5 w-5" /></button>
-                                    <button type="button" className="rounded-full p-2 transition hover:bg-white/8 hover:text-white"><Phone className="h-5 w-5" /></button>
-                                    <button type="button" className="rounded-full p-2 transition hover:bg-white/8 hover:text-white"><Search className="h-5 w-5" /></button>
-                                    <button type="button" className="rounded-full p-2 transition hover:bg-white/8 hover:text-white"><MoreVertical className="h-5 w-5" /></button>
+                                <div className="flex items-center gap-2 text-[var(--wa-muted2)]">
+                                    <button type="button" className="rounded-full p-2 transition hover:bg-[var(--wa-hover)] hover:text-white"><Video className="h-5 w-5" /></button>
+                                    <button type="button" className="rounded-full p-2 transition hover:bg-[var(--wa-hover)] hover:text-white"><Phone className="h-5 w-5" /></button>
+                                    <button type="button" className="rounded-full p-2 transition hover:bg-[var(--wa-hover)] hover:text-white"><Search className="h-5 w-5" /></button>
+                                    <button type="button" className="rounded-full p-2 transition hover:bg-[var(--wa-hover)] hover:text-white"><MoreVertical className="h-5 w-5" /></button>
                                 </div>
                             </header>
 
@@ -801,8 +856,7 @@ function WhatsAppDesktop() {
                                                                 <p className="wrap-break-word whitespace-pre-wrap text-[14px] leading-6">{message.body || "Unsupported message"}</p>
                                                             )}
 
-                                                            {/* Temporarily disabled: Edit/Delete actions */}
-                                                            {false && message.fromMe && editingMessageId !== message.id ? (
+                                                            {message.fromMe && editingMessageId !== message.id ? (
                                                                 <div className="mt-1 flex justify-end gap-1 opacity-0 transition group-hover:opacity-100">
                                                                     <button
                                                                         type="button"
@@ -843,18 +897,18 @@ function WhatsAppDesktop() {
                                 </div>
                             </div>
 
-                            <footer className="bg-[#202c33] px-3 py-3 md:px-4">
+                            <footer className="bg-[var(--wa-header)] px-3 py-3 md:px-4">
                                 <MessageComposer isSending={isSending} onSend={sendMessage} />
                             </footer>
                         </>
                     ) : (
-                        <div className="flex flex-1 items-center justify-center bg-[#222e35] px-6 text-center text-[#d1d7db]">
+                        <div className="flex flex-1 items-center justify-center bg-[var(--wa-bg)] px-6 text-center text-[var(--wa-muted)]">
                             <div>
                                 <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-white/10">
                                     <MessageSquare className="h-10 w-10 text-[#00a884]" />
                                 </div>
                                 <h2 className="text-3xl font-light">WhatsApp for Admin</h2>
-                                <p className="mx-auto mt-4 max-w-md text-sm leading-7 text-[#8696a0]">
+                                <p className="mx-auto mt-4 max-w-md text-sm leading-7 text-[var(--wa-muted)]">
                                     Choose a chat from the conversation list to start reading and replying in real time.
                                 </p>
                             </div>

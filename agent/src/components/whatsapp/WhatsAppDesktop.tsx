@@ -758,7 +758,7 @@ export function WhatsAppDesktop() {
                                     <ChatAvatar chat={selectedChat} sizeClassName="h-10 w-10" />
                                     <div>
                                         <p className="text-sm font-medium">{selectedChat.name}</p>
-                                        <p className="text-xs text-[var(--wa-muted)]">{selectedChat.isGroup ? "Group" : (selectedChat.id.split("@")[0]?.split(":")[0] || "")}</p>
+                                        <p className="text-xs text-[var(--wa-muted)]">{selectedChat.isGroup ? "Group" : selectedChat.phoneNumber || ""}</p>
                                     </div>
                                 </div>
 

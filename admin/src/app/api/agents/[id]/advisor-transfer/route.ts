@@ -162,6 +162,13 @@ export async function PUT(
         data: { active: false },
       });
 
+      // Transfer task ownership too. Advisor deletes can still leave this agent
+      // as owner on tasks even after assignment is moved.
+      await tx.task.updateMany({
+        where: { ownerShipId: agentId },
+        data: { ownerShipId: transferAgentId },
+      });
+
       const [assignedQuoteRequests, createdQuoteRequests, diaryEntries] =
         await Promise.all([
           tx.quoteRequest.findMany({

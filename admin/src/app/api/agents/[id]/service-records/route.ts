@@ -40,7 +40,8 @@ export async function GET(
           select: {
             id: true,
             username: true,
-            email: true
+            email: true,
+            adminType: true
           }
         }
       },
@@ -56,7 +57,7 @@ export async function GET(
         id: record.createdByUser.id,
         username: record.createdByUser.username,
         email: record.createdByUser.email,
-        adminType: "admin" // Default since this is from admin panel
+        adminType: record.createdByUser.adminType
       }
     }));
 

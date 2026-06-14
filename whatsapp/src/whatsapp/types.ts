@@ -22,6 +22,7 @@ export type WhatsAppState = {
 export type WhatsAppChatSummary = {
   id: string;
   name: string;
+  phoneNumber: string | null;
   lastMessage: string;
   timestamp: number | null;
   unreadCount: number;

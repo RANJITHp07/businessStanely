@@ -93,6 +93,12 @@ function fallbackChatName(chatId: string) {
   return normalized || chatId;
 }
 
+function fallbackChatPhone(chatId: string) {
+  const normalized = fallbackChatName(chatId);
+  const digits = normalized.replace(/\D/g, "");
+  return digits || normalized || null;
+}
+
 export function useWhatsAppDesktop() {
   const [state, setState] = useState<SerializableWhatsAppState>(defaultState);
   const [chats, setChats] = useState<WhatsAppChatSummary[]>([]);
@@ -570,6 +576,7 @@ export function useWhatsAppDesktop() {
     upsertChatPreview(chatId, (existing) => ({
       id: chatId,
       name: existing?.name || fallbackChatName(chatId),
+      phoneNumber: existing?.phoneNumber || fallbackChatPhone(chatId),
       lastMessage: previewText,
       timestamp: Date.now(),
       unreadCount: 0,
@@ -645,6 +652,7 @@ export function useWhatsAppDesktop() {
       upsertChatPreview(chatId, (existing) => ({
         id: chatId,
         name: existing?.name || fallbackChatName(chatId),
+        phoneNumber: existing?.phoneNumber || fallbackChatPhone(chatId),
         lastMessage: data.message.body,
         timestamp: data.message.timestamp,
         unreadCount: 0,
@@ -699,6 +707,7 @@ export function useWhatsAppDesktop() {
       upsertChatPreview(chatId, (existing) => ({
         id: chatId,
         name: existing?.name || fallbackChatName(chatId),
+        phoneNumber: existing?.phoneNumber || fallbackChatPhone(chatId),
         lastMessage: data.message.body || existing?.lastMessage || "",
         timestamp: data.message.timestamp || existing?.timestamp || Date.now(),
         unreadCount: existing?.unreadCount || 0,
@@ -739,6 +748,7 @@ export function useWhatsAppDesktop() {
         upsertChatPreview(chatId, (existing) => ({
           id: chatId,
           name: existing?.name || fallbackChatName(chatId),
+          phoneNumber: existing?.phoneNumber || fallbackChatPhone(chatId),
           lastMessage: latestMessage.body || existing?.lastMessage || "",
           timestamp: latestMessage.timestamp,
           unreadCount: existing?.unreadCount || 0,

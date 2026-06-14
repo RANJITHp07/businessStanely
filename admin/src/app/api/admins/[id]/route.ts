@@ -3,6 +3,21 @@ import prisma from "@/lib/prisma";
 import { getCurrentAdmin, AdminUser } from "@/lib/auth";
 import bcrypt from "bcryptjs";
 
+const buildArchivedAdminEmail = (email: string, adminId: string) => {
+  const normalized = email.toLowerCase();
+  const [localPart, domainPart] = normalized.split("@");
+  const suffix = `inactive-${adminId.slice(-6)}-${Date.now()}`;
+
+  if (localPart && domainPart) {
+    return `${localPart}+${suffix}@${domainPart}`;
+  }
+
+  return `${normalized}.${suffix}`;
+};
+
+const buildArchivedAdminUsername = (username: string, adminId: string) =>
+  `${username}-inactive-${adminId.slice(-6)}-${Date.now()}`;
+
 export async function GET(
   req: NextRequest,
   { params }: { params: { id: string } }
@@ -23,10 +38,11 @@ export async function GET(
         username: true,
         email: true,
         adminType: true,
+        status: true,
       },
     })) as AdminUser | null;
 
-    if (!admin) {
+    if (!admin || admin.status === "inactive") {
       return NextResponse.json({ error: "Admin not found" }, { status: 404 });
     }
 
@@ -249,34 +265,25 @@ export async function DELETE(
     // Check if admin exists
     const existingAdmin = await prisma.user.findUnique({
       where: { id },
-      select: { id: true },
+      select: { id: true, username: true, email: true, status: true },
     });
 
-    if (!existingAdmin) {
+    if (!existingAdmin || existingAdmin.status === "inactive") {
       return NextResponse.json({ error: "Admin not found" }, { status: 404 });
     }
 
-    // First, find all comments associated with this admin
-    const comments = await prisma.comment.findMany({
-      where: {
-        authorId: id,
-        authorType: "USER",
-      },
-    });
-
-    // If there are comments, delete them first
-    if (comments.length > 0) {
-      await prisma.comment.deleteMany({
-        where: {
-          authorId: id,
-          authorType: "USER",
-        },
-      });
-    }
-
-    // Now delete the admin
-    await prisma.user.delete({
+    // Soft-delete admins so historical comments/service records remain visible.
+    await prisma.user.update({
       where: { id },
+      data: {
+        status: "inactive",
+        email: buildArchivedAdminEmail(existingAdmin.email, existingAdmin.id),
+        username: buildArchivedAdminUsername(
+          existingAdmin.username,
+          existingAdmin.id,
+        ),
+        currentSessionToken: null,
+      },
     });
 
     return NextResponse.json(

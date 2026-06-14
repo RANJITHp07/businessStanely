@@ -230,6 +230,7 @@ export async function GET(req: NextRequest) {
           },
         },
         createdBy: true,
+        ownerShipBy: true,
         assignedTo: true,
         category: true,
         comments: {
@@ -278,6 +279,7 @@ export async function GET(req: NextRequest) {
         : null,
       category: task.category,
       createdBy: task.createdBy,
+      ownerShipBy: task.ownerShipBy,
       assignedTo: task.assignedTo,
       commentsCount: task.comments.length,
       recentComments: task.comments,

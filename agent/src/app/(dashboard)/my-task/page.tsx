@@ -219,7 +219,11 @@ export function SectionTable({ label, tasks, retainershipTasks, trigger }: { lab
                     ) : (
                       tasks.map((t) => {
                         const clientName = t.client?.name || ""
-                        const ownerName = t.assignedTo?.name ?? "-";
+                        const owner =
+                          t.ownerShipBy?.status?.toLowerCase() === "inactive"
+                            ? t.assignedTo
+                            : t.ownerShipBy ?? t.assignedTo;
+                        const ownerName = owner?.name ?? "-";
                         const shortId = `T-${t.id.slice(0, 6).toUpperCase()}`;
                         // build richer cells: category badge, client email, assigned role, priority badge, due date with overdue
                         const categoryName = t.category?.name;
@@ -427,7 +431,11 @@ export function SectionTable({ label, tasks, retainershipTasks, trigger }: { lab
                           }`.trim()
                         : t.client.organizationName ?? ""
                       : "-";
-                    const ownerName = t.assignedTo?.name ?? "-";
+                    const owner =
+                      t.ownerShipBy?.status?.toLowerCase() === "inactive"
+                        ? t.assignedTo
+                        : t.ownerShipBy ?? t.assignedTo;
+                    const ownerName = owner?.name ?? "-";
                     const shortId = `T-${t.id.slice(0, 6).toUpperCase()}`;
                     return (
                       <div

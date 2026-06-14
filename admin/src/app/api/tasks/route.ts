@@ -289,6 +289,7 @@ export async function GET(req: NextRequest) {
       include: {
         client: true,
         createdBy: true,
+        ownerShipBy: true,
         assignedTo: true,
         category: true,
         legislation: true,

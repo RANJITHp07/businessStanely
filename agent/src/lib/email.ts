@@ -41,6 +41,15 @@ export const createTransporter = () => {
   });
 };
 
+function getPortalLoginUrl(
+  portalUrl: string | undefined,
+  fallbackUrl: string | undefined,
+) {
+  const rawBase = (portalUrl || fallbackUrl || "http://localhost:3000").trim();
+  const base = rawBase.replace(/\/+$/, "").replace(/\/login$/i, "");
+  return `${base}/login`;
+}
+
 interface SendOTPEmailProps {
   to: string;
   otp: string;
@@ -287,6 +296,10 @@ export async function sendAdminInviteEmail({
 }: SendAdminInviteEmailProps) {
   try {
     const transporter = createTransporter();
+    const adminLoginUrl = getPortalLoginUrl(
+      process.env.ADMIN_PORTAL_URL,
+      process.env.NEXTAUTH_URL,
+    );
 
     const mailOptions = {
       from: `"${process.env.COMPANY_NAME || "LegalStanley"}" <${
@@ -326,10 +339,8 @@ export async function sendAdminInviteEmail({
             </p>
 
             <div style="text-align: center; margin: 30px 0;">
-              <a href="${
-                process.env.NEXTAUTH_URL
-              }/login" style="background: #4c51bf; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-weight: bold;">
-                Login Now
+              <a href="${adminLoginUrl}" style="background: #4c51bf; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-weight: bold;">
+                Sign In
               </a>
             </div>
 
@@ -358,7 +369,7 @@ export async function sendAdminInviteEmail({
         
         Please login using your email and the password above. For security purposes, change your password immediately after logging in.
         
-        Login now: ${process.env.NEXTAUTH_URL}/login
+        Sign in: ${adminLoginUrl}
         
         For security reasons, please change your password immediately after logging in.
         

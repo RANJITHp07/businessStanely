@@ -928,7 +928,7 @@ export default function AgentDetails() {
                               item.followUpDuration === "48hr" ? "bg-amber-100 text-amber-700" :
                                 item.followUpDuration === "1w" ? "bg-purple-100 text-purple-700" :
                                   "bg-gray-100 text-gray-500"
-                              }`}>{item.followUpDuration || "None"}</span>
+                              }`}>{item.followUpDuration && item.followUpDuration !== "None" ? item.followUpDuration : "Working"}</span>
                           </TableCell>
                         )}
                         {showClientUpdate && (
@@ -940,11 +940,11 @@ export default function AgentDetails() {
                                     "bg-gray-100 text-gray-500"
                                 }`}
                             >
-                              {item.expectedDuration || "None"}
+                              {item.expectedDuration && item.expectedDuration !== "None" ? item.expectedDuration : "Working"}
                             </span>
                           </TableCell>
                         )}
-                        {!compact && <TableCell className="text-sm">{item.statusCheckDuration || "None"}</TableCell>}
+                        {!compact && <TableCell className="text-sm">{item.statusCheckDuration && item.statusCheckDuration !== "None" ? item.statusCheckDuration : "Working"}</TableCell>}
                         {!compact && <TableCell className="text-sm">{item.status}</TableCell>}
                         {!compact && (
                           <TableCell className="text-right">

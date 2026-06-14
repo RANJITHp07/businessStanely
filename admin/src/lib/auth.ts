@@ -16,6 +16,7 @@ export interface AdminUser {
   email: string;
   username: string;
   adminType: "owner" | "admin";
+  status?: string;
 }
 
 /**
@@ -49,10 +50,14 @@ export async function verifyAuth(req: NextRequest): Promise<JWTPayload | null> {
     if (decoded.userId && decoded.sessionToken) {
       const user = await prisma.user.findUnique({
         where: { id: decoded.userId },
-        select: { currentSessionToken: true },
+        select: { currentSessionToken: true, status: true },
       });
       if (!user) {
         console.error("User not found in DB. User ID:", decoded.userId);
+        return null;
+      }
+      if (user.status === "inactive") {
+        console.error("Inactive user attempted to use an existing session.");
         return null;
       }
       if (user.currentSessionToken !== decoded.sessionToken) {
@@ -108,8 +113,13 @@ export async function getCurrentAdmin(
       email: true,
       username: true,
       adminType: true,
+      status: true,
     },
   });
+
+  if (!admin || admin.status === "inactive") {
+    return null;
+  }
 
   return admin as AdminUser | null;
 }

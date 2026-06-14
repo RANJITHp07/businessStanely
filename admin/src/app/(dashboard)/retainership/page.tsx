@@ -364,8 +364,15 @@ export default function RetainershipTable() {
             ) : (
               <>
                 <CardContent>
-                  <div className="rounded-md border">
-                    <Table>
+                  <div className="rounded-md border overflow-x-auto">
+                    <Table className="table-fixed min-w-[920px]">
+                      <colgroup>
+                        <col className="w-[300px]" />
+                        <col className="w-[240px]" />
+                        <col className="w-[170px]" />
+                        <col className="w-[240px]" />
+                        <col className="w-[90px]" />
+                      </colgroup>
                       <TableHeader>
                         <TableRow>
                           <TableHead>Retainership</TableHead>
@@ -395,7 +402,7 @@ export default function RetainershipTable() {
                                 router.push(`/retainership/${retainership.id}`)
                               }
                             >
-                              <TableCell className="w-12">
+                              <TableCell className="overflow-hidden">
                                 <div className="flex items-center space-x-3">
                                   <Avatar className="h-10 w-10">
                                     <AvatarImage
@@ -425,7 +432,7 @@ export default function RetainershipTable() {
                                   </div>
                                 </div>
                               </TableCell>
-                              <TableCell>
+                              <TableCell className="overflow-hidden">
                                 <div className="max-w-xs">
                                   <p
                                     className="text-sm"
@@ -441,7 +448,7 @@ export default function RetainershipTable() {
                                   </p>
                                 </div>
                               </TableCell>
-                              <TableCell>
+                              <TableCell className="overflow-hidden">
                                 <div className="text-sm">
                                   {retainership.createdBy || "Unknown"}
                                   {retainership.createdByType === "agent" && (
@@ -463,7 +470,7 @@ export default function RetainershipTable() {
                                     )}
                                 </div>
                               </TableCell>
-                              <TableCell>
+                              <TableCell className="overflow-hidden">
                                 <div className="text-sm w-60 truncate">
                                   {(() => {
                                     const organizationName = retainership.client?.organizationName;
@@ -672,8 +679,15 @@ export default function RetainershipTable() {
             ) : (
               <>
                 <CardContent>
-                  <div className="rounded-md border">
-                    <Table>
+                  <div className="rounded-md border overflow-x-auto">
+                    <Table className="table-fixed min-w-[920px]">
+                      <colgroup>
+                        <col className="w-[300px]" />
+                        <col className="w-[240px]" />
+                        <col className="w-[170px]" />
+                        <col className="w-[240px]" />
+                        <col className="w-[90px]" />
+                      </colgroup>
                       <TableHeader>
                         <TableRow>
                           <TableHead>Retainership</TableHead>
@@ -706,7 +720,7 @@ export default function RetainershipTable() {
                                 )
                               }
                             >
-                              <TableCell>
+                              <TableCell className="overflow-hidden">
                                 <div className="flex items-center space-x-3">
                                   <Avatar className="h-10 w-10">
                                     <AvatarImage
@@ -736,7 +750,7 @@ export default function RetainershipTable() {
                                   </div>
                                 </div>
                               </TableCell>
-                              <TableCell>
+                              <TableCell className="overflow-hidden">
                                 <div className="max-w-xs">
                                   <p
                                     className="text-sm truncate"
@@ -747,7 +761,7 @@ export default function RetainershipTable() {
                                 </div>
                               </TableCell>
                               {/* <TableCell>{getStatusBadge(retainership.status)}</TableCell> */}
-                              <TableCell>
+                              <TableCell className="overflow-hidden">
                                 <div className="text-sm">
                                   {retainership.createdBy || "Unknown"}
                                   {retainership.createdByType === "agent" && (
@@ -769,15 +783,17 @@ export default function RetainershipTable() {
                                     )}
                                 </div>
                               </TableCell>
-                              <TableCell>
-                                <div className="text-sm">
-                                  <p>
-                                    {retainership.client?.organizationName ||
-                                      `${retainership.client?.firstName || ""
-                                        } ${retainership.client?.lastName || ""
-                                        }`.trim() ||
-                                      "N/A"}
-                                  </p>
+                              <TableCell className="overflow-hidden">
+                                <div className="text-sm w-60 truncate">
+                                  {(() => {
+                                    const organizationName = retainership.client?.organizationName;
+                                    const fullName = organizationName ||
+                                      `${retainership.client?.firstName || ""} ${retainership.client?.lastName || ""}`.trim() ||
+                                      "N/A";
+                                    const displayName = fullName.length > 30 ? `${fullName.slice(0, 30)}...` : fullName;
+
+                                    return <p title={fullName}>{displayName}</p>;
+                                  })()}
                                   <p className="text-muted-foreground text-xs">
                                     {retainership.client?.email || "N/A"}
                                   </p>

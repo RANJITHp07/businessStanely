@@ -267,7 +267,7 @@ export default function Dashboard() {
                             item.followUpDuration === "48hr" ? "bg-amber-100 text-amber-700" :
                               item.followUpDuration === "1w" ? "bg-purple-100 text-purple-700" :
                                 "bg-gray-100 text-gray-500"
-                            }`}>{item.followUpDuration || "None"}</span>
+                            }`}>{item.followUpDuration && item.followUpDuration !== "None" ? item.followUpDuration : "Working"}</span>
                         </TableCell>
                       )}
                       {showClientUpdate && (
@@ -276,7 +276,7 @@ export default function Dashboard() {
                             item.expectedDuration === "48hr" ? "bg-amber-100 text-amber-700" :
                               item.expectedDuration === "1w" ? "bg-purple-100 text-purple-700" :
                                 "bg-gray-100 text-gray-500"
-                            }`}>{item.expectedDuration || "None"}</span>
+                            }`}>{item.expectedDuration && item.expectedDuration !== "None" ? item.expectedDuration : "Working"}</span>
                         </TableCell>
                       )}
                     </TableRow>

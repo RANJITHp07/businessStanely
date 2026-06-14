@@ -333,6 +333,13 @@ type MessageInternalData = {
   filename?: string;
 };
 
+type ChatInternalData = {
+  formattedTitle?: string;
+  name?: string;
+  pushname?: string;
+  formattedName?: string;
+};
+
 function toSendMessageError(error: unknown): Error {
   const message = error instanceof Error ? error.message : String(error);
   const normalized = message.toLowerCase();
@@ -434,6 +441,49 @@ function normalizeWhatsAppIdentifier(value: string | null | undefined) {
   return trimmed;
 }
 
+function digitsOnly(value: string | null | undefined) {
+  return String(value ?? "").replace(/\D/g, "");
+}
+
+function getPhoneNumberFromChatId(chatId: string | null | undefined) {
+  const normalized = normalizeWhatsAppIdentifier(chatId);
+  if (!normalized) {
+    return null;
+  }
+
+  const digits = digitsOnly(normalized);
+  return digits || normalized;
+}
+
+function isPhoneLikeLabel(value: string, phoneNumber: string | null) {
+  const valueDigits = digitsOnly(value);
+  const phoneDigits = digitsOnly(phoneNumber);
+
+  if (!valueDigits) {
+    return false;
+  }
+
+  if (phoneDigits && valueDigits === phoneDigits) {
+    return true;
+  }
+
+  return /^[+\d\s().:-]+$/.test(value);
+}
+
+function getDisplayNameFromCandidates(
+  candidates: Array<string | null | undefined>,
+  phoneNumber: string | null,
+) {
+  for (const candidate of candidates) {
+    const normalized = normalizeWhatsAppIdentifier(candidate);
+    if (!normalized) continue;
+    if (isPhoneLikeLabel(normalized, phoneNumber)) continue;
+    return normalized;
+  }
+
+  return phoneNumber || "Unknown contact";
+}
+
 function mapMessage(message: Message): WhatsAppMessage {
   const internalData = message as Message & {
     _data?: MessageInternalData;
@@ -475,15 +525,28 @@ function getLastMessagePreview(message: MessageLike | null | undefined) {
 }
 
 function mapChat(chat: Chat): WhatsAppChatSummary {
+  const internalData = chat as Chat & {
+    _data?: ChatInternalData;
+  };
   const lastTimestamp =
     typeof chat.timestamp === "number" ? chat.timestamp * 1000 : null;
   const lastMessage = getLastMessagePreview(chat.lastMessage as MessageLike);
-  const displayName = normalizeWhatsAppIdentifier(chat.name);
-  const displayIdUser = normalizeWhatsAppIdentifier(chat.id.user);
+  const phoneNumber = getPhoneNumberFromChatId(chat.id.user || chat.id._serialized);
+  const displayName = getDisplayNameFromCandidates(
+    [
+      internalData._data?.formattedTitle,
+      chat.name,
+      internalData._data?.name,
+      internalData._data?.formattedName,
+      internalData._data?.pushname,
+    ],
+    phoneNumber,
+  );
 
   return {
     id: chat.id._serialized,
-    name: displayName || displayIdUser || "Unknown contact",
+    name: displayName,
+    phoneNumber,
     lastMessage,
     timestamp: lastTimestamp,
     unreadCount: chat.unreadCount ?? 0,
@@ -504,7 +567,8 @@ function createOptimisticChatSummary(
 ): WhatsAppChatSummary {
   return {
     id: message.chatId,
-    name: getChatAvatarSeed(message.chatId),
+    name: getPhoneNumberFromChatId(message.chatId) || getChatAvatarSeed(message.chatId),
+    phoneNumber: getPhoneNumberFromChatId(message.chatId),
     lastMessage: message.body,
     timestamp: message.timestamp,
     unreadCount: message.fromMe ? 0 : 1,
@@ -567,7 +631,15 @@ class WhatsAppService {
       };
 
       if (Array.isArray(parsed.chats) && parsed.chats.length > 0) {
-        this.chatsCache = parsed.chats;
+        this.chatsCache = parsed.chats.map((chat) => {
+          const phoneNumber =
+            chat.phoneNumber || getPhoneNumberFromChatId(chat.id);
+          return {
+            ...chat,
+            phoneNumber,
+            name: getDisplayNameFromCandidates([chat.name], phoneNumber),
+          };
+        });
         this.chatsCacheAt =
           typeof parsed.chatsAt === "number" ? parsed.chatsAt : 0;
       }
@@ -1565,7 +1637,7 @@ class WhatsAppService {
         if (!normalizedSearch) {
           return true;
         }
-        const searchableText = [chat.name, chat.lastMessage, chat.id]
+        const searchableText = [chat.name, chat.phoneNumber, chat.lastMessage, chat.id]
           .join(" ")
           .toLowerCase();
         return searchableText.includes(normalizedSearch);
@@ -1600,6 +1672,7 @@ class WhatsAppService {
       id: string;
       name: string;
       idUser: string;
+      phoneNumber: string | null;
       timestamp: number | null;
       unreadCount: number;
       isGroup: boolean;
@@ -1633,8 +1706,16 @@ class WhatsAppService {
                 if (!c?.id?._serialized) continue;
                 if (c.id.server === "status" || c.id.server === "broadcast")
                   continue;
+                const contact = store?.Contact?.get?.(c.id._serialized);
+                const saved = Boolean(
+                  contact?.isAddressBookContact ?? contact?.isMyContact,
+                );
+                const savedName =
+                  saved && typeof contact?.name === "string"
+                    ? contact.name.trim()
+                    : "";
                 const name = String(
-                  c.formattedTitle || c.name || c.id?.user || "",
+                  savedName || c.formattedTitle || c.name || c.id?.user || "",
                 ).toLowerCase();
                 const num = String(c.id?.user || "").toLowerCase();
                 if (!name.includes(q) && !num.includes(q)) continue;
@@ -1646,8 +1727,9 @@ class WhatsAppService {
                 }
                 out.push({
                   id: c.id._serialized,
-                  name: c.formattedTitle || c.name || c.id?.user || "",
+                  name: savedName || c.formattedTitle || c.name || c.id?.user || "",
                   idUser: c.id?.user || "",
+                  phoneNumber: c.id?.user || null,
                   timestamp: typeof c.t === "number" ? c.t : null,
                   unreadCount:
                     typeof c.unreadCount === "number" ? c.unreadCount : 0,
@@ -1698,6 +1780,7 @@ class WhatsAppService {
                   id: ct.id._serialized,
                   name: name || ct.id?.user || "",
                   idUser: ct.id?.user || "",
+                  phoneNumber: ct.id?.user || null,
                   timestamp: null,
                   unreadCount: 0,
                   isGroup: false,
@@ -1727,7 +1810,11 @@ class WhatsAppService {
 
       return raw.map((r) => ({
         id: r.id,
-        name: r.name || r.idUser || "Unknown contact",
+        name: getDisplayNameFromCandidates(
+          [r.name, r.idUser],
+          getPhoneNumberFromChatId(r.phoneNumber || r.idUser || r.id),
+        ),
+        phoneNumber: getPhoneNumberFromChatId(r.phoneNumber || r.idUser || r.id),
         lastMessage: getLastMessagePreview(
           r.lastMessageBody !== null || r.lastMessageHasMedia
             ? {
@@ -1864,6 +1951,7 @@ class WhatsAppService {
             id: string;
             name: string;
             idUser: string;
+            phoneNumber: string | null;
             timestamp: number | null;
             unreadCount: number;
             isGroup: boolean;
@@ -1894,10 +1982,19 @@ class WhatsAppService {
                   .map((c: any) => {
                     try {
                       const lm = c.lastMessage ?? c.msgs?.last ?? null;
+                      const contact = store?.Contact?.get?.(c.id._serialized);
+                      const saved = Boolean(
+                        contact?.isAddressBookContact ?? contact?.isMyContact,
+                      );
+                      const savedName =
+                        saved && typeof contact?.name === "string"
+                          ? contact.name.trim()
+                          : "";
                       return {
                         id: c.id._serialized,
-                        name: c.formattedTitle || c.name || c.id?.user || "",
+                        name: savedName || c.formattedTitle || c.name || c.id?.user || "",
                         idUser: c.id?.user || "",
+                        phoneNumber: c.id?.user || null,
                         timestamp: typeof c.t === "number" ? c.t : null,
                         unreadCount:
                           typeof c.unreadCount === "number" ? c.unreadCount : 0,
@@ -1928,7 +2025,11 @@ class WhatsAppService {
             LOG(`refreshChats: fast path returned ${raw.length} chats`);
             const mappedChats: WhatsAppChatSummary[] = raw.map((r) => ({
               id: r.id,
-              name: r.name || r.idUser || "Unknown contact",
+              name: getDisplayNameFromCandidates(
+                [r.name, r.idUser],
+                getPhoneNumberFromChatId(r.phoneNumber || r.idUser || r.id),
+              ),
+              phoneNumber: getPhoneNumberFromChatId(r.phoneNumber || r.idUser || r.id),
               lastMessage: getLastMessagePreview(
                 r.lastMessageBody !== null || r.lastMessageHasMedia
                   ? {
@@ -2331,12 +2432,15 @@ class WhatsAppService {
         }
       }
 
-      await this.withOperationSlot(() => message.edit(content));
-
-      const updated = await this.withOperationSlot(() =>
-        client.getMessageById(messageId),
+      const editedMessage = await this.withOperationSlot(() =>
+        message.edit(content),
       );
-      const mapped = mapMessage(updated ?? message);
+
+      if (!editedMessage) {
+        throw new Error("This message type cannot be edited in WhatsApp.");
+      }
+
+      const mapped = mapMessage(editedMessage);
 
       publishWhatsAppEvent("message", {
         chatId: mapped.chatId,

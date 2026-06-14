@@ -225,7 +225,11 @@ export default function TaskDetails() {
       setSelectedAgentId(taskData.assignedTo.id);
     }
 
-    const ownershipAgent = (taskData as Task & { ownerShipBy?: Agent }).ownerShipBy;
+    const rawOwnershipAgent = (taskData as Task & { ownerShipBy?: Agent }).ownerShipBy;
+    const ownershipAgent =
+      rawOwnershipAgent?.status?.toLowerCase() === "inactive"
+        ? taskData.assignedTo
+        : rawOwnershipAgent;
     if (ownershipAgent) {
       setAgentOwnershipQuery(ownershipAgent.name);
       setSelectedOwnershipAgentId(ownershipAgent.id);
@@ -614,7 +618,7 @@ export default function TaskDetails() {
 
   // Dropdown options for durations
   const durationOptions = [
-    { value: "None", label: "None" },
+    { value: "None", label: "Working" },
     { value: "24hr", label: "24 Hours" },
     { value: "48hr", label: "48 Hours" },
     { value: "1w", label: "1 Week" },
@@ -845,6 +849,11 @@ export default function TaskDetails() {
     );
   }
 
+  const displayOwnershipAgent =
+    taskData.ownerShipBy?.status?.toLowerCase() === "inactive"
+      ? taskData.assignedTo
+      : taskData.ownerShipBy ?? taskData.assignedTo;
+
   return (
     <div className="container mx-auto p-6 max-w-7xl">
       {/* Header */}
@@ -874,8 +883,7 @@ export default function TaskDetails() {
                 <div className="flex-1">
                   <div className="flex flex-col  md:flex-row  items-start md:items-center gap-3 mb-2">
                     <h2
-                      className="text-[18px] md:text-2xl font-bold truncate"
-                      style={{ maxWidth: '350px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                      className="text-[18px] md:text-2xl font-bold break-words"
                       title={taskData.title}
                     >
                       {taskData.title}
@@ -903,9 +911,9 @@ export default function TaskDetails() {
                   </span>
                 </div>
                 <div className="flex items-center gap-2 text-sm">
-                  <span className="inline-flex"><Avatar className="h-4 w-4"><AvatarFallback className="text-xs">{taskData.ownerShipBy?.name?.split(" ").map((n) => n[0]).join("") || "U"}</AvatarFallback></Avatar></span>
+                  <span className="inline-flex"><Avatar className="h-4 w-4"><AvatarFallback className="text-xs">{displayOwnershipAgent?.name?.split(" ").map((n) => n[0]).join("") || "U"}</AvatarFallback></Avatar></span>
                   <span className="text-gray-600">
-                    Ownership to {taskData.ownerShipBy?.name || "Unassigned"}
+                    Ownership to {displayOwnershipAgent?.name || "Unassigned"}
                   </span>
                 </div>
                 <div className="flex items-center gap-2 text-sm">
@@ -935,7 +943,7 @@ export default function TaskDetails() {
                     onValueChange={handleFollowUpDurationChange}
                   >
                     <SelectTrigger id="follow-up-duration" className="w-full">
-                      <SelectValue placeholder="None" />
+                      <SelectValue placeholder="Working" />
                     </SelectTrigger>
                     <SelectContent>
                       {durationOptions.map(opt => (
@@ -953,7 +961,7 @@ export default function TaskDetails() {
                     onValueChange={handleStatusCheckDurationChange}
                   >
                     <SelectTrigger id="status-check-duration" className="w-full">
-                      <SelectValue placeholder="None" />
+                      <SelectValue placeholder="Working" />
                     </SelectTrigger>
                     <SelectContent>
                       {durationOptions.map(opt => (
@@ -1251,8 +1259,7 @@ export default function TaskDetails() {
                         Task Name
                       </Label>
                       <p
-                        className="font-medium truncate"
-                        style={{ maxWidth: '250px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                        className="font-medium break-words"
                         title={taskData.title}
                       >
                         {taskData.title}
@@ -1555,7 +1562,7 @@ export default function TaskDetails() {
                       onValueChange={handleFollowUpDurationChange}
                     >
                       <SelectTrigger id="follow-up-duration" className="w-full">
-                        <SelectValue placeholder="None" />
+                        <SelectValue placeholder="Working" />
                       </SelectTrigger>
                       <SelectContent>
                         {durationOptions.map(opt => (
@@ -1573,7 +1580,7 @@ export default function TaskDetails() {
                       onValueChange={handleStatusCheckDurationChange}
                     >
                       <SelectTrigger id="status-check-duration" className="w-full">
-                        <SelectValue placeholder="None" />
+                        <SelectValue placeholder="Working" />
                       </SelectTrigger>
                       <SelectContent>
                         {durationOptions.map(opt => (

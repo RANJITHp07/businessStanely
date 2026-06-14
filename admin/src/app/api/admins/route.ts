@@ -14,8 +14,11 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // Fetch all admins
+    // Fetch active admins only. Deleted admins are soft-deleted as inactive.
     const admins = await prisma.user.findMany({
+      where: {
+        status: "active",
+      },
       orderBy: {
         createdAt: 'desc',
       },
@@ -27,7 +30,7 @@ export async function GET(req: NextRequest) {
         name: admin.username, // Use username for display
         email: admin.email,
         role: admin.adminType,
-        status: "active", // Default to active since we just added this field
+        status: admin.status,
         createdAt: admin.createdAt.toISOString(),
         photo: "/placeholder.svg?height=40&width=40", // Default placeholder image
         lastLogin: undefined, // We don't have this data yet

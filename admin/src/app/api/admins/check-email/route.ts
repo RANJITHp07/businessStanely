@@ -15,7 +15,10 @@ export async function GET(request: Request) {
 
     // Always check emails in lowercase for case-insensitive uniqueness
     const existingAdmin = await prisma.user.findFirst({
-      where: { email: { equals: email.toLowerCase(), mode: "insensitive" } },
+      where: {
+        email: { equals: email.toLowerCase(), mode: "insensitive" },
+        status: "active",
+      },
       select: { id: true },
     });
 

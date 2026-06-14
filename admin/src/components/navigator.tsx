@@ -53,6 +53,9 @@ export default function Navigator() {
                 <Button size="sm" onClick={() => router.push('/agent/create')}>
                     Create Agent
                 </Button>
+                <Button size="sm" onClick={() => router.push('/client/create')}>
+                    Create Client
+                </Button>
             </div>
         </div>
     )

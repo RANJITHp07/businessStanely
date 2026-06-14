@@ -769,8 +769,12 @@ export default function TasksTable() {
                             : (task.client.organizationName ?? "N/A"))
                           : "N/A";
                         const clientEmail = task.client?.email ?? "";
-                        const ownerName = task.assignedTo?.name ?? "";
-                        const ownerType = task.assignedTo?.agentType ?? "";
+                        const owner =
+                          task.ownerShipBy?.status?.toLowerCase() === "inactive"
+                            ? task.assignedTo
+                            : task.ownerShipBy ?? task.assignedTo;
+                        const ownerName = owner?.name ?? "";
+                        const ownerType = owner?.agentType ?? "";
                         return (
                           <TableRow
                             key={task.id}
@@ -805,7 +809,7 @@ export default function TasksTable() {
                               <div className="flex items-center space-x-2">
                                 <Avatar className="h-8 w-8">
                                   <AvatarFallback className="text-xs">
-                                    {task.assignedTo?.name
+                                    {owner?.name
                                       .toUpperCase()
                                       .split(" ")
                                       .map((n) => n[0])

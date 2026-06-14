@@ -238,6 +238,57 @@ function streamAuth(
   res.status(401).json({ error: "Unauthorized" });
 }
 
+function getRequestValue(req: express.Request, key: string) {
+  const body =
+    req.body && typeof req.body === "object"
+      ? (req.body as Record<string, unknown>)
+      : {};
+
+  return body[key] ?? req.query[key];
+}
+
+function normalizeStringParam(value: unknown) {
+  const raw = Array.isArray(value) ? value[0] : value;
+
+  if (typeof raw === "string") {
+    return raw.trim();
+  }
+
+  if (typeof raw === "number" || typeof raw === "boolean") {
+    return String(raw).trim();
+  }
+
+  return "";
+}
+
+function normalizeBooleanParam(value: unknown, fallback: boolean) {
+  const raw = Array.isArray(value) ? value[0] : value;
+
+  if (raw === undefined || raw === null || raw === "") {
+    return fallback;
+  }
+
+  if (typeof raw === "boolean") {
+    return raw;
+  }
+
+  if (typeof raw === "number") {
+    return raw !== 0;
+  }
+
+  if (typeof raw === "string") {
+    const normalized = raw.trim().toLowerCase();
+    if (["false", "0", "no", "off"].includes(normalized)) {
+      return false;
+    }
+    if (["true", "1", "yes", "on"].includes(normalized)) {
+      return true;
+    }
+  }
+
+  return fallback;
+}
+
 // --- Status ---
 app.get("/status", auth, async (_req, res) => {
   whatsappService.ensureInitialized().catch((err: unknown) => {
@@ -289,7 +340,16 @@ app.get("/messages", auth, async (req, res) => {
 });
 
 app.patch("/messages", auth, async (req, res) => {
-  const { messageId, body } = req.body ?? {};
+  const messageId = normalizeStringParam(
+    getRequestValue(req, "messageId") ?? getRequestValue(req, "id"),
+  );
+  const body = normalizeStringParam(
+    getRequestValue(req, "body") ??
+      getRequestValue(req, "message") ??
+      getRequestValue(req, "text") ??
+      getRequestValue(req, "content"),
+  );
+
   if (!messageId || !body) {
     res.status(400).json({ error: "messageId and body are required." });
     return;
@@ -305,7 +365,11 @@ app.patch("/messages", auth, async (req, res) => {
 });
 
 app.delete("/messages", auth, async (req, res) => {
-  const { messageId, everyone = true } = req.body ?? {};
+  const messageId = normalizeStringParam(
+    getRequestValue(req, "messageId") ?? getRequestValue(req, "id"),
+  );
+  const everyone = normalizeBooleanParam(getRequestValue(req, "everyone"), true);
+
   if (!messageId) {
     res.status(400).json({ error: "messageId is required." });
     return;

@@ -187,7 +187,8 @@ export default function AgentForm({ agent }: AgentFormProps) {
     agent?.photo || null
   );
   const [allAgents, setAllAgents] = useState<Agent[]>([]);
-  const [allSubordinateIds, setAllSubordinateIds] = useState<string[]>([]);
+  const [allExecutionSubordinateIds, setAllExecutionSubordinateIds] = useState<string[]>([]);
+  const [allAdvisorSubordinateIds, setAllAdvisorSubordinateIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   type AgentFormData = {
     name: string;
@@ -239,19 +240,22 @@ export default function AgentForm({ agent }: AgentFormProps) {
       if (response.ok) {
         const agents = await response.json();
         setAllAgents(agents);
-        // Collect all subordinate IDs except for the current agent's subordinates
-        const subordinateIds: string[] = [];
+        // Collect subordinate IDs by team type. A dual-role person may be on
+        // both an execution team and an advisor team.
+        const executionSubordinateIds: string[] = [];
+        const advisorSubordinateIds: string[] = [];
         agents.forEach((a: Agent) => {
           if (!agent || a.id !== agent.id) {
             if (Array.isArray(a.subordinates)) {
-              subordinateIds.push(...a.subordinates.map((s: Agent) => s.id));
+              executionSubordinateIds.push(...a.subordinates.map((s: Agent) => s.id));
             }
             if (Array.isArray(a.advisorSubordinates)) {
-              subordinateIds.push(...a.advisorSubordinates.map((s: Agent) => s.id));
+              advisorSubordinateIds.push(...a.advisorSubordinates.map((s: Agent) => s.id));
             }
           }
         });
-        setAllSubordinateIds(subordinateIds);
+        setAllExecutionSubordinateIds(executionSubordinateIds);
+        setAllAdvisorSubordinateIds(advisorSubordinateIds);
       }
     } catch (error) {
       console.error("Error fetching agents:", error);
@@ -339,7 +343,12 @@ export default function AgentForm({ agent }: AgentFormProps) {
     return allAgents.filter((existingAgent) => {
       if (agent && existingAgent.id === agent.id) return false;
       if (!allowedTypes.includes(existingAgent.agentType)) return false;
-      // Hide agents assigned to other teams, but keep ones already in THIS form's selection
+      if (
+        allExecutionSubordinateIds.includes(existingAgent.id) &&
+        !selectedSubordinates.includes(existingAgent.id)
+      ) {
+        return false;
+      }
       if (
         selectedSubordinates.includes(existingAgent.id)
       ) {
@@ -361,9 +370,10 @@ export default function AgentForm({ agent }: AgentFormProps) {
 
   const filteredAdvisorAgents = allAgents.filter((existingAgent) => {
     if (agent && existingAgent.id === agent.id) return false;
-    if (existingAgent.agentType !== "Client Advisor") return false;
+    const advisorType = existingAgent.advisorAgentType || existingAgent.agentType;
+    if (advisorType !== "Client Advisor") return false;
     if (
-      allSubordinateIds.includes(existingAgent.id) &&
+      allAdvisorSubordinateIds.includes(existingAgent.id) &&
       !selectedAdvisorSubordinates.includes(existingAgent.id)
     ) {
       return false;

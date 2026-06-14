@@ -4,6 +4,21 @@ import prisma from "@/lib/prisma";
 import { sendAdminInviteEmail } from "@/lib/email";
 import { getCurrentAdmin } from "@/lib/auth";
 
+const buildArchivedAdminEmail = (email: string, adminId: string) => {
+  const normalized = email.toLowerCase();
+  const [localPart, domainPart] = normalized.split("@");
+  const suffix = `inactive-${adminId.slice(-6)}-${Date.now()}`;
+
+  if (localPart && domainPart) {
+    return `${localPart}+${suffix}@${domainPart}`;
+  }
+
+  return `${normalized}.${suffix}`;
+};
+
+const buildArchivedAdminUsername = (username: string, adminId: string) =>
+  `${username}-inactive-${adminId.slice(-6)}-${Date.now()}`;
+
 export async function POST(req: NextRequest) {
   try {
     // Get the current admin user
@@ -39,20 +54,71 @@ export async function POST(req: NextRequest) {
     // Generate a random password if not provided
     const password = providedPassword || Math.random().toString(36).slice(-8);
     const hashedPassword = await bcrypt.hash(password, 10);
+    const normalizedEmail = email.toLowerCase();
+
+    const [existingAdminEmail, existingAdminUsername] = await Promise.all([
+      prisma.user.findFirst({
+        where: { email: { equals: normalizedEmail, mode: "insensitive" } },
+        select: { id: true, email: true, status: true },
+      }),
+      prisma.user.findUnique({
+        where: { username },
+        select: { id: true, username: true, status: true },
+      }),
+    ]);
+
+    if (existingAdminEmail) {
+      if (existingAdminEmail.status !== "inactive") {
+        return NextResponse.json(
+          { error: "Username or email already exists" },
+          { status: 409 },
+        );
+      }
+
+      await prisma.user.update({
+        where: { id: existingAdminEmail.id },
+        data: {
+          email: buildArchivedAdminEmail(
+            existingAdminEmail.email,
+            existingAdminEmail.id,
+          ),
+        },
+      });
+    }
+
+    if (existingAdminUsername) {
+      if (existingAdminUsername.status !== "inactive") {
+        return NextResponse.json(
+          { error: "Username or email already exists" },
+          { status: 409 },
+        );
+      }
+
+      await prisma.user.update({
+        where: { id: existingAdminUsername.id },
+        data: {
+          username: buildArchivedAdminUsername(
+            existingAdminUsername.username,
+            existingAdminUsername.id,
+          ),
+        },
+      });
+    }
 
     // Create the new admin, using username as name
     await prisma.user.create({
       data: {
         username,
-        email,
+        email: normalizedEmail,
         password: hashedPassword,
         adminType: adminType || "admin", // Use provided adminType or default to "admin"
+        status: "active",
       },
     });
 
     // Send email with credentials
     await sendAdminInviteEmail({
-      to: email,
+      to: normalizedEmail,
       userName: username, // Use username instead of name
       password: password,
     });

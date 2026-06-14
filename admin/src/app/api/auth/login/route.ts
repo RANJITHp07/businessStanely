@@ -114,6 +114,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    if (user.status === "inactive") {
+      return NextResponse.json(
+        {
+          error:
+            "This admin account has been deactivated. Please contact the owner.",
+        },
+        { status: 403 }
+      );
+    }
+
     // Enforce single-session: block login if user is already logged in elsewhere, unless force is true
     if (user.currentSessionToken && !force) {
       return NextResponse.json(

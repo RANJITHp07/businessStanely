@@ -464,7 +464,13 @@ function getPhoneNumberFromChatId(chatId: string | null | undefined) {
 function isLikelyLidIdentifier(value: string | null | undefined) {
   const normalized = normalizeWhatsAppIdentifier(value);
   if (!normalized) return false;
-  return String(value ?? "").includes("@lid") || digitsOnly(normalized).length > 11;
+  // The reliable signal is the "@lid" server. The length check is only a
+  // backstop for a bare phone-number field that's actually a lid-derived id:
+  // real E.164 numbers top out around 13 digits (≤3 country code + ≤10), while
+  // WhatsApp lids are ~15+, so 11–13 digit numbers must not be flagged.
+  return (
+    String(value ?? "").includes("@lid") || digitsOnly(normalized).length > 13
+  );
 }
 
 function isPhoneLikeLabel(value: string, phoneNumber: string | null) {
@@ -789,7 +795,7 @@ class WhatsAppService {
 
     try {
       const resolved = (await withTimeout(
-        pupPage.evaluate((chatIds: unknown) => {
+        pupPage.evaluate(async (chatIds: unknown) => {
           /* eslint-disable @typescript-eslint/no-explicit-any */
           const store = (window as any).Store;
           const out: Record<
@@ -798,6 +804,20 @@ class WhatsAppService {
           > = {};
           const onlyDigits = (s: any) =>
             typeof s === "string" ? s.replace(/[^0-9]/g, "") : "";
+
+          // whatsapp-web.js exposes the real WA Web internal modules through
+          // window.require. The lid↔phone mapping lives in 'WAWebApiContact'
+          // (getPhoneNumber / getCurrentLid), NOT Store.LidUtils on this build,
+          // which is why earlier Store.LidUtils lookups silently returned null.
+          const requireMod = (name: string) => {
+            try {
+              return (window as any).require?.(name) ?? null;
+            } catch {
+              return null;
+            }
+          };
+          const apiContact = requireMod("WAWebApiContact");
+          const widFactory = requireMod("WAWebWidFactory");
 
           const getContact = (jid: string) => {
             try {
@@ -816,38 +836,53 @@ class WhatsAppService {
           };
 
           // Turn a jid string (or existing Wid) into a real Wid object. The
-          // LidUtils phone-number lookup only works with a proper Wid, not a
-          // raw "<num>@lid" string, so unsaved lid contacts fail unless we
-          // build one here.
+          // phone-number lookup only works with a proper Wid, not a raw
+          // "<num>@lid" string, so unsaved lid contacts fail unless we build
+          // one here.
           const toWid = (val: any) => {
             if (!val) return null;
             if (typeof val === "object" && (val.user || val._serialized))
               return val;
-            const wf = store?.WidFactory;
-            for (const m of ["createWid", "createWidFromWidLike", "createWidFromWid"]) {
-              try {
-                const w = wf?.[m]?.(val);
-                if (w) return w;
-              } catch {}
+            for (const wf of [widFactory, store?.WidFactory]) {
+              for (const m of [
+                "createWid",
+                "createWidFromWidLike",
+                "createWidFromWid",
+              ]) {
+                try {
+                  const w = wf?.[m]?.(val);
+                  if (w) return w;
+                } catch {}
+              }
             }
             return null;
           };
 
+          const pnWidToDigits = (pnWid: any) => {
+            if (!pnWid) return "";
+            if (pnWid?.user) return onlyDigits(pnWid.user);
+            if (typeof pnWid === "string") {
+              const d = onlyDigits(pnWid.split("@")[0]);
+              if (d) return d;
+            }
+            // The lookup may return only a serialized pn jid; resolve its
+            // contact to read the phone-form id.
+            if (pnWid?._serialized) {
+              const pnc = getContact(pnWid._serialized);
+              if (pnc?.id?.server === "c.us" && pnc.id.user)
+                return onlyDigits(pnc.id.user);
+            }
+            return "";
+          };
+
           const phoneFromLid = (wid: any) => {
             try {
-              const pnWid = store?.LidUtils?.getPhoneNumber?.(wid);
-              if (pnWid?.user) return onlyDigits(pnWid.user);
-              if (typeof pnWid === "string") {
-                const d = onlyDigits(pnWid.split("@")[0]);
-                if (d) return d;
-              }
-              // The lookup may return only a serialized pn jid; resolve its
-              // contact to read the phone-form id.
-              if (pnWid?._serialized) {
-                const pnc = getContact(pnWid._serialized);
-                if (pnc?.id?.server === "c.us" && pnc.id.user)
-                  return onlyDigits(pnc.id.user);
-              }
+              const viaApi = apiContact?.getPhoneNumber?.(wid);
+              const d = pnWidToDigits(viaApi);
+              if (d) return d;
+            } catch {}
+            try {
+              return pnWidToDigits(store?.LidUtils?.getPhoneNumber?.(wid));
             } catch {}
             return "";
           };
@@ -872,13 +907,34 @@ class WhatsAppService {
             return "";
           };
 
+          // Last resort for a lid whose phone mapping isn't cached locally:
+          // ask WhatsApp to fetch it (enforceLidAndPnRetrieval queries the
+          // server). Awaited because it's a network round-trip.
+          const enforcePhone = async (jid: string) => {
+            try {
+              const res = await (window as any).WWebJS?.enforceLidAndPnRetrieval?.(
+                jid,
+              );
+              return pnWidToDigits(res?.phone);
+            } catch {
+              return "";
+            }
+          };
+
+          // Each enforcePhone() is a server round-trip; bound how many fire per
+          // call so a list full of unsynced lids can't exceed the eval timeout.
+          // The next refresh resolves any that were skipped this pass.
+          let enforceBudget = 12;
           for (const jid of chatIds as string[]) {
             try {
               const c = getContact(jid);
-              const phone =
-                jid.includes("@c.us")
-                  ? onlyDigits(jid.split("@")[0])
-                  : phoneFromContact(jid, c);
+              let phone = jid.includes("@c.us")
+                ? onlyDigits(jid.split("@")[0])
+                : phoneFromContact(jid, c);
+              if (!phone && jid.includes("@lid") && enforceBudget > 0) {
+                enforceBudget--;
+                phone = await enforcePhone(jid);
+              }
               const isSaved = Boolean(
                 c && (c.isAddressBookContact ?? c.isMyContact),
               );
@@ -900,7 +956,7 @@ class WhatsAppService {
         }, ids) as Promise<
           Record<string, { phoneNumber: string | null; name: string | null }>
         >,
-        8000,
+        15000,
         "resolveChatIdentities",
       )) as Record<string, { phoneNumber: string | null; name: string | null }>;
 
@@ -1957,39 +2013,61 @@ class WhatsAppService {
                 return null;
               }
             };
+            // lid↔phone lives in 'WAWebApiContact' on this build (reachable via
+            // wwebjs's window.require shim), not Store.LidUtils.
+            const requireMod = (name: string) => {
+              try {
+                return (window as any).require?.(name) ?? null;
+              } catch {
+                return null;
+              }
+            };
+            const apiContact = requireMod("WAWebApiContact");
+            const widFactory = requireMod("WAWebWidFactory");
             const toWid = (val: any) => {
               if (!val) return null;
               if (typeof val === "object" && (val.user || val._serialized))
                 return val;
-              const wf = store?.WidFactory;
-              for (const m of [
-                "createWid",
-                "createWidFromWidLike",
-                "createWidFromWid",
-              ]) {
-                try {
-                  const w = wf?.[m]?.(val);
-                  if (w) return w;
-                } catch {}
+              for (const wf of [widFactory, store?.WidFactory]) {
+                for (const m of [
+                  "createWid",
+                  "createWidFromWidLike",
+                  "createWidFromWid",
+                ]) {
+                  try {
+                    const w = wf?.[m]?.(val);
+                    if (w) return w;
+                  } catch {}
+                }
               }
               return null;
             };
+            const pnWidToDigits = (pnWid: any) => {
+              if (!pnWid) return "";
+              if (pnWid?.user) {
+                const digits = onlyDigits(pnWid.user);
+                if (digits) return digits;
+              }
+              if (typeof pnWid === "string") {
+                const digits = onlyDigits(pnWid.split("@")[0]);
+                if (digits) return digits;
+              }
+              if (pnWid?._serialized) {
+                const pnc = getContact(pnWid._serialized);
+                if (pnc?.id?.server === "c.us" && pnc.id.user)
+                  return onlyDigits(pnc.id.user);
+              }
+              return "";
+            };
+            // Search may touch many contacts, so only the fast local lookups
+            // run here — no per-contact server query (enforceLidAndPnRetrieval).
             const lidToPhone = (wid: any) => {
               try {
-                const pnWid = store?.LidUtils?.getPhoneNumber?.(wid);
-                if (pnWid?.user) {
-                  const digits = onlyDigits(pnWid.user);
-                  if (digits) return digits;
-                }
-                if (typeof pnWid === "string") {
-                  const digits = onlyDigits(pnWid.split("@")[0]);
-                  if (digits) return digits;
-                }
-                if (pnWid?._serialized) {
-                  const pnc = getContact(pnWid._serialized);
-                  if (pnc?.id?.server === "c.us" && pnc.id.user)
-                    return onlyDigits(pnc.id.user);
-                }
+                const d = pnWidToDigits(apiContact?.getPhoneNumber?.(wid));
+                if (d) return d;
+              } catch {}
+              try {
+                return pnWidToDigits(store?.LidUtils?.getPhoneNumber?.(wid));
               } catch {}
               return "";
             };
@@ -2579,12 +2657,25 @@ class WhatsAppService {
 
     try {
       const resolved = (await withTimeout(
-        pupPage.evaluate((ids: unknown) => {
+        pupPage.evaluate(async (ids: unknown) => {
           /* eslint-disable @typescript-eslint/no-explicit-any */
           const store = (window as any).Store;
           const out: Record<string, string | null> = {};
           const onlyDigits = (s: any) =>
             typeof s === "string" ? s.replace(/[^0-9]/g, "") : "";
+
+          // lid↔phone lives in the 'WAWebApiContact' internal module on this
+          // build, reachable via wwebjs's window.require shim — not in
+          // Store.LidUtils.
+          const requireMod = (name: string) => {
+            try {
+              return (window as any).require?.(name) ?? null;
+            } catch {
+              return null;
+            }
+          };
+          const apiContact = requireMod("WAWebApiContact");
+          const widFactory = requireMod("WAWebWidFactory");
 
           const getContact = (jid: string) => {
             try {
@@ -2603,35 +2694,49 @@ class WhatsAppService {
           };
 
           // Build a real Wid from a jid string (or pass through an existing
-          // Wid). LidUtils.getPhoneNumber needs a Wid object, not a raw
-          // "<num>@lid" string, so unsaved lid senders fail without this.
+          // Wid). getPhoneNumber needs a Wid object, not a raw "<num>@lid"
+          // string, so unsaved lid senders fail without this.
           const toWid = (val: any) => {
             if (!val) return null;
             if (typeof val === "object" && (val.user || val._serialized))
               return val;
-            const wf = store?.WidFactory;
-            for (const m of ["createWid", "createWidFromWidLike", "createWidFromWid"]) {
-              try {
-                const w = wf?.[m]?.(val);
-                if (w) return w;
-              } catch {}
+            for (const wf of [widFactory, store?.WidFactory]) {
+              for (const m of [
+                "createWid",
+                "createWidFromWidLike",
+                "createWidFromWid",
+              ]) {
+                try {
+                  const w = wf?.[m]?.(val);
+                  if (w) return w;
+                } catch {}
+              }
             }
             return null;
           };
 
+          const pnWidToDigits = (pnWid: any) => {
+            if (!pnWid) return "";
+            if (pnWid?.user) return onlyDigits(pnWid.user);
+            if (typeof pnWid === "string") {
+              const d = onlyDigits(pnWid.split("@")[0]);
+              if (d) return d;
+            }
+            if (pnWid?._serialized) {
+              const pnc = getContact(pnWid._serialized);
+              if (pnc?.id?.server === "c.us" && pnc.id.user)
+                return onlyDigits(pnc.id.user);
+            }
+            return "";
+          };
+
           const lidToPhone = (wid: any) => {
             try {
-              const pnWid = store?.LidUtils?.getPhoneNumber?.(wid);
-              if (pnWid?.user) return onlyDigits(pnWid.user);
-              if (typeof pnWid === "string") {
-                const d = onlyDigits(pnWid.split("@")[0]);
-                if (d) return d;
-              }
-              if (pnWid?._serialized) {
-                const pnc = getContact(pnWid._serialized);
-                if (pnc?.id?.server === "c.us" && pnc.id.user)
-                  return onlyDigits(pnc.id.user);
-              }
+              const d = pnWidToDigits(apiContact?.getPhoneNumber?.(wid));
+              if (d) return d;
+            } catch {}
+            try {
+              return pnWidToDigits(store?.LidUtils?.getPhoneNumber?.(wid));
             } catch {}
             return "";
           };
@@ -2657,6 +2762,17 @@ class WhatsAppService {
             return "";
           };
 
+          const enforcePhone = async (jid: string) => {
+            try {
+              const res = await (window as any).WWebJS?.enforceLidAndPnRetrieval?.(
+                jid,
+              );
+              return pnWidToDigits(res?.phone);
+            } catch {
+              return "";
+            }
+          };
+
           for (const jid of ids as string[]) {
             try {
               const c = getContact(jid);
@@ -2668,10 +2784,13 @@ class WhatsAppService {
                   ? c.name.trim()
                   : null;
 
-              const phone =
+              let phone =
                 jid.indexOf("@c.us") !== -1
                   ? onlyDigits(jid.split("@")[0])
                   : phoneFromLid(jid, c);
+              if (!savedName && !phone && jid.includes("@lid")) {
+                phone = await enforcePhone(jid);
+              }
 
               out[jid] = savedName || (phone ? phone : null);
             } catch {
@@ -2681,7 +2800,7 @@ class WhatsAppService {
           return out;
           /* eslint-enable @typescript-eslint/no-explicit-any */
         }, missing) as Promise<Record<string, string | null>>,
-        8000,
+        15000,
         "resolveGroupSenderLabels",
       )) as Record<string, string | null>;
 

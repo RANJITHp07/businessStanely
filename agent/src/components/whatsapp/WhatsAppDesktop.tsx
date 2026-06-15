@@ -326,7 +326,7 @@ const MessageComposer = memo(function MessageComposer({
                     }}
                     placeholder={attachment ? "Add a caption (optional)" : "Type a message"}
                     rows={1}
-                    className="max-h-32 min-h-6 w-full resize-none bg-transparent text-sm text-white outline-none placeholder:text-[var(--wa-muted)]"
+                    className="max-h-32 min-h-6 w-full resize-none bg-transparent text-sm text-black outline-none placeholder:text-[var(--wa-muted)]"
                 />
             </div>
             <button

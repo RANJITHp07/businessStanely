@@ -344,11 +344,13 @@ export function WhatsAppDesktop() {
     const {
         canLoadMore,
         chats,
+        hasMoreChats,
         deleteMessage,
         editMessage,
         isBootstrapping,
         isLoadingMore,
         isSending,
+        loadMoreChats,
         loadMoreMessages,
         logout,
         messages,
@@ -760,6 +762,17 @@ export function WhatsAppDesktop() {
                                         </button>
                                     );
                                 })}
+                                {hasMoreChats && (
+                                    <div className="flex justify-center py-2">
+                                        <button
+                                            type="button"
+                                            onClick={loadMoreChats}
+                                            className="rounded-lg bg-[var(--wa-header)] px-4 py-2 text-sm text-[#00a884] hover:bg-[var(--wa-input)]"
+                                        >
+                                            Load more chats
+                                        </button>
+                                    </div>
+                                )}
                             </>
                         )}
                     </div>

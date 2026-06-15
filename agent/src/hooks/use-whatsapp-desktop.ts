@@ -104,6 +104,7 @@ function fallbackChatPhone(chatId: string) {
 export function useWhatsAppDesktop() {
   const [state, setState] = useState<SerializableWhatsAppState>(defaultState);
   const [chats, setChats] = useState<WhatsAppChatSummary[]>([]);
+  const [hasMoreChats, setHasMoreChats] = useState(true);
   const [messages, setMessages] = useState<WhatsAppMessage[]>([]);
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -116,6 +117,7 @@ export function useWhatsAppDesktop() {
   const [searchResults, setSearchResults] = useState<WhatsAppChatSummary[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const messageLimitRef = useRef(INITIAL_MESSAGE_LIMIT);
+  const chatPageRef = useRef(1);
   const chatsCountRef = useRef(0);
   const eventSourceRef = useRef<EventSource | null>(null);
   const selectedChatIdRef = useRef<string | null>(null);
@@ -215,6 +217,8 @@ export function useWhatsAppDesktop() {
       const chatList = await fetchChatsPage(1, 15);
       setChats(chatList);
       resolveAvatarsBatch(chatList.map((chat) => chat.id));
+      chatPageRef.current = 1;
+      setHasMoreChats(chatList.length >= 15);
 
       const nextSelectedChatId = preferredChatId ?? selectedChatIdRef.current;
       const activeChat =
@@ -251,16 +255,42 @@ export function useWhatsAppDesktop() {
   // so a single network fetch replaces the full retry-heavy loadChats().
   const refreshChats = async (preferredChatId?: string | null) => {
     try {
-      const chatList = await fetchChatsPage(1, 15);
+      const loadedPages = Math.max(1, chatPageRef.current);
+      const pageSize = loadedPages * 15;
+      const chatList = await fetchChatsPage(1, pageSize);
       if (chatList.length === 0) return;
       setChats(chatList);
       resolveAvatarsBatch(chatList.map((chat) => chat.id));
+      setHasMoreChats(chatList.length >= pageSize);
       const sel = preferredChatId ?? selectedChatIdRef.current;
       if (!sel) {
         setSelectedChatId(chatList[0]?.id ?? null);
       }
     } catch {
       // Leave existing list on screen; next event will retry.
+    }
+  };
+
+  const loadMoreChats = async () => {
+    if (!hasMoreChats || isChatsLoading) return;
+    const nextPage = chatPageRef.current + 1;
+    try {
+      const chatList = await fetchChatsPage(nextPage, 15);
+      if (chatList.length > 0) {
+        resolveAvatarsBatch(chatList.map((chat) => chat.id));
+        setChats((prev) => {
+          const seen = new Set(prev.map((chat) => chat.id));
+          const merged = [...prev];
+          for (const chat of chatList) {
+            if (!seen.has(chat.id)) merged.push(chat);
+          }
+          return merged;
+        });
+        chatPageRef.current = nextPage;
+      }
+      setHasMoreChats(chatList.length >= 15);
+    } catch {
+      // Leave hasMoreChats as-is so the user can try again.
     }
   };
 
@@ -833,12 +863,14 @@ export function useWhatsAppDesktop() {
   return {
     canLoadMore,
     chats: displayChats,
+    hasMoreChats,
     isSearching,
     deleteMessage,
     editMessage,
     isBootstrapping,
     isLoadingMore,
     isSending,
+    loadMoreChats,
     loadMoreMessages,
     logout,
     messages,

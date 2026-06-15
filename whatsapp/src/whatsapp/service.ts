@@ -460,8 +460,22 @@ function formatPhoneNumberForDisplay(value: string | null | undefined) {
   const str = String(value);
   if (str.startsWith("+")) return str;
   const digits = digitsOnly(str);
-  if (digits.length >= 8 && digits.length <= 13) return `+${digits}`;
-  return str;
+  if (digits.length < 8 || digits.length > 13) return str;
+  // Format common country codes with readable spacing so the display shows
+  // "+91 98765 43210" rather than the raw "+919876543210".
+  if (digits.length === 12 && digits.startsWith("91")) {
+    return `+91 ${digits.slice(2, 7)} ${digits.slice(7)}`;
+  }
+  if (digits.length === 11 && digits.startsWith("1")) {
+    return `+1 ${digits.slice(1, 4)} ${digits.slice(4, 7)} ${digits.slice(7)}`;
+  }
+  if (digits.length === 12 && digits.startsWith("44")) {
+    return `+44 ${digits.slice(2, 6)} ${digits.slice(6)}`;
+  }
+  if (digits.length === 11 && digits.startsWith("971")) {
+    return `+971 ${digits.slice(3, 5)} ${digits.slice(5, 8)} ${digits.slice(8)}`;
+  }
+  return `+${digits}`;
 }
 
 function getPhoneNumberFromChatId(chatId: string | null | undefined) {
@@ -951,11 +965,8 @@ class WhatsAppService {
                 enforceBudget--;
                 phone = await enforcePhone(jid);
               }
-              const isSaved = Boolean(
-                c && (c.isAddressBookContact ?? c.isMyContact),
-              );
               const name =
-                isSaved && typeof c?.name === "string" && c.name.trim()
+                typeof c?.name === "string" && c.name.trim()
                   ? c.name.trim()
                   : null;
               out[jid] = {
@@ -2129,11 +2140,8 @@ class WhatsAppService {
                 if (c.id.server === "status" || c.id.server === "broadcast")
                   continue;
                 const contact = getContact(c.id._serialized);
-                const saved = Boolean(
-                  contact?.isAddressBookContact ?? contact?.isMyContact,
-                );
                 const savedName =
-                  saved && typeof contact?.name === "string"
+                  typeof contact?.name === "string" && contact.name.trim()
                     ? contact.name.trim()
                     : "";
                 // Cheap text match first (no lid resolution). Resolve the phone
@@ -2193,9 +2201,6 @@ class WhatsAppService {
               try {
                 if (!ct?.id?._serialized) continue;
                 if (ct.isMe) continue;
-                const saved = Boolean(
-                  ct.isAddressBookContact ?? ct.isMyContact,
-                );
                 // Cheap text match first; resolve the phone lazily (see above).
                 const cheapMatch = textMatches(
                   ct.name,
@@ -2496,11 +2501,12 @@ class WhatsAppService {
                     try {
                       const lm = c.lastMessage ?? c.msgs?.last ?? null;
                       const contact = store?.Contact?.get?.(c.id._serialized);
-                      const saved = Boolean(
-                        contact?.isAddressBookContact ?? contact?.isMyContact,
-                      );
+                      // contact.name is the address-book name set by WhatsApp
+                      // from your phone's contacts — only populated for saved
+                      // contacts, so checking isMyContact/isAddressBookContact
+                      // is redundant and unreliable across WA Web versions.
                       const savedName =
-                        saved && typeof contact?.name === "string"
+                        typeof contact?.name === "string" && contact.name.trim()
                           ? contact.name.trim()
                           : "";
                       return {
@@ -2851,11 +2857,8 @@ class WhatsAppService {
           for (const jid of ids as string[]) {
             try {
               const c = getContact(jid);
-              const isSaved = Boolean(
-                c && (c.isAddressBookContact ?? c.isMyContact),
-              );
               const savedName =
-                isSaved && typeof c?.name === "string" && c.name.trim()
+                typeof c?.name === "string" && c.name.trim()
                   ? c.name.trim()
                   : null;
 

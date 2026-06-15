@@ -363,6 +363,7 @@ function WhatsAppDesktop() {
         loadMoreChats,
         hasMoreChats,
         isChatsLoading,
+        isSearching,
         chatsError,
     } = useWhatsAppDesktop();
     const [mobileSidebarOpen, setMobileSidebarOpen] = useState(true);
@@ -715,11 +716,11 @@ function WhatsAppDesktop() {
                     </div>
 
                     <div className="no-scrollbar flex-1 overflow-y-auto">
-                        {isChatsLoading ? (
+                        {isChatsLoading || isSearching ? (
                             <div className="flex flex-col items-center justify-center h-full py-10 text-[#00a884]">
                                 <LoaderCircle className="h-8 w-8 animate-spin mb-3" />
-                                <span className="text-base font-medium">Loading chats…</span>
-                                <span className="text-xs text-[var(--wa-muted)] mt-2">This may take up to a minute on first login.</span>
+                                <span className="text-base font-medium">{isSearching ? "Searching…" : "Loading chats…"}</span>
+                                {!isSearching && <span className="text-xs text-[var(--wa-muted)] mt-2">This may take up to a minute on first login.</span>}
                             </div>
                         ) : chatsError ? (
                             <div className="flex flex-col items-center justify-center h-full py-10 text-red-400">

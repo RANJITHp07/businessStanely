@@ -198,6 +198,13 @@ export function useWhatsAppDesktop() {
     return nextState;
   };
 
+  const fetchChatsPage = async (page: number, pageSize: number) => {
+    const data = await getJson<{ chats: WhatsAppChatSummary[] }>(
+      `/api/whatsapp/chats?page=${page}&pageSize=${pageSize}`,
+    );
+    return data.chats ?? [];
+  };
+
   const loadChats = async (
     preferredChatId?: string | null,
     retryCount = 0,
@@ -205,26 +212,21 @@ export function useWhatsAppDesktop() {
     setIsChatsLoading(true);
     setChatsError(null);
     try {
-      const data = await getJson<{ chats: WhatsAppChatSummary[] }>(
-        "/api/whatsapp/chats?pageSize=15",
-      );
-      setChats(data.chats);
-      resolveAvatarsBatch(data.chats.map((chat) => chat.id));
+      const chatList = await fetchChatsPage(1, 15);
+      setChats(chatList);
+      resolveAvatarsBatch(chatList.map((chat) => chat.id));
 
       const nextSelectedChatId = preferredChatId ?? selectedChatIdRef.current;
       const activeChat =
-        data.chats.find((chat) => chat.id === nextSelectedChatId) ||
-        data.chats[0] ||
+        chatList.find((chat) => chat.id === nextSelectedChatId) ||
+        chatList[0] ||
         null;
 
       setSelectedChatId(activeChat?.id ?? null);
       setChatsError(null);
       // Keep the loading state on and retry gently while WhatsApp Web syncs —
       // but normally the `chats-updated` SSE event delivers the list first.
-      if (
-        (!data.chats || data.chats.length === 0) &&
-        retryCount < CHATS_EMPTY_RETRY_LIMIT
-      ) {
+      if (chatList.length === 0 && retryCount < CHATS_EMPTY_RETRY_LIMIT) {
         await new Promise((res) =>
           setTimeout(res, CHATS_EMPTY_RETRY_DELAY_MS),
         );
@@ -242,6 +244,23 @@ export function useWhatsAppDesktop() {
       setIsChatsLoading(false);
       setChatsError(err?.message || "Failed to load chats.");
       return null;
+    }
+  };
+
+  // Lightweight background refresh — no spinner, no retries. Used by SSE events
+  // so a single network fetch replaces the full retry-heavy loadChats().
+  const refreshChats = async (preferredChatId?: string | null) => {
+    try {
+      const chatList = await fetchChatsPage(1, 15);
+      if (chatList.length === 0) return;
+      setChats(chatList);
+      resolveAvatarsBatch(chatList.map((chat) => chat.id));
+      const sel = preferredChatId ?? selectedChatIdRef.current;
+      if (!sel) {
+        setSelectedChatId(chatList[0]?.id ?? null);
+      }
+    } catch {
+      // Leave existing list on screen; next event will retry.
     }
   };
 
@@ -287,7 +306,16 @@ export function useWhatsAppDesktop() {
 
     const bootstrap = async () => {
       try {
-        await loadStatus();
+        const nextState = await loadStatus();
+
+        if (!active) return;
+
+        if (nextState.status === "ready") {
+          const chatId = await loadChats();
+          if (active && chatId) {
+            await loadMessages(chatId);
+          }
+        }
       } catch (error) {
         if (active) {
           toast.error(
@@ -336,7 +364,7 @@ export function useWhatsAppDesktop() {
 
         chatsRefreshInFlight = true;
         try {
-          await loadChats(selectedChatIdRef.current);
+          await refreshChats(selectedChatIdRef.current);
         } catch {
           // Ignore transient refresh failures while the desktop client reconnects.
         } finally {

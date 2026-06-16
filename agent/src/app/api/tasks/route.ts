@@ -100,12 +100,10 @@ export async function GET(req: NextRequest) {
     else {
       where = {
         assignedToId,
-        legislation: null,
-        // category: {
-        //   is: {
-        //     status: "approved",
-        //   },
-        // },
+        legislationId: null,
+        AND: [
+          { OR: [{ category: null }, { category: { status: "approved" } }] },
+        ],
       };
     }
 

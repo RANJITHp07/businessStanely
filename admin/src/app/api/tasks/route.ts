@@ -176,6 +176,9 @@ export async function GET(req: NextRequest) {
       if (!statusesArray?.length && !status) {
         whereClause.status = { notIn: ["Completed", "completed"] };
       }
+    } else if (!categoryId) {
+      // Default assigned-task view: exclude legislation/retainership tasks
+      whereClause.legislationId = null;
     }
     if (clientId) {
       whereClause.clientId = clientId;

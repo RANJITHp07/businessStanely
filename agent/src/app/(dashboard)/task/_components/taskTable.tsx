@@ -35,6 +35,7 @@ import {
   Calendar,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useRef } from "react";
 
 import {
   Table,
@@ -93,6 +94,7 @@ export default function TasksTable() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(20);
   const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Map a status query param into the select label used by this component
   const mapQueryToStatusLabel = (q: string | null) => {
@@ -139,6 +141,9 @@ export default function TasksTable() {
         const statuses = searchParams?.get("statuses");
         const statusCheckDuration = searchParams?.get("statusCheckDuration");
         const clientUpdate = searchParams?.get("clientUpdate");
+        const search = searchParams?.get("search");
+        const priorities = searchParams?.get("priorities");
+        const followUpDurations = searchParams?.get("followUpDurations");
         let url = '/api/tasks';
         const params = [];
         if (assignedToId) params.push(`assignedToId=${assignedToId}`);
@@ -151,6 +156,9 @@ export default function TasksTable() {
         if (statuses) params.push(`statuses=${encodeURIComponent(statuses)}`);
         if (statusCheckDuration) params.push(`statusCheckDuration=${encodeURIComponent(statusCheckDuration)}`);
         if (clientUpdate) params.push(`clientUpdate=${encodeURIComponent(clientUpdate)}`);
+        if (search) params.push(`search=${encodeURIComponent(search)}`);
+        if (priorities) params.push(`priorities=${encodeURIComponent(priorities)}`);
+        if (followUpDurations) params.push(`followUpDurations=${encodeURIComponent(followUpDurations)}`);
         if (params.length) url += `?${params.join('&')}`;
         const response = await fetchWithAuth(url);
         if (response.ok) {
@@ -254,7 +262,7 @@ export default function TasksTable() {
     if (statusCheckDuration.length > 0) params.set("statusCheckDuration", statusCheckDuration.join(","));
     if (clientUpdate !== "all") params.set("clientUpdate", clientUpdate);
     const newUrl = params.toString() ? `?${params.toString()}` : window.location.pathname;
-    window.history.replaceState({}, "", newUrl);
+    router.replace(newUrl);
   };
 
   // Load filters from URL on mount
@@ -400,8 +408,12 @@ export default function TasksTable() {
                           placeholder="Search by task name, client, agent, or description..."
                           value={searchTerm}
                           onChange={(e) => {
-                            setSearchTerm(e.target.value);
-                            updateUrlFilters(selectedPriorities, selectedStatuses, e.target.value, selectedFollowUpDurations, selectedStatusCheckDurations);
+                            const value = e.target.value;
+                            setSearchTerm(value);
+                            if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+                            searchDebounceRef.current = setTimeout(() => {
+                              updateUrlFilters(selectedPriorities, selectedStatuses, value, selectedFollowUpDurations, selectedStatusCheckDurations);
+                            }, 350);
                           }}
                           className="pl-10"
                         />

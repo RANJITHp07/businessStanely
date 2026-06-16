@@ -133,6 +133,9 @@ export async function GET(req: NextRequest) {
     const retainershipTasks = searchParams.get("retainershipTasks");
     const clientUpdateFilter = searchParams.get("clientUpdate");
     const statusCheckDurationParam = searchParams.get("statusCheckDuration");
+    const search = searchParams.get("search");
+    const prioritiesParam = searchParams.get("priorities");
+    const followUpDurationsParam = searchParams.get("followUpDurations");
     // Parse statuses as a comma-separated list
     const statusesParam = searchParams.get("statuses");
     const statusesArray = statusesParam
@@ -190,6 +193,14 @@ export async function GET(req: NextRequest) {
       whereClause.status = { in: statusesArray };
     } else if (status) {
       whereClause.status = status;
+    }
+    if (prioritiesParam) {
+      const prioritiesArray = prioritiesParam.split(",").map((p) => p.trim()).filter(Boolean);
+      if (prioritiesArray.length > 0) whereClause.priority = { in: prioritiesArray };
+    }
+    if (followUpDurationsParam) {
+      const followUpArray = followUpDurationsParam.split(",").map((d) => d.trim()).filter(Boolean);
+      if (followUpArray.length > 0) whereClause.followUpDuration = { in: followUpArray };
     }
 
     const appendAndFilter = (filter: Prisma.TaskWhereInput) => {
@@ -286,6 +297,21 @@ export async function GET(req: NextRequest) {
       });
 
       appendAndFilter({ OR: durationFilters });
+    }
+
+    if (search) {
+      appendAndFilter({
+        OR: [
+          { title: { contains: search, mode: "insensitive" } },
+          { description: { contains: search, mode: "insensitive" } },
+          { client: { OR: [
+            { firstName: { contains: search, mode: "insensitive" } },
+            { lastName: { contains: search, mode: "insensitive" } },
+            { organizationName: { contains: search, mode: "insensitive" } },
+          ]}},
+          { assignedTo: { name: { contains: search, mode: "insensitive" } } },
+        ],
+      });
     }
 
     const tasks = await prisma.task.findMany({

@@ -132,11 +132,13 @@ export default function RetainershipTable() {
                 const [
                     retainershipRes,
                     triggerRes,
+                    completedTriggerRes,
                     clientsRes,
                     legislationsRes,
                 ] = await Promise.all([
                     fetchWithAuth(`/api/tasks?retainershipTasks=true`),
                     fetchWithAuth(`/api/tasks?trigger=true`),
+                    fetchWithAuth(`/api/tasks?retainershipTasks=true&status=Completed`),
                     fetchWithAuth(`/api/clients?assignedToId=me`),
                     fetchWithAuth(`/api/legislation?assignedAgent=me`),
                 ]);
@@ -148,17 +150,25 @@ export default function RetainershipTable() {
                 const [
                     retainershipData,
                     triggerData,
+                    completedTriggerData,
                     clientsData,
                     legislationsData,
                 ] = await Promise.all([
                     retainershipRes.json(),
                     triggerRes.json(),
+                    completedTriggerRes.ok ? completedTriggerRes.json() : Promise.resolve({ tasks: [] }),
                     clientsRes.json(),
                     legislationsRes.json(),
                 ]);
 
+                const pendingTriggers = triggerData.tasks || [];
+                const completedWithTrigger = (completedTriggerData.tasks || []).filter((t: any) => !!t.triggerDate);
+                const mergedTriggers = Array.from(
+                    new Map([...pendingTriggers, ...completedWithTrigger].map((t: any) => [t.id, t])).values()
+                );
+
                 setMyRetainerships(retainershipData.tasks || []);
-                setTriggerTask(triggerData.tasks || [])
+                setTriggerTask(mergedTriggers)
                 setMyClients(clientsData || []);
                 setMyLegislations(legislationsData || []);
 
@@ -700,24 +710,24 @@ export default function RetainershipTable() {
                         </div>
                     )}
                 </TabsContent>
-                <TabsContent value="my-trigger">
-
+                <TabsContent value="my-trigger" className="space-y-6">
                     {loading ? (
                         <div className="flex justify-center items-center py-8">
                             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                         </div>
                     ) : triggerTask.length === 0 ? (
-                        <p className="text-center text-muted-foreground">No retainership task assigned to you.</p>
+                        <Card>
+                            <CardContent className="text-center py-8 text-muted-foreground">
+                                No future-trigger tasks assigned to you.
+                            </CardContent>
+                        </Card>
                     ) : (
-                        <div className="">
-
-                            <div className="space-y-3">
-                                <SectionTable
-                                    label="New Task"
-                                    tasks={triggerTask.slice(0, 3)}
-                                    trigger={true}
-                                />
-                            </div>
+                        <div className="space-y-[40px]">
+                            <SectionTable
+                                label="Upcoming Tasks"
+                                tasks={triggerTask.slice(0, 3)}
+                                trigger={true}
+                            />
                         </div>
                     )}
                 </TabsContent>

@@ -1075,57 +1075,59 @@ export default function AgentDetails() {
         }}
         className="space-y-6"
       >
-        <TabsList className="grid w-full" style={{ gridTemplateColumns: `repeat(${tabCount}, minmax(0, 1fr))` }}>
-          {showExecutionTabs && (
-            <TabsTrigger value="dashboard" className="flex items-center gap-2">
-              <LayoutDashboard className="h-4 w-4 hidden md:block" />
-              <p className="text-[10px] md:text-[12px]">Dashboard</p>
+        <div className="w-full overflow-x-auto">
+          <TabsList className="grid h-auto min-w-max" style={{ gridTemplateColumns: `repeat(${tabCount}, minmax(110px, 1fr))` }}>
+            {showExecutionTabs && (
+              <TabsTrigger value="dashboard" className="flex items-center gap-2 whitespace-nowrap">
+                <LayoutDashboard className="h-4 w-4 hidden md:block" />
+                <p className="text-[10px] md:text-[12px]">Dashboard</p>
+              </TabsTrigger>
+            )}
+            <TabsTrigger value="details" className="flex items-center gap-2 whitespace-nowrap">
+              <User className="h-4 w-4 hidden md:block" />
+              <p className="text-[10px] md:text-[12px]">Agent Details</p>
             </TabsTrigger>
-          )}
-          <TabsTrigger value="details" className="flex items-center gap-2">
-            <User className="h-4 w-4 hidden md:block" />
-            <p className="text-[10px] md:text-[12px]">Agent Details</p>
-          </TabsTrigger>
-          {showExecutionTabs && (
-            <TabsTrigger value="tasks" className="flex items-center gap-2">
-              <FileText className="h-4 w-4 hidden md:block" />
-              <p className="text-[10px] md:text-[12px]">
-                Tasks ({agentTasks.length})
-              </p>
-            </TabsTrigger>
-          )}
-          {showAdvisorTabs && (
-            <TabsTrigger value="leads" className="flex items-center gap-2">
-              <FileText className="h-4 w-4 hidden md:block" />
-              <p className="text-[10px] md:text-[12px]">
-                Leads ({agentLeads.length})
-              </p>
-            </TabsTrigger>
-          )}
-          {showAdvisorTabs && (
-            <TabsTrigger value="opportunity" className="flex items-center gap-2">
-              <FileText className="h-4 w-4 hidden md:block" />
-              <p className="text-[10px] md:text-[12px]">
-                Opportunity ({agentOpportunities.length})
-              </p>
-            </TabsTrigger>
-          )}
+            {showExecutionTabs && (
+              <TabsTrigger value="tasks" className="flex items-center gap-2 whitespace-nowrap">
+                <FileText className="h-4 w-4 hidden md:block" />
+                <p className="text-[10px] md:text-[12px]">
+                  Tasks ({agentTasks.length})
+                </p>
+              </TabsTrigger>
+            )}
+            {showAdvisorTabs && (
+              <TabsTrigger value="leads" className="flex items-center gap-2 whitespace-nowrap">
+                <FileText className="h-4 w-4 hidden md:block" />
+                <p className="text-[10px] md:text-[12px]">
+                  Leads ({agentLeads.length})
+                </p>
+              </TabsTrigger>
+            )}
+            {showAdvisorTabs && (
+              <TabsTrigger value="opportunity" className="flex items-center gap-2 whitespace-nowrap">
+                <FileText className="h-4 w-4 hidden md:block" />
+                <p className="text-[10px] md:text-[12px]">
+                  Opportunity ({agentOpportunities.length})
+                </p>
+              </TabsTrigger>
+            )}
 
-          <TabsTrigger value="team" className="flex items-center gap-2">
-            <Users className="h-4 w-4 hidden md:block" />
-            <p className="text-[10px] md:text-[12px]">
-              Team ({teamMembers.length})
-            </p>
-          </TabsTrigger>
-          <TabsTrigger value="activities" className="flex items-center gap-2">
-            <Clock className="h-4 w-4 hidden md:block" />
-            <p className="text-[10px] md:text-[12px]">Activities</p>
-          </TabsTrigger>
-          <TabsTrigger value="service-records" className="flex items-center gap-2">
-            <FileText className="h-4 w-4 hidden md:block" />
-            <p className="text-[10px] md:text-[12px]">Service Records</p>
-          </TabsTrigger>
-        </TabsList>
+            <TabsTrigger value="team" className="flex items-center gap-2 whitespace-nowrap">
+              <Users className="h-4 w-4 hidden md:block" />
+              <p className="text-[10px] md:text-[12px]">
+                Team ({teamMembers.length})
+              </p>
+            </TabsTrigger>
+            <TabsTrigger value="activities" className="flex items-center gap-2 whitespace-nowrap">
+              <Clock className="h-4 w-4 hidden md:block" />
+              <p className="text-[10px] md:text-[12px]">Activities</p>
+            </TabsTrigger>
+            <TabsTrigger value="service-records" className="flex items-center gap-2 whitespace-nowrap">
+              <FileText className="h-4 w-4 hidden md:block" />
+              <p className="text-[10px] md:text-[12px]">Service Records</p>
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
         {showExecutionTabs && (
           <TabsContent value="dashboard" className="space-y-6">
@@ -1545,7 +1547,7 @@ export default function AgentDetails() {
                       <FileText className="h-4 w-4 hidden lg:block flex-shrink-0" />
                       Standard Tasks ({standardAgentTasks.length})
                     </TabsTrigger>
-                    <TabsTrigger value="legislation" className="flex items-center gap-1 px-2 py-3 text-[10px] lg:text-sm whitespace-nowrap">
+                    <TabsTrigger value="legislation-tab" className="flex items-center gap-1 px-2 py-3 text-[10px] lg:text-sm whitespace-nowrap">
                       <CheckCircle className="h-4 w-4 hidden lg:block flex-shrink-0" />
                       Assigned Legislation ({agentLegislations.length})
                     </TabsTrigger>
@@ -1597,7 +1599,7 @@ export default function AgentDetails() {
                   )}
                 </TabsContent>
 
-                <TabsContent value="legislation" className="space-y-6">
+                <TabsContent value="legislation-tab" className="space-y-6">
                   <Card>
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
@@ -1610,7 +1612,14 @@ export default function AgentDetails() {
                     </CardHeader>
                     <CardContent>
                       <div className="rounded-md border overflow-x-auto">
-                        <Table className="min-w-[640px]">
+                        <Table className="min-w-[700px] table-fixed">
+                          <colgroup>
+                            <col className="w-[200px]" />
+                            <col className="w-[240px]" />
+                            <col className="w-[160px]" />
+                            <col className="w-[130px]" />
+                            <col className="w-[60px]" />
+                          </colgroup>
                           <TableHeader>
                             <TableRow>
                               <TableHead>Client</TableHead>
@@ -1638,7 +1647,7 @@ export default function AgentDetails() {
                                   <TableRow
                                     key={legislation.id}
                                     className="cursor-pointer hover:bg-muted/50"
-                                    onClick={() => router.push(`/legislation/${legislation.id}`)}
+                                    onClick={() => legislation.id && router.push(`/legislation/${legislation.id}`)}
                                   >
                                     <TableCell
                                       onClick={(event) => {
@@ -1649,28 +1658,28 @@ export default function AgentDetails() {
                                       className={client?.id ? "cursor-pointer" : undefined}
                                     >
                                       <div className="flex items-center gap-3">
-                                        <Avatar className="h-10 w-10 flex-shrink-0">
-                                          <AvatarFallback>{getClientInitials(client)}</AvatarFallback>
+                                        <Avatar className="h-8 w-8 flex-shrink-0">
+                                          <AvatarFallback className="text-xs">{getClientInitials(client)}</AvatarFallback>
                                         </Avatar>
                                         <div className="min-w-0">
-                                          <div className="truncate font-medium">{getClientDisplayName(client)}</div>
+                                          <div className="truncate font-medium text-sm">{getClientDisplayName(client)}</div>
                                           <div className="truncate text-xs text-muted-foreground">{client?.email || "No email"}</div>
                                         </div>
                                       </div>
                                     </TableCell>
-                                    <TableCell>
-                                      <div className="font-medium">{legislation.title}</div>
-                                      <div className="line-clamp-2 text-xs text-muted-foreground h-9 overflow-hidden">{legislation.description || "No description"}</div>
+                                    <TableCell className="align-top">
+                                      <div className="font-medium text-sm truncate">{legislation.title}</div>
+                                      <div className="text-xs text-muted-foreground h-[36px] overflow-hidden leading-[18px] line-clamp-2 mt-0.5">{legislation.description || "No description"}</div>
                                     </TableCell>
                                     <TableCell>
-                                      <div className="flex flex-col gap-2">
-                                        <Badge variant="outline">Total: {legislation.tasks?.length || 0}</Badge>
-                                        <Badge variant="outline">Running: {activeTasks.length}</Badge>
-                                        <Badge variant="outline">Overdue: {overdueTasks.length}</Badge>
-                                        <Badge variant="outline">Pending Triggers: {pendingTriggers.length}</Badge>
+                                      <div className="grid grid-cols-2 gap-1">
+                                        <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 justify-center">T: {legislation.tasks?.length || 0}</Badge>
+                                        <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 justify-center">R: {activeTasks.length}</Badge>
+                                        <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 justify-center">OD: {overdueTasks.length}</Badge>
+                                        <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 justify-center">PT: {pendingTriggers.length}</Badge>
                                       </div>
                                     </TableCell>
-                                    <TableCell>{legislation.assignedAgent?.name || agent.name}</TableCell>
+                                    <TableCell className="text-sm truncate">{legislation.assignedAgent?.name || agent.name}</TableCell>
                                     <TableCell className="text-right">
                                       <DropdownMenu>
                                         <DropdownMenuTrigger asChild>
@@ -1681,12 +1690,14 @@ export default function AgentDetails() {
                                         </DropdownMenuTrigger>
                                         <DropdownMenuContent align="end">
                                           <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                          <DropdownMenuItem asChild>
-                                            <Link href={`/legislation/${legislation.id}`} onClick={(event) => event.stopPropagation()}>
-                                              <Eye className="mr-2 h-4 w-4" />
-                                              View Details
-                                            </Link>
-                                          </DropdownMenuItem>
+                                          {legislation.id && (
+                                            <DropdownMenuItem asChild>
+                                              <Link href={`/legislation/${legislation.id}`} onClick={(event) => event.stopPropagation()}>
+                                                <Eye className="mr-2 h-4 w-4" />
+                                                View Details
+                                              </Link>
+                                            </DropdownMenuItem>
+                                          )}
                                           <DropdownMenuItem asChild>
                                             <Link
                                               href={`/task/create?legislationId=${legislation.id}&assignedAgent=${legislation.assignedAgent?.id || id}&client=${legislation.retainership?.clientId || ""}`}

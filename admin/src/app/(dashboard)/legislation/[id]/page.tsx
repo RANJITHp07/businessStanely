@@ -168,7 +168,7 @@ export default function LegislationDetail({ params }: { params: Promise<{ id: st
               <FileText className="h-5 w-5" />
               Legislation Tasks
             </CardTitle>
-            <Button onClick={() => router.push(`/task/create?legislationId=${resolvedParams.id}&assignedAgent=${legislation.assignedAgent.id}&client=${legislation.retainership.client?.id}`)}>Add Task</Button>
+            <Button onClick={() => router.push(`/task/create?legislationId=${resolvedParams.id}&assignedAgent=${legislation.assignedAgent?.id || ""}&client=${legislation.retainership?.client?.id || ""}`)}>Add Task</Button>
           </div>
         </CardHeader>
         <CardContent>

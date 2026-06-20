@@ -87,6 +87,7 @@ export function SectionTable({
                     <col className="w-[90px]" />
                     <col className="w-[100px]" />
                     <col className="w-[110px]" />
+                    <col className="w-[110px]" />
                     <col className="w-[60px]" />
                   </colgroup>
                   <TableHeader>
@@ -96,6 +97,7 @@ export function SectionTable({
                       <TableHead className="text-white">Assigned To</TableHead>
                       <TableHead className="text-white">Priority</TableHead>
                       <TableHead className="text-white">Due Date</TableHead>
+                      <TableHead className="text-white">Last Completed</TableHead>
                       <TableHead className="text-white">Progress</TableHead>
                       <TableHead className="text-right text-white">Actions</TableHead>
                     </TableRow>
@@ -103,7 +105,7 @@ export function SectionTable({
                   <TableBody>
                     {tasks.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={7} className="text-center py-4 text-muted-foreground">
+                        <TableCell colSpan={8} className="text-center py-4 text-muted-foreground">
                           No tasks found.
                         </TableCell>
                       </TableRow>
@@ -202,6 +204,12 @@ export function SectionTable({
                                     <span className="inline-block bg-red-600 text-white text-xs px-2 py-0.5 rounded-full">Overdue</span>
                                   </div>
                                 ) : null}
+                              </div>
+                            </TableCell>
+                            <TableCell className="whitespace-nowrap align-top">
+                              <div className="flex items-center gap-2">
+                                <Calendar className="h-4 w-4 text-muted-foreground" />
+                                <span>{t.lastCompletedDate ? formatDate(t.lastCompletedDate) : "—"}</span>
                               </div>
                             </TableCell>
                             <TableCell className="truncate max-w-[160px] align-top" title={statusLabel}>

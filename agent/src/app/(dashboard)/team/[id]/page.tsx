@@ -203,6 +203,7 @@ function SectionTable({
                       <TableHead className="text-white">Client</TableHead>
                       <TableHead className="text-white">Priority</TableHead>
                       <TableHead className="text-white">Due Date</TableHead>
+                      <TableHead className="text-white">Last Completed</TableHead>
                       <TableHead className="text-white">Progress</TableHead>
                       <TableHead className="text-right text-white">
                         Actions
@@ -213,7 +214,7 @@ function SectionTable({
                     {tasks.length === 0 ? (
                       <TableRow>
                         <TableCell
-                          colSpan={6}
+                          colSpan={7}
                           className="text-center py-4 text-muted-foreground"
                         >
                           No tasks found.
@@ -338,6 +339,15 @@ function SectionTable({
                                     </span>
                                   </div>
                                 ) : null}
+                              </div>
+                            </TableCell>
+
+                            <TableCell className="whitespace-nowrap align-top">
+                              <div className="flex items-center gap-2">
+                                <Calendar className="h-4 w-4 text-muted-foreground" />
+                                <span className="text-foreground">
+                                  {t.lastCompletedDate ? formatDateDMY(t.lastCompletedDate) : "—"}
+                                </span>
                               </div>
                             </TableCell>
 
@@ -485,9 +495,14 @@ function SectionTable({
 
       <div className="flex justify-end">
         <Link
-          href={`/task?status=${encodeURIComponent(
-            sectionLabelToStatus(label)
-          )}&assignedToId=${agentId}${retainershipTasks ? "&retainershipTasks=true" : ""}${trigger ? "&trigger=true" : ""}`}
+          href={(() => {
+            const p = new URLSearchParams();
+            p.set("assignedToId", agentId);
+            if (!trigger) p.set("status", sectionLabelToStatus(label));
+            if (retainershipTasks) p.set("retainershipTasks", "true");
+            if (trigger) p.set("trigger", "true");
+            return `/task?${p.toString()}`;
+          })()}
           className="bg-[#002fff] cursor-pointer text-white text-[14px] py-[10px] mt-[10px] px-[10px] rounded-[5px] inline-block"
         >
           View more
@@ -1115,6 +1130,7 @@ export default function AgentDetails() {
                 onValueChange={setTaskOverviewTab}
                 className="space-y-6"
               >
+
                 <TabsList className="grid h-auto w-full grid-cols-3">
                   <TabsTrigger value="standard-tasks" className="flex items-center gap-2 px-2 py-3 text-[11px] md:text-sm">
                     <FileText className="h-4 w-4 hidden md:block" />
@@ -1216,7 +1232,7 @@ export default function AgentDetails() {
                   ) : (
                     <div className="space-y-[40px]">
                       <SectionTable
-                        label="New Task"
+                        label="Upcoming Tasks"
                         tasks={agentTriggerTasks.slice(0, 3)}
                         agentId={id}
                         trigger={true}

@@ -20,7 +20,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 // import { Badge } from "@/components/ui/badge";
 
 import { Legislation, Task } from "@/types";
-import { FileText } from "lucide-react";
+import { Calendar, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export default function LegislationDetail({ params }: { params: Promise<{ id: string }> | { id: string } }) {
@@ -206,7 +206,7 @@ export default function LegislationDetail({ params }: { params: Promise<{ id: st
                   <TableHead>Task Name</TableHead>
                   <TableHead>Description</TableHead>
                   <TableHead>Status</TableHead>
-                  {/* <TableHead className="text-right">Actions</TableHead> */}
+                  <TableHead>Last Completion Date</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -223,37 +223,15 @@ export default function LegislationDetail({ params }: { params: Promise<{ id: st
                       onClick={() => router.push(`/task/${task.id}`)}
                       className="cursor-pointer hover:bg-muted/50"
                     >
-                      <TableCell className="max-w-xs  truncate">{task.title}</TableCell>
-                      <TableCell className="max-w-xs  truncate">{task.description}</TableCell>
+                      <TableCell className="max-w-xs truncate">{task.title}</TableCell>
+                      <TableCell className="max-w-xs truncate">{task.description}</TableCell>
                       <TableCell>{task.status}</TableCell>
-                      {/* <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" className="h-8 w-8 p-0" onClick={(e) => e.stopPropagation()}>
-                              <span className="sr-only">Open menu</span>
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                            <DropdownMenuItem asChild>
-                              <a href={`/tasks/${task.id}`} onClick={(e) => e.stopPropagation()}>
-                                <Eye className="mr-2 h-4 w-4" />
-                                View Details
-                              </a>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem asChild>
-                              <a
-                                href={`/tasks/create?legislationId=${legislation.id}`}
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                <PlusCircle className="mr-2 h-4 w-4" />
-                                Create Task
-                              </a>
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell> */}
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Calendar className="h-4 w-4 text-muted-foreground" />
+                          {formatDate(task.lastCompletedDate)}
+                        </div>
+                      </TableCell>
                     </TableRow>
                   ))
                 )}

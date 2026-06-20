@@ -55,6 +55,7 @@ export async function GET(req: NextRequest) {
 
       const nextFrontier: string[] = [];
       for (const link of links) {
+        if (!link.subordinate || link.subordinate.status !== "active") continue;
         if (visited.has(link.subordinate.id)) continue;
         visited.add(link.subordinate.id);
         teamMembers.push(link.subordinate);

@@ -25,9 +25,9 @@ export async function GET(
       },
     });
 
-    if (agent.id !== id && !superiorLink) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
+    // if (agent.id !== id && !superiorLink) {
+    //   return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    // }
 
     // Find the team member by ID, including superiors and subordinates via join tables
     const teamMember = await prisma.agent.findUnique({

@@ -1076,7 +1076,7 @@ export default function AgentDetails() {
         className="space-y-6"
       >
         <div className="w-full overflow-x-auto">
-          <TabsList className="grid h-auto min-w-max" style={{ gridTemplateColumns: `repeat(${tabCount}, minmax(110px, 1fr))` }}>
+          <TabsList className="grid h-auto min-w-max w-full" style={{ gridTemplateColumns: `repeat(${tabCount}, minmax(110px, 1fr))` }}>
             {showExecutionTabs && (
               <TabsTrigger value="dashboard" className="flex items-center gap-2 whitespace-nowrap">
                 <LayoutDashboard className="h-4 w-4 hidden md:block" />
@@ -1653,7 +1653,7 @@ export default function AgentDetails() {
                                       onClick={(event) => {
                                         if (!client?.id) return;
                                         event.stopPropagation();
-                                        router.push(`/client/${client.id}`);
+                                        router.push(`/legislation/${client.id}`);
                                       }}
                                       className={client?.id ? "cursor-pointer" : undefined}
                                     >

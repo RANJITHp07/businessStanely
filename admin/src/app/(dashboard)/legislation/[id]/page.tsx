@@ -19,8 +19,18 @@ import { Skeleton } from "@/components/ui/skeleton";
 // import { FileText, MoreHorizontal, Eye, PlusCircle } from "lucide-react";
 
 import { Task } from "@/types";
-import { Calendar, FileText } from "lucide-react";
+import { Calendar, Edit, FileText, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export default function LegislationDetail({ params }: { params: Promise<{ id: string }> | { id: string } }) {
   const resolvedParams = params instanceof Promise ? use(params) : params;
@@ -28,6 +38,8 @@ export default function LegislationDetail({ params }: { params: Promise<{ id: st
   const [legislation, setLegislation] = useState<any | null>(null);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
+  const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -168,7 +180,7 @@ export default function LegislationDetail({ params }: { params: Promise<{ id: st
                   <TableHead>Description</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Last Completion Date</TableHead>
-                  {/* <TableHead className="text-right">Actions</TableHead> */}
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -185,43 +197,41 @@ export default function LegislationDetail({ params }: { params: Promise<{ id: st
                       onClick={() => router.push(`/task/${task.id}`)}
                       className="cursor-pointer hover:bg-muted/50"
                     >
-                      <TableCell className="max-w-xs  truncate">{task.title}</TableCell>
+                      <TableCell className="max-w-xs truncate">{task.title}</TableCell>
                       <TableCell className="max-w-xs truncate">{task.description}</TableCell>
-                      <TableCell >{task.status}</TableCell>
+                      <TableCell>{task.status}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <Calendar className="h-4 w-4 text-muted-foreground" />
                           {formatDate(task.lastCompletedDate)}
                         </div>
                       </TableCell>
-                      {/* <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" className="h-8 w-8 p-0" onClick={(e) => e.stopPropagation()}>
-                              <span className="sr-only">Open menu</span>
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                            <DropdownMenuItem asChild>
-                              <a href={`/tasks/${task.id}`} onClick={(e) => e.stopPropagation()}>
-                                <Eye className="mr-2 h-4 w-4" />
-                                View Details
-                              </a>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem asChild>
-                              <a
-                                href={`/tasks/create?legislationId=${legislation.id}`}
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                <PlusCircle className="mr-2 h-4 w-4" />
-                                Create Task
-                              </a>
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell> */}
+                      <TableCell className="text-right">
+                        <div className="flex items-center justify-end gap-2" onClick={(e) => e.stopPropagation()}>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8 px-2"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              router.push(`/task/${task.id}/edit`);
+                            }}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-8 px-2 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setTaskToDelete(task);
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
                     </TableRow>
                   ))
                 )}
@@ -230,6 +240,44 @@ export default function LegislationDetail({ params }: { params: Promise<{ id: st
           </div>
         </CardContent>
       </Card>
-    </div >
+      <AlertDialog open={!!taskToDelete} onOpenChange={() => setTaskToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the task &quot;{taskToDelete?.title}&quot;.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setTaskToDelete(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700"
+              disabled={isDeleting}
+              onClick={async () => {
+                if (!taskToDelete) return;
+                setIsDeleting(true);
+                try {
+                  const response = await fetchWithAuth(`/api/tasks/${taskToDelete.id}`, { method: "DELETE" });
+                  if (response.ok) {
+                    setTasks((prev) => prev.filter((t) => t.id !== taskToDelete.id));
+                    toast.success("Task deleted successfully");
+                  } else {
+                    toast.error("Failed to delete task. Please try again.");
+                  }
+                } catch (error) {
+                  console.error("Error deleting task:", error);
+                  toast.error("An error occurred while deleting the task.");
+                } finally {
+                  setIsDeleting(false);
+                  setTaskToDelete(null);
+                }
+              }}
+            >
+              {isDeleting ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
   );
 }

@@ -1063,8 +1063,12 @@ export default function AgentDetails() {
       <Tabs
         value={activeTab}
         onValueChange={(value) => {
+          const validTabs = new Set([
+            "dashboard", "details", "tasks", "leads", "opportunity",
+            "team", "activities", "service-records",
+          ]);
+          if (!validTabs.has(value)) return;
           setActiveTab(value);
-          // Update URL to include the active tab
           const url = new URL(window.location.href);
           url.searchParams.set('tab', value);
           window.history.replaceState({}, '', url.toString());
@@ -1535,28 +1539,30 @@ export default function AgentDetails() {
               </div>
             ) : (
               <Tabs value={taskOverviewTab} onValueChange={setTaskOverviewTab} className="space-y-6">
-                <TabsList className="grid h-auto w-full grid-cols-5">
-                  <TabsTrigger value="standard-tasks" className="flex items-center gap-2 px-2 py-3 text-[11px] md:text-sm">
-                    <FileText className="h-4 w-4 hidden md:block" />
-                    Standard Tasks ({standardAgentTasks.length})
-                  </TabsTrigger>
-                  <TabsTrigger value="legislation" className="flex items-center gap-2 px-2 py-3 text-[11px] md:text-sm">
-                    <CheckCircle className="h-4 w-4 hidden md:block" />
-                    Assigned Legislation ({agentLegislations.length})
-                  </TabsTrigger>
-                  <TabsTrigger value="retainership-tasks" className="flex items-center gap-2 px-2 py-3 text-[11px] md:text-sm">
-                    <CheckCircle className="h-4 w-4 hidden md:block" />
-                    Retainership Tasks ({agentRetainershipTasks.length})
-                  </TabsTrigger>
-                  <TabsTrigger value="future-triggers" className="flex items-center gap-2 px-2 py-3 text-[11px] md:text-sm">
-                    <Clock className="h-4 w-4 hidden md:block" />
-                    Future Triggers ({agentTriggerTasks.length})
-                  </TabsTrigger>
-                  <TabsTrigger value="clients" className="flex items-center gap-2 px-2 py-3 text-[11px] md:text-sm">
-                    <Users className="h-4 w-4 hidden md:block" />
-                    Clients ({agentClients.length})
-                  </TabsTrigger>
-                </TabsList>
+                <div className="w-full overflow-x-auto">
+                  <TabsList className="grid h-auto min-w-max w-full grid-cols-5">
+                    <TabsTrigger value="standard-tasks" className="flex items-center gap-1 px-2 py-3 text-[10px] lg:text-sm whitespace-nowrap">
+                      <FileText className="h-4 w-4 hidden lg:block flex-shrink-0" />
+                      Standard Tasks ({standardAgentTasks.length})
+                    </TabsTrigger>
+                    <TabsTrigger value="legislation" className="flex items-center gap-1 px-2 py-3 text-[10px] lg:text-sm whitespace-nowrap">
+                      <CheckCircle className="h-4 w-4 hidden lg:block flex-shrink-0" />
+                      Assigned Legislation ({agentLegislations.length})
+                    </TabsTrigger>
+                    <TabsTrigger value="retainership-tasks" className="flex items-center gap-1 px-2 py-3 text-[10px] lg:text-sm whitespace-nowrap">
+                      <CheckCircle className="h-4 w-4 hidden lg:block flex-shrink-0" />
+                      Retainership Tasks ({agentRetainershipTasks.length})
+                    </TabsTrigger>
+                    <TabsTrigger value="future-triggers" className="flex items-center gap-1 px-2 py-3 text-[10px] lg:text-sm whitespace-nowrap">
+                      <Clock className="h-4 w-4 hidden lg:block flex-shrink-0" />
+                      Future Triggers ({agentTriggerTasks.length})
+                    </TabsTrigger>
+                    <TabsTrigger value="clients" className="flex items-center gap-1 px-2 py-3 text-[10px] lg:text-sm whitespace-nowrap">
+                      <Users className="h-4 w-4 hidden lg:block flex-shrink-0" />
+                      Clients ({agentClients.length})
+                    </TabsTrigger>
+                  </TabsList>
+                </div>
 
                 <TabsContent value="standard-tasks" className="space-y-6">
                   {standardAgentTasks.length === 0 ? (
@@ -1603,8 +1609,8 @@ export default function AgentDetails() {
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
-                      <div className="rounded-md border">
-                        <Table>
+                      <div className="rounded-md border overflow-x-auto">
+                        <Table className="min-w-[640px]">
                           <TableHeader>
                             <TableRow>
                               <TableHead>Client</TableHead>
@@ -1654,7 +1660,7 @@ export default function AgentDetails() {
                                     </TableCell>
                                     <TableCell>
                                       <div className="font-medium">{legislation.title}</div>
-                                      <div className="line-clamp-2 text-xs text-muted-foreground">{legislation.description || "No description"}</div>
+                                      <div className="line-clamp-2 text-xs text-muted-foreground h-9 overflow-hidden">{legislation.description || "No description"}</div>
                                     </TableCell>
                                     <TableCell>
                                       <div className="flex flex-col gap-2">
@@ -1751,7 +1757,7 @@ export default function AgentDetails() {
                   ) : (
                     <div className="space-y-[40px]">
                       <SectionTable
-                        label="New Task"
+                        label="Upcoming Tasks"
                         tasks={agentTriggerTasks.slice(0, 3)}
                         agentId={id}
                         trigger={true}

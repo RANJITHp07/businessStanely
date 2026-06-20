@@ -230,9 +230,14 @@ export function SectionTable({
       </div>
       <div className="flex justify-end">
         <Link
-          href={`${agentId
-            ? `/task?assignedToId=${encodeURIComponent(agentId)}&status=${encodeURIComponent(sectionLabelToStatus(label))}`
-            : `/task?status=${encodeURIComponent(sectionLabelToStatus(label))}`}${retainershipTasks ? `&retainershipTasks=${encodeURIComponent("true")}` : ""}${trigger ? `&trigger=${encodeURIComponent("true")}` : ""}`}
+          href={(() => {
+            const params = new URLSearchParams();
+            if (agentId) params.set("assignedToId", agentId);
+            if (!trigger) params.set("status", sectionLabelToStatus(label));
+            if (retainershipTasks) params.set("retainershipTasks", "true");
+            if (trigger) params.set("trigger", "true");
+            return `/task?${params.toString()}`;
+          })()}
           className="bg-[#003459] cursor-pointer text-white text-[14px] py-[10px] mt-[10px] px-[10px] rounded-[5px] inline-block"
         >
           View more

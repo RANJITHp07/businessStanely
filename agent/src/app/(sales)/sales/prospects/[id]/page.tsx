@@ -563,7 +563,7 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
                                             className="hidden"
                                             onChange={handleFileSelect}
                                             disabled={isCommentDisabled}
-                                            accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png"
+                                            accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png,.m4a,.mp3,.mp4,.wav,.ogg,.aac,.flac,.opus"
                                             multiple
                                         />
                                         <Button

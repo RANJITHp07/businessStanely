@@ -12,8 +12,9 @@ import {
   FileText,
   Calendar,
   MessageSquare,
+  Download,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -40,10 +41,18 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import Image from "next/image";
 import Logo from "./../../public/Logo.jpg";
 import { hasAdvisorRole, hasExecutionRole, EXECUTION_AND_ADVISOR_AGENT_ROLE } from "@/lib/agentRole";
 import { getAdvisorAgentType } from "@/lib/agentType";
+import { usePWA } from "@/lib/pwa-context";
 
 type MenuItem = {
   title: string;
@@ -154,7 +163,14 @@ const commonItems: MenuItem[] = [
 
 export function AppSidebar() {
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
+  const [showInstallDialog, setShowInstallDialog] = useState(false);
+  const [isStandalone, setIsStandalone] = useState(false);
   const pathname = usePathname();
+  const { canInstall, install } = usePWA();
+
+  useEffect(() => {
+    setIsStandalone(window.matchMedia('(display-mode: standalone)').matches);
+  }, []);
   const { setOpenMobile, isMobile } = useSidebar();
   const { agentRole, agentType } = useMemo(() => {
     if (typeof window === "undefined") {
@@ -365,6 +381,19 @@ export function AppSidebar() {
           <SidebarGroup>
             <SidebarGroupContent>
               <SidebarMenu>
+                {!isStandalone && (
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      onClick={canInstall ? install : () => setShowInstallDialog(true)}
+                      className="flex items-center gap-[5px] px-3 py-2 rounded-md text-green-600 hover:text-green-700 hover:bg-green-50 transition-all duration-200"
+                    >
+                      <Download className="w-5 h-5" />
+                      <span className="text-[16px] font-semibold">
+                        Install App
+                      </span>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                )}
                 <SidebarMenuItem>
                   <SidebarMenuButton
                     onClick={() => setShowLogoutDialog(true)}
@@ -382,6 +411,31 @@ export function AppSidebar() {
           </SidebarGroup>
         </SidebarFooter>
       </Sidebar>
+
+      <Dialog open={showInstallDialog} onOpenChange={setShowInstallDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Install LegalStanley</DialogTitle>
+            <DialogDescription>
+              To install the app on your device:
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 text-sm text-muted-foreground">
+            <div>
+              <p className="font-semibold text-foreground mb-1">Chrome / Edge (Desktop)</p>
+              <p>Click the install icon <strong>⊕</strong> in the address bar, or open the browser menu → <strong>Install LegalStanley</strong>.</p>
+            </div>
+            <div>
+              <p className="font-semibold text-foreground mb-1">Chrome (Android)</p>
+              <p>Tap the three-dot menu → <strong>Add to Home screen</strong>.</p>
+            </div>
+            <div>
+              <p className="font-semibold text-foreground mb-1">Safari (iPhone / iPad)</p>
+              <p>Tap the Share button → <strong>Add to Home Screen</strong>.</p>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog open={showLogoutDialog} onOpenChange={setShowLogoutDialog}>
         <AlertDialogContent>

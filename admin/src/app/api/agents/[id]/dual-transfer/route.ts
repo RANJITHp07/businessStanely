@@ -26,7 +26,9 @@ export async function PUT(
     }
 
     const agentId = params.id;
-    const { transferAgentId, transferLeadsAgentId } = await req.json();
+    const body = await req.json();
+    const transferAgentId: string | undefined = body.transferAgentId;
+    const transferLeadsAgentId: string | undefined = body.transferLeadsAgentId;
 
     if (!transferAgentId) {
       return NextResponse.json(
@@ -49,11 +51,9 @@ export async function PUT(
       );
     }
 
-    const [agent, taskAgent, leadsAgent] = await Promise.all([
-      prisma.agent.findUnique({ where: { id: agentId } }),
-      prisma.agent.findUnique({ where: { id: transferAgentId } }),
-      prisma.agent.findUnique({ where: { id: transferLeadsAgentId } }),
-    ]);
+    const agent = await prisma.agent.findUnique({ where: { id: agentId } });
+    const taskAgent = await prisma.agent.findUnique({ where: { id: transferAgentId } });
+    const leadsAgent = await prisma.agent.findUnique({ where: { id: transferLeadsAgentId } });
 
     if (!agent || agent.status === "inactive") {
       return NextResponse.json(
@@ -97,61 +97,72 @@ export async function PUT(
       );
     }
 
-    const result = await prisma.$transaction(async (tx) => {
-      const tasksToTransfer = await tx.task.findMany({
-        where: {
-          assignedToId: agentId,
-          status: { notIn: ["Completed", "Abandoned"] },
-        },
-        select: { id: true },
-      });
+    // Collect data before transaction
+    const tasksToTransfer = await prisma.task.findMany({
+      where: { assignedToId: agentId, status: { notIn: ["Completed", "Abandoned"] } },
+      select: { id: true },
+    });
 
-      const completedTasks = await tx.task.findMany({
-        where: {
-          assignedToId: agentId,
-          status: { in: ["Completed", "Abandoned"] },
-        },
-        select: { id: true, status: true, completed: true },
-      });
+    const completedTasks = await prisma.task.findMany({
+      where: { assignedToId: agentId, status: { in: ["Completed", "Abandoned"] } },
+      select: { id: true, status: true, completed: true },
+    });
 
-      const allTaskStatuses = await tx.task.findMany({
-        where: { assignedToId: agentId },
-        select: { status: true, completed: true },
-      });
+    const allTaskStatuses = await prisma.task.findMany({
+      where: { assignedToId: agentId },
+      select: { status: true, completed: true },
+    });
 
-      const assignedLeads = await tx.prospect.findMany({
-        where: { assignedAgentId: agentId },
-        select: { id: true, status: true },
-      });
+    const assignedLeads = await prisma.prospect.findMany({
+      where: { assignedAgentId: agentId },
+      select: { id: true, status: true },
+    });
 
-      const createdLeads = await tx.prospect.findMany({
-        where: { createdByAgentId: agentId },
-        select: { id: true },
-      });
+    const createdLeads = await prisma.prospect.findMany({
+      where: { createdByAgentId: agentId },
+      select: { id: true },
+    });
 
-      // Transfer tasks to the execution agent
+    const assignedQuoteRequests = await prisma.quoteRequest.findMany({
+      where: { assignedAgentId: agentId },
+      select: { id: true, status: true },
+    });
+
+    const createdQuoteRequests = await prisma.quoteRequest.findMany({
+      where: { createdByAgentId: agentId },
+      select: { id: true, status: true },
+    });
+
+    const diaryEntries = await prisma.diaryEntry.findMany({
+      where: { createdByAgentId: agentId },
+      select: { id: true },
+    });
+
+    const subordinateLinks = await prisma.agentSuperior.findMany({
+      where: { superiorId: agentId },
+    });
+
+    // Execute all mutations in a transaction
+    await prisma.$transaction(async (tx) => {
+      // Transfer non-completed tasks to execution agent
       await tx.task.updateMany({
-        where: {
-          assignedToId: agentId,
-          status: { notIn: ["Completed", "Abandoned"] },
-        },
+        where: { assignedToId: agentId, status: { notIn: ["Completed", "Abandoned"] } },
         data: { assignedToId: transferAgentId },
       });
 
+      // Archive completed/abandoned tasks
       await tx.task.updateMany({
-        where: {
-          assignedToId: agentId,
-          status: { in: ["Completed", "Abandoned"] },
-        },
+        where: { assignedToId: agentId, status: { in: ["Completed", "Abandoned"] } },
         data: { active: false },
       });
 
+      // Transfer task ownership to execution agent
       await tx.task.updateMany({
         where: { ownerShipId: agentId },
         data: { ownerShipId: transferAgentId },
       });
 
-      // Transfer leads to the advisor agent
+      // Transfer leads to advisor agent
       await tx.prospect.updateMany({
         where: { assignedAgentId: agentId },
         data: { assignedAgentId: transferLeadsAgentId },
@@ -162,22 +173,7 @@ export async function PUT(
         data: { createdByAgentId: transferLeadsAgentId },
       });
 
-      const [assignedQuoteRequests, createdQuoteRequests, diaryEntries] =
-        await Promise.all([
-          tx.quoteRequest.findMany({
-            where: { assignedAgentId: agentId },
-            select: { id: true, status: true },
-          }),
-          tx.quoteRequest.findMany({
-            where: { createdByAgentId: agentId },
-            select: { id: true, status: true },
-          }),
-          tx.diaryEntry.findMany({
-            where: { createdByAgentId: agentId },
-            select: { id: true },
-          }),
-        ]);
-
+      // Transfer quote requests to execution agent
       await tx.quoteRequest.updateMany({
         where: { assignedAgentId: agentId },
         data: { assignedAgentId: transferAgentId },
@@ -188,16 +184,13 @@ export async function PUT(
         data: { createdByAgentId: transferAgentId },
       });
 
+      // Transfer diary entries to execution agent
       await tx.diaryEntry.updateMany({
         where: { createdByAgentId: agentId },
         data: { createdByAgentId: transferAgentId },
       });
 
-      // Reassign execution subordinates to the task agent
-      const subordinateLinks = await tx.agentSuperior.findMany({
-        where: { superiorId: agentId },
-      });
-
+      // Reassign subordinates to execution agent, avoiding duplicates
       for (const link of subordinateLinks) {
         const existing = await tx.agentSuperior.findFirst({
           where: {
@@ -216,7 +209,7 @@ export async function PUT(
         data: { superiorId: transferAgentId },
       });
 
-      // Soft delete the agent
+      // Soft delete the dual agent
       await tx.agent.update({
         where: { id: agentId },
         data: {
@@ -224,71 +217,71 @@ export async function PUT(
           email: buildArchivedAgentEmail(agent.email, agent.id),
         },
       });
+    });
 
-      const taskStatusBreakdown = allTaskStatuses.reduce(
-        (acc, task) => {
-          acc[task.status] = (acc[task.status] || 0) + 1;
-          return acc;
-        },
-        {} as Record<string, number>,
-      );
+    // Build summary and audit record outside the transaction
+    const taskStatusBreakdown = allTaskStatuses.reduce(
+      (acc, task) => {
+        acc[task.status] = (acc[task.status] || 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>,
+    );
 
-      const quoteStatusBreakdown = assignedQuoteRequests.reduce(
-        (acc, quote) => {
-          acc[quote.status] = (acc[quote.status] || 0) + 1;
-          return acc;
-        },
-        {} as Record<string, number>,
-      );
+    const quoteStatusBreakdown = assignedQuoteRequests.reduce(
+      (acc, quote) => {
+        acc[quote.status] = (acc[quote.status] || 0) + 1;
+        return acc;
+      },
+      {} as Record<string, number>,
+    );
 
-      const completedTaskCount = completedTasks.filter(
-        (task) => task.completed || task.status === "Completed",
-      ).length;
+    const completedTaskCount = completedTasks.filter(
+      (task) => task.completed || task.status === "Completed",
+    ).length;
 
-      const convertedLeadsCount = assignedLeads.filter(
-        (lead) => (lead.status || "").toLowerCase() === "converted",
-      ).length;
+    const convertedLeadsCount = assignedLeads.filter(
+      (lead) => (lead.status || "").toLowerCase() === "converted",
+    ).length;
 
-      const summary = {
-        sourceAgentId: agentId,
-        sourceAgentStatus: "inactive",
-        tasksTransferredToAgentId: transferAgentId,
-        leadsTransferredToAgentId: transferLeadsAgentId,
-        transferredAt: new Date().toISOString(),
-        tasksTransferredCount: tasksToTransfer.length,
-        completedOrAbandonedTasksArchivedCount: completedTasks.length,
-        completedTaskCount,
-        taskStatusBreakdown,
-        assignedLeadsTransferredCount: assignedLeads.length,
-        createdLeadsTransferredCount: createdLeads.length,
-        convertedLeadsCount,
-        assignedQuoteRequestsTransferredCount: assignedQuoteRequests.length,
-        createdQuoteRequestsTransferredCount: createdQuoteRequests.length,
-        quoteStatusBreakdown,
-        diaryEntriesTransferredCount: diaryEntries.length,
-      };
+    const summary = {
+      sourceAgentId: agentId,
+      sourceAgentStatus: "inactive",
+      tasksTransferredToAgentId: transferAgentId,
+      leadsTransferredToAgentId: transferLeadsAgentId,
+      transferredAt: new Date().toISOString(),
+      tasksTransferredCount: tasksToTransfer.length,
+      completedOrAbandonedTasksArchivedCount: completedTasks.length,
+      completedTaskCount,
+      taskStatusBreakdown,
+      assignedLeadsTransferredCount: assignedLeads.length,
+      createdLeadsTransferredCount: createdLeads.length,
+      convertedLeadsCount,
+      assignedQuoteRequestsTransferredCount: assignedQuoteRequests.length,
+      createdQuoteRequestsTransferredCount: createdQuoteRequests.length,
+      quoteStatusBreakdown,
+      diaryEntriesTransferredCount: diaryEntries.length,
+    };
 
-      await tx.serviceRecord.create({
-        data: {
-          agentId,
-          createdBy: currentAdmin.id,
-          note: `AUTO_TRANSFER_AUDIT ${JSON.stringify(summary)}`,
-        },
-      });
-
-      return summary;
+    await prisma.serviceRecord.create({
+      data: {
+        agentId,
+        createdBy: currentAdmin.id,
+        note: `AUTO_TRANSFER_AUDIT ${JSON.stringify(summary)}`,
+      },
     });
 
     return NextResponse.json({
       success: true,
       message:
         "Dual agent deleted: tasks transferred to execution agent, leads transferred to advisor agent",
-      summary: result,
+      summary,
     });
   } catch (error) {
-    console.error("Error deleting dual agent:", error);
+    const message = error instanceof Error ? error.message : String(error);
+    console.error("Error deleting dual agent:", message);
     return NextResponse.json(
-      { error: "Failed to delete dual agent" },
+      { error: "Failed to delete dual agent", detail: message },
       { status: 500 },
     );
   }

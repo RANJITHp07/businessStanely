@@ -32,6 +32,20 @@ export function AddEntryDialog({ open, onOpenChange, onAddEntry }: AddEntryDialo
   const [color, setColor] = useState<TaskColor>("blue")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [titleError, setTitleError] = useState("")
+  const [submitError, setSubmitError] = useState("")
+
+  const resetForm = () => {
+    setTitle("")
+    setDescription("")
+    setProject("")
+    setProjectCode("")
+    setDate(new Date())
+    setStartTime("09:00")
+    setEndTime("10:00")
+    setEntryType("task")
+    setTitleError("")
+    setSubmitError("")
+  }
 
   const handleSubmit = () => {
     if (entryType === "task" && !title.trim()) {
@@ -39,6 +53,7 @@ export function AddEntryDialog({ open, onOpenChange, onAddEntry }: AddEntryDialo
       return
     }
     setTitleError("")
+    setSubmitError("")
 
     ;(async () => {
       setIsSubmitting(true)
@@ -80,21 +95,16 @@ export function AddEntryDialog({ open, onOpenChange, onAddEntry }: AddEntryDialo
             userName: e.agent?.name || "Me",
             type: e.type,
           })
+          resetForm()
+          onOpenChange(false)
+        } else {
+          const errData = await res.json().catch(() => ({}))
+          setSubmitError(errData.error || "Failed to add entry. Please try again.")
         }
-      } catch (err) {
-        console.error('Error creating timesheet entry', err)
+      } catch {
+        setSubmitError("Network error. Please try again.")
       }
 
-      // Reset form
-      setTitle("")
-      setDescription("")
-      setProject("")
-      setProjectCode("")
-      setDate(new Date())
-      setStartTime("09:00")
-      setEndTime("10:00")
-      setEntryType("task")
-      onOpenChange(false)
       setIsSubmitting(false)
     })()
   }
@@ -183,13 +193,16 @@ export function AddEntryDialog({ open, onOpenChange, onAddEntry }: AddEntryDialo
           )}
         </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button onClick={handleSubmit} disabled={isSubmitting}>
-            {isSubmitting ? "Adding..." : "Add Entry"}
-          </Button>
+        <DialogFooter className="flex-col gap-2 sm:flex-row">
+          {submitError && <p className="text-xs text-destructive w-full">{submitError}</p>}
+          <div className="flex gap-2 justify-end w-full">
+            <Button variant="outline" onClick={() => { resetForm(); onOpenChange(false) }}>
+              Cancel
+            </Button>
+            <Button onClick={handleSubmit} disabled={isSubmitting}>
+              {isSubmitting ? "Adding..." : "Add Entry"}
+            </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>

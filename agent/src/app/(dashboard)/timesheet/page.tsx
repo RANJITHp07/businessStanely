@@ -121,28 +121,26 @@ export default function TimesheetPage() {
 
     const endDate = useMemo(() => addDays(startDate, daysToShow - 1), [startDate, daysToShow])
 
-    // Fetch all tasks for agent and team
-    useEffect(() => {
-        const fetchTimesheetData = async () => {
-            if (!agent || users.length === 0) return;
-            try {
-                // Fetch tasks for all user ids (agent + team) from new timesheet API
-                const userIds = selectedUsers.map(u => u.id);
-                const params = new URLSearchParams({
-                    assignedToIds: userIds.join(","),
-                    startDate: getISTStartOfDayISO(startDate),
-                    endDate: getISTEndOfDayISO(endDate),
-                });
-                const response = await fetch(`/api/timesheet?${params.toString()}`);
-                const data = response.ok ? await response.json() : { timeEntries: [] };
-
-                setEntries(data.timeEntries || []);
-            } catch (error) {
-                setEntries([]);
-            }
-        };
-        fetchTimesheetData();
+    const fetchTimesheetData = useCallback(async () => {
+        if (!agent || selectedUsers.length === 0) return;
+        try {
+            const userIds = selectedUsers.map(u => u.id);
+            const params = new URLSearchParams({
+                assignedToIds: userIds.join(","),
+                startDate: getISTStartOfDayISO(startDate),
+                endDate: getISTEndOfDayISO(endDate),
+            });
+            const response = await fetch(`/api/timesheet?${params.toString()}`);
+            const data = response.ok ? await response.json() : { timeEntries: [] };
+            setEntries(data.timeEntries || []);
+        } catch {
+            setEntries([]);
+        }
     }, [agent, selectedUsers, startDate, endDate]);
+
+    useEffect(() => {
+        fetchTimesheetData();
+    }, [fetchTimesheetData]);
 
     // Filter entries by selected users, status, and date
     const filteredEntries = useMemo(() => {
@@ -193,7 +191,8 @@ export default function TimesheetPage() {
 
     const handleAddEntry = useCallback((newEntry: TimeEntry) => {
         setEntries((prev) => [...prev, newEntry])
-    }, [])
+        fetchTimesheetData()
+    }, [fetchTimesheetData])
 
     // Handler for clicking an entry (show modal)
     const handleEntryClick = useCallback((entry: TimeEntry) => {

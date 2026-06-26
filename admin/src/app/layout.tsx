@@ -5,6 +5,7 @@ import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import '@/lib/cronInit'; // Initialize cron scheduler
 import PWAManager from '@/components/PWAManager';
+import { PWAProvider } from '@/lib/pwa-context';
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -29,6 +30,7 @@ export default function RootLayout({
         <link rel="apple-touch-icon" href="/Logo.jpg" />
       </head>
       <body className={`${inter.className} h-screen flex`}>
+        <PWAProvider>
         {children}
         <PWAManager />
         <ToastContainer
@@ -46,6 +48,7 @@ export default function RootLayout({
           containerId="main-toast-container"
           stacked={false}
         />
+        </PWAProvider>
       </body>
     </html>
   );

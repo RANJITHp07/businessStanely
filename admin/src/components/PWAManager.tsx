@@ -34,11 +34,6 @@ export default function PWAManager() {
     navigator.serviceWorker.addEventListener('controllerchange', () => {
       window.location.reload();
     });
-
-    // Suppress browser's native install prompt
-    const handleInstallPrompt = (e: Event) => e.preventDefault();
-    window.addEventListener('beforeinstallprompt', handleInstallPrompt);
-    return () => window.removeEventListener('beforeinstallprompt', handleInstallPrompt);
   }, []);
 
   return null;

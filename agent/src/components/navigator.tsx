@@ -13,6 +13,8 @@ import { useAgentContext } from '@/lib/agent-context'
 import { hasExecutionRole, hasAdvisorRole, EXECUTION_AND_ADVISOR_AGENT_ROLE } from '@/lib/agentRole'
 import { isLeadMaker } from '@/lib/agentType'
 import { AddEntryDialog } from '@/app/(dashboard)/timesheet/_component/add-entry-dialog'
+import { usePWA } from '@/lib/pwa-context'
+import { Download } from 'lucide-react'
 
 export default function Navigator() {
     const router = useRouter()
@@ -20,6 +22,7 @@ export default function Navigator() {
     const pathname = usePathname()
     const segments = pathname.split('/').filter(Boolean)
     const [addEntryDialogOpen, setAddEntryDialogOpen] = useState(false)
+    const { canInstall, install } = usePWA()
 
     return (
         <div className="hidden md:flex items-center justify-between container mx-auto">
@@ -66,6 +69,12 @@ export default function Navigator() {
             </Breadcrumb>
 
             <div className="absolute right-6 flex items-center gap-2">
+                {canInstall && (
+                    <Button size="sm" variant="outline" onClick={install} className="gap-1.5">
+                        <Download className="h-4 w-4" />
+                        Install App
+                    </Button>
+                )}
                 {hasExecutionRole(agent?.agentRole) && (
                     <>
                         <Button size="sm" onClick={() => router.push("/task/create")}>

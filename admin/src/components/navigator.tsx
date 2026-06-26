@@ -4,11 +4,14 @@ import { usePathname, useRouter } from 'next/navigation'
 import { Breadcrumb, BreadcrumbList, BreadcrumbItem, BreadcrumbSeparator, BreadcrumbLink, BreadcrumbPage } from '@/components/ui/breadcrumb'
 import React from 'react'
 import { Button } from '@/components/ui/button'
+import { usePWA } from '@/lib/pwa-context'
+import { Download } from 'lucide-react'
 
 export default function Navigator() {
     const router = useRouter()
     const pathname = usePathname()
     const segments = pathname.split('/').filter(Boolean)
+    const { canInstall, install } = usePWA()
 
 
     return (
@@ -41,6 +44,12 @@ export default function Navigator() {
             </Breadcrumb>
 
             <div className="xl:-mr-20 flex items-center gap-2">
+                {canInstall && (
+                    <Button size="sm" variant="outline" onClick={install} className="gap-1.5">
+                        <Download className="h-4 w-4" />
+                        Install App
+                    </Button>
+                )}
                 <Button size="sm" onClick={() => router.push('/task/create')}>
                     Add Normal Task
                 </Button>

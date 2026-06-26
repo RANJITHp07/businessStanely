@@ -71,7 +71,7 @@ export default function TimesheetPage() {
 
     const endDate = useMemo(() => addDays(startDate, daysToShow), [startDate, daysToShow])
 
-    // Fetch timesheet data for selected agent
+    // Fetch timesheet data for selected agent, with polling to reflect new entries
     useEffect(() => {
         const fetchTimesheetData = async () => {
             if (!selectedAgent) return;
@@ -90,6 +90,8 @@ export default function TimesheetPage() {
             }
         };
         fetchTimesheetData();
+        const interval = setInterval(fetchTimesheetData, 30000);
+        return () => clearInterval(interval);
     }, [selectedAgent, startDate, endDate]);
 
 

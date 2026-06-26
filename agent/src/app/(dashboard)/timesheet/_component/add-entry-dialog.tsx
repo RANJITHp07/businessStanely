@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { format } from "date-fns"
-import { CalendarIcon, Clock, LogIn, LogOut } from "lucide-react"
+import { CalendarIcon } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -16,7 +16,7 @@ import { TaskColor, TaskStatus, TimeEntry } from "../page"
 interface AddEntryDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onAddEntry: (entry: Omit<TimeEntry, "id">) => void
+  onAddEntry: (entry: TimeEntry) => void
 }
 
 export function AddEntryDialog({ open, onOpenChange, onAddEntry }: AddEntryDialogProps) {
@@ -31,12 +31,19 @@ export function AddEntryDialog({ open, onOpenChange, onAddEntry }: AddEntryDialo
   const [status, setStatus] = useState<TaskStatus>("in-progress")
   const [color, setColor] = useState<TaskColor>("blue")
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [titleError, setTitleError] = useState("")
 
   const handleSubmit = () => {
-    (async () => {
+    if (entryType === "task" && !title.trim()) {
+      setTitleError("Title is required")
+      return
+    }
+    setTitleError("")
+
+    ;(async () => {
       setIsSubmitting(true)
       const payload = {
-        title: entryType === "task" ? title : entryType === "login" ? "Login" : "Logout",
+        title: entryType === "task" ? title.trim() : entryType === "login" ? "Login" : "Logout",
         description: entryType === "task" ? description : `${entryType} entry`,
         project: entryType === "task" ? project : "System",
         projectCode: entryType === "task" ? projectCode : entryType.toUpperCase(),
@@ -58,8 +65,8 @@ export function AddEntryDialog({ open, onOpenChange, onAddEntry }: AddEntryDialo
         if (res.ok) {
           const data = await res.json()
           const e = data.entry
-          // Map API entry to UI TimeEntry shape (without id)
           onAddEntry({
+            id: e.id,
             title: e.title,
             description: e.description || "",
             project: e.project || "",
@@ -73,39 +80,9 @@ export function AddEntryDialog({ open, onOpenChange, onAddEntry }: AddEntryDialo
             userName: e.agent?.name || "Me",
             type: e.type,
           })
-        } else {
-          // Fallback: still add locally
-          onAddEntry({
-            title: payload.title,
-            description: payload.description,
-            project: payload.project,
-            projectCode: payload.projectCode,
-            date,
-            startTime: payload.startTime,
-            endTime: payload.endTime,
-            status: payload.status as any,
-            color: payload.color as any,
-            userId: "1",
-            userName: "Me",
-            type: payload.type,
-          })
         }
       } catch (err) {
         console.error('Error creating timesheet entry', err)
-        onAddEntry({
-          title: payload.title,
-          description: payload.description,
-          project: payload.project,
-          projectCode: payload.projectCode,
-          date,
-          startTime: payload.startTime,
-          endTime: payload.endTime,
-          status: payload.status as any,
-          color: payload.color as any,
-          userId: "1",
-          userName: "Me",
-          type: payload.type,
-        })
       }
 
       // Reset form
@@ -113,6 +90,7 @@ export function AddEntryDialog({ open, onOpenChange, onAddEntry }: AddEntryDialo
       setDescription("")
       setProject("")
       setProjectCode("")
+      setDate(new Date())
       setStartTime("09:00")
       setEndTime("10:00")
       setEntryType("task")
@@ -164,8 +142,14 @@ export function AddEntryDialog({ open, onOpenChange, onAddEntry }: AddEntryDialo
           {entryType === "task" && (
             <>
               <div className="space-y-2">
-                <Label>Title</Label>
-                <Input placeholder="Enter task title" value={title} onChange={(e) => setTitle(e.target.value)} />
+                <Label>Title <span className="text-destructive">*</span></Label>
+                <Input
+                  placeholder="Enter task title"
+                  value={title}
+                  onChange={(e) => { setTitle(e.target.value); if (e.target.value.trim()) setTitleError("") }}
+                  className={titleError ? "border-destructive" : ""}
+                />
+                {titleError && <p className="text-xs text-destructive">{titleError}</p>}
               </div>
 
               <div className="space-y-2">

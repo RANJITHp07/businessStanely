@@ -191,9 +191,8 @@ export default function TimesheetPage() {
         return Number(hours.toFixed(2))
     }, [filteredEntries])
 
-    const handleAddEntry = useCallback((newEntry: Omit<TimeEntry, "id">) => {
-        const id = `${Date.now()}`
-        setEntries((prev) => [...prev, { ...newEntry, id }])
+    const handleAddEntry = useCallback((newEntry: TimeEntry) => {
+        setEntries((prev) => [...prev, newEntry])
     }, [])
 
     // Handler for clicking an entry (show modal)

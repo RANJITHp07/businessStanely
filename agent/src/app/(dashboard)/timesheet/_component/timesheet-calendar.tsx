@@ -105,6 +105,11 @@ const colorClasses: Record<string, { bg: string; text: string; border: string }>
     text: "text-blue-900",
     border: "border border-blue-400",
   },
+  "in-progress": {
+    bg: "bg-blue-100",
+    text: "text-blue-900",
+    border: "border border-blue-400",
+  },
   completed: {
     bg: "bg-green-100",
     text: "text-green-900",

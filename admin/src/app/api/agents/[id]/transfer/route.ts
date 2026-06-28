@@ -73,6 +73,7 @@ export async function PUT(
         where: {
           assignedToId: agentId,
           status: { in: ["Completed", "Abandoned"] },
+          retainershipId: null,
         },
         select: { id: true, status: true, completed: true },
       });
@@ -92,12 +93,24 @@ export async function PUT(
       });
 
       // Keep completed/abandoned tasks on source agent but archive them.
+      // Retainership tasks are excluded from archiving — they must remain
+      // active and assigned to the new agent regardless of completion status.
       await tx.task.updateMany({
         where: {
           assignedToId: agentId,
           status: { in: ["Completed", "Abandoned"] },
+          retainershipId: null,
         },
         data: { active: false },
+      });
+
+      // Transfer all retainership tasks (including completed) to the new agent.
+      await tx.task.updateMany({
+        where: {
+          assignedToId: agentId,
+          retainershipId: { not: null },
+        },
+        data: { assignedToId: transferAgentId },
       });
 
       // Transfer task ownership too — a deleted agent must not remain as the

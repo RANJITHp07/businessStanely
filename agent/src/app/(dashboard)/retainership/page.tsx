@@ -143,11 +143,11 @@ export default function RetainershipTable() {
                     clientsRes,
                     legislationsRes,
                 ] = await Promise.all([
-                    fetchWithAuth(`/api/tasks?retainershipTasks=true`),
-                    fetchWithAuth(`/api/tasks?trigger=true`),
-                    fetchWithAuth(`/api/tasks?retainershipTasks=true&status=Completed`),
-                    fetchWithAuth(`/api/clients?assignedToId=me`),
-                    fetchWithAuth(`/api/legislation?assignedAgent=me`),
+                    fetchWithAuth(`/api/tasks?retainershipTasks=true`, { silent401: true }),
+                    fetchWithAuth(`/api/tasks?trigger=true`, { silent401: true }),
+                    fetchWithAuth(`/api/tasks?retainershipTasks=true&status=Completed`, { silent401: true }),
+                    fetchWithAuth(`/api/clients?assignedToId=me`, { silent401: true }),
+                    fetchWithAuth(`/api/legislation?assignedAgent=me`, { silent401: true }),
                 ]);
 
                 if (!retainershipRes.ok || !clientsRes.ok || !legislationsRes.ok) {
@@ -182,12 +182,13 @@ export default function RetainershipTable() {
                 // Team members' retainership tasks (#12): fetch the logged-in
                 // agent's team, then aggregate each member's retainership tasks.
                 try {
-                    const teamRes = await fetchWithAuth("/api/team-members");
+                    const teamRes = await fetchWithAuth("/api/team-members", { silent401: true });
                     const team = teamRes.ok ? await teamRes.json() : [];
                     const teamTaskResults = await Promise.all(
                         (Array.isArray(team) ? team : []).map(async (member: { id: string }) => {
                             const r = await fetchWithAuth(
                                 `/api/tasks?retainershipTasks=true&assignedToId=${member.id}`,
+                                { silent401: true },
                             );
                             if (!r.ok) return [];
                             const d = await r.json();

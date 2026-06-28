@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import prisma from "@/lib/prisma";
+import prisma, { ensureConnected } from "@/lib/prisma";
 
 // Create a separate rate limiter for login attempts (more strict)
 class LoginRateLimiter {
@@ -97,6 +97,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Find agent by email (case-insensitive)
+    await ensureConnected();
     const agent = await prisma.agent.findFirst({
       where: {
         email: { equals: email, mode: "insensitive" },

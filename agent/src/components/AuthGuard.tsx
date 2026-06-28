@@ -36,6 +36,13 @@ export function AuthGuard({ children }: AuthGuardProps) {
         "/task",
         "/setting",
         "/my-diary",
+        "/retainership",
+        "/client",
+        "/legislation",
+        "/task_category",
+        "/service-records",
+        "/request-quote",
+        "/my-task",
       ];
 
       // Check if current route is protected
@@ -69,6 +76,13 @@ export function AuthGuard({ children }: AuthGuardProps) {
           "/task",
           "/setting",
           "/my-diary",
+          "/retainership",
+          "/client",
+          "/legislation",
+          "/task_category",
+          "/service-records",
+          "/request-quote",
+          "/my-task",
         ];
         const isProtectedRoute = protectedRoutes.some((route) =>
           currentPath.startsWith(route)

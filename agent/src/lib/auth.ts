@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import jwt from "jsonwebtoken";
-import prisma from "./prisma";
+import prisma, { ensureConnected } from "./prisma";
 
 export interface AgentJWTPayload {
   agentId: string;
@@ -37,6 +37,7 @@ export async function getCurrentAgent(req: NextRequest) {
     }
 
     // Get agent from database (include currentSessionToken)
+    await ensureConnected();
     const agent = await prisma.agent.findUnique({
       where: { id: payload.agentId },
       select: {

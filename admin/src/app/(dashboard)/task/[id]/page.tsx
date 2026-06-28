@@ -493,18 +493,18 @@ export default function TaskDetails() {
         if (
           isClientUpdateInteraction &&
           taskData.statusCheckDuration &&
-          taskData.statusCheckDuration !== "None"
+          taskData.statusCheckDuration !== "Working"
         ) {
           await fetch(`/api/tasks/${id}`, {
             method: "PUT",
             headers: {
               "Content-Type": "application/json",
             },
-            body: JSON.stringify({ statusCheckDuration: "None" }),
+            body: JSON.stringify({ statusCheckDuration: "Working" }),
           });
 
           setTaskData((prev) =>
-            prev ? { ...prev, statusCheckDuration: "None" } : prev,
+            prev ? { ...prev, statusCheckDuration: "Working" } : prev,
           );
         }
 
@@ -618,7 +618,7 @@ export default function TaskDetails() {
 
   // Dropdown options for durations
   const durationOptions = [
-    { value: "None", label: "Working" },
+    { value: "Working", label: "Working" },
     { value: "24hr", label: "24 Hours" },
     { value: "48hr", label: "48 Hours" },
     { value: "1w", label: "1 Week" },
@@ -947,7 +947,7 @@ export default function TaskDetails() {
                     StatusCheck & Followup
                   </Label>
                   <Select
-                    value={taskData.followUpDuration || "None"}
+                    value={taskData.followUpDuration || "Working"}
                     onValueChange={handleFollowUpDurationChange}
                   >
                     <SelectTrigger id="follow-up-duration" className="w-full">
@@ -965,7 +965,7 @@ export default function TaskDetails() {
                     Client update
                   </Label>
                   <Select
-                    value={taskData.statusCheckDuration || "None"}
+                    value={taskData.statusCheckDuration || "Working"}
                     onValueChange={handleStatusCheckDurationChange}
                   >
                     <SelectTrigger id="status-check-duration" className="w-full">
@@ -1323,6 +1323,24 @@ export default function TaskDetails() {
                         {taskData.legislation?.title || "N/A"}
                       </p>
                     </div>
+                    <div>
+                      <Label className="text-sm font-medium text-muted-foreground">
+                        Recurring Periodicity
+                      </Label>
+                      <p className="font-medium">
+                        {taskData.recurring && Number(taskData.recurring) !== 0
+                          ? (() => {
+                              const type = (taskData.recurringType || "").toLowerCase();
+                              const n = Number(taskData.recurring);
+                              if (type === "once") return "Trigger only once";
+                              if (type === "day") return `Every ${n} ${n === 1 ? "day" : "days"}`;
+                              if (type === "week") return `Every ${n} ${n === 1 ? "week" : "weeks"}`;
+                              if (type === "month") return `Every ${n} ${n === 1 ? "month" : "months"}`;
+                              return `${taskData.recurringType} - ${n}`;
+                            })()
+                          : "No Recurring"}
+                      </p>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -1566,7 +1584,7 @@ export default function TaskDetails() {
                       Follow-up Required
                     </Label>
                     <Select
-                      value={taskData.followUpDuration || "None"}
+                      value={taskData.followUpDuration || "Working"}
                       onValueChange={handleFollowUpDurationChange}
                     >
                       <SelectTrigger id="follow-up-duration" className="w-full">
@@ -1584,7 +1602,7 @@ export default function TaskDetails() {
                       Client update
                     </Label>
                     <Select
-                      value={taskData.statusCheckDuration || "None"}
+                      value={taskData.statusCheckDuration || "Working"}
                       onValueChange={handleStatusCheckDurationChange}
                     >
                       <SelectTrigger id="status-check-duration" className="w-full">

@@ -46,8 +46,8 @@ export interface Task {
   holdDate?: string;
   progress?: number;
   followUpRequired?: boolean;
-  followUpDuration?: string; // e.g., '24hr', '48hr', '1w', 'None'
-  statusCheckDuration?: string; // e.g., '24hr', '48hr', '1w', 'None'
+  followUpDuration?: string; // e.g., '24hr', '48hr', '1w', 'Working'
+  statusCheckDuration?: string; // e.g., '24hr', '48hr', '1w', 'Working'
   completed?: boolean;
   recurring?: number | string | null; // Recurring in months (1-12), or string for new format
   createdAt: string;

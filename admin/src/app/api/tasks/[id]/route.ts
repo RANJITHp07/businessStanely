@@ -188,7 +188,7 @@ export async function PUT(
             data: {
               taskId: id,
               field,
-              oldValue: currentVal ?? "None",
+              oldValue: currentVal ?? "Working",
               newValue: bodyVal,
               auditDate: today,
             },

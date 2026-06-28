@@ -796,8 +796,8 @@ export default function TasksTable() {
                             key={task.id}
                             onClick={() => router.push(`/task/${task.id}`)}
                             className={`cursor-pointer hover:bg-muted/50 ${isOverdue(task.dueDate, task.status) ? "bg-red-50" :
-                              task.followUpDuration && task.followUpDuration !== 'None' ? "bg-blue-50" :
-                                task.statusCheckDuration && task.statusCheckDuration !== 'None' ? "bg-green-50" : ""
+                              task.followUpDuration && task.followUpDuration !== 'Working' ? "bg-blue-50" :
+                                task.statusCheckDuration && task.statusCheckDuration !== 'Working' ? "bg-green-50" : ""
                               }`}
                           >
                             <TableCell className="overflow-hidden">

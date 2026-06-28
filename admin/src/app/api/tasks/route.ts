@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
         legislationId: legislationId || null, // Save legislationId
         recurring: recurringValue, // Save recurring field
         recurringType,
-        followUpDuration: followUpDuration || "None",
+        followUpDuration: followUpDuration || "Working",
         statusCheckDuration: statusCheckDuration || "48hr",
         active,
       },
@@ -69,11 +69,11 @@ export async function POST(req: NextRequest) {
     const initialDurationAudits = [
       {
         field: "followUpDuration",
-        value: newTask.followUpDuration || "None",
+        value: newTask.followUpDuration || "Working",
       },
       {
         field: "statusCheckDuration",
-        value: newTask.statusCheckDuration || "None",
+        value: newTask.statusCheckDuration || "Working",
       },
     ] as const;
 
@@ -81,7 +81,7 @@ export async function POST(req: NextRequest) {
       data: initialDurationAudits.map(({ field, value }) => ({
         taskId: newTask.id,
         field,
-        oldValue: "None",
+        oldValue: "Working",
         newValue: value,
         auditDate: today,
       })),

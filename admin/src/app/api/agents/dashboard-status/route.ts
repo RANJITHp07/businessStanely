@@ -19,7 +19,7 @@ const normalizeInteractionType = (content?: string): InteractionKind => {
 };
 
 const parseDurationMs = (value?: string | null): number | null => {
-  if (!value || value === "None") return null;
+  if (!value || value === "Working") return null;
   return DURATION_MS[value] ?? null;
 };
 
@@ -253,11 +253,11 @@ export async function GET(req: NextRequest) {
       ) => latestAuditEntry(field)?.newValue || null;
 
       const effectiveFollowUpDuration =
-        latestAuditValue("followUpDuration") || task.followUpDuration || "None";
+        latestAuditValue("followUpDuration") || task.followUpDuration || "Working";
       const effectiveStatusCheckDuration =
         latestAuditValue("statusCheckDuration") ||
         task.statusCheckDuration ||
-        "None";
+        "Working";
 
       const latestNormal = getLatestDate(task.comments, "NORMAL");
       const latestClientUpdate = getLatestDate(task.comments, "CLIENT_UPDATE");
@@ -271,7 +271,7 @@ export async function GET(req: NextRequest) {
       const statusCheckAuditAt =
         latestAuditEntry("statusCheckDuration")?.changedAt ?? null;
 
-      if (effectiveFollowUpDuration === "None") {
+      if (effectiveFollowUpDuration === "Working") {
         const reference = maxDate(latestAny, followUpAuditAt) ?? task.createdAt;
         if (hasExceededDuration(reference, DURATION_MS["24hr"], snapshotDate)) {
           notTouchedTasks.push({

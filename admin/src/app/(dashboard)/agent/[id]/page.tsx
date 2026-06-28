@@ -65,6 +65,10 @@ import {
   PlusCircle,
   AlertTriangle,
   Calendar as CalendarIcon,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
 } from "lucide-react";
 import { Agent, Client, Task } from "@/types";
 import Link from "next/link";
@@ -258,6 +262,9 @@ export default function AgentDetails() {
   const [agentRetainershipTasks, setAgentRetainershipTasks] = useState<Task[]>([]);
   const [agentTriggerTasks, setAgentTriggerTasks] = useState<Task[]>([]);
   const [agentLegislations, setAgentLegislations] = useState<AgentLegislation[]>([]);
+  const [legislationPage, setLegislationPage] = useState(1);
+  const [legislationPageSize] = useState(10);
+  const [legislationTotal, setLegislationTotal] = useState(0);
   const [agentClients, setAgentClients] = useState<AgentClient[]>([]);
   const [agentLeads, setAgentLeads] = useState<Task[]>([]);
   const [agentOpportunities, setAgentOpportunities] = useState<Task[]>([]);
@@ -324,6 +331,28 @@ export default function AgentDetails() {
       }
     }
   }, []);
+
+  const fetchAgentLegislations = async (page = 1) => {
+    if (!id) return;
+    try {
+      const response = await fetchWithAuth(
+        `/api/legislation?assignedAgent=${id}&page=${page}&pageSize=${legislationPageSize}`
+      );
+      if (response.ok) {
+        const data = await response.json();
+        setAgentLegislations(data.data || []);
+        setLegislationTotal(data.total || 0);
+        setLegislationPage(page);
+      } else {
+        setAgentLegislations([]);
+        setLegislationTotal(0);
+      }
+    } catch (error) {
+      console.error("Error fetching agent legislations:", error);
+      setAgentLegislations([]);
+      setLegislationTotal(0);
+    }
+  };
 
   useEffect(() => {
     if (!id) return;
@@ -478,21 +507,6 @@ export default function AgentDetails() {
       } catch (error) {
         console.error("Error fetching agent trigger tasks:", error);
         setAgentTriggerTasks([]);
-      }
-    };
-
-    const fetchAgentLegislations = async () => {
-      try {
-        const response = await fetchWithAuth(`/api/legislation?assignedAgent=${id}`);
-        if (response.ok) {
-          const data = await response.json();
-          setAgentLegislations(data || []);
-        } else {
-          setAgentLegislations([]);
-        }
-      } catch (error) {
-        console.error("Error fetching agent legislations:", error);
-        setAgentLegislations([]);
       }
     };
 
@@ -1549,7 +1563,7 @@ export default function AgentDetails() {
                     </TabsTrigger>
                     <TabsTrigger value="legislation-tab" className="flex items-center gap-1 px-2 py-3 text-[10px] lg:text-sm whitespace-nowrap">
                       <CheckCircle className="h-4 w-4 hidden lg:block flex-shrink-0" />
-                      Assigned Legislation ({agentLegislations.length})
+                      Assigned Legislation ({legislationTotal})
                     </TabsTrigger>
                     <TabsTrigger value="retainership-tasks" className="flex items-center gap-1 px-2 py-3 text-[10px] lg:text-sm whitespace-nowrap">
                       <CheckCircle className="h-4 w-4 hidden lg:block flex-shrink-0" />
@@ -1604,7 +1618,7 @@ export default function AgentDetails() {
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
                         <CheckCircle className="h-5 w-5" />
-                        Assigned Legislation ({agentLegislations.length})
+                        Assigned Legislation ({legislationTotal})
                       </CardTitle>
                       <CardDescription>
                         Legislation assigned to {agent.name}, including task health and quick actions.
@@ -1717,6 +1731,65 @@ export default function AgentDetails() {
                           </TableBody>
                         </Table>
                       </div>
+                      {Math.ceil(legislationTotal / legislationPageSize) > 1 && (
+                        <div className="flex items-center justify-between pt-4">
+                          <div className="text-sm text-muted-foreground">
+                            Page {legislationPage} of {Math.ceil(legislationTotal / legislationPageSize)}
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => fetchAgentLegislations(1)}
+                              disabled={legislationPage === 1}
+                            >
+                              <ChevronsLeft className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => fetchAgentLegislations(legislationPage - 1)}
+                              disabled={legislationPage === 1}
+                            >
+                              <ChevronLeft className="h-4 w-4" />
+                            </Button>
+                            {Array.from(
+                              { length: Math.min(5, Math.ceil(legislationTotal / legislationPageSize)) },
+                              (_, i) => {
+                                const totalPages = Math.ceil(legislationTotal / legislationPageSize);
+                                const pageNum = Math.max(1, Math.min(totalPages - 4, legislationPage - 2)) + i;
+                                if (pageNum > totalPages) return null;
+                                return (
+                                  <Button
+                                    key={pageNum}
+                                    variant={legislationPage === pageNum ? "default" : "outline"}
+                                    size="sm"
+                                    onClick={() => fetchAgentLegislations(pageNum)}
+                                  >
+                                    {pageNum}
+                                  </Button>
+                                );
+                              }
+                            )}
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => fetchAgentLegislations(legislationPage + 1)}
+                              disabled={legislationPage === Math.ceil(legislationTotal / legislationPageSize)}
+                            >
+                              <ChevronRight className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => fetchAgentLegislations(Math.ceil(legislationTotal / legislationPageSize))}
+                              disabled={legislationPage === Math.ceil(legislationTotal / legislationPageSize)}
+                            >
+                              <ChevronsRight className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 </TabsContent>

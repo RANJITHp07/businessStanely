@@ -126,6 +126,10 @@ export default function LegislationDetail({ params }: { params: Promise<{ id: st
                     <FileText className="h-4 w-4 text-muted-foreground" />
                     <span>Assigned Agent: {legislation.assignedAgent?.name || "Unknown"}</span>
                   </div>
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                    <span>Last Completed Date: {formatDate(legislation.lastCompletedDate)}</span>
+                  </div>
                   {legislation.client && (
                     <>
                       <div className="flex items-center gap-2">

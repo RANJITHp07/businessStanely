@@ -169,7 +169,7 @@ export async function PUT(
         data: { ownerShipId: transferAgentId },
       });
 
-      const [assignedQuoteRequests, createdQuoteRequests, diaryEntries] =
+      const [assignedQuoteRequests, createdQuoteRequests, diaryEntries, legislations] =
         await Promise.all([
           tx.quoteRequest.findMany({
             where: { assignedAgentId: agentId },
@@ -181,6 +181,10 @@ export async function PUT(
           }),
           tx.diaryEntry.findMany({
             where: { createdByAgentId: agentId },
+            select: { id: true },
+          }),
+          tx.legislation.findMany({
+            where: { assignedAgentId: agentId },
             select: { id: true },
           }),
         ]);
@@ -198,6 +202,11 @@ export async function PUT(
       await tx.diaryEntry.updateMany({
         where: { createdByAgentId: agentId },
         data: { createdByAgentId: transferAgentId },
+      });
+
+      await tx.legislation.updateMany({
+        where: { assignedAgentId: agentId },
+        data: { assignedAgentId: transferAgentId },
       });
 
       // Reassign team members (subordinates) to transfer advisor, avoiding duplicates.
@@ -286,6 +295,7 @@ export async function PUT(
         createdQuoteRequestsTransferredCount: createdQuoteRequests.length,
         quoteStatusBreakdown,
         diaryEntriesTransferredCount: diaryEntries.length,
+        legislationsTransferredCount: legislations.length,
       };
 
       await tx.serviceRecord.create({

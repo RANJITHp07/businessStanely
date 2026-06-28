@@ -5,28 +5,39 @@ export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const assignedAgent = searchParams.get("assignedAgent");
+    const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
+    const pageSize = Math.min(100, Math.max(1, parseInt(searchParams.get("pageSize") || "10", 10)));
 
-    const legislations = await prisma.legislation.findMany({
-      where: assignedAgent
-        ? {
-            assignedAgentId: assignedAgent,
-          }
-        : undefined,
-      include: {
-        assignedAgent: true,
-        retainership: {
-          include: {
-            client: true,
+    const where = assignedAgent ? { assignedAgentId: assignedAgent } : undefined;
+
+    const [legislations, total] = await Promise.all([
+      prisma.legislation.findMany({
+        where,
+        include: {
+          assignedAgent: true,
+          retainership: {
+            include: {
+              client: true,
+            },
           },
+          tasks: true,
         },
-        tasks: true,
-      },
-      orderBy: {
-        createdAt: "desc",
-      },
-    });
+        orderBy: {
+          createdAt: "desc",
+        },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+      prisma.legislation.count({ where }),
+    ]);
 
-    return NextResponse.json(legislations);
+    return NextResponse.json({
+      data: legislations,
+      total,
+      page,
+      pageSize,
+      totalPages: Math.ceil(total / pageSize),
+    });
   } catch (error) {
     console.error("Error fetching legislations:", error);
     return NextResponse.json(

@@ -58,7 +58,7 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { SectionTable, statusKey } from "../my-task/page"
 
 
@@ -100,6 +100,13 @@ export default function RetainershipTable() {
     const [teamRetainerships, setTeamRetainerships] = useState<DashboardRetainership[]>([]);
 
     const router = useRouter()
+    const searchParams = useSearchParams()
+
+    // Activate tab from URL query param (e.g. ?tab=my-trigger from View More link)
+    useEffect(() => {
+        const tab = searchParams?.get("tab")
+        if (tab) setActiveTab(tab)
+    }, [searchParams])
 
     // Get the current user's role from localStorage
     useEffect(() => {
@@ -372,7 +379,7 @@ export default function RetainershipTable() {
                     </TabsTrigger>
                     <TabsTrigger value="my-trigger" className="flex items-center gap-2">
                         <CheckCircle className="h-4 w-4" />
-                        My Task Trigger Retainer ({triggerTask.length})
+                        My Future Tasks ({triggerTask.length})
                     </TabsTrigger>
                     <TabsTrigger value="team-retainerships" className="flex items-center gap-2">
                         <CheckCircle className="h-4 w-4" />

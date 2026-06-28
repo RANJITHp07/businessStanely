@@ -98,7 +98,7 @@ export function SectionTable({
                       <TableHead className="text-white">Priority</TableHead>
                       <TableHead className="text-white">Due Date</TableHead>
                       <TableHead className="text-white">Last Completed</TableHead>
-                      <TableHead className="text-white">Progress</TableHead>
+                      <TableHead className="text-white">{trigger ? "Prev Progress" : "Progress"}</TableHead>
                       <TableHead className="text-right text-white">Actions</TableHead>
                     </TableRow>
                   </TableHeader>

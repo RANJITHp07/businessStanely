@@ -78,6 +78,7 @@ interface Task {
   statusCheckDuration?: string;
   completed: boolean;
   recurring?: number;
+  recurringType?: string;
   assignedTo?: {
     id: string;
     name: string;
@@ -1270,11 +1271,11 @@ export default function TaskDetails() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <Label className="text-sm font-medium text-muted-foreground">
-                        Recurring
+                        Recurring Periodicity
                       </Label>
                       <p className="font-medium">
-                        {task.recurring
-                          ? `Every ${task.recurring} ${task.recurring === 1 ? "month" : "months"}`
+                        {task.recurring && task.recurring > 0
+                          ? `Every ${task.recurring} ${task.recurringType ? task.recurringType.charAt(0).toUpperCase() + task.recurringType.slice(1).toLowerCase() + (task.recurring === 1 ? "" : "s") : task.recurring === 1 ? "month" : "months"}`
                           : "Not recurring"}
                       </p>
                     </div>
@@ -1665,8 +1666,8 @@ export default function TaskDetails() {
                           <div className="flex items-center gap-2">
                             <span className="font-medium text-sm">
                               {comment.authorType === "USER"
-                                ? comment.user?.username
-                                : comment.agent?.name}
+                                ? (comment.user?.username || "Unknown User")
+                                : (comment.agent?.name || "Former Agent")}
                             </span>
                             <Badge variant="outline" className="text-[10px] uppercase tracking-wide">
                               {getInteractionType(comment.content) === "CLIENT_UPDATE"

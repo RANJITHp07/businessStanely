@@ -22,7 +22,18 @@ export async function GET(req: Request, context: { params: { id: string } }) {
       return new Response("Legislation not found", { status: 404 });
     }
 
-    return new Response(JSON.stringify(legislation), {
+    const completedDates = (legislation.tasks || [])
+      .map((task) => task.lastCompletedDate)
+      .filter((date): date is Date => Boolean(date));
+
+    const lastCompletedDate =
+      completedDates.length > 0
+        ? new Date(Math.max(...completedDates.map((date) => date.getTime())))
+        : null;
+
+    const result = { ...legislation, lastCompletedDate };
+
+    return new Response(JSON.stringify(result), {
       headers: { "Content-Type": "application/json" },
     });
   } catch (error) {

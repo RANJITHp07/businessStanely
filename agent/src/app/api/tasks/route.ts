@@ -83,11 +83,10 @@ export async function GET(req: NextRequest) {
       where = {
         assignedToId,
         active: true,
-        legislationId: { not: null },
-        // OR: [
-        //   { retainershipId: { not: null } },
-        //   { legislationId: { not: null } },
-        // ],
+        OR: [
+          { retainershipId: { not: null } },
+          { legislationId: { not: null } },
+        ],
         // AND: [
         //   {
         //     OR: [

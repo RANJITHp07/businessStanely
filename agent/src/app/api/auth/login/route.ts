@@ -113,8 +113,21 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Check if the existing session has naturally expired (JWT is 8h)
+    const SESSION_DURATION_MS = 8 * 60 * 60 * 1000;
+    const openLoginHistory = agent.currentSessionToken
+      ? await prisma.loginHistory.findFirst({
+          where: { agentId: agent.id, logoutAt: null },
+          orderBy: { loginAt: "desc" },
+        })
+      : null;
+    const sessionNaturallyExpired = openLoginHistory
+      ? openLoginHistory.loginAt.getTime() + SESSION_DURATION_MS < Date.now()
+      : false;
+
     // Enforce single-session: block login if agent is already logged in elsewhere, unless force is true
-    if (agent.currentSessionToken && !force) {
+    // or the 8-hour JWT window has already passed (natural expiry)
+    if (agent.currentSessionToken && !force && !sessionNaturallyExpired) {
       return NextResponse.json(
         {
           error: "already_logged_in",
@@ -151,24 +164,22 @@ export async function POST(req: NextRequest) {
     loginRateLimiter.reset(identifier);
 
     // Handle login history: close any open sessions and create a new one
-    const openLoginHistory = await prisma.loginHistory.findFirst({
-      where: {
-        agentId: agent.id,
-      },
-      orderBy: {
-        loginAt: "desc",
-      },
+    // Re-fetch in case openLoginHistory was not queried above (no currentSessionToken)
+    const lastOpenSession = openLoginHistory ?? await prisma.loginHistory.findFirst({
+      where: { agentId: agent.id, logoutAt: null },
+      orderBy: { loginAt: "desc" },
     });
 
-    if (openLoginHistory && !openLoginHistory.logoutAt) {
-      // Close the abandoned session by recording logoutAt at the current time.
-      // This ensures logout time is visible in the timesheet.
+    if (lastOpenSession) {
+      // If the session naturally expired (8h), record logoutAt at the actual expiry time
+      const logoutAt = sessionNaturallyExpired
+        ? new Date(lastOpenSession.loginAt.getTime() + SESSION_DURATION_MS)
+        : new Date();
+      const logoutReason = sessionNaturallyExpired ? "session" : (force ? "force" : "session");
+
       await prisma.loginHistory.update({
-        where: { id: openLoginHistory.id },
-        data: {
-          logoutAt: new Date(),
-          logoutReason: force ? "force" : "session",
-        },
+        where: { id: lastOpenSession.id },
+        data: { logoutAt, logoutReason },
       });
     }
 

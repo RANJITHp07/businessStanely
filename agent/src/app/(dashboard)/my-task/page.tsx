@@ -557,13 +557,12 @@ export function SectionTable({ label, tasks, retainershipTasks, trigger }: { lab
       <div className="flex justify-end">
         <Link
           href={(() => {
-            const params = new URLSearchParams();
             if (trigger) {
-              params.set("trigger", "true");
-            } else {
-              params.set("status", sectionLabelToStatus(label));
-              if (retainershipTasks) params.set("retainershipTasks", "true");
+              return `/retainership?tab=my-trigger`;
             }
+            const params = new URLSearchParams();
+            params.set("status", sectionLabelToStatus(label));
+            if (retainershipTasks) params.set("retainershipTasks", "true");
             return `/task?${params.toString()}`;
           })()}
           className="bg-[#003459] cursor-pointer text-white text-[14px] py-[10px] mt-[10px] px-[10px] rounded-[5px] inline-block"

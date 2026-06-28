@@ -1833,8 +1833,8 @@ export default function TaskDetails() {
                           <div className="flex items-center gap-2">
                             <span className="font-medium text-sm">
                               {comment.authorType === "USER"
-                                ? comment.user?.username
-                                : comment.agent?.name}
+                                ? (comment.user?.username || "Unknown User")
+                                : (comment.agent?.name || "Former Agent")}
                             </span>
                             <Badge variant="outline" className="text-[10px] uppercase tracking-wide">
                               {getInteractionType(comment.content) === "CLIENT_UPDATE"

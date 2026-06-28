@@ -138,6 +138,11 @@ export async function PUT(
       select: { id: true },
     });
 
+    const legislations = await prisma.legislation.findMany({
+      where: { assignedAgentId: agentId },
+      select: { id: true },
+    });
+
     const subordinateLinks = await prisma.agentSuperior.findMany({
       where: { superiorId: agentId },
     });
@@ -188,6 +193,12 @@ export async function PUT(
       await tx.diaryEntry.updateMany({
         where: { createdByAgentId: agentId },
         data: { createdByAgentId: transferAgentId },
+      });
+
+      // Transfer legislation ownership to execution agent
+      await tx.legislation.updateMany({
+        where: { assignedAgentId: agentId },
+        data: { assignedAgentId: transferAgentId },
       });
 
       // Reassign subordinates to execution agent, avoiding duplicates
@@ -261,6 +272,7 @@ export async function PUT(
       createdQuoteRequestsTransferredCount: createdQuoteRequests.length,
       quoteStatusBreakdown,
       diaryEntriesTransferredCount: diaryEntries.length,
+      legislationsTransferredCount: legislations.length,
     };
 
     await prisma.serviceRecord.create({

@@ -1,10 +1,12 @@
-import React from 'react'
+import React, { Suspense } from 'react'
 import TasksTable from './_components/taskTable'
 
 function Task() {
     return (
         <div>
-            <TasksTable />
+            <Suspense>
+                <TasksTable />
+            </Suspense>
         </div>
     )
 }

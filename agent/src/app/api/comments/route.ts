@@ -57,10 +57,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Verify the task exists and agent has access to it (creator, assigned, or superior of assigned)
+    // Verify the task exists and agent has access to it (creator, assigned, ownership, or superior of assigned/ownership)
     const task = await prisma.task.findUnique({
       where: { id: taskId },
-      select: { createdById: true, assignedToId: true, status: true },
+      select: { createdById: true, assignedToId: true, ownerShipId: true, status: true },
     });
 
     if (task && task.status === "To Do") {
@@ -71,17 +71,24 @@ export async function POST(req: NextRequest) {
     }
 
     let isAuthorized = false;
-    if (task?.createdById === agent.id || task?.assignedToId === agent.id) {
+    if (
+      task?.createdById === agent.id ||
+      task?.assignedToId === agent.id ||
+      task?.ownerShipId === agent.id
+    ) {
       isAuthorized = true;
-    } else if (task?.assignedToId) {
-      // Check if agent is a superior of the assigned agent
-      const superiorLink = await prisma.agentSuperior.findFirst({
-        where: {
-          superiorId: agent.id,
-          subordinateId: task.assignedToId,
-        },
-      });
-      if (superiorLink) isAuthorized = true;
+    } else {
+      // Check if agent is a superior of the assigned agent or ownership agent
+      const subordinateIds = [task?.assignedToId, task?.ownerShipId].filter(Boolean) as string[];
+      if (subordinateIds.length > 0) {
+        const superiorLink = await prisma.agentSuperior.findFirst({
+          where: {
+            superiorId: agent.id,
+            subordinateId: { in: subordinateIds },
+          },
+        });
+        if (superiorLink) isAuthorized = true;
+      }
     }
     if (!task || !isAuthorized) {
       return NextResponse.json(
@@ -181,11 +188,33 @@ export async function GET(req: NextRequest) {
     const task = await prisma.task.findFirst({
       where: {
         id: taskId,
-        OR: [{ createdById: agent.id }, { assignedToId: agent.id }],
+        OR: [
+          { createdById: agent.id },
+          { assignedToId: agent.id },
+          { ownerShipId: agent.id },
+        ],
       },
     });
 
-    if (!task) {
+    // Also allow if agent is a superior of assigned/ownership agent
+    let hasAccess = !!task;
+    if (!hasAccess) {
+      const rawTask = await prisma.task.findUnique({
+        where: { id: taskId },
+        select: { assignedToId: true, ownerShipId: true },
+      });
+      if (rawTask) {
+        const subordinateIds = [rawTask.assignedToId, rawTask.ownerShipId].filter(Boolean) as string[];
+        if (subordinateIds.length > 0) {
+          const superiorLink = await prisma.agentSuperior.findFirst({
+            where: { superiorId: agent.id, subordinateId: { in: subordinateIds } },
+          });
+          if (superiorLink) hasAccess = true;
+        }
+      }
+    }
+
+    if (!hasAccess) {
       return NextResponse.json(
         { error: "Task not found or access denied" },
         { status: 404 },

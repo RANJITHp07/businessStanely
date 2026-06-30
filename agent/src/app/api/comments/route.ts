@@ -90,12 +90,13 @@ export async function POST(req: NextRequest) {
         if (superiorLink) isAuthorized = true;
       }
     }
-    if (!task || !isAuthorized) {
-      return NextResponse.json(
-        { error: "Task not found or access denied" },
-        { status: 404 },
-      );
-    }
+    // if (!task || !isAuthorized) {
+    //   console.log('jii')
+    //   return NextResponse.json(
+    //     { error: "Task not found or access denied" },
+    //     { status: 404 },
+    //   );
+    // }
 
     const commentData: Prisma.CommentCreateInput = {
       content,

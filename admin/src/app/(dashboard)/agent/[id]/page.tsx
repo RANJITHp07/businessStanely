@@ -1663,14 +1663,7 @@ export default function AgentDetails() {
                                     className="cursor-pointer hover:bg-muted/50"
                                     onClick={() => legislation.id && router.push(`/legislation/${legislation.id}`)}
                                   >
-                                    <TableCell
-                                      onClick={(event) => {
-                                        if (!client?.id) return;
-                                        event.stopPropagation();
-                                        router.push(`/legislation/${client.id}`);
-                                      }}
-                                      className={client?.id ? "cursor-pointer" : undefined}
-                                    >
+                                    <TableCell>
                                       <div className="flex items-center gap-3">
                                         <Avatar className="h-8 w-8 flex-shrink-0">
                                           <AvatarFallback className="text-xs">{getClientInitials(client)}</AvatarFallback>

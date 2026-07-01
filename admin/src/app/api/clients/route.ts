@@ -60,44 +60,58 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const assignedToId = searchParams.get("assignedToId");
 
+    let clientIds: string[] | undefined;
+    if (assignedToId) {
+      // The Client -> Retainership relation filter is unreliable on
+      // MongoDB, so derive client ids from legislations assigned to the
+      // agent instead, which filters correctly on assignedAgentId.
+      const legislations = await prisma.legislation.findMany({
+        where: { assignedAgentId: assignedToId },
+        select: { retainership: { select: { clientId: true } } },
+      });
+      clientIds = Array.from(
+        new Set(
+          legislations
+            .map((l) => l.retainership?.clientId)
+            .filter((id): id is string => Boolean(id)),
+        ),
+      );
+    }
+
     const clients = await prisma.client.findMany({
-      where: assignedToId
-        ? {
-            retainerships: {
-              some: {
-                legislation: {
-                  some: {
-                    assignedAgentId: assignedToId,
-                  },
-                },
-              },
-            },
-          }
-        : undefined,
+      where: clientIds ? { id: { in: clientIds } } : undefined,
       orderBy: {
         createdAt: "desc",
       },
-      include: {
-        tasks: {
-          select: {
-            status: true,
-          },
-        },
-        retainerships: true,
-      },
     });
+
+    // The Client -> Task/Retainership relation includes are unreliable on
+    // MongoDB, so look up tasks and retainerships directly by clientId.
+    const [tasksByClient, retainershipCountsByClient] = await Promise.all([
+      prisma.task.findMany({
+        where: { clientId: { in: clients.map((c) => c.id) } },
+        select: { clientId: true, status: true },
+      }),
+      prisma.retainership.groupBy({
+        by: ["clientId"],
+        where: { clientId: { in: clients.map((c) => c.id) } },
+        _count: { _all: true },
+      }),
+    ]);
+
+    const retainershipCountByClientId = new Map(
+      retainershipCountsByClient.map((r) => [r.clientId, r._count._all]),
+    );
 
     // Add a `name` field prioritizing `organizationName` for organizations
     const clientsWithStatusCounts = clients.map((client) => {
       // Count tasks by status
       const statusCounts: Record<string, number> = {};
-      for (const task of client.tasks) {
+      for (const task of tasksByClient) {
+        if (task.clientId !== client.id) continue;
         statusCounts[task.status] = (statusCounts[task.status] || 0) + 1;
       }
-      // Count retainerships
-      const retainershipCount = client.retainerships
-        ? client.retainerships.length
-        : 0;
+      const retainershipCount = retainershipCountByClientId.get(client.id) || 0;
       return {
         ...client,
         name:

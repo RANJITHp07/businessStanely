@@ -471,8 +471,8 @@ export default function RetainershipTable() {
                                                                                     .slice(0, 2)}
                                                                         </AvatarFallback>
                                                                     </Avatar>
-                                                                    <div className="min-w-0">
-                                                                        <div className="font-medium text-sm w-60 truncate">
+                                                                    <div className="min-w-0 flex-1">
+                                                                        <div className="font-medium text-sm truncate">
                                                                             {getClientDisplayName(legislation.retainership?.client)
                                                                                 ? getClientDisplayName(legislation.retainership?.client)!.length > 35
                                                                                     ? getClientDisplayName(legislation.retainership?.client)!.slice(0, 35) + '...'

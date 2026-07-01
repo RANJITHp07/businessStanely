@@ -52,24 +52,35 @@ export async function GET(req: NextRequest) {
     const agent = await getCurrentAgent(req);
     const { searchParams } = new URL(req.url);
     const assignedAgentId = searchParams.get("assignedToId");
-    const clients = await prisma.client.findMany({
-      where: assignedAgentId
-        ? {
-            retainerships: {
-              some: {
-                legislation: {
-                  some: {
-                    assignedAgentId: agent?.id,
-                  },
-                },
-              },
-            },
-          }
-        : undefined,
-      orderBy: {
-        createdAt: "desc",
-      },
-    });
+
+    let clients;
+    if (assignedAgentId) {
+      // The Client -> Retainership relation filter is unreliable on
+      // MongoDB, so derive clients from legislations assigned to the
+      // agent instead, which filters correctly on assignedAgentId.
+      const legislations = await prisma.legislation.findMany({
+        where: { assignedAgentId: agent?.id },
+        select: {
+          retainership: {
+            select: { client: true },
+          },
+        },
+      });
+
+      const clientsById = new Map(
+        legislations
+          .map((l) => l.retainership?.client)
+          .filter((client): client is NonNullable<typeof client> => Boolean(client))
+          .map((client) => [client.id, client]),
+      );
+      clients = Array.from(clientsById.values()).sort(
+        (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
+      );
+    } else {
+      clients = await prisma.client.findMany({
+        orderBy: { createdAt: "desc" },
+      });
+    }
 
     // Add computed `name` field
     const clientsWithName = clients.map((client) => ({

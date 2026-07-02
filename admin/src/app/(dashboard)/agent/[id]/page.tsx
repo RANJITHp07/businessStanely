@@ -1138,7 +1138,7 @@ export default function AgentDetails() {
             </TabsTrigger>
             <TabsTrigger value="service-records" className="flex items-center gap-2 whitespace-nowrap">
               <FileText className="h-4 w-4 hidden md:block" />
-              <p className="text-[10px] md:text-[12px]">Service Records</p>
+              <p className="text-[10px] md:text-[12px]">Instructions and Service Records</p>
             </TabsTrigger>
           </TabsList>
         </div>
@@ -2223,7 +2223,7 @@ export default function AgentDetails() {
         < TabsContent value="service-records" className="space-y-6" >
           <Card>
             <CardHeader>
-              <CardTitle>Service Records</CardTitle>
+              <CardTitle>Instructions and Service Records</CardTitle>
               <CardDescription>
                 Administrative notes and remarks for {agent.name}
               </CardDescription>
@@ -2260,12 +2260,12 @@ export default function AgentDetails() {
               {/* Service Records List */}
               {serviceRecordsLoading ? (
                 <div className="text-center py-8">
-                  <p className="text-muted-foreground">Loading service records...</p>
+                  <p className="text-muted-foreground">Loading instructions and service records...</p>
                 </div>
               ) : serviceRecords.length === 0 ? (
                 <div className="text-center py-8">
                   <p className="text-muted-foreground">
-                    No service records found for this agent.
+                    No instructions and service records found for this agent.
                   </p>
                 </div>
               ) : (

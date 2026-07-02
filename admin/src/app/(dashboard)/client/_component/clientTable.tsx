@@ -769,6 +769,12 @@ export default function ClientsTable() {
                                                                     Edit Client
                                                                 </Link>
                                                             </DropdownMenuItem>
+                                                            <DropdownMenuItem asChild>
+                                                                <Link href={`/client/${client.id}/tasks`}>
+                                                                    <Eye className="mr-2 h-4 w-4" />
+                                                                    View Tasks
+                                                                </Link>
+                                                            </DropdownMenuItem>
                                                             <DropdownMenuSeparator />
                                                             <DropdownMenuItem
                                                                 className="text-destructive"
@@ -872,6 +878,12 @@ export default function ClientsTable() {
                                                                 <Link href={`/client/${client.id}/edit`}>
                                                                     <Edit className="mr-2 h-3 w-3" />
                                                                     <span className="text-xs">Edit Client</span>
+                                                                </Link>
+                                                            </DropdownMenuItem>
+                                                            <DropdownMenuItem asChild>
+                                                                <Link href={`/client/${client.id}/tasks`}>
+                                                                    <Eye className="mr-2 h-3 w-3" />
+                                                                    <span className="text-xs">View Tasks</span>
                                                                 </Link>
                                                             </DropdownMenuItem>
                                                             <DropdownMenuSeparator />

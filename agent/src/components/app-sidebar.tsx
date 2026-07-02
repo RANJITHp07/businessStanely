@@ -136,7 +136,7 @@ const dashboardItems: MenuItem[] = [
 
 const commonItems: MenuItem[] = [
   {
-    title: "Service Records",
+    title: "Instructions and Service Records",
     url: "/service-records",
     icon: FileText,
   },
@@ -233,7 +233,7 @@ export function AppSidebar() {
       if (agentType === "Client Advisor") {
         const clientAdvisorCommonItems = commonItemsWithWhatsApp.filter(
           (item) =>
-            item.title === "Service Records" ||
+            item.title === "Instructions and Service Records" ||
             item.title === "Settings" ||
             item.title === "WhatsApp",
         );

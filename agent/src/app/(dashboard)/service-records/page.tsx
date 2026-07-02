@@ -112,9 +112,9 @@ export default function ServiceRecords() {
       <div className="flex items-center gap-3 mb-6">
         <FileText className="h-8 w-8 text-blue-600" />
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">My Service Records</h1>
+          <h1 className="text-3xl font-bold text-gray-900">My Instructions and Service Records</h1>
           <p className="text-gray-600">
-            View all service records and notes from administrators
+            View all instructions and service records and notes from administrators
           </p>
         </div>
       </div>
@@ -161,10 +161,10 @@ export default function ServiceRecords() {
           <CardContent className="flex flex-col items-center justify-center py-12">
             <FileText className="h-16 w-16 text-gray-300 mb-4" />
             <h3 className="text-xl font-semibold text-gray-600 mb-2">
-              No Service Records Found
+              No Instructions and Service Records Found
             </h3>
             <p className="text-gray-500 text-center max-w-md">
-              You don&apos;t have any service records yet. Service records will appear here when administrators add notes about your services.
+              You don&apos;t have any instructions and service records yet. Instructions and service records will appear here when administrators add notes about your services.
             </p>
           </CardContent>
         </Card>
@@ -172,7 +172,7 @@ export default function ServiceRecords() {
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-semibold">
-              Service Records ({serviceRecords.length})
+              Instructions and Service Records ({serviceRecords.length})
             </h2>
           </div>
           
@@ -181,7 +181,7 @@ export default function ServiceRecords() {
               <CardHeader>
                 <div className="flex items-start justify-between">
                   <CardTitle className="text-lg">
-                    Service Record
+                    Instructions and Service Record
                   </CardTitle>
                   <Badge variant="outline" className="flex items-center gap-1">
                     <Calendar className="h-3 w-3" />

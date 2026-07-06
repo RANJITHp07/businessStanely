@@ -61,6 +61,9 @@ export async function GET(
           },
         },
         subordinatesLinks: {
+          where: {
+            subordinate: { status: "active" },
+          },
           select: {
             teamType: true,
             subordinate: {
@@ -77,6 +80,7 @@ export async function GET(
                 jurisdiction: true,
                 specializations: true,
                 photo: true,
+                status: true,
               },
             },
           },

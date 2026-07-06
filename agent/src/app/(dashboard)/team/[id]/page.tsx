@@ -125,6 +125,7 @@ function mergeTeamMembers(agentData: Agent) {
 
   return combinedMembers.filter(
     (member, index, members) =>
+      member.status?.trim().toLowerCase() !== "inactive" &&
       members.findIndex((candidate) => candidate.id === member.id) === index,
   );
 }

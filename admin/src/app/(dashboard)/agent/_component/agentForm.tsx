@@ -187,8 +187,6 @@ export default function AgentForm({ agent }: AgentFormProps) {
     agent?.photo || null
   );
   const [allAgents, setAllAgents] = useState<Agent[]>([]);
-  const [allExecutionSubordinateIds, setAllExecutionSubordinateIds] = useState<string[]>([]);
-  const [allAdvisorSubordinateIds, setAllAdvisorSubordinateIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   type AgentFormData = {
     name: string;
@@ -232,7 +230,7 @@ export default function AgentForm({ agent }: AgentFormProps) {
   const router = useRouter();
 
 
-  // Fetch all agents from API and collect all subordinate IDs
+  // Fetch all agents from API
   const fetchAgents = async () => {
     setLoading(true);
     try {
@@ -240,22 +238,6 @@ export default function AgentForm({ agent }: AgentFormProps) {
       if (response.ok) {
         const agents = await response.json();
         setAllAgents(agents);
-        // Collect subordinate IDs by team type. A dual-role person may be on
-        // both an execution team and an advisor team.
-        const executionSubordinateIds: string[] = [];
-        const advisorSubordinateIds: string[] = [];
-        agents.forEach((a: Agent) => {
-          if (!agent || a.id !== agent.id) {
-            if (Array.isArray(a.subordinates)) {
-              executionSubordinateIds.push(...a.subordinates.map((s: Agent) => s.id));
-            }
-            if (Array.isArray(a.advisorSubordinates)) {
-              advisorSubordinateIds.push(...a.advisorSubordinates.map((s: Agent) => s.id));
-            }
-          }
-        });
-        setAllExecutionSubordinateIds(executionSubordinateIds);
-        setAllAdvisorSubordinateIds(advisorSubordinateIds);
       }
     } catch (error) {
       console.error("Error fetching agents:", error);
@@ -343,17 +325,7 @@ export default function AgentForm({ agent }: AgentFormProps) {
     return allAgents.filter((existingAgent) => {
       if (agent && existingAgent.id === agent.id) return false;
       if (!allowedTypes.includes(existingAgent.agentType)) return false;
-      if (
-        allExecutionSubordinateIds.includes(existingAgent.id) &&
-        !selectedSubordinates.includes(existingAgent.id)
-      ) {
-        return false;
-      }
-      if (
-        selectedSubordinates.includes(existingAgent.id)
-      ) {
-        return false;
-      }
+      if (selectedSubordinates.includes(existingAgent.id)) return false;
       return true;
     });
   };
@@ -372,12 +344,6 @@ export default function AgentForm({ agent }: AgentFormProps) {
     if (agent && existingAgent.id === agent.id) return false;
     const advisorType = existingAgent.advisorAgentType || existingAgent.agentType;
     if (advisorType !== "Client Advisor") return false;
-    if (
-      allAdvisorSubordinateIds.includes(existingAgent.id) &&
-      !selectedAdvisorSubordinates.includes(existingAgent.id)
-    ) {
-      return false;
-    }
     return (
       existingAgent.name.toLowerCase().includes(advisorAgentSearch.toLowerCase()) ||
       existingAgent.email.toLowerCase().includes(advisorAgentSearch.toLowerCase())

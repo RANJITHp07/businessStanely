@@ -14,6 +14,7 @@ export async function GET(req: NextRequest) {
     // Accept agentId as query param, fallback to current agent
     const { searchParams } = new URL(req.url);
     const agentId = searchParams.get("agentId") || agent.id;
+    const directOnly = searchParams.get("depth") === "direct";
 
     const teamFilter =
       teamType === "advisor"
@@ -25,8 +26,11 @@ export async function GET(req: NextRequest) {
     const visited = new Set<string>([agentId]);
     const teamMembers = [];
     let frontier = [agentId];
+    let isFirstLevel = true;
 
     while (frontier.length > 0) {
+      if (directOnly && !isFirstLevel) break;
+      isFirstLevel = false;
       const links = await prisma.agentSuperior.findMany({
         where: {
           superiorId: { in: frontier },

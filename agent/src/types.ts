@@ -80,6 +80,7 @@ export interface Agent {
   superior: Agent | null;
   subordinates: Agent[];
   advisorSubordinates?: Agent[];
+  status?: string;
 }
 
 export interface Client {

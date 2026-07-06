@@ -1089,8 +1089,8 @@ export default function AgentDetails() {
         }}
         className="space-y-6"
       >
-        <div className="w-full overflow-x-auto">
-          <TabsList className="grid h-auto min-w-max w-full" style={{ gridTemplateColumns: `repeat(${tabCount}, minmax(110px, 1fr))` }}>
+        <div className="w-full">
+          <TabsList className="grid h-auto w-full gap-1" style={{ gridTemplateColumns: `repeat(${tabCount}, minmax(0, 1fr))` }}>
             {showExecutionTabs && (
               <TabsTrigger value="dashboard" className="flex items-center gap-2 whitespace-nowrap">
                 <LayoutDashboard className="h-4 w-4 hidden md:block" />
@@ -1136,9 +1136,9 @@ export default function AgentDetails() {
               <Clock className="h-4 w-4 hidden md:block" />
               <p className="text-[10px] md:text-[12px]">Activities</p>
             </TabsTrigger>
-            <TabsTrigger value="service-records" className="flex items-center gap-2 whitespace-nowrap">
-              <FileText className="h-4 w-4 hidden md:block" />
-              <p className="text-[10px] md:text-[12px]">Instructions and Service Records</p>
+            <TabsTrigger value="service-records" className="flex h-auto items-center gap-2 whitespace-normal px-1 py-1.5">
+              <FileText className="h-4 w-4 hidden md:block shrink-0" />
+              <p className="text-[10px] md:text-[12px] text-center leading-tight">Instructions and Service Records</p>
             </TabsTrigger>
           </TabsList>
         </div>

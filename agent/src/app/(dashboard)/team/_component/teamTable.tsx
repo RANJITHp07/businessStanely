@@ -83,7 +83,7 @@ export default function TeamsTable() {
   useEffect(() => {
     const fetchTeams = async () => {
       try {
-        const response = await fetchWithAuth("/api/team-members");
+        const response = await fetchWithAuth("/api/team-members?depth=direct");
         if (response.ok) {
           const data = await response.json();
           setTeams(data);

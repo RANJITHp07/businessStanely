@@ -1544,6 +1544,17 @@ export default function TaskDetails() {
                       </div>
                     </div>
                   </div>
+                  {taskData.holdDate && (
+                    <div className="flex items-center gap-2">
+                      <Calendar className="h-4 w-4 text-muted-foreground" />
+                      <div>
+                        <div className="text-sm font-medium">Hold Date</div>
+                        <div className="text-sm text-muted-foreground">
+                          {formatDateTime(taskData.holdDate, true)}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                   <div className="flex items-center gap-2">
                     <Calendar className="h-4 w-4 text-muted-foreground" />
                     <div>

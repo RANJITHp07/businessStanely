@@ -151,6 +151,7 @@ export interface Task {
   lastCompletedDate?: string;
   nextDueDate?: string;
   currentPeriodStart?: string;
+  holdDate?: string;
 }
 
 export interface Comment {

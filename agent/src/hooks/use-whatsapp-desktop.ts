@@ -627,7 +627,11 @@ export function useWhatsAppDesktop() {
     });
   }, [selectedChatId, state.status]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const sendMessage = async (body: string, file?: File | null) => {
+  const sendMessage = async (
+    body: string,
+    file?: File | null,
+    replyToMessage?: WhatsAppMessage | null,
+  ) => {
     const activeChatId = selectedChatIdRef.current ?? selectedChatId;
 
     if (!activeChatId) {
@@ -677,6 +681,9 @@ export function useWhatsAppDesktop() {
         mediaType: null,
         mimetype: null,
         filename: null,
+        quotedMessageId: replyToMessage?.id ?? null,
+        quotedMessageBody: replyToMessage?.body ?? null,
+        quotedMessageAuthor: replyToMessage?.author ?? null,
       };
       setMessages((current) => [...current, optimisticMessage]);
     }
@@ -700,6 +707,7 @@ export function useWhatsAppDesktop() {
                 mimetype: file.type || "application/octet-stream",
                 filename: file.name || "attachment",
               },
+              quotedMessageId: replyToMessage?.id,
             }),
           },
         );
@@ -708,7 +716,11 @@ export function useWhatsAppDesktop() {
           "/api/whatsapp/send",
           {
             method: "POST",
-            body: JSON.stringify({ chatId, body: content }),
+            body: JSON.stringify({
+              chatId,
+              body: content,
+              quotedMessageId: replyToMessage?.id,
+            }),
           },
         );
       }

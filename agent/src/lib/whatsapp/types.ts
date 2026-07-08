@@ -45,6 +45,9 @@ export type WhatsAppMessage = {
   mediaType: string | null;
   mimetype: string | null;
   filename: string | null;
+  quotedMessageId: string | null;
+  quotedMessageBody: string | null;
+  quotedMessageAuthor: string | null;
 };
 
 export type WhatsAppEventPayload = {

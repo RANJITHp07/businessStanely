@@ -9,6 +9,7 @@ import {
     ArrowLeft,
     Check,
     CheckCheck,
+    Download,
     FileText,
     LoaderCircle,
     LogOut,
@@ -18,6 +19,7 @@ import {
     Pencil,
     Phone,
     Play,
+    Reply,
     Search,
     SendHorizonal,
     Sun,
@@ -150,14 +152,24 @@ function MessageMedia({ message }: { message: WhatsAppMessage }) {
     if (message.mediaType === "image" || message.mediaType === "sticker") {
         return (
             <div>
-                <a href={src} target="_blank" rel="noopener noreferrer" title="Open in new tab">
-                    <img
-                        src={src}
-                        alt={message.body || "Image"}
-                        className="max-h-64 max-w-full cursor-pointer rounded-lg object-cover transition hover:opacity-90"
-                        loading="lazy"
-                    />
-                </a>
+                <div className="group/media relative">
+                    <a href={src} target="_blank" rel="noopener noreferrer" title="Open in new tab">
+                        <img
+                            src={src}
+                            alt={message.body || "Image"}
+                            className="max-h-64 max-w-full cursor-pointer rounded-lg object-cover transition hover:opacity-90"
+                            loading="lazy"
+                        />
+                    </a>
+                    <a
+                        href={src}
+                        download={message.filename || "image"}
+                        title="Download image"
+                        className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-black/55 text-white opacity-0 transition group-hover/media:opacity-100 hover:bg-black/75"
+                    >
+                        <Download className="h-4 w-4" />
+                    </a>
+                </div>
                 {message.body ? (
                     <p className="mt-1 wrap-break-word whitespace-pre-wrap text-[14px] leading-6">{message.body}</p>
                 ) : null}
@@ -168,25 +180,35 @@ function MessageMedia({ message }: { message: WhatsAppMessage }) {
     if (message.mediaType === "video") {
         return (
             <div>
-                <a
-                    href={src}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    title="Open in new tab"
-                    className="relative block w-fit cursor-pointer"
-                >
-                    <video
-                        src={src}
-                        className="pointer-events-none max-h-64 max-w-full rounded-lg"
-                        preload="metadata"
-                        muted
-                    />
-                    <span className="absolute inset-0 flex items-center justify-center">
-                        <span className="flex h-12 w-12 items-center justify-center rounded-full bg-black/55 text-white">
-                            <Play className="h-6 w-6" />
+                <div className="group/media relative w-fit">
+                    <a
+                        href={src}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title="Open in new tab"
+                        className="relative block cursor-pointer"
+                    >
+                        <video
+                            src={src}
+                            className="pointer-events-none max-h-64 max-w-full rounded-lg"
+                            preload="metadata"
+                            muted
+                        />
+                        <span className="absolute inset-0 flex items-center justify-center">
+                            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-black/55 text-white">
+                                <Play className="h-6 w-6" />
+                            </span>
                         </span>
-                    </span>
-                </a>
+                    </a>
+                    <a
+                        href={src}
+                        download={message.filename || "video"}
+                        title="Download video"
+                        className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-black/55 text-white opacity-0 transition group-hover/media:opacity-100 hover:bg-black/75"
+                    >
+                        <Download className="h-4 w-4" />
+                    </a>
+                </div>
                 {message.body ? (
                     <p className="mt-1 wrap-break-word whitespace-pre-wrap text-[14px] leading-6">{message.body}</p>
                 ) : null}
@@ -199,7 +221,7 @@ function MessageMedia({ message }: { message: WhatsAppMessage }) {
             <audio
                 src={src}
                 controls
-                className="w-full min-w-55"
+                className="h-12 w-full min-w-70 sm:min-w-90"
                 preload="metadata"
             />
         );
@@ -241,14 +263,26 @@ function MessageMedia({ message }: { message: WhatsAppMessage }) {
 const MessageComposer = memo(function MessageComposer({
     isSending,
     onSend,
+    replyTarget,
+    onCancelReply,
 }: {
     isSending: boolean;
-    onSend: (content: string, file?: File | null) => Promise<void>;
+    onSend: (content: string, file?: File | null, replyToMessage?: WhatsAppMessage | null) => Promise<void>;
+    replyTarget?: WhatsAppMessage | null;
+    onCancelReply?: () => void;
 }) {
     const [draft, setDraft] = useState("");
     const [attachment, setAttachment] = useState<File | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const formRef = useRef<HTMLFormElement>(null);
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+    useEffect(() => {
+        const textarea = textareaRef.current;
+        if (!textarea) return;
+        textarea.style.height = "auto";
+        textarea.style.height = `${Math.min(textarea.scrollHeight, 320)}px`;
+    }, [draft]);
 
     const openFilePicker = () => {
         fileInputRef.current?.click();
@@ -264,6 +298,7 @@ const MessageComposer = memo(function MessageComposer({
 
         const content = draft.trim();
         const pendingFile = attachment;
+        const pendingReply = replyTarget;
 
         if (!content && !pendingFile) {
             return;
@@ -274,8 +309,9 @@ const MessageComposer = memo(function MessageComposer({
         if (fileInputRef.current) {
             fileInputRef.current.value = "";
         }
+        onCancelReply?.();
 
-        onSend(content, pendingFile).catch((error) => {
+        onSend(content, pendingFile, pendingReply).catch((error) => {
             setDraft(content);
             setAttachment(pendingFile || null);
             toast.error(error instanceof Error ? error.message : "Failed to send message.");
@@ -300,6 +336,23 @@ const MessageComposer = memo(function MessageComposer({
                 <Paperclip className="h-5 w-5" />
             </button>
             <div className="flex-1 rounded-lg bg-[var(--wa-input)] px-4 py-3">
+                {replyTarget ? (
+                    <div className="mb-2 flex items-start justify-between gap-2 rounded-md border-l-4 border-[#00a884] bg-black/20 px-2 py-1.5 text-xs text-[#d1d7db]">
+                        <div className="min-w-0">
+                            <p className="font-medium text-[#00a884]">
+                                {replyTarget.fromMe ? "You" : replyTarget.author || "Contact"}
+                            </p>
+                            <p className="truncate">{replyTarget.body || "Media"}</p>
+                        </div>
+                        <button
+                            type="button"
+                            onClick={() => onCancelReply?.()}
+                            className="shrink-0 text-[var(--wa-muted2)] hover:text-white"
+                        >
+                            Cancel
+                        </button>
+                    </div>
+                ) : null}
                 {attachment ? (
                     <div className="mb-2 flex items-center justify-between rounded-md bg-black/20 px-2 py-1 text-xs text-[#d1d7db]">
                         <span className="truncate pr-2">{attachment.name}</span>
@@ -318,6 +371,7 @@ const MessageComposer = memo(function MessageComposer({
                     </div>
                 ) : null}
                 <textarea
+                    ref={textareaRef}
                     value={draft}
                     onChange={(event) => setDraft(event.target.value)}
                     onKeyDown={(event) => {
@@ -332,7 +386,7 @@ const MessageComposer = memo(function MessageComposer({
                     }}
                     placeholder={attachment ? "Add a caption (optional)" : "Type a message"}
                     rows={1}
-                    className="max-h-32 min-h-6 w-full resize-none bg-transparent text-sm text-black outline-none placeholder:text-[var(--wa-muted)]"
+                    className="max-h-80 min-h-6 w-full resize-none overflow-y-auto bg-transparent text-sm text-[var(--wa-text)] outline-none placeholder:text-[var(--wa-muted)]"
                 />
             </div>
             <button
@@ -378,6 +432,7 @@ function WhatsAppDesktop() {
     const [messageToDelete, setMessageToDelete] = useState<WhatsAppMessage | null>(null);
     const [isSavingEdit, setIsSavingEdit] = useState(false);
     const [isDeletingMessage, setIsDeletingMessage] = useState(false);
+    const [replyTarget, setReplyTarget] = useState<WhatsAppMessage | null>(null);
     const messagesContainerRef = useRef<HTMLDivElement>(null);
     const suppressNextScrollRef = useRef(false);
     const [myProfilePicUrl, setMyProfilePicUrl] = useState<string | null>(null);
@@ -388,6 +443,10 @@ function WhatsAppDesktop() {
     useEffect(() => {
         setTheme(readStoredTheme());
     }, []);
+
+    useEffect(() => {
+        setReplyTarget(null);
+    }, [selectedChatId]);
 
     const toggleTheme = () => {
         setTheme((current) => {
@@ -852,33 +911,52 @@ function WhatsAppDesktop() {
                                                                 <p className="mb-1 text-xs font-medium text-[#667781]">{message.author}</p>
                                                             ) : null}
 
+                                                            {message.quotedMessageId ? (
+                                                                <div className="mb-1 rounded-md border-l-4 border-[#00a884] bg-black/5 px-2 py-1 text-xs text-[#54656f]">
+                                                                    <p className="font-medium text-[#00a884]">
+                                                                        {message.quotedMessageAuthor || "Message"}
+                                                                    </p>
+                                                                    <p className="truncate">{message.quotedMessageBody || "Media"}</p>
+                                                                </div>
+                                                            ) : null}
+
                                                             {message.hasMedia ? (
                                                                 <MessageMedia message={message} />
                                                             ) : (
                                                                 <p className="wrap-break-word whitespace-pre-wrap text-[14px] leading-6">{message.body || "Unsupported message"}</p>
                                                             )}
 
-                                                            {message.fromMe ? (
-                                                                <div className="mt-1 flex justify-end gap-1 opacity-0 transition group-hover:opacity-100">
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => startEdit(message)}
-                                                                        disabled={!canEditMessage(message)}
-                                                                        className="rounded p-1 text-[#54656f] hover:bg-black/10 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
-                                                                        title="Edit message"
-                                                                    >
-                                                                        <Pencil className="h-3.5 w-3.5" />
-                                                                    </button>
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => setMessageToDelete(message)}
-                                                                        className="rounded p-1 text-[#54656f] hover:bg-black/10"
-                                                                        title="Delete message"
-                                                                    >
-                                                                        <Trash2 className="h-3.5 w-3.5" />
-                                                                    </button>
-                                                                </div>
-                                                            ) : null}
+                                                            <div className={`mt-1 flex gap-1 opacity-0 transition group-hover:opacity-100 ${message.fromMe ? "justify-end" : "justify-start"}`}>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => setReplyTarget(message)}
+                                                                    className="rounded p-1 text-[#54656f] hover:bg-black/10"
+                                                                    title="Reply"
+                                                                >
+                                                                    <Reply className="h-3.5 w-3.5" />
+                                                                </button>
+                                                                {message.fromMe ? (
+                                                                    <>
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => startEdit(message)}
+                                                                            disabled={!canEditMessage(message)}
+                                                                            className="rounded p-1 text-[#54656f] hover:bg-black/10 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+                                                                            title="Edit message"
+                                                                        >
+                                                                            <Pencil className="h-3.5 w-3.5" />
+                                                                        </button>
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => setMessageToDelete(message)}
+                                                                            className="rounded p-1 text-[#54656f] hover:bg-black/10"
+                                                                            title="Delete message"
+                                                                        >
+                                                                            <Trash2 className="h-3.5 w-3.5" />
+                                                                        </button>
+                                                                    </>
+                                                                ) : null}
+                                                            </div>
 
                                                             <div className="mt-1 flex items-center justify-end gap-1 text-[11px] text-[#667781]">
                                                                 <span>{formatTime(message.timestamp)}</span>
@@ -900,7 +978,12 @@ function WhatsAppDesktop() {
                             </div>
 
                             <footer className="bg-[var(--wa-header)] px-3 py-3 md:px-4">
-                                <MessageComposer isSending={isSending} onSend={sendMessage} />
+                                <MessageComposer
+                                    isSending={isSending}
+                                    onSend={sendMessage}
+                                    replyTarget={replyTarget}
+                                    onCancelReply={() => setReplyTarget(null)}
+                                />
                             </footer>
                         </>
                     ) : (

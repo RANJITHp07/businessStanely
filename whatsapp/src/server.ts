@@ -386,7 +386,7 @@ app.delete("/messages", auth, async (req, res) => {
 
 // --- Send ---
 app.post("/send", auth, async (req, res) => {
-  const { chatId, body = "", media } = req.body ?? {};
+  const { chatId, body = "", media, quotedMessageId } = req.body ?? {};
   if (!chatId || (!body && !media)) {
     res.status(400).json({
       error: "chatId and at least one of body or media are required.",
@@ -394,7 +394,12 @@ app.post("/send", auth, async (req, res) => {
     return;
   }
   try {
-    const message = await whatsappService.sendMessage(chatId, body, media);
+    const message = await whatsappService.sendMessage(
+      chatId,
+      body,
+      media,
+      quotedMessageId,
+    );
     res.json({ message });
   } catch (error) {
     const message =

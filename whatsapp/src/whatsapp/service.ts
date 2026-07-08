@@ -337,6 +337,13 @@ type MessageInternalData = {
   notifyName?: string;
   mimetype?: string;
   filename?: string;
+  quotedMsg?: {
+    id?: { _serialized?: string };
+    body?: string;
+    caption?: string;
+    notifyName?: string;
+  };
+  quotedStanzaID?: string;
 };
 
 type ChatInternalData = {
@@ -537,6 +544,16 @@ function mapMessage(message: Message): WhatsAppMessage {
   const rawBody = toSafeMessageBody(message.body);
   const fallbackLabel = getMessageTypeLabel(message.type, false);
 
+  const quotedMsg = internalData._data?.quotedMsg;
+  const quotedMessageId =
+    quotedMsg?.id?._serialized || internalData._data?.quotedStanzaID || null;
+  const quotedMessageBody = quotedMsg
+    ? toSafeMessageBody(quotedMsg.body || quotedMsg.caption) || null
+    : null;
+  const quotedMessageAuthor = quotedMsg
+    ? normalizeWhatsAppIdentifier(quotedMsg.notifyName || null)
+    : null;
+
   return {
     id: message.id._serialized,
     chatId: message.fromMe ? message.to : message.from,
@@ -551,6 +568,9 @@ function mapMessage(message: Message): WhatsAppMessage {
     mediaType: message.type || null,
     mimetype: internalData._data?.mimetype || null,
     filename: internalData._data?.filename || null,
+    quotedMessageId,
+    quotedMessageBody,
+    quotedMessageAuthor,
   };
 }
 
@@ -1855,6 +1875,7 @@ class WhatsAppService {
     chatId: string,
     media: { data: string; mimetype: string; filename: string },
     content: string,
+    quotedMessageId?: string,
   ) {
     const mediaPayload = new MessageMedia(
       media.mimetype || "application/octet-stream",
@@ -1867,6 +1888,10 @@ class WhatsAppService {
       // attachment-only sends compatible while remaining visually unobtrusive.
       caption: content || " ",
     };
+
+    if (quotedMessageId) {
+      baseOptions.quotedMessageId = quotedMessageId;
+    }
 
     if ((media.mimetype || "").startsWith("application/")) {
       baseOptions.sendMediaAsDocument = true;
@@ -2994,11 +3019,13 @@ class WhatsAppService {
     chatId: string,
     body: string,
     media?: { data: string; mimetype: string; filename: string },
+    quotedMessageId?: string,
   ) {
     LOG("API: sendMessage", {
       chatId,
       hasMedia: Boolean(media),
       bodyLength: String(body ?? "").length,
+      hasQuote: Boolean(quotedMessageId),
     });
     const client = await this.requireReadyClient();
     const content = body.trim();
@@ -3012,11 +3039,21 @@ class WhatsAppService {
 
       if (media) {
         message = await this.withOperationSlot(() =>
-          this.sendMediaWithFallbacks(client, chatId, media, content),
+          this.sendMediaWithFallbacks(
+            client,
+            chatId,
+            media,
+            content,
+            quotedMessageId,
+          ),
         );
       } else {
         message = await this.withOperationSlot(() =>
-          client.sendMessage(chatId, content),
+          client.sendMessage(
+            chatId,
+            content,
+            quotedMessageId ? { quotedMessageId } : undefined,
+          ),
         );
       }
 

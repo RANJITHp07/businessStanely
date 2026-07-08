@@ -251,6 +251,7 @@ export default function RetainershipTable() {
     const totalPages = Math.ceil(sortedRetainerships.length / itemsPerPage)
     const startIndex = (currentPage - 1) * itemsPerPage
     const endIndex = startIndex + itemsPerPage
+    const paginatedRetainerships = sortedRetainerships.slice(startIndex, endIndex)
     // Explicitly type the retainership object in the component
 
 
@@ -444,14 +445,14 @@ export default function RetainershipTable() {
                                                 </TableRow>
                                             </TableHeader>
                                             <TableBody>
-                                                {sortedRetainerships?.length === 0 ? (
+                                                {paginatedRetainerships?.length === 0 ? (
                                                     <TableRow>
                                                         <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                                                             No legislation found for this retainership.
                                                         </TableCell>
                                                     </TableRow>
                                                 ) : (
-                                                    sortedRetainerships?.map((legislation) => (
+                                                    paginatedRetainerships?.map((legislation) => (
                                                         <TableRow
                                                             key={legislation.id}
                                                             onClick={() => router.push(`/legislation/${legislation.id}`)}

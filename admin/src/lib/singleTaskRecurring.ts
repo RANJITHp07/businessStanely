@@ -48,7 +48,9 @@ export async function updateRecurringTaskSchedule(taskId: string) {
 
   const triggerDate = new Date(task.triggerDate || task.dueDate);
   if (isNaN(triggerDate.getTime())) return null;
-  if (triggerDate < startOfToday || triggerDate > endOfToday) return null;
+  // Process anything due today or earlier (not just an exact match on "today"),
+  // so a missed cron run doesn't permanently skip the task.
+  if (triggerDate > endOfToday) return null;
 
   const dueDate = new Date(task.triggerDate || task.dueDate);
   if (task.category?.timePeriod) {
@@ -75,14 +77,19 @@ export async function updateRecurringTaskSchedule(taskId: string) {
     return updatedTask;
   }
 
+  // Advance repeatedly (not just once) so a task that's been dormant for
+  // several missed periods lands on the next occurrence that is actually
+  // upcoming, instead of one interval past a still-overdue triggerDate.
   const nextTriggerDate = new Date(triggerDate);
-  if (recurringType === "day") {
-    nextTriggerDate.setDate(nextTriggerDate.getDate() + recurringValue);
-  } else if (recurringType === "week") {
-    nextTriggerDate.setDate(nextTriggerDate.getDate() + recurringValue * 7);
-  } else {
-    nextTriggerDate.setMonth(nextTriggerDate.getMonth() + recurringValue);
-  }
+  do {
+    if (recurringType === "day") {
+      nextTriggerDate.setDate(nextTriggerDate.getDate() + recurringValue);
+    } else if (recurringType === "week") {
+      nextTriggerDate.setDate(nextTriggerDate.getDate() + recurringValue * 7);
+    } else {
+      nextTriggerDate.setMonth(nextTriggerDate.getMonth() + recurringValue);
+    }
+  } while (nextTriggerDate <= endOfToday);
 
   const nextDueDate = new Date(nextTriggerDate);
   if (task.category?.timePeriod) {
@@ -196,13 +203,13 @@ export async function updateAllRecurringTasks() {
   const startOfTomorrow = new Date(startOfToday);
   startOfTomorrow.setDate(startOfTomorrow.getDate() + 1);
 
-  // Find all active recurring tasks
+  // Find all active recurring tasks due today or earlier (catches tasks
+  // whose triggerDate was missed on a day the cron didn't run).
   const recurringTasks = await prisma.task.findMany({
     where: {
       recurring: { not: null },
       recurringType: { not: null },
       triggerDate: {
-        gte: startOfToday,
         lt: startOfTomorrow,
       },
     },

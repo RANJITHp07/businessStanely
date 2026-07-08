@@ -8,6 +8,7 @@ import prisma from "@/lib/prisma";
 
 export async function POST(request: NextRequest) {
   const secret = request.headers.get("x-cron-secret");
+  console.log(secret,process.env.CRON_SECRET)
   if (secret !== process.env.CRON_SECRET) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -77,6 +78,8 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   const secret = request.headers.get("x-cron-secret");
+    console.log(secret,process.env.CRON_SECRET)
+
   if (secret !== process.env.CRON_SECRET) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

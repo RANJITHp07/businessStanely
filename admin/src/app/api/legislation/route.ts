@@ -5,10 +5,16 @@ export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const assignedAgent = searchParams.get("assignedAgent");
+    const retainershipClientId = searchParams.get("retainershipClientId");
     const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
     const pageSize = Math.min(100, Math.max(1, parseInt(searchParams.get("pageSize") || "10", 10)));
 
-    const where = assignedAgent ? { assignedAgentId: assignedAgent } : undefined;
+    const where = {
+      ...(assignedAgent ? { assignedAgentId: assignedAgent } : {}),
+      ...(retainershipClientId
+        ? { retainership: { clientId: retainershipClientId } }
+        : {}),
+    };
 
     const [legislations, total] = await Promise.all([
       prisma.legislation.findMany({

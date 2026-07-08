@@ -25,6 +25,7 @@ import {
     MessageSquare,
     Clock,
     CalendarIcon,
+    Pencil,
 } from "lucide-react"
 import Link from "next/link"
 import { Separator } from "@/components/ui/separator"
@@ -278,6 +279,15 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
                                 <p className="text-muted-foreground mt-1">Lead Details</p>
                             </div>
                             <div className="gap-2 flex">
+                                <div>
+                                    <p className="text-sm text-muted-foreground mb-2 invisible">Edit</p>
+                                    <Link href={`/dashboard/prospects/${prospect.id}/edit`}>
+                                        <Button variant="outline">
+                                            <Pencil className="mr-2 h-4 w-4" />
+                                            Edit
+                                        </Button>
+                                    </Link>
+                                </div>
                                 <div>
                                     <p className="text-sm text-muted-foreground mb-2">Next Follow Up</p>
                                     <Popover>

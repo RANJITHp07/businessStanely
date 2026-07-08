@@ -92,10 +92,12 @@ export default function TasksTable() {
   ) => {
     const params = new URLSearchParams();
     const assignedToId = searchParams.get("assignedToId");
+    const clientId = searchParams.get("clientId");
     const retainershipTasks = searchParams.get("retainershipTasks");
     const retainershipId = searchParams.get("retainershipId");
     const trigger = searchParams.get("trigger");
     if (assignedToId) params.set("assignedToId", assignedToId);
+    if (clientId) params.set("clientId", clientId);
     if (retainershipTasks) params.set("retainershipTasks", retainershipTasks);
     if (retainershipId) params.set("retainershipId", retainershipId);
     if (trigger) params.set("trigger", trigger);
@@ -140,6 +142,7 @@ export default function TasksTable() {
       try {
         // Get assignedToId, status, or statuses from URL
         const assignedToId = searchParams.get("assignedToId");
+        const clientId = searchParams.get("clientId");
         const status = searchParams.get("status");
         const statuses = searchParams.get("statuses");
         const statusCheckDuration = searchParams.get("statusCheckDuration");
@@ -153,6 +156,7 @@ export default function TasksTable() {
         let url = "/api/tasks";
         const params = [];
         if (assignedToId) params.push(`assignedToId=${encodeURIComponent(assignedToId)}`);
+        if (clientId) params.push(`clientId=${encodeURIComponent(clientId)}`);
         if (status) params.push(`status=${encodeURIComponent(status)}`);
         if (statuses) params.push(`statuses=${encodeURIComponent(statuses)}`);
         if (statusCheckDuration) params.push(`statusCheckDuration=${encodeURIComponent(statusCheckDuration)}`);

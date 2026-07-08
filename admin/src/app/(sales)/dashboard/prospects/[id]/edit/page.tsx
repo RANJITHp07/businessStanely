@@ -102,7 +102,7 @@ export default function EditProspectPage() {
     const searchQuery = searchParams.get("opportunities") || "";
     const payload = {
       ...formData,
-      assignedTo,
+      assignedAgentId: assignedTo || undefined,
       nextFollowUp: reminderDate ? reminderDate.toISOString() : undefined,
       leadSourceId: leadSources.find((source) => source.name == formData.leadSource)?.id,
       archived: !!searchQuery

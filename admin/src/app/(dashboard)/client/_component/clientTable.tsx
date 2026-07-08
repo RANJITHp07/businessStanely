@@ -769,12 +769,16 @@ export default function ClientsTable() {
                                                                     Edit Client
                                                                 </Link>
                                                             </DropdownMenuItem>
-                                                            <DropdownMenuItem asChild>
-                                                                <Link href={`/client/${client.id}/tasks`}>
-                                                                    <Eye className="mr-2 h-4 w-4" />
-                                                                    View Tasks
-                                                                </Link>
-                                                            </DropdownMenuItem>
+                                                            <DropdownMenuItem
+                                                                className="text-destructive"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    router.push(`/client/${client.id}/tasks`)
+                                                                }}
+                                                            >
+      <Eye className="mr-2 h-4 w-4" />
+  View Tasks
+                                                              </DropdownMenuItem>
                                                             <DropdownMenuSeparator />
                                                             <DropdownMenuItem
                                                                 className="text-destructive"

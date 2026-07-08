@@ -207,15 +207,20 @@ function MessageMedia({ message }: { message: WhatsAppMessage }) {
 
     if (message.mediaType === "document") {
         return (
-            <a
-                href={src}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2 rounded-lg bg-black/10 px-3 py-2 text-sm hover:bg-black/20 transition"
-            >
-                <FileText className="h-4 w-4 shrink-0" />
-                <span className="truncate">{message.filename || "Document"}</span>
-            </a>
+            <div>
+                <a
+                    href={src}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 rounded-lg bg-black/10 px-3 py-2 text-sm hover:bg-black/20 transition"
+                >
+                    <FileText className="h-4 w-4 shrink-0" />
+                    <span className="truncate">{message.filename || "Document"}</span>
+                </a>
+                {message.body ? (
+                    <p className="mt-1 wrap-break-word whitespace-pre-wrap text-[14px] leading-6">{message.body}</p>
+                ) : null}
+            </div>
         );
     }
 

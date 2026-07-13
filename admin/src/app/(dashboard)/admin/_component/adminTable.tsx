@@ -42,6 +42,7 @@ import {
     AlertDialogHeader,
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
+import { useTablePage } from "@/hooks/useTablePage"
 
 const adminRoles = ["All Roles", "owner", "admin"]
 
@@ -67,8 +68,8 @@ export default function AdminsTable() {
     const [selectedStatus, setSelectedStatus] = useState("All Status")
     const [sortBy, setSortBy] = useState("a-z")
     const [sortByDate, setSortByDate] = useState("newest")
-    const [currentPage, setCurrentPage] = useState(1)
-    const [itemsPerPage, setItemsPerPage] = useState(20)
+    const { currentPage, setCurrentPage, itemsPerPage, setItemsPerPage, clampToTotalPages } =
+        useTablePage("admin-dashboard-admin-_component-adminTable")
     const [adminToDelete, setAdminToDelete] = useState<Admin | null>(null)
     const [loading, setLoading] = useState(true)
     const [currentUserRole, setCurrentUserRole] = useState<string>("")
@@ -232,6 +233,10 @@ export default function AdminsTable() {
 
     // Pagination logic
     const totalPages = Math.ceil(sortedAdmins.length / itemsPerPage)
+
+    useEffect(() => {
+        clampToTotalPages(totalPages)
+    }, [totalPages, clampToTotalPages])
     const startIndex = (currentPage - 1) * itemsPerPage
     const endIndex = startIndex + itemsPerPage
     const currentAdmins = sortedAdmins.slice(startIndex, endIndex)

@@ -50,6 +50,7 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Input } from "@/components/ui/input"
+import { useTablePage } from "@/hooks/useTablePage"
 
 export interface TaskCategory {
     id: string
@@ -123,8 +124,8 @@ export default function ApproveCategory({ params }: { params: Promise<{ id: stri
     const [tasks, setTasks] = useState<Task[]>([])
     const [sortBy, setSortBy] = useState("a-z")
     const [sortByDate, setSortByDate] = useState("newest")
-    const [currentPage, setCurrentPage] = useState(1)
-    const [itemsPerPage, setItemsPerPage] = useState(20)
+    const { currentPage, setCurrentPage, itemsPerPage, setItemsPerPage, clampToTotalPages } =
+        useTablePage("admin-dashboard-task_category-approve-id-page")
     const [loading, setLoading] = useState(true)
     const [approving, setApproving] = useState(false)
     const [rejecting, setRejecting] = useState(false)
@@ -255,6 +256,10 @@ export default function ApproveCategory({ params }: { params: Promise<{ id: stri
 
     // Pagination logic
     const totalPages = Math.ceil(sortedTasks.length / itemsPerPage)
+
+    useEffect(() => {
+        clampToTotalPages(totalPages)
+    }, [totalPages, clampToTotalPages])
     const startIndex = (currentPage - 1) * itemsPerPage
     const endIndex = startIndex + itemsPerPage
     const currentTasks = sortedTasks.slice(startIndex, endIndex)

@@ -82,6 +82,7 @@ const jurisdictions = ["All Jurisdictions", "India", "USA", "UAE", "Others"];
 import { Agent } from "@/types";
 import { toast } from "react-toastify";
 import { hasExecutionRole, hasAdvisorRole } from "@/lib/agentRole";
+import { useTablePage } from "@/hooks/useTablePage";
 
 const isVisibleExecutionAgent = (agent: Agent) =>
   hasExecutionRole(agent?.agentRole) && agent.status?.toLowerCase() !== "inactive";
@@ -93,8 +94,8 @@ export default function AgentsTable() {
   const [selectedType, setSelectedType] = useState("All Types");
   const [selectedJurisdiction, setSelectedJurisdiction] =
     useState("All Jurisdictions");
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(20);
+  const { currentPage, setCurrentPage, itemsPerPage, setItemsPerPage, clampToTotalPages } =
+      useTablePage("admin-dashboard-agent-_component-agentTable");
   const [agentToDelete, setAgentToDelete] = useState<Agent | null>(null);
   const [loading, setLoading] = useState(true)
   const [transferAgentId, setTransferAgentId] = useState<string | null>(null);
@@ -201,6 +202,10 @@ export default function AgentsTable() {
 
   // Pagination logic
   const totalPages = Math.ceil(sortedAgents.length / itemsPerPage);
+
+  useEffect(() => {
+      clampToTotalPages(totalPages)
+  }, [totalPages, clampToTotalPages]);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
   const currentAgents = sortedAgents.slice(startIndex, endIndex);

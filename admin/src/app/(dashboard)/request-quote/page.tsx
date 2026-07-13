@@ -35,6 +35,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, FileText, Filter, Plus, RefreshCcw, Search, Send } from "lucide-react";
 import { toast } from "react-toastify";
 import { hasAdvisorRole } from "@/lib/agentRole";
+import { useTablePage } from "@/hooks/useTablePage";
 
 const getStatusBadgeClass = (status?: string) =>
     `${status === "Accepted"
@@ -83,8 +84,8 @@ export default function RequestQuotePage() {
     const [assignedAdvisorFilter, setAssignedAdvisorFilter] = useState("all");
     const [advisorFilterSearch, setAdvisorFilterSearch] = useState("");
     const [showAdvisorFilterDropdown, setShowAdvisorFilterDropdown] = useState(false);
-    const [currentPage, setCurrentPage] = useState(1);
-    const [itemsPerPage, setItemsPerPage] = useState(10);
+    const { currentPage, setCurrentPage, itemsPerPage, setItemsPerPage, clampToTotalPages } =
+        useTablePage("admin-dashboard-request-quote-page", 10);
 
     const [modalAgentSearch, setModalAgentSearch] = useState("");
     const [showModalAgentDropdown, setShowModalAgentDropdown] = useState(false);
@@ -160,6 +161,10 @@ export default function RequestQuotePage() {
     }, [quotes, searchTerm, statusFilter, assignedAdvisorFilter]);
 
     const totalPages = Math.max(1, Math.ceil(filteredQuotes.length / itemsPerPage));
+
+    useEffect(() => {
+        clampToTotalPages(totalPages)
+    }, [totalPages, clampToTotalPages]);
     const paginatedQuotes = useMemo(() => {
         const startIndex = (currentPage - 1) * itemsPerPage;
         return filteredQuotes.slice(startIndex, startIndex + itemsPerPage);

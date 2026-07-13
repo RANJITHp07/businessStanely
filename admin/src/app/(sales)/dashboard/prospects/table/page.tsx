@@ -51,6 +51,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import type { Prospect } from "@/types"
 import { toast } from "react-toastify"
 import { cn } from "@/lib/utils"
+import { useTablePage } from "@/hooks/useTablePage"
 
 const statuses = ["New", "In Progress", "Career", "Relevant but not Now", "Not Relevant"]
 const engagementStatuses = ["To Be Contacted", "Follow Up", "Missed Out"]
@@ -63,8 +64,8 @@ export default function ProspectsTable() {
     const [searchTerm, setSearchTerm] = useState("")
     const [selectedStatuses, setSelectedStatuses] = useState<string[]>([])
     const [selectedEngagementStatus, setSelectedEngagementStatus] = useState<string[]>([])
-    const [currentPage, setCurrentPage] = useState(1)
-    const [itemsPerPage, setItemsPerPage] = useState(20)
+    const { currentPage, setCurrentPage, itemsPerPage, setItemsPerPage, clampToTotalPages } =
+        useTablePage("admin-sales-dashboard-prospects-table-page")
     const [deletingId, setDeletingId] = useState<string | null>(null);
     const [sourceToDelete, setSourceToDelete] = useState<Prospect | null>(null)
     const [dateType, setDateType] = useState<string>("")
@@ -156,6 +157,10 @@ export default function ProspectsTable() {
     });
 
     const totalPages = Math.ceil(filteredProspects.length / itemsPerPage)
+
+    useEffect(() => {
+        clampToTotalPages(totalPages)
+    }, [totalPages, clampToTotalPages])
     const startIndex = (currentPage - 1) * itemsPerPage
     const endIndex = startIndex + itemsPerPage
     const currentProspects = filteredProspects.slice(startIndex, endIndex)

@@ -42,6 +42,7 @@ import {
     Router,
 } from "lucide-react"
 import { useRouter } from "next/navigation"
+import { useTablePage } from "@/hooks/useTablePage"
 
 export interface TaskCategory {
     id: string
@@ -134,8 +135,8 @@ export default function CategoryDetail({ params }: { params: Promise<{ id: strin
     const [tasks, setTasks] = useState<Task[]>([])
     const [sortBy] = useState("a-z")
     const [sortByDate] = useState("newest")
-    const [currentPage, setCurrentPage] = useState(1)
-    const [itemsPerPage, setItemsPerPage] = useState(20)
+    const { currentPage, setCurrentPage, itemsPerPage, setItemsPerPage, clampToTotalPages } =
+        useTablePage("admin-dashboard-task_category-id-page")
     const [loading, setLoading] = useState(true)
     const [taskToDelete, setTaskToDelete] = useState<Task | null>(null)
     // We only need the loading state for this view page
@@ -217,6 +218,10 @@ export default function CategoryDetail({ params }: { params: Promise<{ id: strin
 
     // Pagination logic
     const totalPages = Math.ceil(sortedTasks.length / itemsPerPage)
+
+    useEffect(() => {
+        clampToTotalPages(totalPages)
+    }, [totalPages, clampToTotalPages])
     const startIndex = (currentPage - 1) * itemsPerPage
     const endIndex = startIndex + itemsPerPage
     const currentTasks = sortedTasks.slice(startIndex, endIndex)

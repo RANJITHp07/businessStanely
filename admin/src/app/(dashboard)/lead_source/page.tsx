@@ -40,6 +40,7 @@ import {
     AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { toast } from "react-toastify"
+import { useTablePage } from "@/hooks/useTablePage"
 
 export interface LeadSource {
     id: number
@@ -55,8 +56,8 @@ export default function LeadSourcesTable() {
     const [searchTerm, setSearchTerm] = useState("")
     const [sortBy, setSortBy] = useState("a-z")
     const [sortByDate, setSortByDate] = useState("newest")
-    const [currentPage, setCurrentPage] = useState(1)
-    const [itemsPerPage, setItemsPerPage] = useState(20)
+    const { currentPage, setCurrentPage, itemsPerPage, setItemsPerPage, clampToTotalPages } =
+        useTablePage("admin-dashboard-lead_source-page")
     const [sourceToDelete, setSourceToDelete] = useState<LeadSource | null>(null)
     const [loading, setLoading] = useState(true)
     const [refreshKey, setRefreshKey] = useState(0)
@@ -150,6 +151,10 @@ export default function LeadSourcesTable() {
     }
 
     const totalPages = Math.ceil(sortedLeadSources.length / itemsPerPage)
+
+    useEffect(() => {
+        clampToTotalPages(totalPages)
+    }, [totalPages, clampToTotalPages])
     const startIndex = (currentPage - 1) * itemsPerPage
     const endIndex = startIndex + itemsPerPage
     const currentLeadSources = sortedLeadSources.slice(startIndex, endIndex)

@@ -49,6 +49,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 
 import { toast } from "react-toastify"
 import { cn } from "@/lib/utils"
+import { useTablePage } from "@/hooks/useTablePage"
 
 type OpportunityRow = {
     id: string
@@ -78,8 +79,8 @@ export default function ProspectsTable() {
     const [searchTerm, setSearchTerm] = useState("")
     const [selectedStatuses, setSelectedStatuses] = useState<string[]>([])
     const [selectedEngagementStatus, setSelectedEngagementStatus] = useState<string[]>([])
-    const [currentPage, setCurrentPage] = useState(1)
-    const [itemsPerPage, setItemsPerPage] = useState(20)
+    const { currentPage, setCurrentPage, itemsPerPage, setItemsPerPage, clampToTotalPages } =
+        useTablePage("admin-sales-dashboard-opportunities-table-page")
     const [deletingId, setDeletingId] = useState<string | null>(null);
     const [sourceToDelete, setSourceToDelete] = useState<OpportunityRow | null>(null)
     const [dateType, setDateType] = useState<string>("")
@@ -168,6 +169,10 @@ export default function ProspectsTable() {
     });
 
     const totalPages = Math.ceil(filteredProspects.length / itemsPerPage)
+
+    useEffect(() => {
+        clampToTotalPages(totalPages)
+    }, [totalPages, clampToTotalPages])
     const startIndex = (currentPage - 1) * itemsPerPage
     const endIndex = startIndex + itemsPerPage
     const currentProspects = filteredProspects.slice(startIndex, endIndex)

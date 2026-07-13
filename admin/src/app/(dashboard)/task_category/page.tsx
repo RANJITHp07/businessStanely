@@ -53,14 +53,15 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { useRouter } from "next/navigation"
+import { useTablePage } from "@/hooks/useTablePage"
 
 
 export default function TaskCategoryTable() {
     const [categories, setCategories] = useState<TaskCategory[]>([])
     const [searchTerm, setSearchTerm] = useState("")
     // Removed unused sortBy and sortByDate state
-    const [currentPage, setCurrentPage] = useState(1)
-    const [itemsPerPage, setItemsPerPage] = useState(20)
+    const { currentPage, setCurrentPage, itemsPerPage, setItemsPerPage, clampToTotalPages } =
+        useTablePage("admin-dashboard-task_category-page")
     const [categoryToDelete, setCategoryToDelete] = useState<TaskCategory | null>(null)
     const [loading, setLoading] = useState(true)
     const [activeTab, setActiveTab] = useState("approved")
@@ -158,6 +159,10 @@ export default function TaskCategoryTable() {
 
     // Pagination logic
     const totalPages = Math.ceil(sortedCategories.length / itemsPerPage)
+
+    useEffect(() => {
+        clampToTotalPages(totalPages)
+    }, [totalPages, clampToTotalPages])
     const startIndex = (currentPage - 1) * itemsPerPage
     const endIndex = startIndex + itemsPerPage
     const currentCategories = sortedCategories.slice(startIndex, endIndex)

@@ -1,5 +1,5 @@
 "use client"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { fetchWithAuth } from "@/lib/fetchWithAuth"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -53,8 +53,8 @@ import {
 import Link from "next/link"
 
 import { Task } from "@/types"
-import { useEffect } from "react"
 import { useSearchParams } from "next/navigation"
+import { useTablePage } from "@/hooks/useTablePage"
 
 const priorities = ["All Priorities", "Low", "Medium", "High"]
 const statuses = ["All Status", "To Do", "In Progress", "Hold", "Completed", "Abandoned"]
@@ -73,8 +73,8 @@ export default function TasksTable() {
   // Multi-select status check durations
   const [selectedStatusCheckDurations, setSelectedStatusCheckDurations] = useState<string[]>([])
   const [clientUpdateFilter, setClientUpdateFilter] = useState<"all" | "updated" | "not-updated">("all")
-  const [currentPage, setCurrentPage] = useState(1)
-  const [itemsPerPage, setItemsPerPage] = useState(20)
+  const { currentPage, setCurrentPage, itemsPerPage, setItemsPerPage, clampToTotalPages } =
+      useTablePage("admin-dashboard-task-_components-taskTable")
   const [taskToDelete, setTaskToDelete] = useState<Task | null>(null)
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -233,6 +233,10 @@ export default function TasksTable() {
 
   // Pagination logic
   const totalPages = Math.ceil(sortedTasks.length / itemsPerPage)
+
+  useEffect(() => {
+      clampToTotalPages(totalPages)
+  }, [totalPages, clampToTotalPages])
   const startIndex = (currentPage - 1) * itemsPerPage
   const endIndex = startIndex + itemsPerPage
   const currentTasks = sortedTasks.slice(startIndex, endIndex)

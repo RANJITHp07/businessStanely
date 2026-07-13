@@ -39,6 +39,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { hasAdvisorRole, hasExecutionRole } from "@/lib/agentRole";
+import { useTablePage } from "@/hooks/useTablePage";
 // Removed Link import
 // Removed AlertDialog and related imports
 
@@ -75,8 +76,8 @@ export default function TeamsTable() {
   const [selectedType, setSelectedType] = useState("All Types");
   const [selectedJurisdiction, setSelectedJurisdiction] =
     useState("All Jurisdictions");
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(20);
+  const { currentPage, setCurrentPage, itemsPerPage, setItemsPerPage, clampToTotalPages } =
+      useTablePage("agent-dashboard-team-_component-teamTable");
   // Removed teamToDelete state
   const [loading, setLoading] = useState(true);
 
@@ -150,6 +151,10 @@ export default function TeamsTable() {
 
   // Pagination logic
   const totalPages = Math.ceil(sortedTeams.length / itemsPerPage);
+
+  useEffect(() => {
+      clampToTotalPages(totalPages)
+  }, [totalPages, clampToTotalPages]);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
   const currentTeams = sortedTeams.slice(startIndex, endIndex);

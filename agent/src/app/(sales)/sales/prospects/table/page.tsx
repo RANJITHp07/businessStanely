@@ -48,6 +48,7 @@ import {
 import type { Prospect } from "@/types"
 import { toast } from "react-toastify"
 import { normalizePhoneNumber } from "@/lib/normalizePhoneNumber"
+import { useTablePage } from "@/hooks/useTablePage"
 
 const statuses = ["New", "In Progress", "Relevant but not Now", "Career", "Not Relevant"]
 
@@ -59,8 +60,8 @@ export default function ProspectsTable() {
     const [loading, setLoading] = useState(true)
     const [searchTerm, setSearchTerm] = useState("")
     const [selectedStatuses, setSelectedStatuses] = useState<string[]>([])
-    const [currentPage, setCurrentPage] = useState(1)
-    const [itemsPerPage, setItemsPerPage] = useState(20)
+    const { currentPage, setCurrentPage, itemsPerPage, setItemsPerPage, clampToTotalPages } =
+        useTablePage("agent-sales-sales-prospects-table-page")
     const [deletingId, setDeletingId] = useState<string | null>(null);
     const [sourceToDelete, setSourceToDelete] = useState<Prospect | null>(null)
 
@@ -125,6 +126,10 @@ export default function ProspectsTable() {
     });
 
     const totalPages = Math.ceil(filteredProspects.length / itemsPerPage)
+
+    useEffect(() => {
+        clampToTotalPages(totalPages)
+    }, [totalPages, clampToTotalPages])
     const startIndex = (currentPage - 1) * itemsPerPage
     const endIndex = startIndex + itemsPerPage
     const currentProspects = filteredProspects.slice(startIndex, endIndex)

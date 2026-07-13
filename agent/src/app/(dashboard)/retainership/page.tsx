@@ -61,6 +61,7 @@ import {
 import { useRouter, useSearchParams } from "next/navigation"
 import { SectionTable, statusKey } from "../my-task/page"
 import { countOverdue, countPendingTriggers, countRunning } from "@/lib/taskCounts"
+import { useTablePage } from "@/hooks/useTablePage"
 
 
 // Updated the `DashboardRetainership` interface to include client details
@@ -89,8 +90,8 @@ export default function RetainershipTable() {
     const [myLegislations, setMyLegislations] = useState<any[]>([]);
     const [searchTerm, setSearchTerm] = useState("")
     // Removed unused sortBy and sortByDate state
-    const [currentPage, setCurrentPage] = useState(1)
-    const [itemsPerPage, setItemsPerPage] = useState(20)
+    const { currentPage, setCurrentPage, itemsPerPage, setItemsPerPage, clampToTotalPages } =
+        useTablePage("agent-dashboard-retainership-page")
     const [loading, setLoading] = useState(true)
     const [activeTab, setActiveTab] = useState("my-retainerships")
     const [currentUserRole, setCurrentUserRole] = useState<string>("")
@@ -250,6 +251,10 @@ export default function RetainershipTable() {
 
     // Pagination logic
     const totalPages = Math.ceil(sortedRetainerships.length / itemsPerPage)
+
+    useEffect(() => {
+        clampToTotalPages(totalPages)
+    }, [totalPages, clampToTotalPages])
     const startIndex = (currentPage - 1) * itemsPerPage
     const endIndex = startIndex + itemsPerPage
     const paginatedRetainerships = sortedRetainerships.slice(startIndex, endIndex)

@@ -48,6 +48,7 @@ import {
     ShieldX,
 } from "lucide-react";
 import { toast } from "react-toastify";
+import { useTablePage } from "@/hooks/useTablePage";
 
 type AgentOption = {
     id: string;
@@ -95,8 +96,8 @@ export default function RequestQuotePage() {
 
     const [searchTerm, setSearchTerm] = useState("");
     const [statusFilter, setStatusFilter] = useState("all");
-    const [currentPage, setCurrentPage] = useState(1);
-    const [itemsPerPage, setItemsPerPage] = useState(10);
+    const { currentPage, setCurrentPage, itemsPerPage, setItemsPerPage, clampToTotalPages } =
+        useTablePage("agent-dashboard-request-quote-page", 10);
 
     const isExecutionAgent = hasExecutionRole(agent?.agentRole);
     const isAdvisorAgent = hasAdvisorRole(agent?.agentRole);
@@ -136,6 +137,10 @@ export default function RequestQuotePage() {
     }, [quotes, searchTerm, statusFilter]);
 
     const totalPages = Math.max(1, Math.ceil(filteredQuotes.length / itemsPerPage));
+
+    useEffect(() => {
+        clampToTotalPages(totalPages)
+    }, [totalPages, clampToTotalPages]);
 
     const paginatedQuotes = useMemo(() => {
         const startIndex = (currentPage - 1) * itemsPerPage;

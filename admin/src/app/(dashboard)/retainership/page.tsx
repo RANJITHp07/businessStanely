@@ -67,13 +67,14 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useRouter } from "next/navigation";
+import { useTablePage } from "@/hooks/useTablePage";
 
 export default function RetainershipTable() {
   const [retainerships, setRetainerships] = useState<Retainership[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   // Removed unused sortBy and sortByDate state
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(20);
+  const { currentPage, setCurrentPage, itemsPerPage, setItemsPerPage, clampToTotalPages } =
+      useTablePage("admin-dashboard-retainership-page");
   const [retainershipToDelete, setRetainershipToDelete] =
     useState<Retainership | null>(null);
   const [loading, setLoading] = useState(true);
@@ -177,6 +178,10 @@ export default function RetainershipTable() {
 
   // Pagination logic
   const totalPages = Math.ceil(sortedRetainerships.length / itemsPerPage);
+
+  useEffect(() => {
+      clampToTotalPages(totalPages)
+  }, [totalPages, clampToTotalPages]);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
   const currentRetainerships = sortedRetainerships.slice(startIndex, endIndex);

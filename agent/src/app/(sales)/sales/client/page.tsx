@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useRouter } from "next/navigation"
+import { useTablePage } from "@/hooks/useTablePage"
 
 
 export default function StatusTable() {
@@ -19,8 +20,8 @@ export default function StatusTable() {
     const [loading, setLoading] = useState(true)
     const [searchTerm, setSearchTerm] = useState("")
     const [selectedStatus, setSelectedStatus] = useState("All Status")
-    const [currentPage, setCurrentPage] = useState(1)
-    const [itemsPerPage, setItemsPerPage] = useState(20)
+    const { currentPage, setCurrentPage, itemsPerPage, setItemsPerPage, clampToTotalPages } =
+        useTablePage("agent-sales-sales-client-page")
 
     useEffect(() => {
         const fetchData = async () => {
@@ -58,6 +59,10 @@ export default function StatusTable() {
     })
 
     const totalPages = Math.ceil(filteredClients.length / itemsPerPage)
+
+    useEffect(() => {
+        clampToTotalPages(totalPages)
+    }, [totalPages, clampToTotalPages])
     const startIndex = (currentPage - 1) * itemsPerPage
     const endIndex = startIndex + itemsPerPage
     const currentClients = filteredClients.slice(startIndex, endIndex)

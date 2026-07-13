@@ -36,6 +36,7 @@ import {
 import Link from "next/link"
 import { normalizePhoneNumber } from "@/lib/normalizePhoneNumber"
 import { getAdvisorAgentType, isClientManager } from "@/lib/agentType"
+import { useTablePage } from "@/hooks/useTablePage"
 
 interface Opportunity {
     id: string
@@ -57,8 +58,8 @@ export default function OpportunitiesTable() {
     const [loading, setLoading] = useState(true)
     const [searchTerm, setSearchTerm] = useState("")
     const [selectedStatuses, setSelectedStatuses] = useState<string[]>([])
-    const [currentPage, setCurrentPage] = useState(1)
-    const [itemsPerPage, setItemsPerPage] = useState(20)
+    const { currentPage, setCurrentPage, itemsPerPage, setItemsPerPage, clampToTotalPages } =
+        useTablePage("agent-sales-sales-opportunites-table-page")
 
     useEffect(() => {
         const statusParam = searchParams?.get("status")
@@ -108,6 +109,10 @@ export default function OpportunitiesTable() {
     });
 
     const totalPages = Math.ceil(filteredOpportunities.length / itemsPerPage)
+
+    useEffect(() => {
+        clampToTotalPages(totalPages)
+    }, [totalPages, clampToTotalPages])
     const startIndex = (currentPage - 1) * itemsPerPage
     const endIndex = startIndex + itemsPerPage
     const currentOpportunities = filteredOpportunities.slice(startIndex, endIndex)

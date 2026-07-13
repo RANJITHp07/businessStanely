@@ -156,9 +156,18 @@ export async function GET(req: NextRequest) {
     if (categoryId) {
       whereClause = { categoryId };
     } else {
+      // Legislation tasks stay visible even while their service awaits
+      // approval, so admin counts match the agent's legislation view. The
+      // row is flagged in the UI via `category.status` rather than dropped.
       whereClause = {
         AND: [
-          { OR: [{ category: null }, { category: { status: "approved" } }] },
+          {
+            OR: [
+              { category: null },
+              { category: { status: "approved" } },
+              { legislationId: { not: null } },
+            ],
+          },
         ],
       };
     }

@@ -807,12 +807,19 @@ export default function TasksTable() {
                             <TableCell className="overflow-hidden">
                               <div className="space-y-1">
                                 <div className="font-medium truncate" title={task.title}>{task.title}</div>
-                                {/* Show approved category only */}
-                                {task.category && task.category.status === 'approved' && (
-                                  <div className="text-xs mt-1">
+                                {task.category && (
+                                  <div className="text-xs mt-1 flex flex-wrap items-center gap-1">
                                     <span className="inline-block px-2 py-1 rounded bg-blue-100 text-blue-800 border border-blue-200">
                                       {task.category.name}
                                     </span>
+                                    {task.category.status !== 'approved' && (
+                                      <span
+                                        className="inline-block px-2 py-1 rounded bg-amber-100 text-amber-800 border border-amber-200"
+                                        title="This service is awaiting approval"
+                                      >
+                                        Service pending approval
+                                      </span>
+                                    )}
                                   </div>
                                 )}
                               </div>

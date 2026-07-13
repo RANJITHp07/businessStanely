@@ -119,6 +119,8 @@ export function SectionTable({
                         const ownerName = t.assignedTo?.name ?? "-";
                         const shortId = `T-${t.id.slice(0, 6).toUpperCase()}`;
                         const categoryName = t.category?.name;
+                        const categoryPending =
+                          !!t.category && t.category.status !== "approved";
                         const clientEmail = t.client?.email ?? "";
                         const assignedRole = t.assignedTo?.agentType ?? "";
                         const priority = (t.priority || "").toLowerCase();
@@ -161,10 +163,18 @@ export function SectionTable({
                                   {t.title || shortId}
                                 </Link>
                                 {categoryName ? (
-                                  <div className="mt-2">
+                                  <div className="mt-2 flex flex-wrap items-center gap-1">
                                     <span className="inline-block bg-blue-50 text-blue-600 px-2 py-1 rounded-md text-xs">
                                       {categoryName}
                                     </span>
+                                    {categoryPending ? (
+                                      <span
+                                        className="inline-block bg-amber-50 text-amber-700 px-2 py-1 rounded-md text-xs"
+                                        title="This service is awaiting approval"
+                                      >
+                                        Service pending approval
+                                      </span>
+                                    ) : null}
                                   </div>
                                 ) : null}
                               </div>

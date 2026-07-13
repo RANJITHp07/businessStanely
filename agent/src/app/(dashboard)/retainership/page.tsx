@@ -60,6 +60,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { useRouter, useSearchParams } from "next/navigation"
 import { SectionTable, statusKey } from "../my-task/page"
+import { countOverdue, countPendingTriggers, countRunning } from "@/lib/taskCounts"
 
 
 // Updated the `DashboardRetainership` interface to include client details
@@ -504,13 +505,13 @@ export default function RetainershipTable() {
                                                             <TableCell className="flex flex-col gap-2">
                                                                 <Badge>Total Task: {legislation.tasks?.length || 0}</Badge>
                                                                 <Badge>
-                                                                    Running Task: {legislation.tasks?.filter((t: any) => t.active && !t.completed && t.status !== "Hold").length || 0}
+                                                                    Running Task: {countRunning(legislation.tasks)}
                                                                 </Badge>
                                                                 <Badge>
-                                                                    Overdue Task: {legislation.tasks?.filter((t: any) => t.active && !t.completed && t.status !== "Hold" && t.dueDate && new Date(t.dueDate) < new Date()).length || 0}
+                                                                    Overdue Task: {countOverdue(legislation.tasks)}
                                                                 </Badge>
                                                                 <Badge>
-                                                                    Pending Triggers: {legislation.tasks?.filter((t: any) => !t.active && !t.completed && t.status !== "Hold").length || 0}
+                                                                    Pending Triggers: {countPendingTriggers(legislation.tasks)}
                                                                 </Badge>
                                                             </TableCell>
                                                             <TableCell>{legislation.assignedAgent?.name || "Unknown"}</TableCell>

@@ -41,6 +41,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Progress } from "@/components/ui/progress";
+import { countOverdue, countPendingTriggers, countRunning } from "@/lib/taskCounts";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -1653,9 +1654,9 @@ export default function AgentDetails() {
                             ) : (
                               agentLegislations.map((legislation) => {
                                 const client = legislation.retainership?.client;
-                                const activeTasks = legislation.tasks?.filter((task) => task.active && statusKey(task.status) !== "completed" && statusKey(task.status) !== "hold") || [];
-                                const overdueTasks = activeTasks.filter((task) => task.dueDate && new Date(task.dueDate) < new Date());
-                                const pendingTriggers = legislation.tasks?.filter((task) => !task.active && statusKey(task.status) !== "completed" && statusKey(task.status) !== "hold") || [];
+                                const runningCount = countRunning(legislation.tasks);
+                                const overdueCount = countOverdue(legislation.tasks);
+                                const pendingTriggerCount = countPendingTriggers(legislation.tasks);
 
                                 return (
                                   <TableRow
@@ -1681,9 +1682,9 @@ export default function AgentDetails() {
                                     <TableCell>
                                       <div className="grid grid-cols-2 gap-1">
                                         <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 justify-center">T: {legislation.tasks?.length || 0}</Badge>
-                                        <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 justify-center">R: {activeTasks.length}</Badge>
-                                        <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 justify-center">OD: {overdueTasks.length}</Badge>
-                                        <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 justify-center">PT: {pendingTriggers.length}</Badge>
+                                        <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 justify-center">R: {runningCount}</Badge>
+                                        <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 justify-center">OD: {overdueCount}</Badge>
+                                        <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 justify-center">PT: {pendingTriggerCount}</Badge>
                                       </div>
                                     </TableCell>
                                     <TableCell className="text-sm truncate">{legislation.assignedAgent?.name || agent.name}</TableCell>

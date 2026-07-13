@@ -569,14 +569,16 @@ export default function TaskForm() {
     }
   };
 
-  // Fetch legislation data and populate legislationList
+  // Fetch legislation data and populate legislationList.
+  // The endpoint paginates and defaults to 10 per page, so ask for the max —
+  // this list backs a picker and needs every legislation, not just the first page.
   useEffect(() => {
     const fetchLegislation = async () => {
       try {
-        const response = await fetch("/api/legislation");
+        const response = await fetch("/api/legislation?pageSize=100");
         if (response.ok) {
           const data = await response.json();
-          setLegislationList(data);
+          setLegislationList(Array.isArray(data) ? data : data?.data ?? []);
         }
       } catch (error) {
         console.error("Failed to fetch legislation", error);

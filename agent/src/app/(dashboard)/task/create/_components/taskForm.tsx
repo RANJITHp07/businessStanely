@@ -650,12 +650,13 @@ export default function TaskForm({ id }: TaskFormProps) {
   };
 
 
-  // Log API call and response for /api/legislations
   useEffect(() => {
     fetch("/api/legislation")
       .then((response) => response.json())
+      // This endpoint returns a bare array today, but the admin one returns a
+      // paginated { data } envelope — accept either so the list is always an array.
       .then((data) => {
-        setLegislationList(data);
+        setLegislationList(Array.isArray(data) ? data : data?.data ?? []);
       })
       .catch((error) => {
         console.error("Error fetching legislations:", error);

@@ -12,7 +12,6 @@ import {
     Download,
     FileText,
     LoaderCircle,
-    LogOut,
     MessageSquare,
     MoreVertical,
     Moon,
@@ -311,8 +310,9 @@ const MessageComposer = memo(function MessageComposer({
         onCancelReply?.();
 
         onSend(content, pendingFile, pendingReply).catch((error) => {
-            setDraft(content);
-            setAttachment(pendingFile || null);
+            // The backend can report a late delivery/status error after
+            // WhatsApp has already accepted the message. Do not repopulate the
+            // composer with content that may already have been sent.
             toast.error(error instanceof Error ? error.message : "Failed to send message.");
         });
     };
@@ -411,7 +411,6 @@ export function WhatsAppDesktop() {
         isSending,
         loadMoreChats,
         loadMoreMessages,
-        logout,
         messages,
         searchQuery,
         selectedChat,
@@ -751,14 +750,6 @@ export function WhatsAppDesktop() {
                                 title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
                             >
                                 {theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
-                            </button>
-                            <button
-                                type="button"
-                                onClick={logout}
-                                className="rounded-full p-2 text-[var(--wa-muted2)] transition hover:bg-[var(--wa-hover)] hover:text-white"
-                                title="Log out WhatsApp session"
-                            >
-                                <LogOut className="h-5 w-5" />
                             </button>
                         </div>
                     </div>

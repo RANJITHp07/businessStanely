@@ -1,27 +1,10 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 
-const WHATSAPP_BACKEND_URL =
-  process.env.WHATSAPP_BACKEND_URL ??
-  process.env.NEXT_PUBLIC_WHATSAPP_BACKEND_URL ??
-  "https://69.62.78.14.nip.io";
-const SERVICE_TOKEN =
-  process.env.WHATSAPP_SERVICE_TOKEN ??
-  process.env.NEXT_PUBLIC_WHATSAPP_SERVICE_TOKEN ??
-  "";
-
-export async function POST(req: NextRequest) {
-  const url = `${WHATSAPP_BACKEND_URL}/logout`;
-
-  const upstream = await fetch(url, {
-    method: "POST",
-    headers: {
-      Accept: "application/json",
-      "Cache-Control": "no-cache",
-      ...(SERVICE_TOKEN ? { "x-whatsapp-service-token": SERVICE_TOKEN } : {}),
-    },
-    signal: req.signal,
-  });
-
-  const data = await upstream.json();
-  return NextResponse.json(data, { status: upstream.status });
+export async function POST() {
+  // The WhatsApp session is shared by every agent. Only the admin application
+  // may disconnect it; allowing one agent to log out would interrupt everyone.
+  return NextResponse.json(
+    { error: "Only an administrator can disconnect the WhatsApp session." },
+    { status: 403 },
+  );
 }

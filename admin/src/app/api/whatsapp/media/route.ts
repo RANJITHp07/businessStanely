@@ -28,6 +28,9 @@ export async function GET(req: NextRequest) {
     method: "GET",
     headers: {
       ...(SERVICE_TOKEN ? { "x-whatsapp-service-token": SERVICE_TOKEN } : {}),
+      ...(req.headers.get("range")
+        ? { Range: req.headers.get("range") as string }
+        : {}),
     },
   });
 
@@ -40,6 +43,8 @@ export async function GET(req: NextRequest) {
     backendRes.headers.get("content-type") || "application/octet-stream";
   const contentLength = backendRes.headers.get("content-length");
   const cacheControl = backendRes.headers.get("cache-control");
+  const acceptRanges = backendRes.headers.get("accept-ranges");
+  const contentRange = backendRes.headers.get("content-range");
 
   headers.set("Content-Type", contentType);
   headers.set("Content-Disposition", "inline");
@@ -49,9 +54,15 @@ export async function GET(req: NextRequest) {
   if (cacheControl) {
     headers.set("Cache-Control", cacheControl);
   }
+  if (acceptRanges) {
+    headers.set("Accept-Ranges", acceptRanges);
+  }
+  if (contentRange) {
+    headers.set("Content-Range", contentRange);
+  }
 
   return new Response(backendRes.body, {
-    status: 200,
+    status: backendRes.status,
     headers,
   });
 }

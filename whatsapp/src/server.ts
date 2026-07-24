@@ -31,6 +31,124 @@ if (!SERVICE_TOKEN) {
 let recoveryTimer: NodeJS.Timeout | null = null;
 let qrDataUrlCache: { qr: string; dataUrl: string } | null = null;
 let qrDataUrlInFlight: Promise<string | null> | null = null;
+const maxMediaBytes = Number(
+  process.env.WHATSAPP_MAX_MEDIA_BYTES ?? 20 * 1024 * 1024,
+);
+const jsonBodyLimitBytes = Math.ceil(
+  (Number.isFinite(maxMediaBytes) && maxMediaBytes > 0
+    ? maxMediaBytes
+    : 20 * 1024 * 1024) *
+    1.4 +
+    1024 * 1024,
+);
+const mediaCacheTtlMs = Number(
+  process.env.WHATSAPP_MEDIA_CACHE_TTL_MS ?? 10 * 60 * 1000,
+);
+const mediaCacheMaxBytes = Number(
+  process.env.WHATSAPP_MEDIA_CACHE_MAX_BYTES ?? 128 * 1024 * 1024,
+);
+const mediaCacheMaxEntries = Number(
+  process.env.WHATSAPP_MEDIA_CACHE_MAX_ENTRIES ?? 100,
+);
+
+type MediaResponse = {
+  buffer: Buffer;
+  mimetype: string;
+  filename?: string;
+};
+
+const mediaResponseCache = new Map<
+  string,
+  MediaResponse & { cachedAt: number }
+>();
+const mediaResponseInFlight = new Map<string, Promise<MediaResponse>>();
+let mediaResponseCacheBytes = 0;
+
+function clearMediaResponseCache() {
+  mediaResponseCache.clear();
+  mediaResponseInFlight.clear();
+  mediaResponseCacheBytes = 0;
+}
+
+function cacheMediaResponse(messageId: string, media: MediaResponse) {
+  const maxBytes =
+    Number.isFinite(mediaCacheMaxBytes) && mediaCacheMaxBytes > 0
+      ? mediaCacheMaxBytes
+      : 128 * 1024 * 1024;
+  const maxEntries =
+    Number.isFinite(mediaCacheMaxEntries) && mediaCacheMaxEntries > 0
+      ? mediaCacheMaxEntries
+      : 100;
+
+  // Do not let one unusually large document evict the entire working set.
+  if (media.buffer.byteLength > maxBytes / 2) {
+    return;
+  }
+
+  const previous = mediaResponseCache.get(messageId);
+  if (previous) {
+    mediaResponseCacheBytes -= previous.buffer.byteLength;
+    mediaResponseCache.delete(messageId);
+  }
+  mediaResponseCache.set(messageId, { ...media, cachedAt: Date.now() });
+  mediaResponseCacheBytes += media.buffer.byteLength;
+
+  while (
+    mediaResponseCache.size > maxEntries ||
+    mediaResponseCacheBytes > maxBytes
+  ) {
+    const oldestKey = mediaResponseCache.keys().next().value as
+      | string
+      | undefined;
+    if (!oldestKey) break;
+    const oldest = mediaResponseCache.get(oldestKey);
+    if (oldest) {
+      mediaResponseCacheBytes -= oldest.buffer.byteLength;
+    }
+    mediaResponseCache.delete(oldestKey);
+  }
+}
+
+async function getCachedMediaResponse(messageId: string) {
+  const cached = mediaResponseCache.get(messageId);
+  const ttl =
+    Number.isFinite(mediaCacheTtlMs) && mediaCacheTtlMs > 0
+      ? mediaCacheTtlMs
+      : 10 * 60 * 1000;
+  if (cached && Date.now() - cached.cachedAt <= ttl) {
+    // Refresh insertion order so the Map also acts as a small LRU.
+    mediaResponseCache.delete(messageId);
+    mediaResponseCache.set(messageId, cached);
+    return cached;
+  }
+  if (cached) {
+    mediaResponseCacheBytes -= cached.buffer.byteLength;
+    mediaResponseCache.delete(messageId);
+  }
+
+  const existing = mediaResponseInFlight.get(messageId);
+  if (existing) {
+    return existing;
+  }
+
+  const promise = whatsappService
+    .getMedia(messageId)
+    .then((media) => {
+      const result: MediaResponse = {
+        buffer: Buffer.from(media.data, "base64"),
+        mimetype: media.mimetype,
+        filename: media.filename,
+      };
+      cacheMediaResponse(messageId, result);
+      return result;
+    })
+    .finally(() => {
+      mediaResponseInFlight.delete(messageId);
+    });
+
+  mediaResponseInFlight.set(messageId, promise);
+  return promise;
+}
 
 async function getQrCodeDataUrl(qr: string | null) {
   if (!qr) {
@@ -139,7 +257,7 @@ app.use(
   }),
 );
 app.use(cors(corsOptions));
-app.use(express.json({ limit: "50mb" }));
+app.use(express.json({ limit: jsonBodyLimitBytes }));
 
 // Simple request logger to show which APIs are hit and key params
 app.use((req, _res, next) => {
@@ -289,6 +407,28 @@ function normalizeBooleanParam(value: unknown, fallback: boolean) {
   return fallback;
 }
 
+function boundedInteger(
+  value: unknown,
+  fallback: number,
+  minimum: number,
+  maximum: number,
+) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.min(maximum, Math.max(minimum, Math.trunc(parsed)));
+}
+
+function estimateBase64Bytes(value: string) {
+  const data = value.includes(",") ? value.slice(value.indexOf(",") + 1) : value;
+  const padding = data.endsWith("==") ? 2 : data.endsWith("=") ? 1 : 0;
+  return Math.max(0, Math.floor((data.length * 3) / 4) - padding);
+}
+
+function isBusyError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error ?? "");
+  return message.includes("busy handling other users");
+}
+
 // --- Status ---
 app.get("/status", auth, async (_req, res) => {
   whatsappService.ensureInitialized().catch((err: unknown) => {
@@ -301,9 +441,9 @@ app.get("/status", auth, async (_req, res) => {
 // --- Chats ---
 // Paginated chats endpoint
 app.get("/chats", auth, async (req, res) => {
-  const search = String(req.query.search ?? "");
-  const page = Number(req.query.page ?? 1);
-  const pageSize = Number(req.query.pageSize ?? 50);
+  const search = String(req.query.search ?? "").trim().slice(0, 200);
+  const page = boundedInteger(req.query.page, 1, 1, 1000);
+  const pageSize = boundedInteger(req.query.pageSize, 50, 1, 100);
   try {
     const chats = await whatsappService.getPaginatedChats(
       search,
@@ -335,6 +475,11 @@ app.get("/messages", auth, async (req, res) => {
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Failed to load messages.";
+    if (isBusyError(error)) {
+      res.set("Retry-After", "2");
+      res.status(503).json({ error: message });
+      return;
+    }
     res.status(500).json({ error: message });
   }
 });
@@ -387,11 +532,47 @@ app.delete("/messages", auth, async (req, res) => {
 // --- Send ---
 app.post("/send", auth, async (req, res) => {
   const { chatId, body = "", media, quotedMessageId } = req.body ?? {};
+  if (
+    typeof chatId !== "string" ||
+    typeof body !== "string" ||
+    (quotedMessageId !== undefined && typeof quotedMessageId !== "string")
+  ) {
+    res.status(400).json({ error: "Invalid message payload." });
+    return;
+  }
   if (!chatId || (!body && !media)) {
     res.status(400).json({
       error: "chatId and at least one of body or media are required.",
     });
     return;
+  }
+  if (body.length > 65536) {
+    res.status(413).json({ error: "Message text is too large." });
+    return;
+  }
+  if (media) {
+    const validMedia =
+      typeof media === "object" &&
+      typeof media.data === "string" &&
+      media.data.length > 0 &&
+      typeof media.mimetype === "string" &&
+      media.mimetype.length <= 200 &&
+      typeof media.filename === "string" &&
+      media.filename.length <= 255;
+    if (!validMedia) {
+      res.status(400).json({ error: "Invalid media payload." });
+      return;
+    }
+    const allowedBytes =
+      Number.isFinite(maxMediaBytes) && maxMediaBytes > 0
+        ? maxMediaBytes
+        : 20 * 1024 * 1024;
+    if (estimateBase64Bytes(media.data) > allowedBytes) {
+      res.status(413).json({
+        error: `Media exceeds the ${Math.floor(allowedBytes / 1024 / 1024)} MB limit.`,
+      });
+      return;
+    }
   }
   try {
     const message = await whatsappService.sendMessage(
@@ -404,6 +585,11 @@ app.post("/send", auth, async (req, res) => {
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Failed to send message.";
+    if (isBusyError(error)) {
+      res.set("Retry-After", "2");
+      res.status(503).json({ error: message });
+      return;
+    }
     res.status(500).json({ error: message });
   }
 });
@@ -416,23 +602,79 @@ app.get("/media", auth, async (req, res) => {
     return;
   }
   try {
-    const media = await whatsappService.getMedia(messageId);
-    const buffer = Buffer.from(media.data, "base64");
-    res.set({
+    const media = await getCachedMediaResponse(messageId);
+    const buffer = media.buffer;
+    const rangeHeader = req.headers.range;
+    const commonHeaders = {
       "Content-Type": media.mimetype,
-      "Content-Length": String(buffer.byteLength),
+      "Accept-Ranges": "bytes",
       "Cache-Control": "private, max-age=3600",
+    };
+
+    if (rangeHeader) {
+      const match = rangeHeader.match(/^bytes=(\d*)-(\d*)$/);
+      if (match) {
+        let start: number;
+        let end: number;
+        if (!match[1] && match[2]) {
+          // Suffix range: "bytes=-500" means the final 500 bytes.
+          const suffixLength = Number(match[2]);
+          start = Math.max(0, buffer.length - suffixLength);
+          end = buffer.length - 1;
+        } else {
+          start = match[1] ? Number(match[1]) : 0;
+          const requestedEnd = match[2]
+            ? Number(match[2])
+            : buffer.length - 1;
+          end = Math.min(requestedEnd, buffer.length - 1);
+        }
+
+        if (
+          Number.isInteger(start) &&
+          Number.isInteger(end) &&
+          start >= 0 &&
+          start <= end &&
+          start < buffer.length
+        ) {
+          const chunk = buffer.subarray(start, end + 1);
+          res.status(206).set({
+            ...commonHeaders,
+            "Content-Range": `bytes ${start}-${end}/${buffer.length}`,
+            "Content-Length": String(chunk.byteLength),
+          });
+          res.send(chunk);
+          return;
+        }
+      }
+
+      res.status(416).set({
+        ...commonHeaders,
+        "Content-Range": `bytes */${buffer.length}`,
+      });
+      res.end();
+      return;
+    }
+
+    res.set({
+      ...commonHeaders,
+      "Content-Length": String(buffer.byteLength),
     });
     res.send(buffer);
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Failed to fetch media.";
+    if (isBusyError(error)) {
+      res.set("Retry-After", "2");
+      res.status(503).json({ error: message });
+      return;
+    }
     res.status(500).json({ error: message });
   }
 });
 
 // --- Logout ---
 app.post("/logout", auth, async (_req, res) => {
+  clearMediaResponseCache();
   await whatsappService.logout();
   res.json({ ok: true });
 });
@@ -440,6 +682,7 @@ app.post("/logout", auth, async (_req, res) => {
 // --- Force clear session (destructive) ---
 app.post("/force-clear-session", auth, async (_req, res) => {
   try {
+    clearMediaResponseCache();
     await whatsappService.forceClearSession();
     res.json({ ok: true });
   } catch (error) {
@@ -454,6 +697,10 @@ app.get("/chat-avatar", auth, async (req, res) => {
   const chatId = String(req.query.chatId ?? "");
   if (!chatId) {
     res.status(400).json({ error: "chatId is required." });
+    return;
+  }
+  if (whatsappService.getState().status !== "ready") {
+    res.status(503).json({ error: "WhatsApp is not connected." });
     return;
   }
   try {
@@ -473,6 +720,10 @@ app.post("/chat-avatars", auth, async (req, res) => {
     : [];
   if (chatIds.length === 0) {
     res.json({ urls: {} });
+    return;
+  }
+  if (whatsappService.getState().status !== "ready") {
+    res.status(503).json({ error: "WhatsApp is not connected." });
     return;
   }
   try {

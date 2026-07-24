@@ -1,7 +1,7 @@
 import fs from "fs";
 import os from "os";
 import path from "path";
-import { exec } from "child_process";
+import { exec, spawnSync } from "child_process";
 import { promisify } from "util";
 
 const execp = promisify(exec);
@@ -63,15 +63,21 @@ function cleanupStuckLockfiles() {
 
     for (const name of candidates) {
       const p = path.join(sessionPath, name);
-      if (fs.existsSync(p)) {
-        try {
-          fs.unlinkSync(p);
-          // DevToolsActivePort is always left behind on abrupt exit — not worth logging.
-          if (name !== "DevToolsActivePort") {
-            console.log(`[WhatsApp] Cleaned up stuck lockfile: ${name}`);
-          }
-        } catch (e) {
-          // Ignore, file might still be in use
+      try {
+        // lstatSync sees dangling Singleton* symlinks; existsSync does not.
+        fs.lstatSync(p);
+        fs.unlinkSync(p);
+        // DevToolsActivePort is always left behind on abrupt exit — not worth logging.
+        if (name !== "DevToolsActivePort") {
+          console.log(`[WhatsApp] Cleaned up stuck lockfile: ${name}`);
+        }
+      } catch (error) {
+        const code =
+          error && typeof error === "object" && "code" in error
+            ? String(error.code)
+            : "";
+        if (code !== "ENOENT") {
+          LOG("cleanupStuckLockfiles: failed", name, String(error));
         }
       }
     }
@@ -89,7 +95,7 @@ async function killBrowserProcessesReferencing(sessionPath: string) {
     const marker = path.basename(sessionPath) || "session-admin-whatsapp";
     if (process.platform === "win32") {
       // Use PowerShell to find processes whose command line references the marker
-      const cmd = `powershell -NoProfile -Command "Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -and $_.CommandLine -match '${marker}' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }"`;
+      const cmd = `powershell -NoProfile -Command "Get-CimInstance Win32_Process | Where-Object { $_.ProcessId -ne $PID -and $_.Name -match 'chrome|chromium' -and $_.CommandLine -and $_.CommandLine -match '${marker}' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }"`;
       await execp(cmd);
       LOG(
         "killBrowserProcessesReferencing: attempted PowerShell stop for marker",
@@ -98,14 +104,70 @@ async function killBrowserProcessesReferencing(sessionPath: string) {
       return;
     }
 
-    // POSIX: try to kill by matching the marker in the command line
-    // This command finds matching PIDs and kills them; ignore failures.
-    const cmd = `ps aux | grep -F '${marker}' | grep -v grep | awk '{print $2}' | xargs -r kill -9`;
-    await execp(cmd);
-    LOG(
-      "killBrowserProcessesReferencing: attempted POSIX kill for marker",
-      marker,
-    );
+    // POSIX: inspect the process table in Node instead of a grep/xargs shell
+    // pipeline. The old pipeline could match and kill its own shell because
+    // the marker also appeared in the command string.
+    const { stdout } = await execp("ps -axo pid=,command=");
+    const matchingPids = stdout
+      .split("\n")
+      .map((line) => line.match(/^\s*(\d+)\s+(.+)$/))
+      .filter(
+        (match): match is RegExpMatchArray =>
+          Boolean(match) &&
+          Number(match?.[1]) !== process.pid &&
+          /(?:chrome|chromium)/i.test(match?.[2] ?? "") &&
+          (match?.[2] ?? "").includes(sessionPath),
+      )
+      .map((match) => Number(match[1]))
+      .filter((pid) => Number.isInteger(pid) && pid > 1);
+
+    for (const pid of matchingPids) {
+      try {
+        process.kill(pid, "SIGTERM");
+      } catch (error) {
+        const code =
+          error && typeof error === "object" && "code" in error
+            ? String(error.code)
+            : "";
+        if (code !== "ESRCH") {
+          throw error;
+        }
+      }
+    }
+
+    if (matchingPids.length > 0) {
+      await new Promise((resolve) => setTimeout(resolve, 300));
+    }
+
+    const survivors = matchingPids.filter((pid) => {
+      try {
+        process.kill(pid, 0);
+        return true;
+      } catch {
+        return false;
+      }
+    });
+
+    for (const pid of survivors) {
+      try {
+        process.kill(pid, "SIGKILL");
+      } catch (error) {
+        const code =
+          error && typeof error === "object" && "code" in error
+            ? String(error.code)
+            : "";
+        if (code !== "ESRCH") {
+          throw error;
+        }
+      }
+    }
+
+    if (matchingPids.length > 0) {
+      LOG(
+        "killBrowserProcessesReferencing: stopped stale browser processes",
+        matchingPids,
+      );
+    }
   } catch (e) {
     LOG(
       "killBrowserProcessesReferencing: error while killing processes",
@@ -138,6 +200,37 @@ function ensureSessionDirectoryWritable() {
 
 const chromiumExecutablePath =
   process.env.WHATSAPP_CHROMIUM_EXECUTABLE_PATH?.trim() || undefined;
+
+function resolveWhatsAppUserAgent() {
+  const configured = process.env.WHATSAPP_USER_AGENT?.trim();
+  if (configured) {
+    return configured;
+  }
+
+  if (chromiumExecutablePath) {
+    try {
+      const result = spawnSync(chromiumExecutablePath, ["--version"], {
+        encoding: "utf8",
+        timeout: 3000,
+      });
+      const output = `${result.stdout ?? ""} ${result.stderr ?? ""}`;
+      const version = output.match(/(\d+\.\d+\.\d+\.\d+)/)?.[1];
+      if (version) {
+        // whatsapp-web.js currently defaults to Chrome 101 even when a much
+        // newer system Chrome is launched. WhatsApp can reject or stall device
+        // linking for that obsolete browser identity, so advertise the actual
+        // installed browser version while still hiding the HeadlessChrome tag.
+        return `Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${version} Safari/537.36`;
+      }
+    } catch (error) {
+      LOG("resolveWhatsAppUserAgent: browser version check failed", String(error));
+    }
+  }
+
+  return undefined;
+}
+
+const whatsappUserAgent = resolveWhatsAppUserAgent();
 // Bound Chromium's on-disk HTTP/media cache so the session profile under
 // WHATSAPP_SESSION_DIR can't grow unbounded over weeks of use. Default 64 MB
 // each; override via env if needed. 0 disables Chromium caching entirely.
@@ -161,13 +254,10 @@ const chatCacheTtlMs = Number(process.env.WHATSAPP_CHAT_CACHE_TTL_MS ?? 60000);
 const coldChatWaitMs = Number(process.env.WHATSAPP_COLD_CHAT_WAIT_MS ?? 8000);
 // Cache resolved profile-picture URLs so repeated /chat-avatar requests (one per
 // chat row, per browser) don't each trigger an expensive Puppeteer evaluation.
-// Found avatars are cached for hours; "no avatar" results for only a few minutes
-// so a contact that later adds a photo still shows up reasonably soon.
+// Found avatars are cached for hours. Failed/null lookups are not cached because
+// they are also returned transiently while WhatsApp is reconnecting or syncing.
 const avatarCacheOkTtlMs = Number(
   process.env.WHATSAPP_AVATAR_CACHE_TTL_MS ?? 6 * 60 * 60 * 1000,
-);
-const avatarCacheNullTtlMs = Number(
-  process.env.WHATSAPP_AVATAR_NULL_CACHE_TTL_MS ?? 5 * 60 * 1000,
 );
 // Lower default chat fetch limit for performance
 const chatFetchLimit = Number(process.env.WHATSAPP_CHAT_FETCH_LIMIT ?? 50);
@@ -179,6 +269,12 @@ const WARM_CACHE_MAX_ATTEMPTS = Number(
 );
 const operationConcurrencyLimit = Number(
   process.env.WHATSAPP_OPERATION_CONCURRENCY ?? 12,
+);
+const operationQueueLimit = Number(
+  process.env.WHATSAPP_OPERATION_QUEUE_LIMIT ?? 200,
+);
+const operationQueueTimeoutMs = Number(
+  process.env.WHATSAPP_OPERATION_QUEUE_TIMEOUT_MS ?? 30000,
 );
 const reconnectBaseDelayMs = Number(
   process.env.WHATSAPP_RECONNECT_BASE_DELAY_MS ?? 2000,
@@ -331,6 +427,29 @@ function toSafeMessageBody(body: string | undefined | null) {
   }
 
   return body.trim();
+}
+
+function toSafeMediaCaption(body: string | undefined | null) {
+  const caption = toSafeMessageBody(body);
+  if (!caption) {
+    return "";
+  }
+
+  // Some WhatsApp Web builds put the uploaded media payload in the returned
+  // message body. It is transport data, not a user caption, and must never be
+  // rendered in the conversation.
+  if (/^data:[^;,]+;base64,/i.test(caption)) {
+    return "";
+  }
+  if (
+    caption.length >= 256 &&
+    caption.length % 4 === 0 &&
+    /^[A-Za-z0-9+/]+={0,2}$/.test(caption)
+  ) {
+    return "";
+  }
+
+  return caption;
 }
 
 type MessageInternalData = {
@@ -486,6 +605,13 @@ function formatPhoneNumberForDisplay(value: string | null | undefined) {
 }
 
 function getPhoneNumberFromChatId(chatId: string | null | undefined) {
+  // A LID is WhatsApp's internal privacy-preserving contact identifier, not a
+  // dialable phone number. It must be resolved through WA's LID↔PN mapping
+  // before it is exposed as a phone-number label.
+  if (String(chatId ?? "").includes("@lid")) {
+    return null;
+  }
+
   const normalized = normalizeWhatsAppIdentifier(chatId);
   if (!normalized) {
     return null;
@@ -533,7 +659,103 @@ function getDisplayNameFromCandidates(
     return normalized;
   }
 
-  return phoneNumber || "Unknown contact";
+  return phoneNumber || "";
+}
+
+// Shape of a serialized WA Web internal message (msg.serialize()) as returned
+// by fetchMessagesRaw(). Only the fields we consume are typed; the rest are
+// tolerated via the index signature.
+type Wid = { server?: string; user?: string; _serialized?: string };
+type MessageKeyData = {
+  _serialized?: string;
+  fromMe?: boolean;
+  remote?: Wid | string;
+  id?: string;
+  self?: string;
+};
+interface MessageRawData {
+  id?: MessageKeyData;
+  body?: string;
+  caption?: string;
+  type?: string;
+  t?: number;
+  from?: Wid | string;
+  to?: Wid | string;
+  author?: Wid | string;
+  notifyName?: string;
+  ack?: number;
+  self?: string;
+  contextInfo?: {
+    quotedMessage?: unknown;
+    stanzaId?: string;
+    participant?: Wid | string;
+  };
+  [k: string]: unknown;
+}
+
+function serializeWid(value: Wid | string | undefined): string {
+  if (typeof value === "string") return value;
+  if (value?._serialized) return value._serialized;
+  if (value?.user && value?.server) return `${value.user}@${value.server}`;
+  return "";
+}
+
+function serializeMessageKey(value: MessageKeyData | unknown): string {
+  if (typeof value === "string") return value;
+  if (!value || typeof value !== "object") return "";
+
+  const key = value as MessageKeyData & { toString?: () => string };
+  if (key._serialized) return key._serialized;
+
+  // Live WAWeb MsgKey models still stringify to the collection key even though
+  // `_serialized` was removed in current 2.3000 builds.
+  if (typeof key.toString === "function") {
+    const serialized = key.toString();
+    if (serialized && serialized !== "[object Object]") {
+      return serialized;
+    }
+  }
+
+  // msg.serialize() strips the MsgKey prototype. Rebuild the exact key format
+  // used by WAWebCollections.Msg: fromMe_remote_id_self.
+  const remote = serializeWid(key.remote);
+  if (!remote || !key.id) return "";
+  return `${Boolean(key.fromMe)}_${remote}_${key.id}${
+    key.self ? `_${key.self}` : ""
+  }`;
+}
+
+// Adapt a serialized raw message into the wwebjs Message-like object that
+// mapMessage() and the group-labeling code expect. Only the accessed surface
+// is reproduced (getters used by mapMessage + `author`).
+function rawToMessageLike(raw: MessageRawData): Message {
+  const ser = (w?: Wid | string): string =>
+    typeof w === "string" ? w : w?._serialized || "";
+  const quoted = raw.contextInfo?.quotedMessage;
+  return {
+    id: {
+      _serialized: serializeMessageKey(raw.id),
+      fromMe: Boolean(raw.id?.fromMe),
+    },
+    body: typeof raw.body === "string" ? raw.body : raw.caption || "",
+    type: raw.type || "chat",
+    timestamp: typeof raw.t === "number" ? raw.t : 0,
+    fromMe: Boolean(raw.id?.fromMe),
+    from: ser(raw.from),
+    to: ser(raw.to),
+    author: ser(raw.author) || undefined,
+    ack: typeof raw.ack === "number" ? raw.ack : undefined,
+    hasMedia: ["image", "video", "audio", "ptt", "document", "sticker"].includes(
+      raw.type || "",
+    ),
+    _data: {
+      notifyName: raw.notifyName,
+      quotedStanzaID: raw.contextInfo?.stanzaId,
+      quotedMsg: quoted,
+      mimetype: (raw as { mimetype?: string }).mimetype,
+      filename: (raw as { filename?: string }).filename,
+    },
+  } as unknown as Message;
 }
 
 function mapMessage(message: Message): WhatsAppMessage {
@@ -541,7 +763,10 @@ function mapMessage(message: Message): WhatsAppMessage {
     _data?: MessageInternalData;
   };
 
-  const rawBody = toSafeMessageBody(message.body);
+  const hasMedia = Boolean(message.hasMedia);
+  const rawBody = hasMedia
+    ? toSafeMediaCaption(message.body)
+    : toSafeMessageBody(message.body);
   const fallbackLabel = getMessageTypeLabel(message.type, false);
 
   const quotedMsg = internalData._data?.quotedMsg;
@@ -555,16 +780,16 @@ function mapMessage(message: Message): WhatsAppMessage {
     : null;
 
   return {
-    id: message.id._serialized,
+    id: serializeMessageKey(message.id),
     chatId: message.fromMe ? message.to : message.from,
-    body: rawBody || fallbackLabel || "Unsupported message",
+    body: hasMedia ? rawBody : rawBody || fallbackLabel || "Unsupported message",
     timestamp: Number(message.timestamp ?? 0) * 1000,
     fromMe: message.fromMe,
     author: normalizeWhatsAppIdentifier(
       internalData._data?.notifyName || message.author || null,
     ),
     ack: typeof message.ack === "number" ? message.ack : undefined,
-    hasMedia: Boolean(message.hasMedia),
+    hasMedia,
     mediaType: message.type || null,
     mimetype: internalData._data?.mimetype || null,
     filename: internalData._data?.filename || null,
@@ -579,7 +804,9 @@ function getLastMessagePreview(message: MessageLike | null | undefined) {
     return "Open chat to view messages";
   }
 
-  const body = toSafeMessageBody(message.body);
+  const body = message.hasMedia
+    ? toSafeMediaCaption(message.body)
+    : toSafeMessageBody(message.body);
   const label = getMessageTypeLabel(message.type, Boolean(message.hasMedia));
 
   if (message.hasMedia) {
@@ -596,7 +823,7 @@ function mapChat(chat: Chat): WhatsAppChatSummary {
   const lastTimestamp =
     typeof chat.timestamp === "number" ? chat.timestamp * 1000 : null;
   const lastMessage = getLastMessagePreview(chat.lastMessage as MessageLike);
-  const phoneNumber = getPhoneNumberFromChatId(chat.id.user || chat.id._serialized);
+  const phoneNumber = getPhoneNumberFromChatId(chat.id._serialized);
   const displayName = getDisplayNameFromCandidates(
     [
       internalData._data?.formattedTitle,
@@ -653,10 +880,15 @@ function getChatAvatarSeed(chatId: string) {
 function createOptimisticChatSummary(
   message: WhatsAppMessage,
 ): WhatsAppChatSummary {
+  const phoneNumber = getPhoneNumberFromChatId(message.chatId);
   return {
     id: message.chatId,
-    name: getPhoneNumberFromChatId(message.chatId) || getChatAvatarSeed(message.chatId),
-    phoneNumber: getPhoneNumberFromChatId(message.chatId),
+    name:
+      phoneNumber ||
+      (message.chatId.endsWith("@lid")
+        ? ""
+        : getChatAvatarSeed(message.chatId)),
+    phoneNumber,
     lastMessage: message.body,
     timestamp: message.timestamp,
     unreadCount: message.fromMe ? 0 : 1,
@@ -693,8 +925,14 @@ class WhatsAppService {
   private reconnectTimer: NodeJS.Timeout | null = null;
   private reconnectAttempts = 0;
   private authFailureTimestamps: number[] = [];
+  private readyRecoveryTimer: NodeJS.Timeout | null = null;
+  private readyRecoveryInFlight = false;
   private activeOperationCount = 0;
-  private operationQueue: Array<() => void> = [];
+  private operationQueue: Array<{
+    resolve: () => void;
+    reject: (error: Error) => void;
+    timer: NodeJS.Timeout;
+  }> = [];
   private cachePersistTimer: NodeJS.Timeout | null = null;
 
   constructor() {
@@ -720,12 +958,21 @@ class WhatsAppService {
 
       if (Array.isArray(parsed.chats) && parsed.chats.length > 0) {
         this.chatsCache = parsed.chats.map((chat) => {
-          const phoneNumber =
-            chat.phoneNumber || getPhoneNumberFromChatId(chat.id);
+          const phoneNumber = isLikelyLidIdentifier(chat.id)
+            ? null
+            : chat.phoneNumber || getPhoneNumberFromChatId(chat.id);
           return {
             ...chat,
             phoneNumber,
-            name: getDisplayNameFromCandidates([chat.name], phoneNumber),
+            name: getDisplayNameFromCandidates(
+              [
+                isLikelyLidIdentifier(chat.name) ||
+                chat.name === "Unknown contact"
+                  ? null
+                  : chat.name,
+              ],
+              phoneNumber,
+            ),
           };
         });
         const containsLidLabels = this.chatsCache.some(
@@ -745,9 +992,11 @@ class WhatsAppService {
       if (Array.isArray(parsed.avatars)) {
         const now = Date.now();
         for (const [id, entry] of parsed.avatars) {
-          if (!entry) continue;
-          const ttl = entry.url ? avatarCacheOkTtlMs : avatarCacheNullTtlMs;
-          if (now - entry.at <= ttl) {
+          // Do not restore cached "no avatar" results across restarts. A null
+          // produced by an outdated WA module lookup would otherwise hide every
+          // profile picture until its negative-cache TTL expires.
+          if (!entry?.url) continue;
+          if (now - entry.at <= avatarCacheOkTtlMs) {
             this.avatarCache.set(id, entry);
           }
         }
@@ -773,10 +1022,11 @@ class WhatsAppService {
   }
 
   private persistCachesNow() {
+    const tempFile = `${CACHE_FILE}.${process.pid}.tmp`;
     try {
       fs.mkdirSync(SESSION_DIR, { recursive: true });
       fs.writeFileSync(
-        CACHE_FILE,
+        tempFile,
         JSON.stringify({
           savedAt: Date.now(),
           chats: this.chatsCache,
@@ -784,8 +1034,14 @@ class WhatsAppService {
           avatars: Array.from(this.avatarCache.entries()),
         }),
       );
+      // Atomic replacement prevents a process interruption from leaving a
+      // partially written JSON cache that every user would inherit on restart.
+      fs.renameSync(tempFile, CACHE_FILE);
     } catch (e) {
       LOG("persistCachesNow: failed", String(e));
+      try {
+        fs.unlinkSync(tempFile);
+      } catch {}
     }
   }
 
@@ -828,6 +1084,40 @@ class WhatsAppService {
 
     if (ids.length === 0) {
       return chats;
+    }
+
+    const resolvedById: Record<
+      string,
+      { phoneNumber: string | null; name: string | null }
+    > = {};
+
+    // Prefer whatsapp-web.js's supported LID/phone resolver. It runs lookups in
+    // parallel and preserves result order, avoiding the old sequential
+    // in-page loop timing out and leaving the raw LID visible in the UI.
+    try {
+      const pairs = await withTimeout(
+        client.getContactLidAndPhone(ids),
+        20000,
+        "getContactLidAndPhone",
+      );
+      pairs.forEach((pair, index) => {
+        const chatId = ids[index];
+        const phoneNumber = getPhoneNumberFromChatId(pair?.pn);
+        if (chatId && phoneNumber) {
+          resolvedById[chatId] = { phoneNumber, name: null };
+        }
+      });
+    } catch (error) {
+      LOG("getContactLidAndPhone failed:", String(error));
+    }
+
+    const unresolvedIds = ids.filter(
+      (chatId) => !resolvedById[chatId]?.phoneNumber,
+    );
+    if (unresolvedIds.length === 0) {
+      return chats.map((chat) =>
+        applyResolvedChatIdentity(chat, resolvedById[chat.id] ?? null),
+      );
     }
 
     const pupPage = (client as unknown as { pupPage?: unknown }).pupPage as
@@ -1000,19 +1290,22 @@ class WhatsAppService {
 
           return out;
           /* eslint-enable @typescript-eslint/no-explicit-any */
-        }, ids) as Promise<
+        }, unresolvedIds) as Promise<
           Record<string, { phoneNumber: string | null; name: string | null }>
         >,
         15000,
         "resolveChatIdentities",
       )) as Record<string, { phoneNumber: string | null; name: string | null }>;
 
+      const combined = { ...resolvedById, ...resolved };
       return chats.map((chat) =>
-        applyResolvedChatIdentity(chat, resolved?.[chat.id] ?? null),
+        applyResolvedChatIdentity(chat, combined[chat.id] ?? null),
       );
     } catch (error) {
       LOG("resolveChatIdentities failed:", String(error));
-      return chats;
+      return chats.map((chat) =>
+        applyResolvedChatIdentity(chat, resolvedById[chat.id] ?? null),
+      );
     }
   }
 
@@ -1035,6 +1328,86 @@ class WhatsAppService {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
     }
+  }
+
+  private clearReadyRecoveryTimer() {
+    if (this.readyRecoveryTimer) {
+      clearTimeout(this.readyRecoveryTimer);
+      this.readyRecoveryTimer = null;
+    }
+  }
+
+  /**
+   * Current WA Web 2.3000 builds can finish socket sync before whatsapp-web.js
+   * attaches its `change:hasSynced` listener. In that race `authenticated`
+   * fires, but `ready` never does. Re-run the already-exposed sync callback
+   * once the socket reports CONNECTED/hasSynced so the library completes its
+   * normal utility injection and emits `ready`.
+   */
+  private scheduleReadyRecovery(client: WhatsAppClient) {
+    this.clearReadyRecoveryTimer();
+    this.readyRecoveryTimer = setTimeout(async () => {
+      this.readyRecoveryTimer = null;
+      if (
+        this.readyRecoveryInFlight ||
+        this.client !== client ||
+        this.state.status !== "authenticated"
+      ) {
+        return;
+      }
+
+      const page = (client as unknown as { pupPage?: unknown }).pupPage as
+        | {
+            evaluate<T>(fn: () => T | Promise<T>): Promise<T>;
+          }
+        | undefined;
+      if (!page?.evaluate) {
+        return;
+      }
+
+      this.readyRecoveryInFlight = true;
+      try {
+        const result = await withTimeout(
+          page.evaluate(async () => {
+            try {
+              /* eslint-disable @typescript-eslint/no-explicit-any */
+              const w = window as any;
+              const socket = w.require?.("WAWebSocketModel")?.Socket;
+              const state = socket?.state ?? null;
+              const hasSynced = Boolean(socket?.hasSynced);
+              const canSignal =
+                typeof w.onAppStateHasSyncedEvent === "function";
+
+              if ((state === "CONNECTED" || hasSynced) && canSignal) {
+                await w.onAppStateHasSyncedEvent();
+                return { state, hasSynced, triggered: true };
+              }
+
+              return { state, hasSynced, triggered: false };
+              /* eslint-enable @typescript-eslint/no-explicit-any */
+            } catch (error) {
+              return {
+                state: null,
+                hasSynced: false,
+                triggered: false,
+                error: String(error),
+              };
+            }
+          }),
+          45000,
+          "WhatsApp ready recovery",
+        );
+        LOG("ready recovery check", result);
+      } catch (error) {
+        LOG("ready recovery failed", String(error));
+      } finally {
+        this.readyRecoveryInFlight = false;
+      }
+
+      if (this.client === client && this.state.status === "authenticated") {
+        this.scheduleReadyRecovery(client);
+      }
+    }, 15000);
   }
 
   private clearAuthFailureHistory() {
@@ -1106,8 +1479,38 @@ class WhatsAppService {
       return;
     }
 
-    await new Promise<void>((resolve) => {
-      this.operationQueue.push(resolve);
+    const maxQueue =
+      Number.isFinite(operationQueueLimit) && operationQueueLimit > 0
+        ? operationQueueLimit
+        : 200;
+    if (this.operationQueue.length >= maxQueue) {
+      throw new Error(
+        "WhatsApp is busy handling other users. Please retry shortly.",
+      );
+    }
+
+    await new Promise<void>((resolve, reject) => {
+      const timeoutMs =
+        Number.isFinite(operationQueueTimeoutMs) &&
+        operationQueueTimeoutMs > 0
+          ? operationQueueTimeoutMs
+          : 30000;
+      const waiter = {
+        resolve,
+        reject,
+        timer: setTimeout(() => {
+          const index = this.operationQueue.indexOf(waiter);
+          if (index >= 0) {
+            this.operationQueue.splice(index, 1);
+          }
+          reject(
+            new Error(
+              "WhatsApp is busy handling other users. Please retry shortly.",
+            ),
+          );
+        }, timeoutMs),
+      };
+      this.operationQueue.push(waiter);
     });
     this.activeOperationCount += 1;
   }
@@ -1116,7 +1519,8 @@ class WhatsAppService {
     this.activeOperationCount = Math.max(0, this.activeOperationCount - 1);
     const next = this.operationQueue.shift();
     if (next) {
-      next();
+      clearTimeout(next.timer);
+      next.resolve();
     }
   }
 
@@ -1152,37 +1556,17 @@ class WhatsAppService {
     try {
       ensureSessionDirectoryWritable();
 
-      // Clean up any stuck lockfiles before starting
-      cleanupStuckLockfiles();
-
-      // Ensure the session subdirectory exists and try to kill any lingering
-      // browser processes that may be holding the profile open. This prevents
-      // a loop where lockfiles are removed but the browser immediately
-      // recreates them.
+      // Stop any browser still using this profile before deleting its lock
+      // markers. Deleting the markers first allowed a second Chrome instance
+      // to open the same profile while the orphaned process was still alive.
       try {
         const sessionPath = path.join(SESSION_DIR, "session-admin-whatsapp");
         fs.mkdirSync(sessionPath, { recursive: true });
-
-        const lockCandidates = [
-          path.join(sessionPath, "lockfile"),
-          path.join(sessionPath, "LOCK"),
-          path.join(sessionPath, "SingletonLock"),
-          path.join(sessionPath, "SingletonSocket"),
-          path.join(sessionPath, "DevToolsActivePort"),
-        ];
-
-        const anyLockExists = lockCandidates.some((p) => fs.existsSync(p));
-        if (anyLockExists) {
-          LOG(
-            "initializeClient: lockfiles detected, attempting to kill browser processes referencing session",
-          );
-          // best-effort kill; ignore errors
-          await killBrowserProcessesReferencing(sessionPath);
-          // allow filesystem settle
-          await new Promise((r) => setTimeout(r, 400));
-          // attempt cleanup again
-          cleanupStuckLockfiles();
-        }
+        await killBrowserProcessesReferencing(sessionPath);
+        // Give terminated browser processes time to release their profile
+        // handles, then remove any remaining lockfiles/dangling symlinks.
+        await new Promise((resolve) => setTimeout(resolve, 400));
+        cleanupStuckLockfiles();
       } catch (e) {
         LOG("initializeClient: session pre-setup failed", String(e));
       }
@@ -1194,12 +1578,18 @@ class WhatsAppService {
         }),
         // Extra time for WhatsApp Web to inject and authenticate.
         authTimeoutMs: 180000,
+        ...(whatsappUserAgent ? { userAgent: whatsappUserAgent } : {}),
         puppeteer: {
           headless: process.env.WHATSAPP_HEADLESS !== "false",
           executablePath: chromiumExecutablePath,
-          protocolTimeout: Number.isFinite(protocolTimeoutMs)
-            ? protocolTimeoutMs
-            : 180000,
+          // `protocolTimeout` is a valid runtime Puppeteer launch option but is
+          // missing from the old bundled puppeteer-core 18.2.1 LaunchOptions
+          // type. Cast so tsc accepts it without dropping the runtime behavior.
+          ...({
+            protocolTimeout: Number.isFinite(protocolTimeoutMs)
+              ? protocolTimeoutMs
+              : 180000,
+          } as Record<string, unknown>),
           args: [
             "--no-sandbox",
             "--disable-setuid-sandbox",
@@ -1226,20 +1616,31 @@ class WhatsAppService {
             "--window-size=1280,800",
           ],
         },
-        // Pin a known-good WA Web version fetched from the wppconnect archive.
-        // Using type:'local' (live WhatsApp CDN) breaks wwebjs when WA ships a new
-        // version that hasn't been patched yet, causing auth / ready events to never
-        // fire and effectively logging everyone out.
-        webVersion: process.env.WHATSAPP_WEB_VERSION || "2.2412.54",
-        webVersionCache: {
-          type: "remote",
-          remotePath:
-            "https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/{version}.html",
-        },
+        // WA Web version handling:
+        //  - If WHATSAPP_WEB_VERSION is set, pin that exact build from the
+        //    wppconnect archive (deterministic, but breaks when the pinned
+        //    build ages out / is pruned from the mirror).
+        //  - If it is UNSET, use type:'local' (whatever WhatsApp Web serves
+        //    live). This self-heals to the current build so `ready` fires even
+        //    after WA rolls its web build forward, instead of hanging on a
+        //    dead pinned version. This is wwebjs's own default.
+        ...(process.env.WHATSAPP_WEB_VERSION
+          ? {
+              webVersion: process.env.WHATSAPP_WEB_VERSION,
+              webVersionCache: {
+                type: "remote" as const,
+                remotePath:
+                  "https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/{version}.html",
+              },
+            }
+          : {
+              webVersionCache: { type: "local" as const },
+            }),
       });
 
       client.on("qr", (qr: string) => {
         LOG("event: qr received");
+        this.clearReadyRecoveryTimer();
         this.setState({ status: "qr", qr, error: null });
       });
 
@@ -1247,10 +1648,12 @@ class WhatsAppService {
         LOG("event: authenticated");
         this.clearAuthFailureHistory();
         this.setState({ status: "authenticated", error: null });
+        this.scheduleReadyRecovery(client);
       });
 
       client.on("ready", () => {
         LOG("event: ready");
+        this.clearReadyRecoveryTimer();
         this.clearAuthFailureHistory();
         this.reconnectAttempts = 0;
         this.clearReconnectTimer();
@@ -1324,6 +1727,7 @@ class WhatsAppService {
 
       client.on("auth_failure", (message: string) => {
         LOG("event: auth_failure", message);
+        this.clearReadyRecoveryTimer();
         const shouldClearSession =
           this.registerAuthFailureAndShouldClearSession();
 
@@ -1375,6 +1779,7 @@ class WhatsAppService {
 
       client.on("disconnected", (reason: string) => {
         LOG("event: disconnected", reason);
+        this.clearReadyRecoveryTimer();
         this.clearReconnectTimer();
         this.client = null;
         this.setState({
@@ -1410,6 +1815,14 @@ class WhatsAppService {
           status: "error",
           error: error.message || "WhatsApp client encountered an error.",
         });
+      });
+
+      client.on("change_state", (state: string) => {
+        LOG("event: connection state", state);
+      });
+
+      client.on("loading_screen", (percent: number, message: string) => {
+        LOG("event: loading screen", percent, message);
       });
 
       client.on("message", async (message: Message) => {
@@ -1628,6 +2041,8 @@ class WhatsAppService {
    * Reset the client (for recovery after crashes)
    */
   resetClient() {
+    this.clearReadyRecoveryTimer();
+    this.readyRecoveryInFlight = false;
     if (this.client) {
       try {
         LOG("resetClient: destroying client");
@@ -1666,6 +2081,8 @@ class WhatsAppService {
 
     const brokenClient = this.client;
 
+    this.clearReadyRecoveryTimer();
+    this.readyRecoveryInFlight = false;
     this.client = null;
     this.initializingPromise = null;
 
@@ -1718,13 +2135,17 @@ class WhatsAppService {
   }
 
   async getChatAvatarUrlById(chatId: string): Promise<string | null> {
-    // Serve from cache when fresh — avoids a Puppeteer round-trip per request.
+    // Cache only successful URLs. A null can mean the client was still syncing,
+    // the chat model was not loaded yet, or WhatsApp was reconnecting; treating
+    // it as "no profile photo" hides valid avatars even after recovery.
     const cached = this.avatarCache.get(chatId);
-    if (cached) {
-      const ttl = cached.url ? avatarCacheOkTtlMs : avatarCacheNullTtlMs;
-      if (Date.now() - cached.at <= ttl) {
+    if (cached?.url) {
+      if (Date.now() - cached.at <= avatarCacheOkTtlMs) {
         return cached.url;
       }
+      this.avatarCache.delete(chatId);
+    } else if (cached) {
+      this.avatarCache.delete(chatId);
     }
 
     // Collapse concurrent lookups for the same chat into one in-flight request.
@@ -1735,8 +2156,10 @@ class WhatsAppService {
 
     const promise = this.resolveChatAvatarUrlById(chatId)
       .then((url) => {
-        this.avatarCache.set(chatId, { url, at: Date.now() });
-        this.persistCachesDebounced();
+        if (url) {
+          this.avatarCache.set(chatId, { url, at: Date.now() });
+          this.persistCachesDebounced();
+        }
         return url;
       })
       .finally(() => {
@@ -1805,22 +2228,34 @@ class WhatsAppService {
           pupPage.evaluate(async (id: unknown) => {
             try {
               /* eslint-disable @typescript-eslint/no-explicit-any */
-              const store = (window as any).Store;
-              if (!store?.WidFactory || !store?.ProfilePic) return null;
-              const wid = store.WidFactory.createWid(id as string);
-              const result = await store.ProfilePic.profilePicFind(wid);
-              if (!result) return null;
-              // Plain object (newer wwebjs) or Backbone model (.get accessor)
-              return (
-                result.eurl ||
-                (typeof result.get === "function"
-                  ? result.get("eurl")
-                  : null) ||
-                null
+              const w = window as any;
+              const serializedId = id as string;
+              const bridge = w.require(
+                "WAWebContactProfilePicThumbBridge",
               );
-            } catch {
+              const coll = w.require("WAWebCollections");
+              const loadedChats =
+                coll?.Chat?.getModelsArray?.() ?? coll?.Chat?.models ?? [];
+              // Use the loaded model itself. Current WA Web's bridge accepts a
+              // Chat model; reconstructing it through older Store/ProfilePic
+              // wrappers returned null even though the model had a valid photo.
+              const chat = loadedChats.find((candidate: any) => {
+                  const candidateId = candidate?.id;
+                  return (
+                    String(candidateId) === serializedId ||
+                    candidateId?._serialized === serializedId ||
+                    `${candidateId?.user || ""}@${candidateId?.server || ""}` ===
+                      serializedId
+                  );
+                });
+              if (!chat || !bridge?.requestProfilePicFromServer) return null;
+              const result = await bridge.requestProfilePicFromServer(chat);
+              return typeof result?.eurl === "string" ? result.eurl : null;
+            } catch (error: any) {
+              if (error?.name === "ServerStatusCodeError") return null;
               return null;
             }
+            /* eslint-enable @typescript-eslint/no-explicit-any */
           }, chatId) as Promise<string | null>,
           10000,
           `profilePicFind(${chatId})`,
@@ -1877,17 +2312,20 @@ class WhatsAppService {
     content: string,
     quotedMessageId?: string,
   ) {
+    const normalizedMediaData = media.data.includes(",")
+      ? media.data.slice(media.data.indexOf(",") + 1)
+      : media.data;
     const mediaPayload = new MessageMedia(
       media.mimetype || "application/octet-stream",
-      media.data,
+      normalizedMediaData,
       media.filename || "attachment",
     );
 
-    const baseOptions: Record<string, unknown> = {
-      // Some environments reject media sends without a body; a single space keeps
-      // attachment-only sends compatible while remaining visually unobtrusive.
-      caption: content || " ",
-    };
+    const baseOptions: Record<string, unknown> = {};
+
+    if (content) {
+      baseOptions.caption = content;
+    }
 
     if (quotedMessageId) {
       baseOptions.quotedMessageId = quotedMessageId;
@@ -1905,18 +2343,23 @@ class WhatsAppService {
       const firstMessage =
         firstError instanceof Error ? firstError.message : String(firstError);
 
-      if (!firstMessage.toLowerCase().includes("message body is required")) {
-        throw firstError;
-      }
+      LOG("sendMediaWithFallbacks: direct media send failed", firstMessage);
 
-      // Fallback 1: force a non-empty caption for environments that incorrectly
-      // require a body with media payloads.
+      // Fallback 1: use the alternate whatsapp-web.js media option signature.
+      // This follows a separate branch in Client.sendMessage and works around
+      // current WA builds that reject a MessageMedia instance as the body.
       try {
-        return await client.sendMessage(chatId, mediaPayload, {
+        return await client.sendMessage(chatId, content || " ", {
           ...baseOptions,
-          caption: content || " ",
+          media: mediaPayload,
         });
-      } catch {
+      } catch (fallbackError) {
+        LOG(
+          "sendMediaWithFallbacks: media-option fallback failed",
+          fallbackError instanceof Error
+            ? fallbackError.message
+            : String(fallbackError),
+        );
         // Continue to the next fallback.
       }
 
@@ -1936,7 +2379,10 @@ class WhatsAppService {
       );
 
       try {
-        fs.writeFileSync(tempFilePath, Buffer.from(media.data, "base64"));
+        fs.writeFileSync(
+          tempFilePath,
+          Buffer.from(normalizedMediaData, "base64"),
+        );
         const filePayload = MessageMedia.fromFilePath(tempFilePath);
 
         return Object.keys(baseOptions).length > 0
@@ -2196,9 +2642,17 @@ class WhatsAppService {
                 }
                 out.push({
                   id: c.id._serialized,
-                  name: savedName || c.formattedTitle || c.name || c.id?.user || "",
+                  name:
+                    savedName ||
+                    c.formattedTitle ||
+                    c.name ||
+                    (c.id?.server === "c.us" ? c.id?.user : "") ||
+                    "",
                   idUser: c.id?.user || "",
-                  phoneNumber: phone || c.id?.user || null,
+                  phoneNumber:
+                    phone ||
+                    (c.id?.server === "c.us" ? c.id?.user : null) ||
+                    null,
                   timestamp: typeof c.t === "number" ? c.t : null,
                   unreadCount:
                     typeof c.unreadCount === "number" ? c.unreadCount : 0,
@@ -2297,30 +2751,36 @@ class WhatsAppService {
 
       if (!Array.isArray(raw)) return [];
 
-      return raw.map((r) => ({
-        id: r.id,
-        name: getDisplayNameFromCandidates(
-          [r.name, r.idUser],
-          getPhoneNumberFromChatId(r.phoneNumber || r.idUser || r.id),
-        ),
-        phoneNumber: getPhoneNumberFromChatId(r.phoneNumber || r.idUser || r.id),
-        lastMessage: getLastMessagePreview(
-          r.lastMessageBody !== null || r.lastMessageHasMedia
-            ? {
-                body: r.lastMessageBody,
-                hasMedia: r.lastMessageHasMedia,
-                type: r.lastMessageType,
-              }
-            : null,
-        ),
-        timestamp: r.timestamp !== null ? r.timestamp * 1000 : null,
-        unreadCount: r.unreadCount,
-        avatarSeed: r.idUser || r.id,
-        avatarUrl: null,
-        isGroup: r.isGroup,
-        isMuted: r.isMuted,
-        isPinned: r.isPinned,
-      }));
+      return raw.map((r) => {
+        const isLid = r.id.endsWith("@lid");
+        const phoneNumber = getPhoneNumberFromChatId(
+          r.phoneNumber || (!isLid ? r.idUser : null) || r.id,
+        );
+        return {
+          id: r.id,
+          name: getDisplayNameFromCandidates(
+            [r.name, !isLid ? r.idUser : null],
+            phoneNumber,
+          ),
+          phoneNumber,
+          lastMessage: getLastMessagePreview(
+            r.lastMessageBody !== null || r.lastMessageHasMedia
+              ? {
+                  body: r.lastMessageBody,
+                  hasMedia: r.lastMessageHasMedia,
+                  type: r.lastMessageType,
+                }
+              : null,
+          ),
+          timestamp: r.timestamp !== null ? r.timestamp * 1000 : null,
+          unreadCount: r.unreadCount,
+          avatarSeed: r.idUser || r.id,
+          avatarUrl: null,
+          isGroup: r.isGroup,
+          isMuted: r.isMuted,
+          isPinned: r.isPinned,
+        };
+      });
     } catch (e) {
       LOG("searchChatsAndContacts failed:", String(e));
       return [];
@@ -2447,6 +2907,89 @@ class WhatsAppService {
     });
   }
 
+  // Fetch messages for a chat by reading the internal WAWebCollections Chat
+  // model directly (chat.msgs.getModelsArray()), bypassing wwebjs's
+  // getChatById()/fetchMessages() which fail with a minified `r` error on
+  // current WA Web builds (their internal Store helpers are renamed/gone).
+  // Returns serialized raw message objects (msg.serialize()); the caller adapts
+  // them into the shape mapMessage() expects. Best-effort loads earlier history
+  // via WAWebChatLoadMessages when that module is present, ignoring failures.
+  private async fetchMessagesRaw(
+    client: WhatsAppClient,
+    chatId: string,
+    limit: number,
+  ): Promise<MessageRawData[]> {
+    const pupPage = (client as unknown as { pupPage?: unknown }).pupPage as
+      | {
+          evaluate(
+            fn: (...a: unknown[]) => unknown,
+            ...args: unknown[]
+          ): Promise<unknown>;
+        }
+      | undefined;
+    if (!pupPage?.evaluate) return [];
+    const raw = (await withTimeout(
+      pupPage.evaluate(
+        async (cid: unknown, lim: unknown) => {
+          /* eslint-disable @typescript-eslint/no-explicit-any */
+          try {
+            const w = window as any;
+            const coll = w.require("WAWebCollections");
+            if (!coll?.Chat) return null;
+            let wid: any = cid;
+            try {
+              wid = w.require("WAWebWidFactory").createWid(cid as string);
+            } catch {
+              wid = cid;
+            }
+            const chat = coll.Chat.get(wid) || coll.Chat.get(cid as string);
+            if (!chat) return null;
+            const limitNum = (lim as number) || 80;
+
+            // Best-effort: pull older history until we have enough (or the
+            // loader module is unavailable / throws — then just use what's
+            // already in the local msgs collection).
+            try {
+              const loader = w.require("WAWebChatLoadMessages");
+              let guard = 0;
+              while (
+                (chat.msgs?.getModelsArray?.().length ?? 0) < limitNum &&
+                guard < 10
+              ) {
+                guard++;
+                const loaded = await loader.loadEarlierMsgs({ chat });
+                if (!loaded || !loaded.length) break;
+              }
+            } catch {
+              /* loader unavailable — use whatever is cached */
+            }
+
+            const msgs: any[] = chat.msgs?.getModelsArray?.() ?? [];
+            return msgs
+              .filter((m: any) => m && !m.isNotification)
+              .slice(-limitNum)
+              .map((m: any) => {
+                try {
+                  return m.serialize ? m.serialize() : null;
+                } catch {
+                  return null;
+                }
+              })
+              .filter((m: any) => m !== null);
+          } catch {
+            return null;
+          }
+          /* eslint-enable @typescript-eslint/no-explicit-any */
+        },
+        chatId,
+        limit,
+      ) as Promise<MessageRawData[] | null>,
+      Number.isFinite(chatFetchTimeoutMs) ? chatFetchTimeoutMs : 180000,
+      "WhatsApp message fetch",
+    )) as MessageRawData[] | null;
+    return Array.isArray(raw) ? raw : [];
+  }
+
   private async refreshChats(
     client: WhatsAppClient,
     options: { allowSlowFallback?: boolean } = {},
@@ -2509,10 +3052,26 @@ class WhatsAppService {
             pupPage.evaluate((lim: unknown) => {
               try {
                 /* eslint-disable @typescript-eslint/no-explicit-any */
-                const store = (window as any).Store;
-                if (!store?.Chat) return null;
-                if (!Array.isArray(store.Chat.models)) return null;
-                const models: any[] = store.Chat.models;
+                const w = window as any;
+                // On current WA Web builds wwebjs no longer exposes
+                // window.Store; the Chat/Contact collections live in the
+                // internal 'WAWebCollections' module, reachable through
+                // wwebjs's window.require shim. Prefer that, fall back to the
+                // legacy window.Store for older builds.
+                let coll: any = null;
+                try {
+                  coll = w.require ? w.require("WAWebCollections") : null;
+                } catch {
+                  coll = null;
+                }
+                const chatColl = coll?.Chat ?? w.Store?.Chat ?? null;
+                const contactColl = coll?.Contact ?? w.Store?.Contact ?? null;
+                const models: any[] =
+                  chatColl?.getModelsArray?.() ??
+                  (Array.isArray(chatColl?.models) ? chatColl.models : null);
+                if (!Array.isArray(models)) return null;
+
+                const store = { Contact: contactColl };
 
                 return models
                   .filter(
@@ -2536,9 +3095,15 @@ class WhatsAppService {
                           : "";
                       return {
                         id: c.id._serialized,
-                        name: savedName || c.formattedTitle || c.name || c.id?.user || "",
+                        name:
+                          savedName ||
+                          c.formattedTitle ||
+                          c.name ||
+                          (c.id?.server === "c.us" ? c.id?.user : "") ||
+                          "",
                         idUser: c.id?.user || "",
-                        phoneNumber: c.id?.user || null,
+                        phoneNumber:
+                          c.id?.server === "c.us" ? c.id?.user || null : null,
                         timestamp: typeof c.t === "number" ? c.t : null,
                         unreadCount:
                           typeof c.unreadCount === "number" ? c.unreadCount : 0,
@@ -2567,30 +3132,36 @@ class WhatsAppService {
 
           if (Array.isArray(raw) && raw.length > 0) {
             LOG(`refreshChats: fast path returned ${raw.length} chats`);
-            const mappedChats: WhatsAppChatSummary[] = raw.map((r) => ({
-              id: r.id,
-              name: getDisplayNameFromCandidates(
-                [r.name, r.idUser],
-                getPhoneNumberFromChatId(r.phoneNumber || r.idUser || r.id),
-              ),
-              phoneNumber: getPhoneNumberFromChatId(r.phoneNumber || r.idUser || r.id),
-              lastMessage: getLastMessagePreview(
-                r.lastMessageBody !== null || r.lastMessageHasMedia
-                  ? {
-                      body: r.lastMessageBody,
-                      hasMedia: r.lastMessageHasMedia,
-                      type: r.lastMessageType,
-                    }
-                  : null,
-              ),
-              timestamp: r.timestamp !== null ? r.timestamp * 1000 : null,
-              unreadCount: r.unreadCount,
-              avatarSeed: r.idUser || r.id,
-              avatarUrl: null,
-              isGroup: r.isGroup,
-              isMuted: r.isMuted,
-              isPinned: r.isPinned,
-            }));
+            const mappedChats: WhatsAppChatSummary[] = raw.map((r) => {
+              const isLid = r.id.endsWith("@lid");
+              const phoneNumber = getPhoneNumberFromChatId(
+                r.phoneNumber || (!isLid ? r.idUser : null) || r.id,
+              );
+              return {
+                id: r.id,
+                name: getDisplayNameFromCandidates(
+                  [r.name, !isLid ? r.idUser : null],
+                  phoneNumber,
+                ),
+                phoneNumber,
+                lastMessage: getLastMessagePreview(
+                  r.lastMessageBody !== null || r.lastMessageHasMedia
+                    ? {
+                        body: r.lastMessageBody,
+                        hasMedia: r.lastMessageHasMedia,
+                        type: r.lastMessageType,
+                      }
+                    : null,
+                ),
+                timestamp: r.timestamp !== null ? r.timestamp * 1000 : null,
+                unreadCount: r.unreadCount,
+                avatarSeed: r.idUser || r.id,
+                avatarUrl: null,
+                isGroup: r.isGroup,
+                isMuted: r.isMuted,
+                isPinned: r.isPinned,
+              };
+            });
             const resolvedChats = await this.resolveChatIdentities(
               client,
               mappedChats,
@@ -2751,6 +3322,34 @@ class WhatsAppService {
     }
     if (missing.length === 0) return result;
 
+    const prefetchedPhones: Record<string, string> = {};
+    for (const jid of missing) {
+      const directPhone = getPhoneNumberFromChatId(jid);
+      if (directPhone) {
+        prefetchedPhones[jid] = digitsOnly(directPhone);
+      }
+    }
+
+    const lidIds = missing.filter((jid) => jid.endsWith("@lid"));
+    if (lidIds.length > 0) {
+      try {
+        const pairs = await withTimeout(
+          client.getContactLidAndPhone(lidIds),
+          20000,
+          "getContactLidAndPhone(group)",
+        );
+        pairs.forEach((pair, index) => {
+          const jid = lidIds[index];
+          const phone = getPhoneNumberFromChatId(pair?.pn);
+          if (jid && phone) {
+            prefetchedPhones[jid] = digitsOnly(phone);
+          }
+        });
+      } catch (error) {
+        LOG("group getContactLidAndPhone failed:", String(error));
+      }
+    }
+
     const pupPage = (client as unknown as { pupPage?: unknown }).pupPage as
       | {
           evaluate(
@@ -2759,14 +3358,24 @@ class WhatsAppService {
           ): Promise<unknown>;
         }
       | undefined;
-    if (!pupPage?.evaluate) return result;
+    if (!pupPage?.evaluate) {
+      for (const jid of missing) {
+        const phone = prefetchedPhones[jid];
+        if (phone) {
+          result[jid] = phone;
+          this.contactNameCache.set(jid, { name: phone, at: now });
+        }
+      }
+      return result;
+    }
 
     try {
       const resolved = (await withTimeout(
-        pupPage.evaluate(async (ids: unknown) => {
+        pupPage.evaluate(async (ids: unknown, phoneMap: unknown) => {
           /* eslint-disable @typescript-eslint/no-explicit-any */
           const store = (window as any).Store;
           const out: Record<string, string | null> = {};
+          const prefetched = phoneMap as Record<string, string>;
           const onlyDigits = (s: any) =>
             typeof s === "string" ? s.replace(/[^0-9]/g, "") : "";
 
@@ -2888,9 +3497,10 @@ class WhatsAppService {
                   : null;
 
               let phone =
-                jid.indexOf("@c.us") !== -1
+                prefetched[jid] ||
+                (jid.indexOf("@c.us") !== -1
                   ? onlyDigits(jid.split("@")[0])
-                  : phoneFromLid(jid, c);
+                  : phoneFromLid(jid, c));
               if (!savedName && !phone && jid.includes("@lid")) {
                 phone = await enforcePhone(jid);
               }
@@ -2902,18 +3512,27 @@ class WhatsAppService {
           }
           return out;
           /* eslint-enable @typescript-eslint/no-explicit-any */
-        }, missing) as Promise<Record<string, string | null>>,
+        }, missing, prefetchedPhones) as Promise<Record<string, string | null>>,
         15000,
         "resolveGroupSenderLabels",
       )) as Record<string, string | null>;
 
       for (const jid of missing) {
-        const label = resolved?.[jid] ?? null;
-        this.contactNameCache.set(jid, { name: label, at: now });
-        if (label) result[jid] = label;
+        const label = resolved?.[jid] ?? prefetchedPhones[jid] ?? null;
+        if (label) {
+          this.contactNameCache.set(jid, { name: label, at: now });
+          result[jid] = label;
+        }
       }
     } catch (e) {
       LOG("resolveGroupSenderLabels failed:", String(e));
+      for (const jid of missing) {
+        const phone = prefetchedPhones[jid];
+        if (phone) {
+          this.contactNameCache.set(jid, { name: phone, at: now });
+          result[jid] = phone;
+        }
+      }
     }
 
     return result;
@@ -2936,12 +3555,31 @@ class WhatsAppService {
     const isGroup = chatId.endsWith("@g.us");
 
     const fetchPromise = this.withOperationSlot(async () => {
-      const chat = await client.getChatById(chatId);
-      const messages = await chat.fetchMessages({ limit });
+      // Read messages via WAWebCollections directly; wwebjs's
+      // getChatById()/fetchMessages() throw a minified `r` on current WA builds.
+      const rawMessages = await this.fetchMessagesRaw(client, chatId, limit);
+      const messages = rawMessages.map(rawToMessageLike);
       const directChatIdentity = isGroup
         ? null
-        : (await this.resolveChatIdentities(client, [mapChat(chat)]))[0] ??
-          null;
+        : (
+            await this.resolveChatIdentities(client, [
+              this.chatsCache.find((c) => c.id === chatId) ?? {
+                id: chatId,
+                name:
+                  getPhoneNumberFromChatId(chatId) ||
+                  (chatId.endsWith("@lid") ? "" : getChatAvatarSeed(chatId)),
+                phoneNumber: getPhoneNumberFromChatId(chatId),
+                lastMessage: "",
+                timestamp: null,
+                avatarSeed: chatId,
+                avatarUrl: null,
+                isGroup: false,
+                isMuted: false,
+                isPinned: false,
+                unreadCount: 0,
+              },
+            ])
+          )[0] ?? null;
 
       // For group chats, label each sender with their saved contact name, or
       // their phone number if not saved — never the raw JID / LID.
@@ -2977,7 +3615,7 @@ class WhatsAppService {
             const authorJid = (m as Message & { author?: string }).author;
             if (authorJid) {
               const resolved =
-                labelMap[authorJid] || normalizeWhatsAppIdentifier(authorJid);
+                labelMap[authorJid] || getPhoneNumberFromChatId(authorJid);
               // resolveGroupSenderLabels returns a saved name when it has one,
               // otherwise a bare phone number. If we only got a number, try the
               // cache (saved name by phone) before falling back to showing the
@@ -2990,14 +3628,15 @@ class WhatsAppService {
                 mapped.author =
                   cachedName || formatPhoneNumberForDisplay(resolved);
               } else {
-                mapped.author = resolved;
+                mapped.author = resolved || null;
               }
             }
           } else if (!mapped.fromMe) {
             mapped.author =
               directChatIdentity?.phoneNumber ||
               directChatIdentity?.name ||
-              getPhoneNumberFromChatId(mapped.chatId);
+              getPhoneNumberFromChatId(mapped.chatId) ||
+              null;
           }
           return mapped;
         })
@@ -3170,16 +3809,136 @@ class WhatsAppService {
     LOG("API: getMedia", { messageId });
     const client = await this.requireReadyClient();
     try {
-      const message = await this.withOperationSlot(() =>
-        client.getMessageById(messageId),
-      );
-      if (!message) {
-        throw new Error("Message not found.");
+      const pupPage = (client as unknown as { pupPage?: unknown }).pupPage as
+        | {
+            evaluate(
+              fn: (...args: unknown[]) => unknown,
+              ...args: unknown[]
+            ): Promise<unknown>;
+          }
+        | undefined;
+      if (!pupPage?.evaluate) {
+        throw new Error("WhatsApp media page is unavailable.");
       }
-      if (!message.hasMedia) {
-        throw new Error("Message has no media.");
-      }
-      const media = await this.withOperationSlot(() => message.downloadMedia());
+
+      // Current WA Web may keep fetched history only in chat.msgs, not in the
+      // global Msg collection. whatsapp-web.js falls back to getMessagesById(),
+      // which currently throws a minified `r` error. Search both collections
+      // and then use the same decrypt pipeline as Message.downloadMedia().
+      const media = (await this.withOperationSlot(() =>
+        withTimeout(
+          pupPage.evaluate(async (id: unknown) => {
+            /* eslint-disable @typescript-eslint/no-explicit-any */
+            const w = window as any;
+            const collections = w.require("WAWebCollections");
+            let message = collections?.Msg?.get?.(id as string) ?? null;
+
+            if (!message) {
+              const chats: any[] =
+                collections?.Chat?.getModelsArray?.() ??
+                collections?.Chat?.models ??
+                [];
+              for (const chat of chats) {
+                const messages: any[] =
+                  chat?.msgs?.getModelsArray?.() ?? chat?.msgs?.models ?? [];
+                for (const item of messages) {
+                  const key = item?.id;
+                  if (!key) continue;
+
+                  let matches =
+                    String(key) === id || key?._serialized === id;
+                  if (!matches) {
+                    const remote =
+                      typeof key.remote === "string"
+                        ? key.remote
+                        : key.remote?._serialized ||
+                          (key.remote?.user && key.remote?.server
+                            ? `${key.remote.user}@${key.remote.server}`
+                            : "");
+                    // msg.serialize() drops MsgKey's prototype. Rebuild the
+                    // stable key used by our API. Group MsgKey.toString()
+                    // includes participant metadata and cannot be compared
+                    // directly with that API key.
+                    const stableKey =
+                      remote && key.id
+                        ? `${Boolean(key.fromMe)}_${remote}_${key.id}`
+                        : "";
+                    matches =
+                      stableKey === id ||
+                      Boolean(
+                        stableKey &&
+                          (key.self || key.$1) &&
+                          `${stableKey}_${key.self || key.$1}` === id,
+                      );
+                  }
+
+                  if (matches) {
+                    message = item;
+                    break;
+                  }
+                }
+                if (message) break;
+              }
+            }
+
+            if (!message?.directPath || !message?.mediaData) {
+              return null;
+            }
+            if (message.mediaData.mediaStage === "REUPLOADING") {
+              return null;
+            }
+            if (message.mediaData.mediaStage !== "RESOLVED") {
+              await message.downloadMedia({
+                downloadEvenIfExpensive: true,
+                rmrReason: 1,
+              });
+            }
+            if (
+              String(message.mediaData.mediaStage).includes("ERROR") ||
+              message.mediaData.mediaStage === "FETCHING"
+            ) {
+              return null;
+            }
+
+            const mockQpl = {
+              addAnnotations() {
+                return this;
+              },
+              addPoint() {
+                return this;
+              },
+            };
+            const decrypted = await w
+              .require("WAWebDownloadManager")
+              .downloadManager.downloadAndMaybeDecrypt({
+                directPath: message.directPath,
+                encFilehash: message.encFilehash,
+                filehash: message.filehash,
+                mediaKey: message.mediaKey,
+                mediaKeyTimestamp: message.mediaKeyTimestamp,
+                type: message.type,
+                signal: new AbortController().signal,
+                downloadQpl: mockQpl,
+              });
+            const data = await w.WWebJS.arrayBufferToBase64Async(decrypted);
+            return {
+              data,
+              mimetype: message.mimetype || "application/octet-stream",
+              filename: message.filename || undefined,
+              filesize: message.size || undefined,
+            };
+            /* eslint-enable @typescript-eslint/no-explicit-any */
+          }, messageId),
+          60000,
+          "WhatsApp media download",
+        ),
+      )) as {
+        data: string;
+        mimetype: string;
+        filename?: string;
+        filesize?: number;
+      } | null;
+
       if (!media) {
         throw new Error("Failed to download media.");
       }
@@ -3271,6 +4030,7 @@ class WhatsAppService {
     this.client = null;
     this.initializingPromise = null;
     this.clearReconnectTimer();
+    this.clearReadyRecoveryTimer();
     try {
       LOG("shutdownClient: destroying browser");
       await c.destroy();
@@ -3283,6 +4043,7 @@ class WhatsAppService {
   async forceClearSession() {
     LOG("forceClearSession: starting");
     this.clearReconnectTimer();
+    this.clearReadyRecoveryTimer();
 
     const sessionPath = path.join(SESSION_DIR, "session-admin-whatsapp");
 

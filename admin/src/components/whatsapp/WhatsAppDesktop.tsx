@@ -312,8 +312,9 @@ const MessageComposer = memo(function MessageComposer({
         onCancelReply?.();
 
         onSend(content, pendingFile, pendingReply).catch((error) => {
-            setDraft(content);
-            setAttachment(pendingFile || null);
+            // The backend can report a late delivery/status error after
+            // WhatsApp has already accepted the message. Do not repopulate the
+            // composer with content that may already have been sent.
             toast.error(error instanceof Error ? error.message : "Failed to send message.");
         });
     };

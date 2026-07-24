@@ -146,6 +146,7 @@ export async function updateHoldTasks() {
             where: { id: task.id },
             data: {
               status: "To Do",
+              active:true,
               holdDate: null,
               holdDaysLeft: null,
             },

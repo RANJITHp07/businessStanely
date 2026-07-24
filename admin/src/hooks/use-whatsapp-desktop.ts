@@ -32,12 +32,13 @@ const CHATS_PAGE_SIZE = 15;
 // The backend pushes a `chats-updated` SSE event the moment its chat list first
 // populates, so the initial fetch no longer needs to poll aggressively. These
 // are just a gentle safety net in case the stream is unavailable.
-const CHATS_EMPTY_RETRY_LIMIT = 4;
+const CHATS_EMPTY_RETRY_LIMIT = 10;
 const CHATS_EMPTY_RETRY_DELAY_MS = 3000;
 // Smaller first fetch paints the conversation faster; "Load older messages"
 // pulls more on demand.
 const INITIAL_MESSAGE_LIMIT = 30;
 const MESSAGE_LOAD_MORE_CHUNK = 50;
+const MAX_MEDIA_BYTES = 20 * 1024 * 1024;
 
 async function getJson<T>(url: string, init?: RequestInit): Promise<T> {
   const isFormData =
@@ -92,7 +93,7 @@ export function useWhatsAppDesktop() {
   const [chats, setChats] = useState<WhatsAppChatSummary[]>([]);
   const [hasMoreChats, setHasMoreChats] = useState(true);
   const [messages, setMessages] = useState<WhatsAppMessage[]>([]);
-  const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
+  const [selectedChatId, setSelectedChatIdState] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [isBootstrapping, setIsBootstrapping] = useState(true);
   const [isChatsLoading, setIsChatsLoading] = useState(false);
@@ -107,9 +108,18 @@ export function useWhatsAppDesktop() {
   const chatsCountRef = useRef(0);
   const eventSourceRef = useRef<EventSource | null>(null);
   const selectedChatIdRef = useRef<string | null>(null);
+  const messageRequestIdRef = useRef(0);
   const stateRef = useRef<SerializableWhatsAppState>(defaultState);
   const deletedMessageIdsRef = useRef<Set<string>>(new Set());
   const editedMessagesRef = useRef<Map<string, WhatsAppMessage>>(new Map());
+  const sendInFlightRef = useRef(false);
+
+  const setSelectedChatId = (chatId: string | null) => {
+    selectedChatIdRef.current = chatId;
+    // Invalidate any response still loading for the previously selected chat.
+    messageRequestIdRef.current += 1;
+    setSelectedChatIdState(chatId);
+  };
 
   const reconcileMessages = (incoming: WhatsAppMessage[]) =>
     incoming
@@ -286,9 +296,16 @@ export function useWhatsAppDesktop() {
   };
 
   const loadMessages = async (chatId: string, limit = INITIAL_MESSAGE_LIMIT) => {
+    const requestId = ++messageRequestIdRef.current;
     const data = await getJson<{ messages: WhatsAppMessage[] }>(
       `/api/whatsapp/messages?chatId=${encodeURIComponent(chatId)}&limit=${limit}`,
     );
+    if (
+      requestId !== messageRequestIdRef.current ||
+      selectedChatIdRef.current !== chatId
+    ) {
+      return;
+    }
     const nextMessages = reconcileMessages(data.messages);
     setMessages(nextMessages);
     setCanLoadMore(data.messages.length >= limit);
@@ -370,6 +387,18 @@ export function useWhatsAppDesktop() {
     let chatsRefreshInFlight = false;
     let chatsRefreshQueued = false;
 
+    const scheduleStreamReconnect = () => {
+      if (disposed || reconnectTimer) return;
+      const jitter = Math.floor(Math.random() * 1000);
+      reconnectTimer = setTimeout(() => {
+        reconnectTimer = null;
+        if (!disposed) {
+          backoffMs = Math.min(backoffMs * 2, 30000);
+          void connect();
+        }
+      }, backoffMs + jitter);
+    };
+
     const triggerChatsRefresh = () => {
       if (chatsRefreshTimer) {
         clearTimeout(chatsRefreshTimer);
@@ -403,7 +432,12 @@ export function useWhatsAppDesktop() {
     async function connect() {
       if (disposed) return;
 
-      source = await openWhatsAppStream();
+      try {
+        source = await openWhatsAppStream();
+      } catch {
+        scheduleStreamReconnect();
+        return;
+      }
       if (disposed) {
         source.close();
         return;
@@ -422,13 +456,7 @@ export function useWhatsAppDesktop() {
         source?.close();
         source = null;
         eventSourceRef.current = null;
-        const jitter = Math.floor(Math.random() * 1000);
-        reconnectTimer = setTimeout(() => {
-          if (!disposed) {
-            backoffMs = Math.min(backoffMs * 2, 30000);
-            connect();
-          }
-        }, backoffMs + jitter);
+        scheduleStreamReconnect();
       };
 
       source.addEventListener("state", async (event) => {
@@ -565,7 +593,7 @@ export function useWhatsAppDesktop() {
       });
     }
 
-    connect();
+    void connect();
 
     return () => {
       disposed = true;
@@ -737,6 +765,13 @@ export function useWhatsAppDesktop() {
     const content = body.trim();
     const hasFile = Boolean(file && file.size > 0);
     if (!content && !hasFile) return;
+    if (hasFile && file && file.size > MAX_MEDIA_BYTES) {
+      throw new Error("Attachments must be 20 MB or smaller.");
+    }
+    if (sendInFlightRef.current) {
+      throw new Error("Please wait for the current message to finish sending.");
+    }
+    sendInFlightRef.current = true;
     const optimisticId = `optimistic-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     const previewText = hasFile
       ? content ||
@@ -842,6 +877,7 @@ export function useWhatsAppDesktop() {
       }
       throw error;
     } finally {
+      sendInFlightRef.current = false;
       setIsSending(false);
     }
   };

@@ -15,8 +15,11 @@
 type AvatarEntry = { url: string | null; expiresAt: number };
 
 const TTL_FOUND_MS = 6 * 60 * 60 * 1000; // 6h for a real avatar URL
-const TTL_NONE_MS = 5 * 60 * 1000; // 5m for "no avatar" so new photos appear
-const STORAGE_PREFIX = "wa-avatar:";
+const TTL_NONE_MS = 30 * 1000; // retry transient/null results quickly
+// Bump the cache namespace when the backend avatar resolver changes. This
+// prevents previously persisted null results from hiding newly resolved
+// profile photos after a deployment or dev-server reload.
+const STORAGE_PREFIX = "wa-avatar:v4:";
 
 const memoryCache = new Map<string, AvatarEntry>();
 const inFlight = new Map<string, Promise<string | null>>();
@@ -80,6 +83,9 @@ export function resolveAvatar(chatId: string): Promise<string | null> {
       const response = await fetch(
         `/api/whatsapp/chat-avatar?chatId=${encodeURIComponent(chatId)}`,
       );
+      if (!response.ok) {
+        throw new Error("WhatsApp avatar service is not ready.");
+      }
       const data = (await response.json()) as { url?: string | null };
       const url = data?.url ?? null;
       const entry: AvatarEntry = {
@@ -125,6 +131,9 @@ export function resolveAvatarsBatch(chatIds: string[]): void {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ chatIds: missing }),
       });
+      if (!response.ok) {
+        throw new Error("WhatsApp avatar service is not ready.");
+      }
       const data = (await response.json()) as {
         urls?: Record<string, string | null>;
       };

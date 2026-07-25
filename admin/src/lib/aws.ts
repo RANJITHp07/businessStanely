@@ -16,6 +16,14 @@ const s3Client = new S3Client({
     accessKeyId: process.env.APP_AWS_ACCESS_KEY_ID!,
     secretAccessKey: process.env.APP_AWS_SECRET_ACCESS_KEY!,
   },
+  // AWS SDK v3 (>=3.729) adds a CRC32 checksum to PutObject/UploadPart by
+  // default. For presigned browser uploads this bakes an (empty-payload)
+  // x-amz-checksum-crc32 into the signature, so S3 then requires the PUT to
+  // send a matching checksum header. A plain browser XHR/fetch PUT can't, so
+  // S3 rejects it with 403 Forbidden. "WHEN_REQUIRED" only adds a checksum
+  // when the operation actually mandates one, keeping presigned PUTs signable
+  // with just Content-Type. See also directUpload.ts (the browser PUT).
+  requestChecksumCalculation: "WHEN_REQUIRED",
 });
 
 const BUCKET_NAME = process.env.APP_AWS_S3_BUCKET_NAME!;

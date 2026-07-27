@@ -62,7 +62,17 @@ export default function OppurtunitiesDetailPage() {
         user?: { username?: string };
         attachmentName?: string;
         attachmentUrl?: string;
+        attachmentType?: string;
+        attachments?: Array<{ name: string; url: string; size: number; type: string }>;
     }
+
+    const MANAGEMENT_BASE_URL = "https://management.legalstanley.com";
+
+    const getAttachmentUrl = (url?: string) => {
+        if (!url) return "";
+        if (url.startsWith("http://") || url.startsWith("https://")) return url;
+        return `${MANAGEMENT_BASE_URL}${url.startsWith("/") ? url : `/${url}`}`;
+    };
 
     const [comments, setComments] = useState<Comment[]>([])
     const [loading, setLoading] = useState(true)
@@ -357,15 +367,68 @@ export default function OppurtunitiesDetailPage() {
                                                 </div>
                                             </div>
                                             <p className="text-sm leading-relaxed">{comment.content}</p>
-                                            {comment.attachmentUrl && (
+                                            {comment.attachments && comment.attachments.length > 0 && (
                                                 <div className="flex flex-wrap gap-2 pt-2">
-                                                    <a
-                                                        href={comment.attachmentUrl}
-                                                        className="flex items-center gap-2 px-3 py-1.5 bg-muted rounded-md text-sm hover:bg-muted/80 transition-colors"
-                                                    >
-                                                        <Paperclip className="h-3 w-3" />
-                                                        {comment.attachmentName}
-                                                    </a>
+                                                    {comment.attachments.map((att, idx) => {
+                                                        const isAudio =
+                                                            att.type?.startsWith("audio/") ||
+                                                            /\.(mp3|wav|ogg|m4a|aac|webm)$/i.test(att.name || att.url);
+                                                        if (isAudio) {
+                                                            return (
+                                                                <div
+                                                                    key={idx}
+                                                                    className="flex w-full flex-col gap-1 bg-muted px-2 py-1.5 rounded border"
+                                                                >
+                                                                    <span className="text-xs text-muted-foreground font-medium truncate">
+                                                                        {att.name}
+                                                                    </span>
+                                                                    <audio controls className="w-full">
+                                                                        <source src={getAttachmentUrl(att.url)} />
+                                                                        Your browser does not support the audio element.
+                                                                    </audio>
+                                                                </div>
+                                                            );
+                                                        }
+                                                        return (
+                                                            <a
+                                                                key={idx}
+                                                                href={getAttachmentUrl(att.url)}
+                                                                target="_blank"
+                                                                rel="noopener noreferrer"
+                                                                className="flex items-center gap-2 px-3 py-1.5 bg-muted rounded-md text-sm hover:bg-muted/80 transition-colors"
+                                                            >
+                                                                <Paperclip className="h-3 w-3 shrink-0" />
+                                                                <span className="max-w-[150px] truncate">{att.name}</span>
+                                                                <span className="text-xs text-muted-foreground">({(att.size / 1024).toFixed(1)} KB)</span>
+                                                            </a>
+                                                        );
+                                                    })}
+                                                </div>
+                                            )}
+                                            {!comment.attachments && comment.attachmentUrl && (
+                                                <div className="flex flex-wrap gap-2 pt-2">
+                                                    {comment.attachmentType?.startsWith("audio/") ||
+                                                        /\.(mp3|wav|ogg|m4a|aac|webm)$/i.test(comment.attachmentName || comment.attachmentUrl) ? (
+                                                        <div className="flex w-full flex-col gap-1 bg-muted px-2 py-1.5 rounded border">
+                                                            <span className="text-xs text-muted-foreground font-medium truncate">
+                                                                {comment.attachmentName}
+                                                            </span>
+                                                            <audio controls className="w-full">
+                                                                <source src={getAttachmentUrl(comment.attachmentUrl)} />
+                                                                Your browser does not support the audio element.
+                                                            </audio>
+                                                        </div>
+                                                    ) : (
+                                                        <a
+                                                            href={getAttachmentUrl(comment.attachmentUrl)}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="flex items-center gap-2 px-3 py-1.5 bg-muted rounded-md text-sm hover:bg-muted/80 transition-colors"
+                                                        >
+                                                            <Paperclip className="h-3 w-3" />
+                                                            {comment.attachmentName}
+                                                        </a>
+                                                    )}
                                                 </div>
                                             )}
                                         </div>

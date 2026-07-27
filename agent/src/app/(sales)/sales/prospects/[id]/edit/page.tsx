@@ -171,10 +171,17 @@ export default function EditProspectPage() {
       })
       if (!res.ok) throw new Error("Failed to update prospect")
 
-      const data = await res.json()
-      toast.success("Updated successfully")
-      searchParams.get("opportunity") ? router.push(`/sales/opportunites/${data?.opportunity?.id}`) :
+      await res.json()
+      if (searchParams.get("opportunity")) {
+        toast.success("Converted to opportunity successfully")
+        // Send the agent back to the opportunities table, and refresh so the
+        // newly created opportunity is present in the list.
+        router.push("/sales/opportunites")
+        router.refresh()
+      } else {
+        toast.success("Updated successfully")
         router.back()
+      }
     } catch (err) {
       toast.error("Failed to update prospect")
     } finally {

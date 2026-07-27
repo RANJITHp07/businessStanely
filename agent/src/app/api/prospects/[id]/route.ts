@@ -87,13 +87,26 @@ export async function PUT(
             { status: 404 },
           );
         }
+        // The edit form posts `amount` as a string, so coerce it here and fall
+        // back to the prospect's existing amount when it is blank/unparseable.
+        const parsedAmount =
+          typeof amount === "number"
+            ? amount
+            : typeof amount === "string" && amount.trim() !== ""
+              ? Number(amount)
+              : undefined;
+        const resolvedAmount =
+          parsedAmount !== undefined && Number.isFinite(parsedAmount)
+            ? parsedAmount
+            : (prospect.amount ?? 0);
+
         // Create Opportunity
         const opportunity = await prisma.opportunity.create({
           data: {
             name: name || prospect.name,
             phoneNumber: phoneNumber || prospect.phoneNumber,
             description: description || prospect.description,
-            amount: typeof amount === "number" ? amount : 0,
+            amount: resolvedAmount,
             nextFollowUp: nextFollowUp ? new Date(nextFollowUp) : undefined,
             prevFollowup:
               nextFollowUp && prospect?.nextFollowUp

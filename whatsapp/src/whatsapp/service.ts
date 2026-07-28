@@ -2483,6 +2483,18 @@ class WhatsAppService {
           (rawQuery: unknown, rawLimit: unknown) => {
             /* eslint-disable @typescript-eslint/no-explicit-any */
             const store = (window as any).Store;
+            // Current WA Web no longer exposes window.Store, so the Chat and
+            // Contact collections must come from the internal
+            // 'WAWebCollections' module (same path refreshChats uses). Keep
+            // window.Store as a fallback for older builds.
+            let collections: any = null;
+            try {
+              collections = (window as any).require?.("WAWebCollections") ?? null;
+            } catch {
+              collections = null;
+            }
+            const chatColl = collections?.Chat ?? store?.Chat ?? null;
+            const contactColl = collections?.Contact ?? store?.Contact ?? null;
             const onlyDigits = (value: any) =>
               String(value ?? "").replace(/[^0-9]/g, "");
             const q = String(rawQuery ?? "").toLowerCase();
@@ -2496,14 +2508,23 @@ class WhatsAppService {
                 if (text.includes(q)) return true;
                 return Boolean(qDigits && onlyDigits(value).includes(qDigits));
               });
+            const contactModelsArray = (): any[] => {
+              try {
+                return (
+                  contactColl?.getModelsArray?.() ?? contactColl?.models ?? []
+                );
+              } catch {
+                return [];
+              }
+            };
             const getContact = (jid: string) => {
               try {
-                const contact = store?.Contact?.get?.(jid);
+                const contact = contactColl?.get?.(jid);
                 if (contact) return contact;
               } catch {}
               try {
                 return (
-                  store?.Contact?.models?.find(
+                  contactModelsArray().find(
                     (model: any) => model?.id?._serialized === jid,
                   ) ?? null
                 );
@@ -2601,9 +2622,13 @@ class WhatsAppService {
             // 1) Existing chats (so matches keep their last-message preview).
             // Each model is guarded individually — a single chat with a throwing
             // getter must not abort the whole search.
-            const chatModels = Array.isArray(store?.Chat?.models)
-              ? store.Chat.models
-              : [];
+            let chatModels: any[] = [];
+            try {
+              chatModels = chatColl?.getModelsArray?.() ?? chatColl?.models ?? [];
+            } catch {
+              chatModels = [];
+            }
+            if (!Array.isArray(chatModels)) chatModels = [];
             for (const c of chatModels) {
               if (out.length >= max) break;
               try {
@@ -2672,9 +2697,7 @@ class WhatsAppService {
             }
 
             // 2) Contacts without an existing chat (startable results).
-            const contactModels = Array.isArray(store?.Contact?.models)
-              ? store.Contact.models
-              : [];
+            const contactModels = contactModelsArray();
             for (const ct of contactModels) {
               if (out.length >= max) break;
               try {

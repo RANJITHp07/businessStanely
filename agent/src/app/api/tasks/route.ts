@@ -3,6 +3,10 @@ import { getCurrentAgent } from "@/lib/auth";
 
 import { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
+import {
+  SUMMARY_STATUS_SECTIONS,
+  buildStatusCounts,
+} from "@/lib/taskSummary";
 
 interface TaskWithAdditionalFields {
   progress?: number | null;
@@ -13,6 +17,60 @@ interface TaskWithAdditionalFields {
   nextDueDate?: Date | null;
   currentPeriodStart?: Date | null;
   lastCompletedDate?: Date | null;
+}
+
+// Only the columns the My Tasks summary tables actually render. Notably this
+// drops `comments`, which the full listing pulls in with nested user/agent
+// relations for every task.
+const SUMMARY_TASK_INCLUDE = {
+  client: {
+    select: {
+      id: true,
+      firstName: true,
+      lastName: true,
+      organizationName: true,
+      clientType: true,
+      email: true,
+    },
+  },
+  ownerShipBy: true,
+  assignedTo: true,
+  category: true,
+} satisfies Prisma.TaskInclude;
+
+type SummaryTask = Prisma.TaskGetPayload<{
+  include: typeof SUMMARY_TASK_INCLUDE;
+}>;
+
+function formatSummaryTask(task: SummaryTask) {
+  return {
+    id: task.id,
+    title: task.title,
+    description: task.description,
+    status: task.status,
+    priority: task.priority,
+    dueDate: task.dueDate,
+    lastCompletedDate: (task as SummaryTask & TaskWithAdditionalFields)
+      .lastCompletedDate,
+    createdAt: task.createdAt,
+    updatedAt: task.updatedAt,
+    client: task.client
+      ? {
+          id: task.client.id,
+          name:
+            task.client.clientType === "individual"
+              ? `${task.client.firstName} ${task.client.lastName}`.trim()
+              : task.client.organizationName,
+          type: task.client.clientType,
+          email: task.client.email,
+        }
+      : null,
+    category: task.category,
+    ownerShipBy: task.ownerShipBy,
+    assignedTo: task.assignedTo,
+    followUpDuration: task.followUpDuration,
+    statusCheckDuration: task.statusCheckDuration,
+  };
 }
 
 export async function GET(req: NextRequest) {
@@ -241,8 +299,46 @@ export async function GET(req: NextRequest) {
       });
     }
 
+    const finalWhere = trigger === "true" ? where : { ...where, active: true };
+
+    // Summary mode: the My Tasks dashboard only renders the newest few rows per
+    // status plus the headline counts, so fetch exactly that instead of every
+    // task. `limit` is the per-status row cap.
+    if (searchParams.get("summary") === "true") {
+      const limit = Math.min(
+        Math.max(parseInt(searchParams.get("limit") || "5", 10) || 5, 1),
+        50,
+      );
+
+      const [groups, sections] = await Promise.all([
+        prisma.task.groupBy({
+          by: ["status"],
+          where: finalWhere,
+          _count: { _all: true },
+        }),
+        Promise.all(
+          SUMMARY_STATUS_SECTIONS.map(async ({ key, statuses }) => ({
+            key,
+            tasks: await prisma.task.findMany({
+              where: { ...finalWhere, status: { in: [...statuses] } },
+              include: SUMMARY_TASK_INCLUDE,
+              orderBy: { createdAt: "desc" },
+              take: limit,
+            }),
+          })),
+        ),
+      ]);
+
+      return NextResponse.json({
+        counts: buildStatusCounts(groups),
+        sections: Object.fromEntries(
+          sections.map((s) => [s.key, s.tasks.map(formatSummaryTask)]),
+        ),
+      });
+    }
+
     const tasks = await prisma.task.findMany({
-      where: trigger === "true" ? where : { ...where, active: true },
+      where: finalWhere,
       include: {
         legislation: true,
         client: {

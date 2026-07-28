@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { getCurrentAgent } from "@/lib/auth";
 import { getAdvisorAgentType } from "@/lib/agentType";
+import {
+  OPPORTUNITY_SUMMARY_STATUSES,
+  OPPORTUNITY_SUMMARY_INCLUDE,
+  buildOpportunityCounts,
+} from "@/lib/opportunitySummary";
 
 function getAssignedAdvisorType(assignedAgent: {
   agentType?: string | null;
@@ -52,6 +58,74 @@ export async function GET(req: NextRequest) {
       targetAgent = requestedAgent;
     }
 
+    const advisorType = requestedAgentId
+      ? getAssignedAdvisorType(targetAgent)
+      : getAdvisorAgentType(agent);
+
+    // Mongo can't filter Opportunity by a Prospect relation field, so resolve
+    // the agent's prospect ids first and scope by `prospectId` instead.
+    const scopedProspectIds = async (
+      field: "createdByAgentId" | "assignedAgentId",
+    ) => {
+      const prospects = await prisma.prospect.findMany({
+        where: { [field]: targetAgent.id },
+        select: { id: true },
+      });
+      return prospects.map((p) => p.id);
+    };
+
+    // Summary mode: the My Opportunities dashboard renders only the newest few
+    // rows per status plus the headline counts/amounts, so fetch exactly that
+    // instead of every opportunity. `limit` is the per-status row cap.
+    if (req.nextUrl.searchParams.get("summary") === "true") {
+      const limit = Math.min(
+        Math.max(
+          parseInt(req.nextUrl.searchParams.get("limit") || "5", 10) || 5,
+          1,
+        ),
+        50,
+      );
+
+      // Scope by agent in the database rather than in memory. The full listing
+      // below still filters in-memory for backwards compatibility.
+      const where: Prisma.OpportunityWhereInput = {};
+      if (advisorType === "Lead Maker") {
+        where.prospectId = { in: await scopedProspectIds("createdByAgentId") };
+      } else if (
+        advisorType === "Client Advisor" ||
+        advisorType === "Client Manager"
+      ) {
+        where.prospectId = { in: await scopedProspectIds("assignedAgentId") };
+      }
+
+      const [groups, sections] = await Promise.all([
+        prisma.opportunity.groupBy({
+          by: ["status"],
+          where,
+          _count: { _all: true },
+          _sum: { amount: true },
+        }),
+        Promise.all(
+          OPPORTUNITY_SUMMARY_STATUSES.map(async (status) => ({
+            status,
+            opportunities: await prisma.opportunity.findMany({
+              where: { ...where, status },
+              include: OPPORTUNITY_SUMMARY_INCLUDE,
+              orderBy: { createdAt: "desc" },
+              take: limit,
+            }),
+          })),
+        ),
+      ]);
+
+      return NextResponse.json({
+        counts: buildOpportunityCounts(groups),
+        sections: Object.fromEntries(
+          sections.map((s) => [s.status, s.opportunities]),
+        ),
+      });
+    }
+
     // MongoDB does not support relation filtering in Prisma, so filter in-memory
     const allOpportunities = await prisma.opportunity.findMany({
       include: {
@@ -61,9 +135,6 @@ export async function GET(req: NextRequest) {
       orderBy: { createdAt: "desc" },
     });
     let opportunities = allOpportunities;
-    const advisorType = requestedAgentId
-      ? getAssignedAdvisorType(targetAgent)
-      : getAdvisorAgentType(agent);
 
     if (advisorType === "Lead Maker") {
       opportunities = allOpportunities.filter(

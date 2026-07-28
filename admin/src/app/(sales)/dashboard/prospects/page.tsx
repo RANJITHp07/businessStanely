@@ -491,7 +491,10 @@ function SegregationTable({
 
 export default function ProspectDashboard() {
     const router = useRouter()
-    const [prospects, setProspects] = useState<any>([])
+    const [stats, setStats] = useState<{ total: number; statusCounts: Record<string, number> }>({
+        total: 0,
+        statusCounts: {},
+    })
     const [loading, setLoading] = useState(false)
     const [leadSources, setLeadSources] = useState<any>([])
     const [statusCategoryData, setStatusCategoryData] = useState<any>([])
@@ -538,17 +541,16 @@ export default function ProspectDashboard() {
         setLoading(true)
 
         Promise.all([
-            fetch("/api/prospects").then(res => res.json()),
+            fetch("/api/prospects?stats=true").then(res => res.json()),
             fetch("/api/lead_source").then(res => res.json()),
             fetch("/api/prospectAssignmentSetting").then((res) => res.json()),
             fetch("/api/agents").then((res) => res.json()),
         ])
-            .then(([prospectsRes, leadSourceRes, assignmentSettingRes, agentsRes]) => {
-                const prospects = Array.isArray(prospectsRes?.prospects)
-                    ? prospectsRes.prospects.filter((p: any) => !p.archived)
-                    : []
-
-                setProspects(prospects)
+            .then(([statsRes, leadSourceRes, assignmentSettingRes, agentsRes]) => {
+                setStats({
+                    total: statsRes?.total ?? 0,
+                    statusCounts: statsRes?.statusCounts ?? {},
+                })
 
                 /* Set agents */
                 const agentsList = Array.isArray(agentsRes) ? agentsRes : []
@@ -568,12 +570,13 @@ export default function ProspectDashboard() {
                     "#06b6d4",
                 ]
 
+                const leadSourceCounts: Record<string, number> =
+                    statsRes?.leadSourceCounts ?? {}
+
                 const leadSourceChartData = Array.isArray(leadSourceRes)
                     ? leadSourceRes.map((source: any, index: number) => ({
                         name: source.name,
-                        value: prospects.filter(
-                            (p: any) => p.leadSourceId === source.id
-                        ).length,
+                        value: leadSourceCounts[source.id] ?? 0,
                         color: leadSourceColors[index % leadSourceColors.length],
                     }))
                     : []
@@ -585,50 +588,21 @@ export default function ProspectDashboard() {
                 }
 
                 /* ---------------- STATUS CATEGORY DATA ---------------- */
-                const today = new Date()
-
-                const statusCounts = {
-                    "Follow Up": 0,
-                    Missed: 0,
-                    "To Be Contacted": 0,
+                const engagement = statsRes?.engagement ?? {
+                    followUp: 0,
+                    missed: 0,
+                    toBeContacted: 0,
                 }
 
-                prospects.forEach((p: any) => {
-                    const assignedAgentId = p.assignedAgentId
-                    const agentComments = Array.isArray(p.comments)
-                        ? p.comments
-                            .filter((c: any) => c.authorId === assignedAgentId)
-                            .sort(
-                                (a: any, b: any) =>
-                                    new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-                            )
-                        : []
-
-                    if (p.nextFollowUp) {
-                        const followUpDate = new Date(p.nextFollowUp)
-                        if (agentComments.length === 0) {
-                            statusCounts["Follow Up"]++
-                        } else {
-                            const lastCommentDate = new Date(agentComments[0].createdAt)
-                            if (followUpDate > lastCommentDate) statusCounts["Follow Up"]++
-                            else statusCounts.Missed++
-                        }
-                    } else {
-                        statusCounts["To Be Contacted"]++
-                    }
-                })
-
-                const statusCategoryData = [
-                    { status: "Follow Up", count: statusCounts["Follow Up"], color: "#f87171" },
-                    { status: "Missed", count: statusCounts.Missed, color: "#ef4444" },
-                    { status: "To Be Contacted", count: statusCounts["To Be Contacted"], color: "#10b981" },
-                ]
-
-                setStatusCategoryData(statusCategoryData)
+                setStatusCategoryData([
+                    { status: "Follow Up", count: engagement.followUp, color: "#f87171" },
+                    { status: "Missed", count: engagement.missed, color: "#ef4444" },
+                    { status: "To Be Contacted", count: engagement.toBeContacted, color: "#10b981" },
+                ])
             })
             .catch((err) => {
                 console.error(err)
-                setProspects([])
+                setStats({ total: 0, statusCounts: {} })
                 setLeadSources([])
                 setStatusCategoryData([])
             })
@@ -776,7 +750,7 @@ export default function ProspectDashboard() {
                         </CardHeader>
                         <CardContent>
                             <div className="space-y-2">
-                                <div className="text-3xl font-bold text-slate-800">{prospects.length}</div>
+                                <div className="text-3xl font-bold text-slate-800">{stats.total}</div>
                                 <div className="w-full bg-blue-200 h-1.5 rounded-full overflow-hidden">
                                     <div className="bg-blue-500 h-full" style={{ width: "75%" }} />
                                 </div>
@@ -797,7 +771,7 @@ export default function ProspectDashboard() {
                         </CardHeader>
                         <CardContent>
                             <div className="space-y-2">
-                                <div className="text-3xl font-bold text-slate-800">{prospects.filter((prospect: any) => prospect.status == "New")?.length}</div>
+                                <div className="text-3xl font-bold text-slate-800">{stats.statusCounts["New"] ?? 0}</div>
                                 <div className="w-full bg-emerald-200 h-1.5 rounded-full overflow-hidden">
                                     <div className="bg-emerald-500 h-full" style={{ width: "60%" }} />
                                 </div>
@@ -818,7 +792,7 @@ export default function ProspectDashboard() {
                         </CardHeader>
                         <CardContent>
                             <div className="space-y-2">
-                                <div className="text-3xl font-bold text-slate-800">{prospects.filter((prospect: any) => prospect.status == "In Progress")?.length}</div>
+                                <div className="text-3xl font-bold text-slate-800">{stats.statusCounts["In Progress"] ?? 0}</div>
                                 <div className="w-full bg-purple-200 h-1.5 rounded-full overflow-hidden">
                                     <div className="bg-purple-500 h-full" style={{ width: "45%" }} />
                                 </div>

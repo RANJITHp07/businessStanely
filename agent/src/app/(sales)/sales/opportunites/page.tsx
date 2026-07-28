@@ -342,51 +342,76 @@ function SectionTable({ label, opportunities }: { label: string; opportunities: 
     )
 }
 
+const SECTION_LIMIT = 5
+
+const EMPTY_COUNTS = {
+    total: 0,
+    proposal: 0,
+    won: 0,
+    loss: 0,
+    totalAmount: 0,
+    wonAmount: 0,
+}
+
+function normalizeOpportunity(opp: any) {
+    return {
+        id: opp.id || "",
+        name: opp.name || "",
+        phoneNumber: opp.phoneNumber || "",
+        description: opp.description || "",
+        amount: typeof opp.amount === "number" ? opp.amount : 0,
+        nextFollowUp: opp.nextFollowUp || "",
+        status: opp.status || "Proposal Issued",
+        prospect: opp.prospect,
+    }
+}
+
 export default function OpportunitiesPage() {
-    const [opportunities, setOpportunities] = useState<any[]>([])
+    const [sections, setSections] = useState<Record<string, any[]>>({})
+    const [counts, setCounts] = useState(EMPTY_COUNTS)
     const [loading, setLoading] = useState(true)
 
     useEffect(() => {
         async function fetchOpportunities() {
             setLoading(true)
             try {
-                const res = await fetch("/api/opportunities", { method: "GET" })
+                const res = await fetch(
+                    `/api/opportunities?summary=true&limit=${SECTION_LIMIT}`,
+                    { method: "GET" }
+                )
                 if (!res.ok) throw new Error("Failed to fetch opportunities")
                 const data = await res.json()
-                // Ensure all frontend fields are present, fallback to empty string/zero if missing
-                const safeData = Array.isArray(data.opportunities)
-                    ? data.opportunities.map((opp: any) => ({
-                        id: opp.id || "",
-                        name: opp.name || "",
-                        phoneNumber: opp.phoneNumber || "",
-                        description: opp.description || "",
-                        amount: typeof opp.amount === "number" ? opp.amount : 0,
-                        nextFollowUp: opp.nextFollowUp || "",
-                        status: opp.status || "Proposal Issued",
-                        prospect: opp.prospect
-                    }))
-                    : []
-                setOpportunities(safeData)
+                const rawSections = data.sections ?? {}
+                setSections(
+                    Object.fromEntries(
+                        Object.entries(rawSections).map(([status, list]) => [
+                            status,
+                            Array.isArray(list) ? list.map(normalizeOpportunity) : [],
+                        ])
+                    )
+                )
+                setCounts(data.counts ?? EMPTY_COUNTS)
             } catch {
-                setOpportunities([])
+                setSections({})
+                setCounts(EMPTY_COUNTS)
             }
             setLoading(false)
         }
         fetchOpportunities()
     }, [])
 
-    const proposalOpportunities = opportunities.filter((o) => o.status === "Proposal Issued")
-    const newOpportunities = opportunities.filter((o) => o.status === "New Opportunity")
-    const wonOpportunities = opportunities.filter((o) => o.status === "Closed as Won")
-    const lossOpportunities = opportunities.filter((o) => o.status === "Closed as Loss")
+    const proposalOpportunities = sections["Proposal Issued"] ?? []
+    const newOpportunities = sections["New Opportunity"] ?? []
+    const wonOpportunities = sections["Closed as Won"] ?? []
+    const lossOpportunities = sections["Closed as Loss"] ?? []
 
-    const totalOpportunities = opportunities.length
-    const proposalCount = proposalOpportunities.length
-    const wonCount = wonOpportunities.length
-    const lossCount = lossOpportunities.length
+    const totalOpportunities = counts.total
+    const proposalCount = counts.proposal
+    const wonCount = counts.won
+    const lossCount = counts.loss
 
-    const totalAmount = opportunities.reduce((sum, opp) => sum + opp.amount, 0)
-    const wonAmount = wonOpportunities.reduce((sum, opp) => sum + opp.amount, 0)
+    const totalAmount = counts.totalAmount
+    const wonAmount = counts.wonAmount
 
     const proposalPercent = totalOpportunities > 0 ? Math.round((proposalCount / totalOpportunities) * 100) : 0
     const wonPercent = totalOpportunities > 0 ? Math.round((wonCount / totalOpportunities) * 100) : 0
@@ -435,10 +460,10 @@ export default function OpportunitiesPage() {
                     </div>
 
                     <div className="space-y-8">
-                        <SectionTable label="New Opportunity" opportunities={newOpportunities.slice(0, 5)} />
-                        <SectionTable label="Proposal Issued" opportunities={proposalOpportunities.slice(0, 5)} />
-                        <SectionTable label="Closed as Won" opportunities={wonOpportunities.slice(0, 5)} />
-                        <SectionTable label="Closed as Loss" opportunities={lossOpportunities.slice(0, 5)} />
+                        <SectionTable label="New Opportunity" opportunities={newOpportunities} />
+                        <SectionTable label="Proposal Issued" opportunities={proposalOpportunities} />
+                        <SectionTable label="Closed as Won" opportunities={wonOpportunities} />
+                        <SectionTable label="Closed as Loss" opportunities={lossOpportunities} />
                     </div>
                 </>
             )}

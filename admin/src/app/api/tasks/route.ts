@@ -2,6 +2,18 @@ import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { getCurrentAdmin } from "@/lib/auth";
+import {
+  SUMMARY_STATUS_SECTIONS,
+  buildStatusCounts,
+} from "@/lib/taskSummary";
+
+// Only the columns the My Tasks summary tables actually render.
+const SUMMARY_TASK_INCLUDE = {
+  client: true,
+  ownerShipBy: true,
+  assignedTo: true,
+  category: true,
+} satisfies Prisma.TaskInclude;
 
 export async function POST(req: NextRequest) {
   try {
@@ -323,11 +335,47 @@ export async function GET(req: NextRequest) {
       });
     }
 
+    const finalWhere =
+      trigger === "true"
+        ? { ...whereClause }
+        : { ...whereClause, active: true };
+
+    // Summary mode: the My Tasks dashboard only renders the newest few rows per
+    // status plus the headline counts, so fetch exactly that instead of every
+    // task. `limit` is the per-status row cap.
+    if (searchParams.get("summary") === "true") {
+      const limit = Math.min(
+        Math.max(parseInt(searchParams.get("limit") || "5", 10) || 5, 1),
+        50,
+      );
+
+      const [groups, sections] = await Promise.all([
+        prisma.task.groupBy({
+          by: ["status"],
+          where: finalWhere,
+          _count: { _all: true },
+        }),
+        Promise.all(
+          SUMMARY_STATUS_SECTIONS.map(async ({ key, statuses }) => ({
+            key,
+            tasks: await prisma.task.findMany({
+              where: { ...finalWhere, status: { in: [...statuses] } },
+              include: SUMMARY_TASK_INCLUDE,
+              orderBy: { createdAt: "desc" },
+              take: limit,
+            }),
+          })),
+        ),
+      ]);
+
+      return NextResponse.json({
+        counts: buildStatusCounts(groups),
+        sections: Object.fromEntries(sections.map((s) => [s.key, s.tasks])),
+      });
+    }
+
     const tasks = await prisma.task.findMany({
-      where:
-        trigger === "true"
-          ? { ...whereClause }
-          : { ...whereClause, active: true },
+      where: finalWhere,
       include: {
         client: true,
         createdBy: true,

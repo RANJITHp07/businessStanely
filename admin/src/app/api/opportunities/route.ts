@@ -48,6 +48,80 @@ export async function GET(req: NextRequest) {
         assignedAgent = null;
       }
     }
+    // Stats mode: the Opportunity Reports dashboard renders only aggregates
+    // (status counts, lead-source distribution, follow-up/missed split). Fetch a
+    // narrow projection instead of every opportunity with all of its comments.
+    if (req.nextUrl.searchParams.get("stats") === "true") {
+      const rows = await prisma.opportunity.findMany({
+        select: {
+          status: true,
+          nextFollowUp: true,
+          prospect: {
+            select: {
+              leadSourceId: true,
+              assignedAgentId: true,
+              createdByAgentId: true,
+            },
+          },
+          comments: {
+            select: { createdAt: true, authorId: true },
+            orderBy: { createdAt: "desc" },
+          },
+        },
+      });
+
+      const advisorType = assignedAgent
+        ? getAssignedAdvisorType(assignedAgent)
+        : null;
+
+      const scoped = rows.filter((row) => {
+        if (!assignedAgentId || !assignedAgent) return true;
+        if (advisorType === "Lead Maker") {
+          return row.prospect?.createdByAgentId === assignedAgentId;
+        }
+        if (
+          advisorType === "Client Advisor" ||
+          advisorType === "Client Manager"
+        ) {
+          return row.prospect?.assignedAgentId === assignedAgentId;
+        }
+        return true;
+      });
+
+      const statusCounts: Record<string, number> = {};
+      const leadSourceCounts: Record<string, number> = {};
+      const engagement = { followUp: 0, missed: 0 };
+
+      for (const row of scoped) {
+        if (row.status)
+          statusCounts[row.status] = (statusCounts[row.status] ?? 0) + 1;
+
+        const leadSourceId = row.prospect?.leadSourceId;
+        if (leadSourceId)
+          leadSourceCounts[leadSourceId] =
+            (leadSourceCounts[leadSourceId] ?? 0) + 1;
+
+        // Follow-up vs missed: only opportunities with a scheduled follow-up
+        // count, matching the dashboard's original tally.
+        if (!row.nextFollowUp) continue;
+        const lastAgentComment = row.comments.find(
+          (c) => c.authorId === row.prospect?.assignedAgentId,
+        );
+        if (!lastAgentComment || row.nextFollowUp > lastAgentComment.createdAt) {
+          engagement.followUp++;
+        } else {
+          engagement.missed++;
+        }
+      }
+
+      return NextResponse.json({
+        total: scoped.length,
+        statusCounts,
+        leadSourceCounts,
+        engagement,
+      });
+    }
+
     // MongoDB does not support relation filtering in Prisma, so filter in-memory
     const allOpportunities = await prisma.opportunity.findMany({
       include: {

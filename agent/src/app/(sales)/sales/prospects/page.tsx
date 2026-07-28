@@ -289,38 +289,37 @@ function SectionTable({ label, prospects }: { label: string; prospects: Prospect
     )
 }
 
+const SECTION_LIMIT = 5
+
 export default function ProspectsPage() {
     const router = useRouter()
-    const [prospects, setProspects] = useState<Prospect[]>([])
+    const [sections, setSections] = useState<Record<string, Prospect[]>>({})
+    const [counts, setCounts] = useState({ total: 0, new: 0, inProgress: 0 })
     const [loading, setLoading] = useState(true)
 
     useEffect(() => {
         setLoading(true)
-        fetch('/api/prospects')
+        fetch(`/api/prospects?summary=true&limit=${SECTION_LIMIT}`)
             .then(res => res.json())
             .then(data => {
-                if (data.prospects) {
-                    console.log(data.prospects)
-                    setProspects(data.prospects.filter((p: Prospect) => !p.archived))
-                } else {
-                    setProspects([])
-                }
+                setSections(data.sections ?? {})
+                setCounts(data.counts ?? { total: 0, new: 0, inProgress: 0 })
                 setLoading(false)
             })
             .catch(() => {
-                setProspects([])
+                setSections({})
                 setLoading(false)
             })
     }, [])
 
-    const newProspects = prospects.filter((p) => p.status === "New")
-    const inProgressProspects = prospects.filter((p) => p.status === "In Progress")
-    const inRelevantNotNowProspects = prospects.filter((p) => p.status === "Relevant but not Now")
-    const inCarrerProspects = prospects.filter((p) => p.status === "Career")
-    const inRelevantNotProspects = prospects.filter((p) => p.status === "Not Relevant")
-    const totalProspects = prospects.length
-    const newCount = newProspects.length
-    const inProgressCount = inProgressProspects.length
+    const newProspects = sections["New"] ?? []
+    const inProgressProspects = sections["In Progress"] ?? []
+    const inRelevantNotNowProspects = sections["Relevant but not Now"] ?? []
+    const inCarrerProspects = sections["Career"] ?? []
+    const inRelevantNotProspects = sections["Not Relevant"] ?? []
+    const totalProspects = counts.total
+    const newCount = counts.new
+    const inProgressCount = counts.inProgress
 
     const newPercent = totalProspects > 0 ? Math.round((newCount / totalProspects) * 100) : 0
     const inProgressPercent = totalProspects > 0 ? Math.round((inProgressCount / totalProspects) * 100) : 0
@@ -363,11 +362,11 @@ export default function ProspectsPage() {
                     </div>
 
                     <div className="space-y-8">
-                        <SectionTable label="New Prospects" prospects={newProspects.slice(0, 5)} />
-                        <SectionTable label="In Progress" prospects={inProgressProspects.slice(0, 5)} />
-                        <SectionTable label="Relevant but not Now" prospects={inRelevantNotNowProspects.slice(0, 5)} />
-                        <SectionTable label="Career" prospects={inCarrerProspects.slice(0, 5)} />
-                        <SectionTable label="Not Relevant" prospects={inRelevantNotProspects.slice(0, 5)} />
+                        <SectionTable label="New Prospects" prospects={newProspects} />
+                        <SectionTable label="In Progress" prospects={inProgressProspects} />
+                        <SectionTable label="Relevant but not Now" prospects={inRelevantNotNowProspects} />
+                        <SectionTable label="Career" prospects={inCarrerProspects} />
+                        <SectionTable label="Not Relevant" prospects={inRelevantNotProspects} />
                     </div>
                 </>
             )}

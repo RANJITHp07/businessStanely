@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Task } from "@/types";
 import { fetchWithAuth } from "@/lib/fetchWithAuth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -532,21 +532,38 @@ export function SectionTable({ label, tasks }: { label: string; tasks: Task[] })
   );
 }
 
+const SECTION_LIMIT = 3;
+
 export default function MyTasksPage() {
-  const [tasks, setTasks] = useState<Task[]>([]);
+  const [sections, setSections] = useState<Record<string, Task[]>>({});
+  const [counts, setCounts] = useState({
+    total: 0,
+    completed: 0,
+    inprogress: 0,
+    todo: 0,
+  });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const load = async () => {
       try {
-        const res = await fetchWithAuth("/api/tasks");
+        const res = await fetchWithAuth(
+          `/api/tasks?summary=true&limit=${SECTION_LIMIT}`
+        );
         if (!res.ok) throw new Error("Failed to fetch tasks");
         const data = await res.json();
-        const arr = Array.isArray(data) ? data : data.tasks ?? [];
-        setTasks(arr);
+        setSections(data.sections ?? {});
+        setCounts(
+          data.counts ?? {
+            total: 0,
+            completed: 0,
+            inprogress: 0,
+            todo: 0,
+          }
+        );
       } catch (e) {
         console.error(e);
-        setTasks([]);
+        setSections({});
       } finally {
         setLoading(false);
       }
@@ -554,35 +571,14 @@ export default function MyTasksPage() {
     load();
   }, []);
 
-  const { total, completed, inprogress, todo } = useMemo(() => {
-    const counts = {
-      total: tasks.length,
-      completed: 0,
-      inprogress: 0,
-      todo: 0,
-    };
-    tasks.forEach((t) => {
-      const k = statusKey(t.status);
-      if (k === "completed") counts.completed += 1;
-      else if (k === "inprogress") counts.inprogress += 1;
-      else counts.todo += 1;
-    });
-    return counts;
-  }, [tasks]);
+  const { total, completed, inprogress, todo } = counts;
 
   const pct = (n: number) => (total ? Math.round((n / total) * 100) : 0);
 
-  const tasksNew = tasks.filter((t) => ["todo"].includes(statusKey(t.status)));
-  const tasksInProgress = tasks.filter((t) =>
-    ["inprogress"].includes(statusKey(t.status))
-  );
-  const tasksCompleted = tasks.filter((t) =>
-    ["completed"].includes(statusKey(t.status))
-  );
-
-  const tasksHold = tasks.filter((t) =>
-    ["hold"].includes(statusKey(t.status))
-  );
+  const tasksNew = sections.todo ?? [];
+  const tasksInProgress = sections.inprogress ?? [];
+  const tasksCompleted = sections.completed ?? [];
+  const tasksHold = sections.hold ?? [];
 
   return (
     <section className="container mx-auto p-6 max-w-7xl space-y-8 overflow-x-hidden min-w-0">
@@ -644,13 +640,10 @@ export default function MyTasksPage() {
         </div>
       ) : (
         <div className="space-y-[40px]">
-          <SectionTable label="New Task" tasks={tasksNew.slice(0, 3)} />
-          <SectionTable
-            label="In Progress"
-            tasks={tasksInProgress.slice(0, 3)}
-          />
-          <SectionTable label="Completed" tasks={tasksCompleted.slice(0, 3)} />
-          <SectionTable label="Hold" tasks={tasksHold.slice(0, 3)} />
+          <SectionTable label="New Task" tasks={tasksNew} />
+          <SectionTable label="In Progress" tasks={tasksInProgress} />
+          <SectionTable label="Completed" tasks={tasksCompleted} />
+          <SectionTable label="Hold" tasks={tasksHold} />
         </div>
       )}
     </section>

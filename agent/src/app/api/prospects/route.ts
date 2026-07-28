@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAdvisorAgentType } from "@/lib/agentType";
 import { getCurrentAgent } from "@/lib/auth";
+import {
+  PROSPECT_SUMMARY_STATUSES,
+  PROSPECT_SUMMARY_SELECT,
+  buildProspectCounts,
+} from "@/lib/prospectSummary";
 
 // GET: List all prospects (optionally filter by assignedAgentId)
 function getAssignedAdvisorType(assignedAgent: {
@@ -67,6 +72,45 @@ export async function GET(req: NextRequest) {
       advisorType === "Client Manager"
     ) {
       where.assignedAgentId = targetAgent.id;
+    }
+
+    // Summary mode: the My Leads dashboard renders only the newest few rows per
+    // status plus the headline counts, so fetch exactly that rather than every
+    // prospect (with all of its comments). `limit` is the per-status row cap.
+    if (req.nextUrl.searchParams.get("summary") === "true") {
+      const limit = Math.min(
+        Math.max(
+          parseInt(req.nextUrl.searchParams.get("limit") || "5", 10) || 5,
+          1,
+        ),
+        50,
+      );
+
+      const [groups, sections] = await Promise.all([
+        prisma.prospect.groupBy({
+          by: ["status"],
+          where,
+          _count: { _all: true },
+        }),
+        Promise.all(
+          PROSPECT_SUMMARY_STATUSES.map(async (status) => ({
+            status,
+            prospects: await prisma.prospect.findMany({
+              where: { ...where, status },
+              select: PROSPECT_SUMMARY_SELECT,
+              orderBy: { createdAt: "desc" },
+              take: limit,
+            }),
+          })),
+        ),
+      ]);
+
+      return NextResponse.json({
+        counts: buildProspectCounts(groups),
+        sections: Object.fromEntries(
+          sections.map((s) => [s.status, s.prospects]),
+        ),
+      });
     }
 
     const prospects = await prisma.prospect.findMany({

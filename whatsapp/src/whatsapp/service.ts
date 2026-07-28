@@ -577,6 +577,81 @@ function digitsOnly(value: string | null | undefined) {
   return String(value ?? "").replace(/\D/g, "");
 }
 
+function normalizeSearchText(value: string | null | undefined) {
+  return String(value ?? "")
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+
+function bestTextSearchRank(
+  values: Array<string | null | undefined>,
+  normalizedSearch: string,
+  baseRank: number,
+) {
+  const terms = normalizedSearch.split(" ").filter(Boolean);
+  let bestRank = Number.POSITIVE_INFINITY;
+
+  for (const value of values) {
+    const text = normalizeSearchText(value);
+    if (!text) continue;
+    if (text === normalizedSearch) bestRank = Math.min(bestRank, baseRank);
+    else if (text.startsWith(normalizedSearch))
+      bestRank = Math.min(bestRank, baseRank + 1);
+    else if (text.includes(normalizedSearch))
+      bestRank = Math.min(bestRank, baseRank + 2);
+    else if (terms.length > 1 && terms.every((term) => text.includes(term)))
+      bestRank = Math.min(bestRank, baseRank + 3);
+  }
+
+  return bestRank;
+}
+
+function bestDigitSearchRank(
+  values: Array<string | null | undefined>,
+  searchDigits: string,
+  baseRank: number,
+) {
+  if (!searchDigits) return Number.POSITIVE_INFINITY;
+
+  let bestRank = Number.POSITIVE_INFINITY;
+  for (const value of values) {
+    const digits = digitsOnly(value);
+    if (!digits) continue;
+    if (digits === searchDigits) bestRank = Math.min(bestRank, baseRank);
+    else if (digits.endsWith(searchDigits))
+      bestRank = Math.min(bestRank, baseRank + 1);
+    else if (digits.includes(searchDigits))
+      bestRank = Math.min(bestRank, baseRank + 2);
+  }
+
+  return bestRank;
+}
+
+function rankChatSearchMatch(
+  chat: WhatsAppChatSummary,
+  normalizedSearch: string,
+  searchDigits: string,
+) {
+  if (!normalizedSearch) return 0;
+
+  const identityValues = [
+    chat.name,
+    chat.phoneNumber,
+    chat.id,
+    chat.avatarSeed,
+  ];
+
+  return Math.min(
+    bestDigitSearchRank(identityValues, searchDigits, 0),
+    bestTextSearchRank(identityValues, normalizedSearch, 4),
+    bestTextSearchRank([chat.lastMessage], normalizedSearch, 20),
+  );
+}
+
 // Prefix a dialable phone number with "+" so the country code is visible in the
 // UI. Idempotent (skips values already starting with "+"), and intentionally
 // leaves WhatsApp lid-style ids untouched: real E.164 numbers carry a country
@@ -2408,35 +2483,26 @@ class WhatsAppService {
     page: number = 1,
     pageSize: number = chatFetchLimit,
   ) {
+    const normalizedSearchText = normalizeSearchText(normalizedSearch);
     const searchDigits = digitsOnly(normalizedSearch);
+    if (normalizedSearch && !normalizedSearchText && !searchDigits) {
+      return [];
+    }
+
     const filtered = chats
-      .filter((chat) => {
-        if (!normalizedSearch) {
-          return true;
-        }
-        const searchableValues = [
-          chat.name,
-          chat.phoneNumber,
-          chat.lastMessage,
-          chat.id,
-          chat.avatarSeed,
-        ];
-        const searchableText = searchableValues
-          .join(" ")
-          .toLowerCase();
-        if (searchableText.includes(normalizedSearch)) {
-          return true;
-        }
-
-        if (!searchDigits) {
-          return false;
-        }
-
-        return searchableValues.some((value) =>
-          digitsOnly(value).includes(searchDigits),
-        );
+      .map((chat) => ({
+        chat,
+        rank: rankChatSearchMatch(chat, normalizedSearchText, searchDigits),
+      }))
+      .filter(({ rank }) => {
+        return !normalizedSearchText || Number.isFinite(rank);
       })
-      .sort((left, right) => (right.timestamp ?? 0) - (left.timestamp ?? 0));
+      .sort(
+        (left, right) =>
+          left.rank - right.rank ||
+          (right.chat.timestamp ?? 0) - (left.chat.timestamp ?? 0),
+      )
+      .map(({ chat }) => chat);
     const start = (page - 1) * pageSize;
     return filtered.slice(start, start + pageSize);
   }
@@ -2475,6 +2541,7 @@ class WhatsAppService {
       lastMessageBody: string | null;
       lastMessageHasMedia: boolean;
       lastMessageType: string | null;
+      matchScore: number;
     };
 
     try {
@@ -2497,17 +2564,51 @@ class WhatsAppService {
             const contactColl = collections?.Contact ?? store?.Contact ?? null;
             const onlyDigits = (value: any) =>
               String(value ?? "").replace(/[^0-9]/g, "");
-            const q = String(rawQuery ?? "").toLowerCase();
+            const normalizeText = (value: any) =>
+              String(value ?? "")
+                .normalize("NFKD")
+                .replace(/[\u0300-\u036f]/g, "")
+                .toLowerCase()
+                .replace(/[^\p{L}\p{N}]+/gu, " ")
+                .trim()
+                .replace(/\s+/g, " ");
+            const q = normalizeText(rawQuery);
             const qDigits = onlyDigits(q);
+            if (!q && !qDigits) return [];
             const max = (rawLimit as number) || 50;
             const out: any[] = [];
             const seen = new Set<string>();
-            const textMatches = (...values: any[]) =>
-              values.some((value) => {
-                const text = String(value ?? "").toLowerCase();
-                if (text.includes(q)) return true;
-                return Boolean(qDigits && onlyDigits(value).includes(qDigits));
-              });
+            const bestTextRank = (baseRank: number, ...values: any[]) => {
+              const terms = q.split(" ").filter(Boolean);
+              let best = Number.POSITIVE_INFINITY;
+              for (const value of values) {
+                const text = normalizeText(value);
+                if (!text) continue;
+                if (text === q) best = Math.min(best, baseRank);
+                else if (text.startsWith(q)) best = Math.min(best, baseRank + 1);
+                else if (text.includes(q)) best = Math.min(best, baseRank + 2);
+                else if (
+                  terms.length > 1 &&
+                  terms.every((term: string) => text.includes(term))
+                )
+                  best = Math.min(best, baseRank + 3);
+              }
+              return best;
+            };
+            const bestDigitRank = (baseRank: number, ...values: any[]) => {
+              if (!qDigits) return Number.POSITIVE_INFINITY;
+              let best = Number.POSITIVE_INFINITY;
+              for (const value of values) {
+                const digits = onlyDigits(value);
+                if (!digits) continue;
+                if (digits === qDigits) best = Math.min(best, baseRank);
+                else if (digits.endsWith(qDigits))
+                  best = Math.min(best, baseRank + 1);
+                else if (digits.includes(qDigits))
+                  best = Math.min(best, baseRank + 2);
+              }
+              return best;
+            };
             const contactModelsArray = (): any[] => {
               try {
                 return (
@@ -2630,7 +2731,6 @@ class WhatsAppService {
             }
             if (!Array.isArray(chatModels)) chatModels = [];
             for (const c of chatModels) {
-              if (out.length >= max) break;
               try {
                 if (!c?.id?._serialized) continue;
                 if (c.id.server === "status" || c.id.server === "broadcast")
@@ -2643,28 +2743,32 @@ class WhatsAppService {
                 // Cheap text match first (no lid resolution). Resolve the phone
                 // number only when it's actually needed — for display on a
                 // match, or to test a digit query that didn't match by name.
-                const cheapMatch = textMatches(
-                  savedName,
-                  c.formattedTitle,
-                  c.name,
-                  contact?.pushname,
-                  contact?.formattedName,
-                  c.id?.user,
+                const cheapScore = Math.min(
+                  bestDigitRank(0, c.id?.user),
+                  bestTextRank(
+                    4,
+                    savedName,
+                    c.formattedTitle,
+                    c.name,
+                    contact?.pushname,
+                    contact?.formattedName,
+                    c.id?.user,
+                  ),
                 );
                 let phone = "";
-                let matched = cheapMatch;
-                if (cheapMatch || qDigits) {
+                let matchScore = cheapScore;
+                if (Number.isFinite(cheapScore) || qDigits) {
                   phone = phoneFromContact(c.id._serialized, contact);
-                  if (!matched && qDigits && onlyDigits(phone).includes(qDigits))
-                    matched = true;
+                  matchScore = Math.min(matchScore, bestDigitRank(0, phone));
                 }
-                if (!matched) continue;
                 let lm: any = null;
                 try {
                   lm = c.lastMessage ?? c.msgs?.last ?? null;
                 } catch {
                   lm = null;
                 }
+                matchScore = Math.min(matchScore, bestTextRank(20, lm?.body));
+                if (!Number.isFinite(matchScore)) continue;
                 out.push({
                   id: c.id._serialized,
                   name:
@@ -2689,6 +2793,7 @@ class WhatsAppService {
                   lastMessageHasMedia: Boolean(lm?.hasMedia),
                   lastMessageType:
                     typeof lm?.type === "string" ? lm.type : null,
+                  matchScore,
                 });
                 seen.add(c.id._serialized);
               } catch {
@@ -2699,25 +2804,21 @@ class WhatsAppService {
             // 2) Contacts without an existing chat (startable results).
             const contactModels = contactModelsArray();
             for (const ct of contactModels) {
-              if (out.length >= max) break;
               try {
                 if (!ct?.id?._serialized) continue;
                 if (ct.isMe) continue;
                 // Cheap text match first; resolve the phone lazily (see above).
-                const cheapMatch = textMatches(
-                  ct.name,
-                  ct.pushname,
-                  ct.formattedName,
-                  ct.id?.user,
+                const cheapScore = Math.min(
+                  bestDigitRank(0, ct.id?.user),
+                  bestTextRank(4, ct.name, ct.pushname, ct.formattedName, ct.id?.user),
                 );
                 let phone = "";
-                let matched = cheapMatch;
-                if (cheapMatch || qDigits) {
+                let matchScore = cheapScore;
+                if (Number.isFinite(cheapScore) || qDigits) {
                   phone = phoneFromContact(ct.id._serialized, ct);
-                  if (!matched && qDigits && onlyDigits(phone).includes(qDigits))
-                    matched = true;
+                  matchScore = Math.min(matchScore, bestDigitRank(0, phone));
                 }
-                if (!matched) continue;
+                if (!Number.isFinite(matchScore)) continue;
                 const resultId =
                   ct.id.server === "c.us"
                     ? ct.id._serialized
@@ -2754,6 +2855,7 @@ class WhatsAppService {
                   lastMessageBody: null,
                   lastMessageHasMedia: false,
                   lastMessageType: null,
+                  matchScore,
                 });
                 seen.add(ct.id._serialized);
                 seen.add(resultId);
@@ -2762,7 +2864,13 @@ class WhatsAppService {
               }
             }
 
-            return out.slice(0, max);
+            return out
+              .sort(
+                (left: any, right: any) =>
+                  left.matchScore - right.matchScore ||
+                  (right.timestamp ?? 0) - (left.timestamp ?? 0),
+              )
+              .slice(0, max);
             /* eslint-enable @typescript-eslint/no-explicit-any */
           },
           query,
@@ -2822,6 +2930,8 @@ class WhatsAppService {
 
       const searchTerm = search.trim().toLowerCase();
       if (searchTerm) {
+        const normalizedSearchText = normalizeSearchText(searchTerm);
+        const searchDigits = digitsOnly(searchTerm);
         const limit = Math.max(pageSize * page, 50);
 
         // The in-page contact search (searchChatsAndContacts) depends on
@@ -2879,6 +2989,13 @@ class WhatsAppService {
           if (phoneDigits) seenPhones.add(phoneDigits);
           merged.push(chat);
         }
+
+        merged.sort(
+          (left, right) =>
+            rankChatSearchMatch(left, normalizedSearchText, searchDigits) -
+              rankChatSearchMatch(right, normalizedSearchText, searchDigits) ||
+            (right.timestamp ?? 0) - (left.timestamp ?? 0),
+        );
 
         const start = (page - 1) * pageSize;
         return merged.slice(start, start + pageSize);

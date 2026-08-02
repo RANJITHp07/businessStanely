@@ -1,6 +1,7 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
+import { useAgentContext } from "@/lib/agent-context";
 import { Task } from "@/types";
 import { fetchWithAuth } from "@/lib/fetchWithAuth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -586,6 +587,10 @@ export default function MyTasksPage() {
   });
   const [loading, setLoading] = useState(true);
   const { agent, isLoading: authLoading } = useAuth();
+  // Read the permission from the live profile rather than the localStorage copy
+  // in useAuth, so an admin revoking it takes effect without a re-login.
+  const currentAgent = useAgentContext();
+  const canCreateTask = currentAgent?.canCreateTask !== false;
 
   useEffect(() => {
     const load = async () => {
@@ -677,11 +682,13 @@ export default function MyTasksPage() {
             Manage and track your legal tasks
           </p>
         </div>
-        <Link href="/task/create">
-          <Button className="bg-[#003459] cursor-pointer hover:bg-[#003459] text-white">
-            <Plus className="h-4 w-4 mr-2" /> Add New Task
-          </Button>
-        </Link>
+        {canCreateTask && (
+          <Link href="/task/create">
+            <Button className="bg-[#003459] cursor-pointer hover:bg-[#003459] text-white">
+              <Plus className="h-4 w-4 mr-2" /> Add New Task
+            </Button>
+          </Link>
+        )}
       </div>
 
       {/* Tables */}

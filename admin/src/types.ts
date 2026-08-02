@@ -32,6 +32,7 @@ export interface Agent {
   subordinates: Agent[];
   advisorSubordinates?: Agent[];
   autoAssign?: boolean;
+  canCreateTask?: boolean;
   status: string;
 }
 export interface Task {

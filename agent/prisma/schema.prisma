@@ -165,6 +165,9 @@ model Agent {
   isOtpVerified Boolean   @default(false)
 
   autoAssign           Boolean @default(true)
+  // Admin-controlled: may this agent create normal (non-legislation, non-service)
+  // tasks? Legislation/retainership and service-linked creation is unaffected.
+  canCreateTask        Boolean @default(true)
 
   // Team Management (multiple superiors via join table)
   superiorsLinks    AgentSuperior[] @relation("AgentSuperiors_superior")

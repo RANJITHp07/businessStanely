@@ -200,6 +200,7 @@ export default function AgentForm({ agent }: AgentFormProps) {
     barAssociationId: string;
     jurisdiction: string;
     autoAssign?: boolean
+    canCreateTask?: boolean
   };
   const searchParams = useSearchParams();
   const agentRole = searchParams.get("agentRole");
@@ -222,7 +223,10 @@ export default function AgentForm({ agent }: AgentFormProps) {
     advisorAgentType: initialAdvisorType || "",
     barAssociationId: agent?.barAssociationId || "",
     jurisdiction: agent?.jurisdiction || "",
-    autoAssign: agent?.autoAssign || true
+    autoAssign: agent?.autoAssign || true,
+    // `??` rather than `||` so an agent explicitly set to false stays false
+    // when the edit form reloads.
+    canCreateTask: agent?.canCreateTask ?? true
   });
   const [agentSearch, setAgentSearch] = useState("");
   const [advisorAgentSearch, setAdvisorAgentSearch] = useState("");
@@ -810,6 +814,37 @@ export default function AgentForm({ agent }: AgentFormProps) {
                   ))}
                 </div>
               )}
+            </div>
+
+            {/* Permissions */}
+            <div className="space-y-3">
+              <Label>Permissions</Label>
+              <div className="flex items-start gap-3 rounded-lg border p-4">
+                <Checkbox
+                  id="can-create-task"
+                  className="mt-0.5"
+                  checked={formData.canCreateTask ?? true}
+                  onCheckedChange={(checked) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      canCreateTask: checked as boolean,
+                    }))
+                  }
+                />
+                <div className="space-y-1">
+                  <Label
+                    htmlFor="can-create-task"
+                    className="text-sm font-medium"
+                  >
+                    Allow this agent to create tasks
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    When unchecked, the agent cannot create normal tasks. Tasks
+                    created from a legislation, retainership, or service are not
+                    affected.
+                  </p>
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>

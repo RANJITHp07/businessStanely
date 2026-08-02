@@ -77,9 +77,11 @@ export default function Navigator() {
                 )}
                 {hasExecutionRole(agent?.agentRole) && (
                     <>
-                        <Button size="sm" onClick={() => router.push("/task/create")}>
-                            Add Normal Task
-                        </Button>
+                        {agent?.canCreateTask !== false && (
+                            <Button size="sm" onClick={() => router.push("/task/create")}>
+                                Add Normal Task
+                            </Button>
+                        )}
                         <Button size="sm" onClick={() => router.push("/task_category/create")}>
                             Create Service
                         </Button>

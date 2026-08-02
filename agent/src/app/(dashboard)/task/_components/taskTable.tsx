@@ -71,6 +71,7 @@ import { Task } from "@/types";
 import { useSearchParams } from "next/navigation";
 import { X } from "lucide-react";
 import { useTablePage } from "@/hooks/useTablePage";
+import { useAgentContext } from "@/lib/agent-context";
 
 const priorities = ["All Priorities", "Low", "Medium", "High"];
 const statuses = ["All Status", "To Do", "In Progress", "Hold", "Completed", "Abandoned"];
@@ -78,6 +79,10 @@ const durations = ["24hr", "48hr", "1w"];
 
 export default function TasksTable() {
   const router = useRouter();
+  const currentAgent = useAgentContext();
+  // Hide the create entry point when the admin has revoked the permission.
+  // Undefined while the agent is still loading, so default to showing it.
+  const canCreateTask = currentAgent?.canCreateTask !== false;
   const [tasks, setTasks] = useState<Task[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -356,17 +361,19 @@ export default function TasksTable() {
                 Manage and track all legal tasks and assignments
               </p>
             </div>
-            <Link href={
-              searchParams.get("retainershipTasks")
-                ? `/task/create?retainershipTasks=${searchParams.get("retainershipTasks")}`
-                : "/task/create"
-            }
-              className="flex justify-end">
-              <Button className=" mt-[20px] md:mt-none   text-white rounded-lg px-4 py-2 flex items-center gap-2 cursor-pointer shadow-none hover:shadow-md transition-shadow duration-300">
-                <Plus className="h-4 w-4" />
-                Create Task
-              </Button>
-            </Link>
+            {(canCreateTask || searchParams.get("retainershipTasks")) && (
+              <Link href={
+                searchParams.get("retainershipTasks")
+                  ? `/task/create?retainershipTasks=${searchParams.get("retainershipTasks")}`
+                  : "/task/create"
+              }
+                className="flex justify-end">
+                <Button className=" mt-[20px] md:mt-none   text-white rounded-lg px-4 py-2 flex items-center gap-2 cursor-pointer shadow-none hover:shadow-md transition-shadow duration-300">
+                  <Plus className="h-4 w-4" />
+                  Create Task
+                </Button>
+              </Link>
+            )}
           </div>
 
           {/* Filters */}

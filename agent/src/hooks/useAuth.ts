@@ -15,6 +15,7 @@ interface Agent {
   jurisdiction: string;
   specializations: string[];
   photo?: string;
+  canCreateTask?: boolean;
 }
 
 interface AuthState {

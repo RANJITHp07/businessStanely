@@ -453,6 +453,18 @@ export async function POST(req: NextRequest) {
       statusCheckDuration,
     } = body;
 
+    // Admin can revoke an agent's ability to create normal tasks. Tasks that
+    // belong to a legislation/retainership or a service (category) still go
+    // through, since those are driven by the retainership/service workflow
+    // rather than the agent creating ad-hoc work.
+    const isNormalTask = !legislationId && !categoryId;
+    if (isNormalTask && agent.canCreateTask === false) {
+      return NextResponse.json(
+        { error: "You are not allowed to create tasks. Contact your admin." },
+        { status: 403 },
+      );
+    }
+
     // Validate required fields
     if (!title) {
       return NextResponse.json({ error: "Title is required" }, { status: 400 });

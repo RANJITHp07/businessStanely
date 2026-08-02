@@ -53,6 +53,7 @@ export async function getCurrentAgent(req: NextRequest) {
         jurisdiction: true,
         specializations: true,
         photo: true,
+        canCreateTask: true,
         currentSessionToken: true,
       },
     });

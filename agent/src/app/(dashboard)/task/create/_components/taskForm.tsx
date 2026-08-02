@@ -772,6 +772,32 @@ export default function TaskForm({ id }: TaskFormProps) {
     return format(maxDate, "yyyy-MM-dd");
   };
 
+  // A blocked agent can still reach /task/create by typing the URL, so guard
+  // the form itself. Editing an existing task and creating a task tied to a
+  // legislation/retainership or service stay allowed.
+  const isLinkedTask = Boolean(
+    formData.legislationId || formData.categoryId || id,
+  );
+  if (!isEditMode && !isLinkedTask && agent?.canCreateTask === false) {
+    return (
+      <div className="container mx-auto p-6 max-w-7xl">
+        <div className="rounded-lg border bg-white p-8 text-center">
+          <AlertCircle className="mx-auto h-8 w-8 text-muted-foreground" />
+          <h1 className="mt-4 text-xl font-semibold">
+            Task creation is disabled
+          </h1>
+          <p className="text-muted-foreground mt-2 text-sm">
+            Your admin has not given you permission to create tasks. Please
+            contact your admin if you need access.
+          </p>
+          <Button className="mt-6" onClick={() => router.push("/task")}>
+            Back to Tasks
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="container mx-auto p-6 max-w-7xl">
       <div className="mb-8">

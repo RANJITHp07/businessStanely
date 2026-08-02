@@ -6,6 +6,7 @@ export interface AgentContext {
   email: string;
   agentType: string;
   agentRole: string;
+  canCreateTask?: boolean;
 }
 
 export function useAgentContext(): AgentContext | null {

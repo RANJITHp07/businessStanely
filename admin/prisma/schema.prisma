@@ -162,6 +162,10 @@ model Agent {
   photo                String?
   status               String    @default("active") // "active" or "inactive"
   autoAssign           Boolean @default(true)
+  // Admin-controlled: may this agent create normal (non-legislation, non-service)
+  // tasks from the agent app? Legislation/retainership and service-linked task
+  // creation is unaffected.
+  canCreateTask        Boolean @default(true)
   lastLogin            DateTime?
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt

@@ -38,6 +38,7 @@ export async function POST(req: NextRequest) {
       executionAgentType,
       advisorAgentType,
       autoAssign,
+      canCreateTask,
       ...agentData
     } = body;
 
@@ -166,6 +167,9 @@ export async function POST(req: NextRequest) {
       photo: photoS3Key,
       status: "active",
       autoAssign,
+      // Default to allowed so agents created before this flag existed, and any
+      // client that omits it, keep the previous behaviour.
+      canCreateTask: canCreateTask ?? true,
       ...(specializations?.length && {
         specializations: {
           set: specializations,

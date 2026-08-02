@@ -259,21 +259,21 @@ export async function PUT(
     let { followUpDuration, statusCheckDuration } = body;
     if (
       followUpDuration &&
-      followUpDuration !== "None" &&
+      followUpDuration !== "Working" &&
       statusCheckDuration &&
-      statusCheckDuration !== "None"
+      statusCheckDuration !== "Working"
     ) {
-      // If both are non-None, prioritize the one being changed (frontend always sends both)
-      // If followUpDuration is being set, set statusCheckDuration to 'None'
-      statusCheckDuration = "None";
+      // If both are non-Working, prioritize the one being changed (frontend always sends both)
+      // If followUpDuration is being set, set statusCheckDuration to 'Working'
+      statusCheckDuration = "Working";
     } else if (
       statusCheckDuration &&
-      statusCheckDuration !== "None" &&
+      statusCheckDuration !== "Working" &&
       followUpDuration &&
-      followUpDuration !== "None"
+      followUpDuration !== "Working"
     ) {
-      // If statusCheckDuration is being set, set followUpDuration to 'None'
-      followUpDuration = "None";
+      // If statusCheckDuration is being set, set followUpDuration to 'Working'
+      followUpDuration = "Working";
     }
     // Transform relation IDs to nested connect objects for Prisma
     const updateData: Record<string, unknown> = {
@@ -395,7 +395,7 @@ export async function PUT(
             data: {
               taskId,
               field,
-              oldValue: currentVal ?? "None",
+              oldValue: currentVal ?? "Working",
               newValue: bodyVal,
               auditDate: today,
               changedByAgentId: agent.id,

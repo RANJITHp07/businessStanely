@@ -253,8 +253,8 @@ model Task {
   progress         Int?      @default(0) // Progress percentage (0-100)
   statusProgressMap Json?     // Map of status to progress percentage, e.g. {"To Do": 10, "In Progress": 50, "Completed": 100}
   followUpRequired Boolean   @default(false)
-  followUpDuration     String? // e.g., "24hr", "48hr", "1w", "None"
-  statusCheckDuration  String? // e.g., "24hr", "48hr", "1w", "None"
+  followUpDuration     String? // e.g., "24hr", "48hr", "1w", "Working"
+  statusCheckDuration  String? // e.g., "24hr", "48hr", "1w", "Working"
   completed        Boolean   @default(false)
   recurring        Int?      // Recurring in months (1-12), null means not recurring
   recurringType  String?  // 'DAY' | 'WEEK' | 'MONTH'

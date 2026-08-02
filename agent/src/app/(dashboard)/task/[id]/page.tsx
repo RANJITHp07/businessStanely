@@ -558,18 +558,18 @@ export default function TaskDetails() {
         if (
           isClientUpdateInteraction &&
           task.statusCheckDuration &&
-          task.statusCheckDuration !== "None"
+          task.statusCheckDuration !== "Working"
         ) {
           await fetch(`/api/tasks/${task.id}`, {
             method: "PUT",
             headers: {
               "Content-Type": "application/json",
             },
-            body: JSON.stringify({ statusCheckDuration: "None" }),
+            body: JSON.stringify({ statusCheckDuration: "Working" }),
           });
 
           setTask((prev) =>
-            prev ? { ...prev, statusCheckDuration: "None" } : prev,
+            prev ? { ...prev, statusCheckDuration: "Working" } : prev,
           );
         }
       } else {
@@ -586,7 +586,7 @@ export default function TaskDetails() {
   // Optimistic UI update for status
   // When status changes, restore progress for that status from statusProgressMap
   const calculateNewDueDate = (holdDuration: string, currentDueDate: string) => {
-    if (!holdDuration || holdDuration === "None") return currentDueDate;
+    if (!holdDuration || holdDuration === "Working") return currentDueDate;
 
     const durationMap: Record<string, number> = {
       "24hr": 1,
@@ -610,7 +610,7 @@ export default function TaskDetails() {
 
     let updatedDueDate = task.dueDate;
     if (newStatus === "Hold") {
-      updatedDueDate = calculateNewDueDate(task.followUpDuration || "None", task.dueDate);
+      updatedDueDate = calculateNewDueDate(task.followUpDuration || "Working", task.dueDate);
     }
 
     setTask({
@@ -756,7 +756,7 @@ export default function TaskDetails() {
 
   // Dropdown options for durations
   const durationOptions = [
-    { value: "None", label: "Working" },
+    { value: "Working", label: "Working" },
     { value: "24hr", label: "24 Hours" },
     { value: "48hr", label: "48 Hours" },
     { value: "1w", label: "1 Week" },
@@ -1052,7 +1052,7 @@ export default function TaskDetails() {
                     StatusCheck & Followup
                   </Label>
                   <Select
-                    value={task.followUpDuration || "None"}
+                    value={task.followUpDuration || "Working"}
                     onValueChange={handleFollowUpDurationChange}
                   >
                     <SelectTrigger id="follow-up-duration" className="w-28">
@@ -1070,7 +1070,7 @@ export default function TaskDetails() {
                     Client update
                   </Label>
                   <Select
-                    value={task.statusCheckDuration || "None"}
+                    value={task.statusCheckDuration || "Working"}
                     onValueChange={handleStatusCheckDurationChange}
                     disabled
                   >

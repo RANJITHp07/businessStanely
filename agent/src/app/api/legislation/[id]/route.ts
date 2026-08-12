@@ -14,7 +14,9 @@ export async function GET(req: Request, context: { params: { id: string } }) {
             client: true,
           },
         },
-        tasks: true,
+        tasks: {
+          where: { active: true },
+        },
       },
     });
 

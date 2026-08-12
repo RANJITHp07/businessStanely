@@ -14,11 +14,12 @@ export async function GET(req: Request, context: { params: { id: string } }) {
             client: true,
           },
         },
-        tasks: true,
+        tasks: {
+          where: { active: true },
+        },
       },
     });
 
-    console.log(legislation)
     if (!legislation) {
       return new Response("Legislation not found", { status: 404 });
     }

@@ -103,6 +103,21 @@ export async function GET(req: NextRequest) {
 
     let where: Prisma.TaskWhereInput;
 
+    // A comment counts as in range when its startTime falls in range, or when it
+    // has no startTime at all and was created in range (createdAt is used as the
+    // fallback work time below).
+    const commentInRange: Prisma.CommentWhereInput = {
+      OR: [
+        { startTime: { gte: startDate, lte: endDate } },
+        {
+          AND: [
+            { startTime: null },
+            { createdAt: { gte: startDate, lte: endDate } },
+          ],
+        },
+      ],
+    };
+
     if (assignedToIdsParam) {
       const assignedToIds = assignedToIdsParam
         .split(",")
@@ -117,12 +132,7 @@ export async function GET(req: NextRequest) {
           },
           {
             comments: {
-              some: {
-                startTime: {
-                  gte: startDate,
-                  lte: endDate,
-                },
-              },
+              some: commentInRange,
             },
           },
         ],
@@ -136,12 +146,7 @@ export async function GET(req: NextRequest) {
           },
           {
             comments: {
-              some: {
-                startTime: {
-                  gte: startDate,
-                  lte: endDate,
-                },
-              },
+              some: commentInRange,
             },
           },
         ],
@@ -238,12 +243,41 @@ export async function GET(req: NextRequest) {
     // --------------------------
     // TASK ENTRIES
     // --------------------------
+    const formatISTTime = (value: Date) =>
+      value.toLocaleTimeString("en-US", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: true,
+        timeZone: IST_TIME_ZONE,
+      });
+
     tasks.forEach((task) => {
-      const userId = agent.id;
-      const userName = agent.name || agent.email;
+      const userId = task.assignedToId || agent.id;
+      const userName =
+        task.assignedTo?.name ||
+        task.assignedTo?.email ||
+        agent.name ||
+        agent.email;
 
       task.comments.forEach((comment) => {
-        const commentDate = new Date(comment.startTime!);
+        // Fall back to createdAt so an entry logged without an explicit start
+        // time still shows up instead of becoming an Invalid Date.
+        const startAt = comment.startTime
+          ? new Date(comment.startTime)
+          : new Date(comment.createdAt);
+
+        // The task-level query only guarantees that *some* comment is in range,
+        // so each comment needs its own range check.
+        if (startAt < startDate || startAt > endDate) {
+          return;
+        }
+
+        // Use the end time the agent actually entered; only fall back to +1h
+        // when the comment has none.
+        const endAt = comment.endTime
+          ? new Date(comment.endTime)
+          : new Date(startAt.getTime() + 60 * 60 * 1000);
+
         const status = task.status?.toLowerCase();
 
         timeEntries.push({
@@ -255,26 +289,15 @@ export async function GET(req: NextRequest) {
             task.client?.firstName ||
             task.client?.organizationName ||
             "Project",
-          date: new Date(commentDate),
-          startTime: commentDate.toLocaleTimeString("en-US", {
-            hour: "2-digit",
-            minute: "2-digit",
-            hour12: true,
-            timeZone: IST_TIME_ZONE,
-          }),
-          endTime: new Date(
-            commentDate.getTime() + 60 * 60 * 1000,
-          ).toLocaleTimeString("en-US", {
-            hour: "2-digit",
-            minute: "2-digit",
-            hour12: true,
-            timeZone: IST_TIME_ZONE,
-          }),
+          date: new Date(startAt),
+          startTime: formatISTTime(startAt),
+          endTime: formatISTTime(endAt),
           status, // ✅ only pending | completed
           type: "task",
           userId,
           userName,
-          commentAuthor: comment.agent?.name || "Unknown",
+          commentAuthor:
+            comment.agent?.name || comment.user?.username || "Unknown",
           commentId: comment.id,
         });
       });

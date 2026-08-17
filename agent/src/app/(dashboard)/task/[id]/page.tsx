@@ -166,6 +166,37 @@ interface TimeLogData {
   };
 }
 
+const IST_TIME_ZONE = "Asia/Kolkata";
+const IST_OFFSET_MINUTES = 330;
+
+// The calendar day a date falls on in IST, regardless of browser timezone.
+const getISTDayParts = (date: Date) => {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: IST_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+
+  return {
+    year: Number(parts.find((part) => part.type === "year")?.value ?? "1970"),
+    month: Number(parts.find((part) => part.type === "month")?.value ?? "1"),
+    day: Number(parts.find((part) => part.type === "day")?.value ?? "1"),
+  };
+};
+
+// Combines an IST calendar day with an "HH:mm" wall-clock time into the matching
+// absolute instant. The timesheet buckets entries by IST day, so the times sent
+// to the API must be anchored to IST and not to the browser's local timezone.
+const buildISTDateTime = (date: Date, time: string) => {
+  const { year, month, day } = getISTDayParts(date);
+  const [hour, minute] = time.split(":").map(Number);
+  const utcMillis =
+    Date.UTC(year, month - 1, day, hour || 0, minute || 0, 0, 0) -
+    IST_OFFSET_MINUTES * 60 * 1000;
+  return new Date(utcMillis);
+};
+
 export default function TaskDetails() {
   const MANAGEMENT_BASE_URL = "https://management.legalstanley.com";
 
@@ -205,7 +236,7 @@ export default function TaskDetails() {
   const [showAssignSearch, setShowAssignSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
-  const [duration, setDuration] = useState(2)
+  const [duration, setDuration] = useState(30)
 
   const params = useParams();
   const router = useRouter();
@@ -509,14 +540,15 @@ export default function TaskDetails() {
         attachmentData = { attachments: uploaded };
       }
 
-      // Combine date and time values
-      const startDateTime = new Date(commentDate);
-      const [startHour, startMinute] = startTime.split(":").map(Number);
-      startDateTime.setHours(startHour, startMinute, 0);
+      // Combine date and time values, interpreted in IST.
+      const startDateTime = buildISTDateTime(commentDate, startTime);
+      let endDateTime = buildISTDateTime(commentDate, endTime);
 
-      const endDateTime = new Date(commentDate);
-      const [endHour, endMinute] = endTime.split(":").map(Number);
-      endDateTime.setHours(endHour, endMinute, 0);
+      // End time wrapped past midnight (e.g. 23:30 + 60 min): it belongs to the
+      // next IST day.
+      if (endDateTime.getTime() <= startDateTime.getTime()) {
+        endDateTime = new Date(endDateTime.getTime() + 24 * 60 * 60 * 1000);
+      }
 
       const response = await fetch(`/api/comments`, {
         method: "POST",
@@ -527,7 +559,7 @@ export default function TaskDetails() {
           taskId: task.id,
           content: `${isClientUpdateInteraction ? "[CLIENT_UPDATE]" : "[NORMAL]"} ${newComment.trim()}`,
           interactionType: isClientUpdateInteraction ? "CLIENT_UPDATE" : "NORMAL",
-          commentDate: commentDate.toISOString(),
+          commentDate: buildISTDateTime(commentDate, "00:00").toISOString(),
           startTime: startDateTime.toISOString(),
           endTime: endDateTime.toISOString(),
           ...attachmentData,
@@ -886,10 +918,13 @@ export default function TaskDetails() {
     }
   };
 
-  const getNowTime = () => {
-    const d = new Date()
-    return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`
-  }
+  const getNowTime = () =>
+    new Date().toLocaleTimeString("en-GB", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+      timeZone: IST_TIME_ZONE,
+    })
 
   const timeToMinutes = (time: string) => {
     const [h, m] = time.split(":").map(Number)
@@ -897,10 +932,11 @@ export default function TaskDetails() {
   }
 
   const addMinutes = (time: string, mins: number) => {
-    const [h, m] = time.split(":").map(Number)
-    const d = new Date()
-    d.setHours(h, m + mins)
-    return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`
+    const total = (timeToMinutes(time) + mins) % (24 * 60)
+    const wrapped = total < 0 ? total + 24 * 60 : total
+    const h = Math.floor(wrapped / 60)
+    const m = wrapped % 60
+    return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`
   }
 
   const getInteractionType = (content?: string) => {

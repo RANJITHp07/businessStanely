@@ -130,7 +130,9 @@ export default function TimesheetPage() {
                 startDate: getISTStartOfDayISO(startDate),
                 endDate: getISTEndOfDayISO(endDate),
             });
-            const response = await fetch(`/api/timesheet?${params.toString()}`);
+            const response = await fetch(`/api/timesheet?${params.toString()}`, {
+                cache: "no-store",
+            });
             const data = response.ok ? await response.json() : { timeEntries: [] };
             setEntries(data.timeEntries || []);
         } catch {
@@ -140,6 +142,24 @@ export default function TimesheetPage() {
 
     useEffect(() => {
         fetchTimesheetData();
+    }, [fetchTimesheetData]);
+
+    // Interactions are logged on the task page, so refresh when the user comes
+    // back to this tab instead of showing a stale week.
+    useEffect(() => {
+        const refetchIfVisible = () => {
+            if (document.visibilityState === "visible") {
+                fetchTimesheetData();
+            }
+        };
+
+        window.addEventListener("focus", refetchIfVisible);
+        document.addEventListener("visibilitychange", refetchIfVisible);
+
+        return () => {
+            window.removeEventListener("focus", refetchIfVisible);
+            document.removeEventListener("visibilitychange", refetchIfVisible);
+        };
     }, [fetchTimesheetData]);
 
     // Filter entries by selected users, status, and date

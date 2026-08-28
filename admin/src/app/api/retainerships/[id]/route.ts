@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentAdmin } from "@/lib/auth";
 import prisma from "@/lib/prisma";
+import {
+  recordDeletionAudit,
+  actorFromAdmin,
+  softDeleteData,
+} from "@/lib/audit";
 
 export async function GET(
   req: NextRequest,
@@ -28,8 +33,8 @@ export async function GET(
 
     // Find the retainership in database with creator information (user or agent)
     // Include legislation relation in the query
-    const retainership = await prisma.retainership.findUnique({
-      where: { id },
+    const retainership = await prisma.retainership.findFirst({
+      where: { id, deletedAt: null },
       include: {
         createdByUser: true,
         createdByAgent: true,
@@ -214,10 +219,10 @@ export async function PUT(
       return NextResponse.json({ error: "Name is required" }, { status: 400 });
     }
 
-    const existingRetainership = await prisma.retainership.findUnique({
-      where: { id },
+    const existingRetainership = await prisma.retainership.findFirst({
+      where: { id, deletedAt: null },
       include: {
-        legislation: true,
+        legislation: { where: { deletedAt: null } },
       },
     });
 
@@ -278,8 +283,8 @@ export async function PUT(
       });
     });
 
-    const updatedRetainership = await prisma.retainership.findUnique({
-      where: { id },
+    const updatedRetainership = await prisma.retainership.findFirst({
+      where: { id, deletedAt: null },
       include: {
         createdByUser: {
           select: { id: true, username: true },
@@ -331,9 +336,15 @@ export async function DELETE(
 
     const { id } = params;
 
-    // Check if retainership exists
-    const existingRetainership = await prisma.retainership.findUnique({
-      where: { id },
+    // Check if retainership exists and is not already deleted
+    const existingRetainership = await prisma.retainership.findFirst({
+      where: { id, deletedAt: null },
+      include: {
+        legislation: {
+          where: { deletedAt: null },
+          select: { id: true, title: true },
+        },
+      },
     });
 
     if (!existingRetainership) {
@@ -343,24 +354,68 @@ export async function DELETE(
       );
     }
 
-    // Delete the retainership
-    await prisma.retainership.delete({
-      where: { id },
+    const legislationIds = existingRetainership.legislation.map((l) => l.id);
+
+    // Count what stays behind so the audit reflects the state at delete time.
+    // Tasks are intentionally left untouched: they keep their legislationId and
+    // become visible again if the retainership is restored.
+    const taskCount = await prisma.task.count({
+      where: {
+        OR: [
+          { retainershipId: id },
+          ...(legislationIds.length
+            ? [{ legislationId: { in: legislationIds } }]
+            : []),
+        ],
+      },
     });
 
-    return NextResponse.json({ message: "Retainership deleted successfully" });
+    const deletedAt = new Date();
+
+    // Soft delete the retainership and its legislations together. Prisma's
+    // onDelete: Cascade only fires on a real delete, so the cascade is explicit.
+    await prisma.$transaction([
+      prisma.retainership.update({
+        where: { id },
+        data: softDeleteData(actorFromAdmin(currentAdmin), deletedAt),
+      }),
+      prisma.legislation.updateMany({
+        where: { retainershipId: id, deletedAt: null },
+        data: softDeleteData(actorFromAdmin(currentAdmin), deletedAt),
+      }),
+    ]);
+
+    await recordDeletionAudit({
+      entityType: "Retainership",
+      entityId: id,
+      entityName: existingRetainership.name,
+      affectedTaskCount: taskCount,
+      affectedLegislationCount: legislationIds.length,
+      actor: actorFromAdmin(currentAdmin),
+      req,
+    });
+
+    // One audit row per cascaded legislation, so each is traceable on its own.
+    for (const legislation of existingRetainership.legislation) {
+      await recordDeletionAudit({
+        entityType: "Legislation",
+        entityId: legislation.id,
+        entityName: legislation.title,
+        reason: "Cascaded from retainership deletion",
+        parentEntityType: "Retainership",
+        parentEntityId: id,
+        actor: actorFromAdmin(currentAdmin),
+        req,
+      });
+    }
+
+    return NextResponse.json({
+      message: "Retainership deleted successfully",
+      deletedLegislationCount: legislationIds.length,
+      affectedTaskCount: taskCount,
+    });
   } catch (error) {
     console.error("Error deleting retainership:", error);
-
-    // Check for foreign key constraint violations
-    if (error instanceof Error && "code" in error && error.code === "P2003") {
-      return NextResponse.json(
-        {
-          error: "Cannot delete retainership because it is being used by tasks",
-        },
-        { status: 409 }
-      );
-    }
 
     return NextResponse.json(
       { error: "Failed to delete retainership" },

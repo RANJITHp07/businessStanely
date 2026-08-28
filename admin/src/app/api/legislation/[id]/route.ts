@@ -1,12 +1,19 @@
+import { NextRequest } from "next/server";
+import { getCurrentAdmin } from "@/lib/auth";
 import prisma from "@/lib/prisma";
+import {
+  recordDeletionAudit,
+  actorFromAdmin,
+  softDeleteData,
+} from "@/lib/audit";
 
 export async function GET(req: Request, context: { params: { id: string } }) {
   const params = await context.params; // Await params before destructuring
   const { id } = params;
 
   try {
-    const legislation = await prisma.legislation.findUnique({
-      where: { id },
+    const legislation = await prisma.legislation.findFirst({
+      where: { id, deletedAt: null },
       include: {
         assignedAgent: true,
         retainership: {
@@ -110,15 +117,22 @@ export async function POST(req: Request, context: { params: { id: string } }) {
 }
 
 export async function DELETE(
-  req: Request,
+  req: NextRequest,
   context: { params: { id: string } }
 ) {
   const { params } = context;
   const { id } = params;
 
   try {
-    const deletedLegislation = await prisma.legislation.delete({
-      where: { id },
+    // Auth is required here because the deletion audit has to name an actor.
+    const currentAdmin = await getCurrentAdmin(req);
+
+    if (!currentAdmin) {
+      return new Response("Unauthorized", { status: 401 });
+    }
+
+    const existingLegislation = await prisma.legislation.findFirst({
+      where: { id, deletedAt: null },
       include: {
         assignedAgent: true,
         retainership: {
@@ -128,6 +142,35 @@ export async function DELETE(
         },
         tasks: true,
       },
+    });
+
+    if (!existingLegislation) {
+      return new Response("Legislation not found", { status: 404 });
+    }
+
+    // Soft delete: tasks keep their legislationId so nothing is orphaned and the
+    // link comes back intact if the legislation is restored.
+    const deletedLegislation = await prisma.legislation.update({
+      where: { id },
+      data: softDeleteData(actorFromAdmin(currentAdmin)),
+      include: {
+        assignedAgent: true,
+        retainership: {
+          include: {
+            client: true,
+          },
+        },
+        tasks: true,
+      },
+    });
+
+    await recordDeletionAudit({
+      entityType: "Legislation",
+      entityId: id,
+      entityName: existingLegislation.title,
+      affectedTaskCount: existingLegislation.tasks.length,
+      actor: actorFromAdmin(currentAdmin),
+      req,
     });
 
     return new Response(JSON.stringify(deletedLegislation), {

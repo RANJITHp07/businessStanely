@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
-import { deleteFromS3 } from "@/lib/aws";
+import { getCurrentAdmin } from "@/lib/auth";
+import {
+  recordDeletionAudit,
+  actorFromAdmin,
+  softDeleteData,
+} from "@/lib/audit";
+import { commentDisplayName } from "@/lib/entityNames";
 
 export async function POST(req: NextRequest) {
   try {
@@ -207,32 +213,36 @@ export async function DELETE(req: NextRequest) {
       );
     }
 
-    const comment = await prisma.comment.findUnique({
-      where: { id: commentId },
+    const currentAdmin = await getCurrentAdmin(req);
+    if (!currentAdmin) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const comment = await prisma.comment.findFirst({
+      where: { id: commentId, deletedAt: null },
     });
 
     if (!comment) {
       return NextResponse.json({ error: "Comment not found" }, { status: 404 });
     }
 
-    const attachments = Array.isArray(comment.attachments)
-      ? (comment.attachments as { url?: string }[])
-      : [];
-    const urlsToDelete = [
-      comment.attachmentUrl,
-      ...attachments.map((attachment) => attachment.url),
-    ].filter((url): url is string => Boolean(url));
+    // S3 attachments are intentionally left in place. The comment row survives a
+    // soft delete and can be restored, so removing the files would leave it
+    // pointing at dead URLs. Orphaned objects are reclaimed out of band.
 
-    for (const url of [...new Set(urlsToDelete)]) {
-      try {
-        await deleteFromS3(url);
-      } catch (error) {
-        console.error("Error deleting file from S3:", error);
-      }
-    }
+    const actor = actorFromAdmin(currentAdmin);
 
-    await prisma.comment.delete({
+    await prisma.comment.update({
       where: { id: commentId },
+      data: softDeleteData(actor),
+    });
+
+    await recordDeletionAudit({
+      entityType: "Comment",
+      entityId: commentId,
+      entityName: commentDisplayName(comment),
+      actor,
+      req,
     });
 
     return NextResponse.json({ message: "Comment deleted successfully" });

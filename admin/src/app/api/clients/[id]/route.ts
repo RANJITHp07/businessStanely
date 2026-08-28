@@ -1,5 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { getCurrentAdmin } from "@/lib/auth";
+import {
+  recordDeletionAudit,
+  recordUpdateAudit,
+  changedFields,
+  actorFromAdmin,
+  softDeleteData,
+} from "@/lib/audit";
+import { withActor } from "@/lib/auditContext";
+import { clientDisplayName } from "@/lib/entityNames";
 
 export async function GET(
   req: NextRequest,
@@ -45,13 +55,34 @@ export async function PUT(
       );
     }
 
+    const currentAdmin = await getCurrentAdmin(req);
+    if (!currentAdmin) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const before = await prisma.client.findFirst({ where: { id } });
+    if (!before) {
+      return NextResponse.json({ error: "Client not found" }, { status: 404 });
+    }
+
+    const actor = actorFromAdmin(currentAdmin);
+    const patch = { ...clientData, email };
+
     // Proceed to update
-    const updatedClient = await prisma.client.update({
-      where: { id: id },
-      data: {
-        ...clientData,
-        email, // Include email if it's part of the update
-      },
+    const updatedClient = await withActor(actor, () =>
+      prisma.client.update({
+        where: { id: id },
+        data: patch,
+      })
+    );
+
+    await recordUpdateAudit({
+      entityType: "Client",
+      entityId: id,
+      entityName: clientDisplayName(updatedClient),
+      changedFields: changedFields(before, patch),
+      actor,
+      req,
     });
 
     return NextResponse.json(updatedClient);
@@ -76,9 +107,33 @@ export async function DELETE(
     if (!id) {
       return NextResponse.json({ error: "Missing client id" }, { status: 400 });
     }
-    await prisma.client.delete({
-      where: { id },
+    const currentAdmin = await getCurrentAdmin(req);
+    if (!currentAdmin) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const existing = await prisma.client.findFirst({
+      where: { id, deletedAt: null },
     });
+    if (!existing) {
+      return NextResponse.json({ error: "Client not found" }, { status: 404 });
+    }
+
+    const actor = actorFromAdmin(currentAdmin);
+
+    await prisma.client.update({
+      where: { id },
+      data: softDeleteData(actor),
+    });
+
+    await recordDeletionAudit({
+      entityType: "Client",
+      entityId: id,
+      entityName: clientDisplayName(existing),
+      actor,
+      req,
+    });
+
     return new NextResponse(null, { status: 204 });
   } catch (error) {
     console.error(`Error deleting client:`, error);

@@ -1,4 +1,3 @@
-
 datasource db {
   provider = "mongodb"
   url      = env("DATABASE_URL")
@@ -10,60 +9,82 @@ generator client {
 }
 
 model Prospect {
-  id            String   @id @default(auto()) @map("_id") @db.ObjectId
-  name          String
-  email         String?
-  service       String?
-  phone         String?
-  phoneNumber   String?
-  description   String?
-  amount        Float?
-  address        String?
-  status        String   @default("New") // e.g., New, Contacted, Qualified, Lost, Converted
-  notes         String?
-  nextFollowUp  DateTime?
-  assignedAgentId String? @db.ObjectId
-  assignedAgent   Agent?  @relation("AgentAssignedProspects", fields: [assignedAgentId], references: [id])
-  createdByAgentId String? @db.ObjectId
-  createdByAgent   Agent?  @relation("AgentCreatedProspects", fields: [createdByAgentId], references: [id])
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  opportunities Opportunity[] @relation("ProspectOpportunities")
-  archived      Boolean  @default(false) // If true, this prospect is archived (e.g., converted to opportunity)
-  leadSourceId   String?
-  leadSource     LeadSource? @relation(fields: [leadSourceId], references: [id])
-  comments      Comment[] // Comments/interactions for this prospect
+  id               String        @id @default(auto()) @map("_id") @db.ObjectId
+  name             String
+  email            String?
+  service          String?
+  phone            String?
+  phoneNumber      String?
+  description      String?
+  amount           Float?
+  address          String?
+  status           String        @default("New") // e.g., New, Contacted, Qualified, Lost, Converted
+  notes            String?
+  nextFollowUp     DateTime?
+  assignedAgentId  String?       @db.ObjectId
+  assignedAgent    Agent?        @relation("AgentAssignedProspects", fields: [assignedAgentId], references: [id])
+  createdByAgentId String?       @db.ObjectId
+  createdByAgent   Agent?        @relation("AgentCreatedProspects", fields: [createdByAgentId], references: [id])
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  opportunities    Opportunity[] @relation("ProspectOpportunities")
+  archived         Boolean       @default(false) // If true, this prospect is archived (e.g., converted to opportunity)
+  leadSourceId     String?
+  leadSource       LeadSource?   @relation(fields: [leadSourceId], references: [id])
+  comments         Comment[] // Comments/interactions for this prospect
+
+  /// Soft delete: rows are never removed, only stamped. Every read filters on
+  /// deletedAt: null. See lib/audit.ts.
+  deletedAt       DateTime?
+  deletedById     String?   @db.ObjectId
+  deletedByType   String? // "USER" | "AGENT"
+
+  /// Who last changed this row. Field-level history lives in DeletionAudit.
+  updatedById     String?   @db.ObjectId
+  updatedByType   String? // "USER" | "AGENT"
+
 }
 
 model Opportunity {
-  id            String   @id @default(auto()) @map("_id") @db.ObjectId
-  name          String
-  phoneNumber   String?
-  description   String?
-  amount        Float?
-  nextFollowUp  DateTime?
-  status        String   @default("Proposal Issued") // "Proposal Issued", "Closed as Won", "Closed as Loss"
-  prospectId    String   @db.ObjectId
-  prospect      Prospect @relation("ProspectOpportunities", fields: [prospectId], references: [id])
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  comments      Comment[] // Comments/interactions for this opportunity
+  id           String    @id @default(auto()) @map("_id") @db.ObjectId
+  name         String
+  phoneNumber  String?
+  description  String?
+  amount       Float?
+  nextFollowUp DateTime?
+  status       String    @default("Proposal Issued") // "Proposal Issued", "Closed as Won", "Closed as Loss"
+  prospectId   String    @db.ObjectId
+  prospect     Prospect  @relation("ProspectOpportunities", fields: [prospectId], references: [id])
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  comments     Comment[] // Comments/interactions for this opportunity
+
+  /// Soft delete: rows are never removed, only stamped. Every read filters on
+  /// deletedAt: null. See lib/audit.ts.
+  deletedAt       DateTime?
+  deletedById     String?   @db.ObjectId
+  deletedByType   String? // "USER" | "AGENT"
+
+  /// Who last changed this row. Field-level history lives in DeletionAudit.
+  updatedById     String?   @db.ObjectId
+  updatedByType   String? // "USER" | "AGENT"
+
 }
 
 model User {
-  id          String    @id @default(auto()) @map("_id") @db.ObjectId
-  username    String    @unique // Used for both login and display
-  email       String    @unique
-  password    String
-  adminType   String    @default("admin") // Either "owner" or "admin"
-  status      String    @default("active") // "active" or "inactive"
-  photo       String?
-  lastLogin   DateTime?
-  permissions String[]  @default([])
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  comments    Comment[] @relation("UserComments")
-  diaryEntries DiaryEntry[] @relation("UserDiaryEntries")
+  id                   String         @id @default(auto()) @map("_id") @db.ObjectId
+  username             String         @unique // Used for both login and display
+  email                String         @unique
+  password             String
+  adminType            String         @default("admin") // Either "owner" or "admin"
+  status               String         @default("active") // "active" or "inactive"
+  photo                String?
+  lastLogin            DateTime?
+  permissions          String[]       @default([])
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+  comments             Comment[]      @relation("UserComments")
+  diaryEntries         DiaryEntry[]   @relation("UserDiaryEntries")
   createdQuoteRequests QuoteRequest[] @relation("UserCreatedQuoteRequests")
 
   // Task Category relations
@@ -75,6 +96,11 @@ model User {
   createdRetainerships  Retainership[] @relation("UserCreatedRetainerships")
   approvedRetainerships Retainership[] @relation("RetainershipApprovals")
   rejectedRetainerships Retainership[] @relation("RetainershipRejections")
+  deletedRetainerships  Retainership[] @relation("RetainershipDeletions")
+  deletedLegislations   Legislation[]  @relation("LegislationDeletions")
+
+  // Audit trail of deletions performed by this admin
+  deletionAudits DeletionAudit[] @relation("UserDeletionAudits")
 
   // Service Records relation
   serviceRecords ServiceRecord[] @relation("UserServiceRecords")
@@ -84,6 +110,51 @@ model User {
   otpExpiry           DateTime?
   isOtpVerified       Boolean   @default(false)
   currentSessionToken String?
+}
+
+/// Append-only record of every soft delete, restore, and update, so a change can
+/// always be traced to an actor and a time even after the row is filtered out of
+/// normal reads. Written by both the admin and agent apps against one database.
+model DeletionAudit {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  entityType String // "Client" | "Prospect" | "Task" | "Retainership" | ...
+  entityId   String @db.ObjectId
+  entityName String // name/title captured at write time, so it survives later edits
+
+  action String  @default("SOFT_DELETE") // "SOFT_DELETE" | "RESTORE" | "UPDATE"
+  reason String?
+
+  /// Names of the fields touched by an UPDATE. Values are deliberately not
+  /// stored: the audit answers who and when, not what the old value was.
+  changedFields String[] @default([])
+
+  /// Counts of related records left behind, recorded at delete time.
+  affectedTaskCount        Int @default(0)
+  affectedLegislationCount Int @default(0)
+
+  /// Set when this row was written as a side effect of acting on a parent.
+  parentEntityType String?
+  parentEntityId   String? @db.ObjectId
+
+  /// The actor is a User (admin app) or an Agent (agent app), never both.
+  /// The relation is left optional on both sides so either app can write here.
+  performedByType String  @default("USER") // "USER" | "AGENT"
+  performedById   String  @db.ObjectId
+  performedByUser User?   @relation("UserDeletionAudits", fields: [performedById], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  performedByAgent Agent? @relation("AgentDeletionAudits", fields: [performedById], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  performedByEmail    String // denormalized so the audit reads correctly if the actor is later removed
+  performedByUsername String
+
+  ipAddress String?
+  userAgent String?
+
+  createdAt DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([createdAt])
+  @@index([action, createdAt])
 }
 
 model Client {
@@ -120,6 +191,17 @@ model Client {
   // Add this to the Client model
   retainerships Retainership[]
   diaryEntries  ClientDiaryEntry[]
+
+  /// Soft delete: rows are never removed, only stamped. Every read filters on
+  /// deletedAt: null. See lib/audit.ts.
+  deletedAt       DateTime?
+  deletedById     String?   @db.ObjectId
+  deletedByType   String? // "USER" | "AGENT"
+
+  /// Who last changed this row. Field-level history lives in DeletionAudit.
+  updatedById     String?   @db.ObjectId
+  updatedByType   String? // "USER" | "AGENT"
+
 }
 
 model ClientDiaryEntry {
@@ -131,6 +213,17 @@ model ClientDiaryEntry {
   content   String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  /// Soft delete: rows are never removed, only stamped. Every read filters on
+  /// deletedAt: null. See lib/audit.ts.
+  deletedAt       DateTime?
+  deletedById     String?   @db.ObjectId
+  deletedByType   String? // "USER" | "AGENT"
+
+  /// Who last changed this row. Field-level history lives in DeletionAudit.
+  updatedById     String?   @db.ObjectId
+  updatedByType   String? // "USER" | "AGENT"
+
 }
 
 model DiaryEntry {
@@ -143,6 +236,17 @@ model DiaryEntry {
   createdByAgent   Agent?   @relation("AgentDiaryEntries", fields: [createdByAgentId], references: [id])
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
+
+  /// Soft delete: rows are never removed, only stamped. Every read filters on
+  /// deletedAt: null. See lib/audit.ts.
+  deletedAt       DateTime?
+  deletedById     String?   @db.ObjectId
+  deletedByType   String? // "USER" | "AGENT"
+
+  /// Who last changed this row. Field-level history lives in DeletionAudit.
+  updatedById     String?   @db.ObjectId
+  updatedByType   String? // "USER" | "AGENT"
+
 }
 
 model Agent {
@@ -161,11 +265,11 @@ model Agent {
   specializations      String[]
   photo                String?
   status               String    @default("active") // "active" or "inactive"
-  autoAssign           Boolean @default(true)
+  autoAssign           Boolean   @default(true)
   // Admin-controlled: may this agent create normal (non-legislation, non-service)
   // tasks from the agent app? Legislation/retainership and service-linked task
   // creation is unaffected.
-  canCreateTask        Boolean @default(true)
+  canCreateTask        Boolean   @default(true)
   lastLogin            DateTime?
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
@@ -182,12 +286,12 @@ model Agent {
   // For Execution Agent, agentType can be: "CEO", "Partner", "Manager", etc. (existing types)
   superiorsLinks    AgentSuperior[] @relation("AgentSuperiors_superior")
   subordinatesLinks AgentSuperior[] @relation("AgentSuperiors_subordinate")
-  createdTasks  Task[]    @relation("CreatedTasks")
-  assignedTasks Task[]    @relation("AssignedTasks")
-  comments      Comment[] @relation("CommentAuthor")
-  diaryEntries  DiaryEntry[] @relation("AgentDiaryEntries")
-  timeLogs      TimeLog[] @relation("TimeLogAgent")
-  ownerShipTasks Task[]    @relation("OwnerShipTasks")
+  createdTasks      Task[]          @relation("CreatedTasks")
+  assignedTasks     Task[]          @relation("AssignedTasks")
+  comments          Comment[]       @relation("CommentAuthor")
+  diaryEntries      DiaryEntry[]    @relation("AgentDiaryEntries")
+  timeLogs          TimeLog[]       @relation("TimeLogAgent")
+  ownerShipTasks    Task[]          @relation("OwnerShipTasks")
 
   // TaskCategory agent-created relation
   createdCategories    TaskCategory[] @relation("AgentCreatedCategories")
@@ -199,79 +303,83 @@ model Agent {
   legislations Legislation[] @relation("AgentLegislations")
 
   // Prospects assigned to this agent
-  assignedProspects Prospect[] @relation("AgentAssignedProspects")
+  assignedProspects     Prospect[]     @relation("AgentAssignedProspects")
   // Prospects created by this agent
-  createdProspects Prospect[] @relation("AgentCreatedProspects")
-  createdQuoteRequests QuoteRequest[] @relation("AgentCreatedQuoteRequests")
+  createdProspects      Prospect[]     @relation("AgentCreatedProspects")
+  createdQuoteRequests  QuoteRequest[] @relation("AgentCreatedQuoteRequests")
   assignedQuoteRequests QuoteRequest[] @relation("AgentAssignedQuoteRequests")
 
   // Service Records relation
-  serviceRecords ServiceRecord[] @relation("AgentServiceRecords")
-  loginHistory   LoginHistory[]
-  timesheetEntries TimesheetEntry[] @relation("TimesheetEntries")
-  durationAudits TaskDurationAudit[]
-  
+  serviceRecords   ServiceRecord[]     @relation("AgentServiceRecords")
+  loginHistory     LoginHistory[]
+  timesheetEntries TimesheetEntry[]    @relation("TimesheetEntries")
+  durationAudits   TaskDurationAudit[]
+
+  // Audit trail of soft deletes/updates performed by this agent
+  deletionAudits DeletionAudit[] @relation("AgentDeletionAudits")
+
 }
 
 model QuoteRequest {
-  id String @id @default(auto()) @map("_id") @db.ObjectId
-  title String
+  id          String  @id @default(auto()) @map("_id") @db.ObjectId
+  title       String
   description String?
-  status String @default("Requested") // Requested | Accepted | Rejected
+  status      String  @default("Requested") // Requested | Accepted | Rejected
 
   // Creator can be either admin user or agent.
   createdByUserId String? @db.ObjectId
-  createdByUser User? @relation("UserCreatedQuoteRequests", fields: [createdByUserId], references: [id])
+  createdByUser   User?   @relation("UserCreatedQuoteRequests", fields: [createdByUserId], references: [id])
 
   createdByAgentId String? @db.ObjectId
-  createdByAgent Agent? @relation("AgentCreatedQuoteRequests", fields: [createdByAgentId], references: [id])
+  createdByAgent   Agent?  @relation("AgentCreatedQuoteRequests", fields: [createdByAgentId], references: [id])
 
-  assignedAgentId String @db.ObjectId
-  assignedAgent Agent @relation("AgentAssignedQuoteRequests", fields: [assignedAgentId], references: [id])
-  acceptedAt DateTime?
+  assignedAgentId String    @db.ObjectId
+  assignedAgent   Agent     @relation("AgentAssignedQuoteRequests", fields: [assignedAgentId], references: [id])
+  acceptedAt      DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
 model AgentSuperior {
-  id            String @id @default(auto()) @map("_id") @db.ObjectId
-  superiorId    String @db.ObjectId
-  subordinateId String @db.ObjectId
+  id            String  @id @default(auto()) @map("_id") @db.ObjectId
+  superiorId    String  @db.ObjectId
+  subordinateId String  @db.ObjectId
   teamType      String? // "execution" | "advisor"
 
-  superior      Agent  @relation("AgentSuperiors_superior", fields: [superiorId], references: [id])
-  subordinate   Agent  @relation("AgentSuperiors_subordinate", fields: [subordinateId], references: [id])
+  superior    Agent @relation("AgentSuperiors_superior", fields: [superiorId], references: [id])
+  subordinate Agent @relation("AgentSuperiors_subordinate", fields: [subordinateId], references: [id])
 }
-model Task {
-  id               String    @id @default(auto()) @map("_id") @db.ObjectId
-  title            String
-  description      String?
-  status           String    @default("To Do") // e.g., To Do, In Progress, Hold, Completed
-  priority         String    @default("Medium") // e.g., Low, Medium, High
-  dueDate          DateTime?
-  progress         Int?      @default(0) // Progress percentage (0-100)
-  statusProgressMap Json?     // Map of status to progress percentage, e.g. {"To Do": 10, "In Progress": 50, "Completed": 100}
-  followUpRequired Boolean   @default(false)
-  followUpDuration     String? // e.g., "24hr", "48hr", "1w", "Working"
-  statusCheckDuration  String? // e.g., "24hr", "48hr", "1w", "Working"
-  completed        Boolean   @default(false)
-  recurring        Int?      // Recurring in months (1-12), null means not recurring
-  recurringType  String?  // 'DAY' | 'WEEK' | 'MONTH'
-  active           Boolean   @default(true)
-  holdDate         DateTime? 
-  holdDaysLeft     Int?
 
-  triggerDate      DateTime?
+model Task {
+  id                  String    @id @default(auto()) @map("_id") @db.ObjectId
+  title               String
+  description         String?
+  status              String    @default("To Do") // e.g., To Do, In Progress, Hold, Completed
+  priority            String    @default("Medium") // e.g., Low, Medium, High
+  dueDate             DateTime?
+  progress            Int?      @default(0) // Progress percentage (0-100)
+  statusProgressMap   Json? // Map of status to progress percentage, e.g. {"To Do": 10, "In Progress": 50, "Completed": 100}
+  followUpRequired    Boolean   @default(false)
+  followUpDuration    String? // e.g., "24hr", "48hr", "1w", "Working"
+  statusCheckDuration String? // e.g., "24hr", "48hr", "1w", "Working"
+  completed           Boolean   @default(false)
+  recurring           Int? // Recurring in months (1-12), null means not recurring
+  recurringType       String? // 'DAY' | 'WEEK' | 'MONTH'
+  active              Boolean   @default(true)
+  holdDate            DateTime?
+  holdDaysLeft        Int?
+
+  triggerDate DateTime?
 
   // New recurring tracking fields
-  lastCompletedDate    DateTime? // When the current period was completed
-  nextDueDate          DateTime? // When the next occurrence is due
-  completionHistory    Json?     // Array of completion dates for tracking
-  currentPeriodStart   DateTime? // Start of current recurring period
+  lastCompletedDate  DateTime? // When the current period was completed
+  nextDueDate        DateTime? // When the next occurrence is due
+  completionHistory  Json? // Array of completion dates for tracking
+  currentPeriodStart DateTime? // Start of current recurring period
 
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   clientId String? @db.ObjectId
   client   Client? @relation(fields: [clientId], references: [id])
@@ -279,9 +387,8 @@ model Task {
   createdById String? @db.ObjectId
   createdBy   Agent?  @relation("CreatedTasks", fields: [createdById], references: [id])
 
-  ownerShipId   String? @db.ObjectId
-  ownerShipBy   Agent?  @relation("OwnerShipTasks", fields: [ownerShipId], references: [id])
-
+  ownerShipId String? @db.ObjectId
+  ownerShipBy Agent?  @relation("OwnerShipTasks", fields: [ownerShipId], references: [id])
 
   assignedToId String? @db.ObjectId
   assignedTo   Agent?  @relation("AssignedTasks", fields: [assignedToId], references: [id])
@@ -290,33 +397,44 @@ model Task {
   category   TaskCategory? @relation(fields: [categoryId], references: [id])
 
   // Legislation relation
-  legislationId String?       @db.ObjectId
-  legislation   Legislation?  @relation(fields: [legislationId], references: [id])
+  legislationId String?      @db.ObjectId
+  legislation   Legislation? @relation(fields: [legislationId], references: [id])
 
-  comments Comment[]
-  timeLogs TimeLog[]
+  comments       Comment[]
+  timeLogs       TimeLog[]
   durationAudits TaskDurationAudit[]
 
   // Add this to the Task model
-  retainershipId String? @db.ObjectId
+  retainershipId String?       @db.ObjectId
   retainership   Retainership? @relation("RetainershipTasks", fields: [retainershipId], references: [id])
+
+  /// Soft delete: rows are never removed, only stamped. Every read filters on
+  /// deletedAt: null. See lib/audit.ts.
+  deletedAt       DateTime?
+  deletedById     String?   @db.ObjectId
+  deletedByType   String? // "USER" | "AGENT"
+
+  /// Who last changed this row. Field-level history lives in DeletionAudit.
+  updatedById     String?   @db.ObjectId
+  updatedByType   String? // "USER" | "AGENT"
+
 
   @@index([assignedToId, legislationId, active, statusCheckDuration, status])
   @@index([categoryId, assignedToId, status, active])
 }
 
 model TaskDurationAudit {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  taskId    String   @db.ObjectId
-  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  field     String   // "followUpDuration" or "statusCheckDuration"
-  oldValue  String?  // Value before the first change of the day
-  newValue  String?  // Latest value set on this day
-  auditDate String   // "YYYY-MM-DD" — one entry per (task, field, day)
-  changedByAgentId String? @db.ObjectId
-  changedByAgent   Agent?  @relation(fields: [changedByAgentId], references: [id])
-  changedAt DateTime @default(now()) @updatedAt
-  createdAt DateTime @default(now())
+  id               String   @id @default(auto()) @map("_id") @db.ObjectId
+  taskId           String   @db.ObjectId
+  task             Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  field            String // "followUpDuration" or "statusCheckDuration"
+  oldValue         String? // Value before the first change of the day
+  newValue         String? // Latest value set on this day
+  auditDate        String // "YYYY-MM-DD" — one entry per (task, field, day)
+  changedByAgentId String?  @db.ObjectId
+  changedByAgent   Agent?   @relation(fields: [changedByAgentId], references: [id])
+  changedAt        DateTime @default(now()) @updatedAt
+  createdAt        DateTime @default(now())
 }
 
 model Legislation {
@@ -334,6 +452,18 @@ model Legislation {
 
   // Add tasks relation to fetch tasks based on legislation
   tasks Task[] @relation
+
+  // Soft delete: mirrors Retainership so a retainership delete can cascade without data loss
+  deletedAt   DateTime?
+  deletedById String?   @db.ObjectId
+  deletedBy   User?     @relation("LegislationDeletions", fields: [deletedById], references: [id])
+
+  deletedByType   String? // "USER" | "AGENT"
+  updatedById     String?   @db.ObjectId
+  updatedByType   String? // "USER" | "AGENT"
+
+
+  @@index([deletedAt])
 }
 
 model Retainership {
@@ -370,6 +500,18 @@ model Retainership {
 
   clientId String? @db.ObjectId
   client   Client? @relation(fields: [clientId], references: [id])
+
+  // Soft delete: rows are retained and filtered out of reads instead of being removed
+  deletedAt   DateTime?
+  deletedById String?   @db.ObjectId
+  deletedBy   User?     @relation("RetainershipDeletions", fields: [deletedById], references: [id])
+
+  deletedByType   String? // "USER" | "AGENT"
+  updatedById     String?   @db.ObjectId
+  updatedByType   String? // "USER" | "AGENT"
+
+
+  @@index([deletedAt])
 }
 
 model Comment {
@@ -383,18 +525,18 @@ model Comment {
   attachmentUrl  String?
   attachmentSize Int?
   attachmentType String?
-  attachments    Json?   // Array of {name, url, size, type} for multiple file attachments
+  attachments    Json? // Array of {name, url, size, type} for multiple file attachments
 
   // Timesheet fields for task comments
   commentDate DateTime? // The date when the comment/work was done (defaults to createdAt if not provided)
   startTime   DateTime? // Start time of the work session
   endTime     DateTime? // End time of the work session
 
-  taskId String? @db.ObjectId
-  task   Task?   @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  prospectId   String? @db.ObjectId
-  prospect     Prospect? @relation(fields: [prospectId], references: [id])
-  opportunityId String? @db.ObjectId
+  taskId        String?      @db.ObjectId
+  task          Task?        @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  prospectId    String?      @db.ObjectId
+  prospect      Prospect?    @relation(fields: [prospectId], references: [id])
+  opportunityId String?      @db.ObjectId
   opportunity   Opportunity? @relation(fields: [opportunityId], references: [id])
 
   // Author can be either a User or an Agent
@@ -402,6 +544,17 @@ model Comment {
   authorType String @default("USER") // "USER" or "AGENT"
   user       User?  @relation("UserComments", fields: [authorId], references: [id])
   agent      Agent? @relation("CommentAuthor", fields: [authorId], references: [id])
+
+  /// Soft delete: rows are never removed, only stamped. Every read filters on
+  /// deletedAt: null. See lib/audit.ts.
+  deletedAt       DateTime?
+  deletedById     String?   @db.ObjectId
+  deletedByType   String? // "USER" | "AGENT"
+
+  /// Who last changed this row. Field-level history lives in DeletionAudit.
+  updatedById     String?   @db.ObjectId
+  updatedByType   String? // "USER" | "AGENT"
+
 
   @@index([taskId, createdAt])
 }
@@ -442,6 +595,17 @@ model TaskCategory {
 
   /// If true, agents can edit the timePeriod (days) for this service
   agentCanEditDays Boolean @default(false)
+
+  /// Soft delete: rows are never removed, only stamped. Every read filters on
+  /// deletedAt: null. See lib/audit.ts.
+  deletedAt       DateTime?
+  deletedById     String?   @db.ObjectId
+  deletedByType   String? // "USER" | "AGENT"
+
+  /// Who last changed this row. Field-level history lives in DeletionAudit.
+  updatedById     String?   @db.ObjectId
+  updatedByType   String? // "USER" | "AGENT"
+
 }
 
 model TimeLog {
@@ -457,6 +621,17 @@ model TimeLog {
 
   agentId String @db.ObjectId
   agent   Agent  @relation("TimeLogAgent", fields: [agentId], references: [id])
+
+  /// Soft delete: rows are never removed, only stamped. Every read filters on
+  /// deletedAt: null. See lib/audit.ts.
+  deletedAt       DateTime?
+  deletedById     String?   @db.ObjectId
+  deletedByType   String? // "USER" | "AGENT"
+
+  /// Who last changed this row. Field-level history lives in DeletionAudit.
+  updatedById     String?   @db.ObjectId
+  updatedByType   String? // "USER" | "AGENT"
+
 }
 
 model ServiceRecord {
@@ -473,62 +648,73 @@ model ServiceRecord {
 }
 
 model LeadSource {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  name        String   
+  id          String  @id @default(auto()) @map("_id") @db.ObjectId
+  name        String
   description String?
 
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  prospects   Prospect[]
+  prospects Prospect[]
+
+  /// Soft delete: rows are never removed, only stamped. Every read filters on
+  /// deletedAt: null. See lib/audit.ts.
+  deletedAt       DateTime?
+  deletedById     String?   @db.ObjectId
+  deletedByType   String? // "USER" | "AGENT"
+
+  /// Who last changed this row. Field-level history lives in DeletionAudit.
+  updatedById     String?   @db.ObjectId
+  updatedByType   String? // "USER" | "AGENT"
+
 }
 
 model ProspectAssignmentSetting {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  prospectsPerAgent   Int  @default(1)
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  id                String   @id @default(auto()) @map("_id") @db.ObjectId
+  prospectsPerAgent Int      @default(1)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 }
 
 model LoginHistory {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  agentId   String   @db.ObjectId
-  agent     Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  id      String @id @default(auto()) @map("_id") @db.ObjectId
+  agentId String @db.ObjectId
+  agent   Agent  @relation(fields: [agentId], references: [id], onDelete: Cascade)
 
   ipAddress String?
   userAgent String?
   device    String?
   location  String?
 
-  loginAt   DateTime @default(now())
-  logoutAt  DateTime?
+  loginAt      DateTime  @default(now())
+  logoutAt     DateTime?
   logoutReason String?
 
   createdAt DateTime @default(now())
 }
 
 model TimesheetEntry {
-  id            String   @id @default(auto()) @map("_id") @db.ObjectId
-  title         String
-  description   String?
-  project       String?
-  projectCode   String?
-  date          DateTime
-  startTime     String
-  endTime       String
-  status        String   @default("pending")
-  type          String   @default("task")
-  color         String   @default("blue")
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  title       String
+  description String?
+  project     String?
+  projectCode String?
+  date        DateTime
+  startTime   String
+  endTime     String
+  status      String   @default("pending")
+  type        String   @default("task")
+  color       String   @default("blue")
 
-  agentId       String   @db.ObjectId
-  agent         Agent    @relation("TimesheetEntries", fields: [agentId], references: [id], onDelete: Cascade)
+  agentId String @db.ObjectId
+  agent   Agent  @relation("TimesheetEntries", fields: [agentId], references: [id], onDelete: Cascade)
 
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model CronLog {
-  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
   jobName      String
   ranAt        DateTime @default(now())
   status       String   @default("running")

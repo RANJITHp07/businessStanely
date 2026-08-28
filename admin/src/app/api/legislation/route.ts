@@ -10,6 +10,9 @@ export async function GET(req: NextRequest) {
     const pageSize = Math.min(100, Math.max(1, parseInt(searchParams.get("pageSize") || "10", 10)));
 
     const where = {
+      // Soft-deleted legislations, including ones cascaded from a deleted
+      // retainership, stay out of normal reads.
+      deletedAt: null,
       ...(assignedAgent ? { assignedAgentId: assignedAgent } : {}),
       ...(retainershipClientId
         ? { retainership: { clientId: retainershipClientId } }

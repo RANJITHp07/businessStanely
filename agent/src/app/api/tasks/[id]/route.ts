@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentAgent } from "@/lib/auth";
 import prisma from "@/lib/prisma";
+import {
+  recordDeletionAudit,
+  actorFromAgent,
+  softDeleteData,
+} from "@/lib/audit";
 
 interface TaskWithFields {
   categoryId?: string;
@@ -19,7 +24,7 @@ export async function DELETE(
     // Allow delete if agent is creator, assigned, or superior of assigned agent
     const task = await prisma.task.findUnique({
       where: { id: taskId },
-      select: { createdById: true, assignedToId: true },
+      select: { createdById: true, assignedToId: true, title: true },
     });
     if (!task) {
       return NextResponse.json({ error: "Task not found" }, { status: 404 });
@@ -43,7 +48,21 @@ export async function DELETE(
         { status: 403 },
       );
     }
-    await prisma.task.delete({ where: { id: taskId } });
+    const actor = actorFromAgent(agent);
+
+    await prisma.task.update({
+      where: { id: taskId },
+      data: softDeleteData(actor),
+    });
+
+    await recordDeletionAudit({
+      entityType: "Task",
+      entityId: taskId,
+      entityName: task.title,
+      actor,
+      req,
+    });
+
     return new NextResponse(null, { status: 204 });
   } catch (error) {
     const { id: taskId } = await params;

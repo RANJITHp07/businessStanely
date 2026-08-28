@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentAgent } from "@/lib/auth";
 import prisma from "@/lib/prisma";
+import {
+  recordDeletionAudit,
+  actorFromAgent,
+  softDeleteData,
+} from "@/lib/audit";
 
 export async function GET(
   req: NextRequest,
@@ -228,8 +233,11 @@ export async function DELETE(
     const { id } = params;
 
     // Check if retainership exists
-    const existingRetainership = await prisma.retainership.findUnique({
+    const existingRetainership = await prisma.retainership.findFirst({
       where: { id },
+      include: {
+        legislation: { select: { id: true, title: true } },
+      },
     });
 
     if (!existingRetainership) {
@@ -239,10 +247,44 @@ export async function DELETE(
       );
     }
 
-    // Delete the retainership
-    await prisma.retainership.delete({
-      where: { id },
+    const actor = actorFromAgent(currentAgent);
+    const deletedAt = new Date();
+    const legislations = existingRetainership.legislation;
+
+    // Legislations are cascaded explicitly: Prisma's onDelete only fires on a
+    // real delete, and nothing here is really deleted any more.
+    await prisma.$transaction([
+      prisma.retainership.update({
+        where: { id },
+        data: softDeleteData(actor, deletedAt),
+      }),
+      prisma.legislation.updateMany({
+        where: { retainershipId: id },
+        data: softDeleteData(actor, deletedAt),
+      }),
+    ]);
+
+    await recordDeletionAudit({
+      entityType: "Retainership",
+      entityId: id,
+      entityName: existingRetainership.name,
+      affectedLegislationCount: legislations.length,
+      actor,
+      req,
     });
+
+    for (const legislation of legislations) {
+      await recordDeletionAudit({
+        entityType: "Legislation",
+        entityId: legislation.id,
+        entityName: legislation.title,
+        reason: "Cascaded from retainership deletion",
+        parentEntityType: "Retainership",
+        parentEntityId: id,
+        actor,
+        req,
+      });
+    }
 
     return NextResponse.json({ message: "Retainership deleted successfully" });
   } catch (error) {

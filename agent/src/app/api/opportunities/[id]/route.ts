@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import {
+  recordDeletionAudit,
+  actorFromAgent,
+  softDeleteData,
+} from "@/lib/audit";
 
 // GET: Get a single opportunity by ID
 export async function GET(
@@ -179,8 +184,36 @@ export async function DELETE(
   { params }: { params: { id: string } },
 ) {
   try {
+    const agent = await getCurrentAgent(req);
+    if (!agent) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const { id } = await params;
-    await prisma.opportunity.delete({ where: { id } });
+
+    const existing = await prisma.opportunity.findFirst({ where: { id } });
+    if (!existing) {
+      return NextResponse.json(
+        { error: "Opportunity not found" },
+        { status: 404 },
+      );
+    }
+
+    const actor = actorFromAgent(agent);
+
+    await prisma.opportunity.update({
+      where: { id },
+      data: softDeleteData(actor),
+    });
+
+    await recordDeletionAudit({
+      entityType: "Opportunity",
+      entityId: id,
+      entityName: existing.name,
+      actor,
+      req,
+    });
+
     return NextResponse.json({ success: true });
   } catch (error) {
     return NextResponse.json(

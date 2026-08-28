@@ -1,5 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from '@/lib/prisma';
+import { getCurrentAgent } from "@/lib/auth";
+import {
+  recordDeletionAudit,
+  actorFromAgent,
+  softDeleteData,
+} from "@/lib/audit";
+import { clientDisplayName } from "@/lib/entityNames";
 
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
   try {
@@ -52,9 +59,33 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
 
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
   try {
-    await prisma.client.delete({
+    const agent = await getCurrentAgent(req);
+    if (!agent) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const existing = await prisma.client.findFirst({
       where: { id: params.id },
     });
+    if (!existing) {
+      return NextResponse.json({ error: "Client not found" }, { status: 404 });
+    }
+
+    const actor = actorFromAgent(agent);
+
+    await prisma.client.update({
+      where: { id: params.id },
+      data: softDeleteData(actor),
+    });
+
+    await recordDeletionAudit({
+      entityType: "Client",
+      entityId: params.id,
+      entityName: clientDisplayName(existing),
+      actor,
+      req,
+    });
+
     return new NextResponse(null, { status: 204 });
   } catch (error) {
     console.error(`Error deleting client ${params.id}:`, error);

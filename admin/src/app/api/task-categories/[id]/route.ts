@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentAdmin } from "@/lib/auth";
+import {
+  recordDeletionAudit,
+  actorFromAdmin,
+  softDeleteData,
+} from "@/lib/audit";
 import prisma from "@/lib/prisma";
 
 export async function GET(
@@ -255,8 +260,8 @@ export async function DELETE(
     const { id } = params;
 
     // Check if category exists
-    const existingCategory = await prisma.taskCategory.findUnique({
-      where: { id },
+    const existingCategory = await prisma.taskCategory.findFirst({
+      where: { id, deletedAt: null },
     });
 
     if (!existingCategory) {
@@ -266,9 +271,19 @@ export async function DELETE(
       );
     }
 
-    // Delete the category
-    await prisma.taskCategory.delete({
+    const actor = actorFromAdmin(currentAdmin);
+
+    await prisma.taskCategory.update({
       where: { id },
+      data: softDeleteData(actor),
+    });
+
+    await recordDeletionAudit({
+      entityType: "TaskCategory",
+      entityId: id,
+      entityName: existingCategory.name,
+      actor,
+      req,
     });
 
     return NextResponse.json({ message: "Category deleted successfully" });

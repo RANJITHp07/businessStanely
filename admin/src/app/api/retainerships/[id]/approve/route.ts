@@ -34,6 +34,18 @@ export async function PUT(
       );
     }
 
+    const existingRetainership = await prisma.retainership.findFirst({
+      where: { id, deletedAt: null },
+      select: { id: true },
+    });
+
+    if (!existingRetainership) {
+      return NextResponse.json(
+        { error: "Retainership not found" },
+        { status: 404 }
+      );
+    }
+
     const retainership = await prisma.retainership.update({
       where: {
         id

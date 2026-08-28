@@ -2,7 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { getCurrentAgent } from "@/lib/auth";
-import { deleteFromS3 } from "@/lib/aws";
+import {
+  recordDeletionAudit,
+  actorFromAgent,
+  softDeleteData,
+} from "@/lib/audit";
+import { commentDisplayName } from "@/lib/entityNames";
 
 export async function POST(req: NextRequest) {
   try {
@@ -296,17 +301,23 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: "Access denied" }, { status: 403 });
     }
 
-    // Delete attachment from S3 if exists
-    if (comment.attachmentUrl) {
-      try {
-        await deleteFromS3(comment.attachmentUrl);
-      } catch (error) {
-        console.error("Error deleting file from S3:", error);
-      }
-    }
+    // S3 attachments are intentionally left in place. The comment row survives a
+    // soft delete and can be restored, so removing the files would leave it
+    // pointing at dead URLs. Orphaned objects are reclaimed out of band.
 
-    await prisma.comment.delete({
+    const actor = actorFromAgent(agent);
+
+    await prisma.comment.update({
       where: { id: commentId },
+      data: softDeleteData(actor),
+    });
+
+    await recordDeletionAudit({
+      entityType: "Comment",
+      entityId: commentId,
+      entityName: commentDisplayName(comment),
+      actor,
+      req,
     });
 
     return NextResponse.json({ message: "Comment deleted successfully" });

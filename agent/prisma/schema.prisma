@@ -24,6 +24,17 @@ model Prospect {
   comments      Comment[] // Comments/interactions for this prospect
 
   service           String?
+
+  /// Soft delete: rows are never removed, only stamped. Every read filters on
+  /// deletedAt: null. See lib/audit.ts.
+  deletedAt       DateTime?
+  deletedById     String?   @db.ObjectId
+  deletedByType   String? // "USER" | "AGENT"
+
+  /// Who last changed this row. Field-level history lives in DeletionAudit.
+  updatedById     String?   @db.ObjectId
+  updatedByType   String? // "USER" | "AGENT"
+
 }
 
 model Opportunity {
@@ -41,6 +52,17 @@ model Opportunity {
   updatedAt     DateTime @updatedAt
   comments      Comment[] // Comments/interactions for this opportunity
   quote         String?
+
+  /// Soft delete: rows are never removed, only stamped. Every read filters on
+  /// deletedAt: null. See lib/audit.ts.
+  deletedAt       DateTime?
+  deletedById     String?   @db.ObjectId
+  deletedByType   String? // "USER" | "AGENT"
+
+  /// Who last changed this row. Field-level history lives in DeletionAudit.
+  updatedById     String?   @db.ObjectId
+  updatedByType   String? // "USER" | "AGENT"
+
 }
 datasource db {
   provider = "mongodb"
@@ -86,6 +108,55 @@ model User {
   otpExpiry           DateTime?
   isOtpVerified       Boolean   @default(false)
   currentSessionToken String?
+
+  // Audit trail of deletions/updates performed by this admin
+  deletionAudits DeletionAudit[] @relation("UserDeletionAudits")
+
+}
+
+/// Append-only record of every soft delete, restore, and update, so a change can
+/// always be traced to an actor and a time even after the row is filtered out of
+/// normal reads. Written by both the admin and agent apps against one database.
+model DeletionAudit {
+  id String @id @default(auto()) @map("_id") @db.ObjectId
+
+  entityType String // "Client" | "Prospect" | "Task" | "Retainership" | ...
+  entityId   String @db.ObjectId
+  entityName String // name/title captured at write time, so it survives later edits
+
+  action String  @default("SOFT_DELETE") // "SOFT_DELETE" | "RESTORE" | "UPDATE"
+  reason String?
+
+  /// Names of the fields touched by an UPDATE. Values are deliberately not
+  /// stored: the audit answers who and when, not what the old value was.
+  changedFields String[] @default([])
+
+  /// Counts of related records left behind, recorded at delete time.
+  affectedTaskCount        Int @default(0)
+  affectedLegislationCount Int @default(0)
+
+  /// Set when this row was written as a side effect of acting on a parent.
+  parentEntityType String?
+  parentEntityId   String? @db.ObjectId
+
+  /// The actor is a User (admin app) or an Agent (agent app), never both.
+  /// The relation is left optional on both sides so either app can write here.
+  performedByType String  @default("USER") // "USER" | "AGENT"
+  performedById   String  @db.ObjectId
+  performedByUser User?   @relation("UserDeletionAudits", fields: [performedById], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  performedByAgent Agent? @relation("AgentDeletionAudits", fields: [performedById], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  performedByEmail    String // denormalized so the audit reads correctly if the actor is later removed
+  performedByUsername String
+
+  ipAddress String?
+  userAgent String?
+
+  createdAt DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([createdAt])
+  @@index([action, createdAt])
 }
 
 model Client {
@@ -121,6 +192,17 @@ model Client {
 
   // Add this to the Client model
   retainerships Retainership[]
+
+  /// Soft delete: rows are never removed, only stamped. Every read filters on
+  /// deletedAt: null. See lib/audit.ts.
+  deletedAt       DateTime?
+  deletedById     String?   @db.ObjectId
+  deletedByType   String? // "USER" | "AGENT"
+
+  /// Who last changed this row. Field-level history lives in DeletionAudit.
+  updatedById     String?   @db.ObjectId
+  updatedByType   String? // "USER" | "AGENT"
+
 }
 
 model DiaryEntry {
@@ -133,6 +215,17 @@ model DiaryEntry {
   createdByAgent   Agent?   @relation("AgentDiaryEntries", fields: [createdByAgentId], references: [id])
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
+
+  /// Soft delete: rows are never removed, only stamped. Every read filters on
+  /// deletedAt: null. See lib/audit.ts.
+  deletedAt       DateTime?
+  deletedById     String?   @db.ObjectId
+  deletedByType   String? // "USER" | "AGENT"
+
+  /// Who last changed this row. Field-level history lives in DeletionAudit.
+  updatedById     String?   @db.ObjectId
+  updatedByType   String? // "USER" | "AGENT"
+
 }
 
 model Agent {
@@ -200,6 +293,10 @@ model Agent {
   loginHistory   LoginHistory[]
   timesheetEntries TimesheetEntry[] @relation("TimesheetEntries")
   durationAudits TaskDurationAudit[]
+
+  // Audit trail of soft deletes/updates performed by this agent
+  deletionAudits DeletionAudit[] @relation("AgentDeletionAudits")
+
 }
 
 model QuoteRequest {
@@ -311,6 +408,17 @@ model Task {
   // Per-status progress tracking
   statusProgressMap Json?
 
+  /// Soft delete: rows are never removed, only stamped. Every read filters on
+  /// deletedAt: null. See lib/audit.ts.
+  deletedAt       DateTime?
+  deletedById     String?   @db.ObjectId
+  deletedByType   String? // "USER" | "AGENT"
+
+  /// Who last changed this row. Field-level history lives in DeletionAudit.
+  updatedById     String?   @db.ObjectId
+  updatedByType   String? // "USER" | "AGENT"
+
+
   @@index([assignedToId, legislationId, active, statusCheckDuration, status])
   @@index([categoryId, assignedToId, status, active])
 }
@@ -344,6 +452,11 @@ model Legislation {
 
   // Add tasks relation to fetch tasks based on legislation
   tasks Task[] @relation
+
+  deletedByType   String? // "USER" | "AGENT"
+  updatedById     String?   @db.ObjectId
+  updatedByType   String? // "USER" | "AGENT"
+
 }
 
 model Retainership {
@@ -380,6 +493,11 @@ model Retainership {
 
   clientId String? @db.ObjectId
   client   Client? @relation(fields: [clientId], references: [id])
+
+  deletedByType   String? // "USER" | "AGENT"
+  updatedById     String?   @db.ObjectId
+  updatedByType   String? // "USER" | "AGENT"
+
 }
 
 model Comment {
@@ -412,6 +530,17 @@ model Comment {
   authorType String @default("USER") // "USER" or "AGENT"
   user       User?  @relation("UserComments", fields: [authorId], references: [id])
   agent      Agent? @relation("CommentAuthor", fields: [authorId], references: [id])
+
+  /// Soft delete: rows are never removed, only stamped. Every read filters on
+  /// deletedAt: null. See lib/audit.ts.
+  deletedAt       DateTime?
+  deletedById     String?   @db.ObjectId
+  deletedByType   String? // "USER" | "AGENT"
+
+  /// Who last changed this row. Field-level history lives in DeletionAudit.
+  updatedById     String?   @db.ObjectId
+  updatedByType   String? // "USER" | "AGENT"
+
 
   @@index([taskId, createdAt])
 }
@@ -452,6 +581,17 @@ model TaskCategory {
 
   /// If true, agents can edit the timePeriod (days) for this service
   agentCanEditDays Boolean @default(false)
+
+  /// Soft delete: rows are never removed, only stamped. Every read filters on
+  /// deletedAt: null. See lib/audit.ts.
+  deletedAt       DateTime?
+  deletedById     String?   @db.ObjectId
+  deletedByType   String? // "USER" | "AGENT"
+
+  /// Who last changed this row. Field-level history lives in DeletionAudit.
+  updatedById     String?   @db.ObjectId
+  updatedByType   String? // "USER" | "AGENT"
+
 }
 
 model TimeLog {
@@ -467,6 +607,17 @@ model TimeLog {
 
   agentId String @db.ObjectId
   agent   Agent  @relation("TimeLogAgent", fields: [agentId], references: [id])
+
+  /// Soft delete: rows are never removed, only stamped. Every read filters on
+  /// deletedAt: null. See lib/audit.ts.
+  deletedAt       DateTime?
+  deletedById     String?   @db.ObjectId
+  deletedByType   String? // "USER" | "AGENT"
+
+  /// Who last changed this row. Field-level history lives in DeletionAudit.
+  updatedById     String?   @db.ObjectId
+  updatedByType   String? // "USER" | "AGENT"
+
 }
 
 model ServiceRecord {
@@ -491,6 +642,17 @@ model LeadSource {
   updatedAt   DateTime @updatedAt
 
   prospects   Prospect[]
+
+  /// Soft delete: rows are never removed, only stamped. Every read filters on
+  /// deletedAt: null. See lib/audit.ts.
+  deletedAt       DateTime?
+  deletedById     String?   @db.ObjectId
+  deletedByType   String? // "USER" | "AGENT"
+
+  /// Who last changed this row. Field-level history lives in DeletionAudit.
+  updatedById     String?   @db.ObjectId
+  updatedByType   String? // "USER" | "AGENT"
+
 }
 
 model ProspectAssignmentSetting {

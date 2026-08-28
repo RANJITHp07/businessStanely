@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getCurrentAdmin } from "@/lib/auth";
+import {
+  recordDeletionAudit,
+  actorFromAdmin,
+  softDeleteData,
+} from "@/lib/audit";
+import { diaryDisplayName } from "@/lib/entityNames";
 
 // Temporary compatibility for newly added model until `prisma generate` is run.
 const prismaWithDiary = prisma as typeof prisma & {
@@ -90,8 +96,8 @@ export async function DELETE(
       return NextResponse.json({ error: "Missing diary id" }, { status: 400 });
     }
 
-    const existing = await prismaWithDiary.diaryEntry.findUnique({
-      where: { id: entryId },
+    const existing = await prismaWithDiary.diaryEntry.findFirst({
+      where: { id: entryId, deletedAt: null },
     });
 
     if (!existing || existing.createdByUserId !== currentAdmin.id) {
@@ -101,8 +107,19 @@ export async function DELETE(
       );
     }
 
-    await prismaWithDiary.diaryEntry.delete({
+    const actor = actorFromAdmin(currentAdmin);
+
+    await prismaWithDiary.diaryEntry.update({
       where: { id: entryId },
+      data: softDeleteData(actor),
+    });
+
+    await recordDeletionAudit({
+      entityType: "DiaryEntry",
+      entityId: entryId,
+      entityName: diaryDisplayName(existing),
+      actor,
+      req,
     });
 
     return NextResponse.json({ success: true });

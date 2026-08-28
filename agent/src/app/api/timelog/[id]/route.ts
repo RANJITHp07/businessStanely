@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentAgent } from "@/lib/auth";
 import prisma from "@/lib/prisma";
+import {
+  recordDeletionAudit,
+  actorFromAgent,
+  softDeleteData,
+} from "@/lib/audit";
+import { timeLogDisplayName } from "@/lib/entityNames";
 
 export async function PUT(
   req: NextRequest,
@@ -113,9 +119,19 @@ export async function DELETE(
       );
     }
 
-    // Delete the time log
-    await prisma.timeLog.delete({
+    const actor = actorFromAgent(agent);
+
+    await prisma.timeLog.update({
       where: { id: timeLogId },
+      data: softDeleteData(actor),
+    });
+
+    await recordDeletionAudit({
+      entityType: "TimeLog",
+      entityId: timeLogId,
+      entityName: timeLogDisplayName(existingTimeLog),
+      actor,
+      req,
     });
 
     return NextResponse.json({

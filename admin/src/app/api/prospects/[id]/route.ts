@@ -1,6 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getCurrentAdmin } from "@/lib/auth";
+import {
+  recordDeletionAudit,
+  recordUpdateAudit,
+  changedFields,
+  actorFromAdmin,
+  softDeleteData,
+} from "@/lib/audit";
+import { withActor } from "@/lib/auditContext";
 
 // GET: Get a single prospect by ID
 export async function GET(
@@ -118,24 +126,46 @@ export async function PUT(
       }
     }
 
+    const currentAdmin = await getCurrentAdmin(req);
+    if (!currentAdmin) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const before = await prisma.prospect.findFirst({ where: { id } });
+    if (!before) {
+      return NextResponse.json({ error: "Prospect not found" }, { status: 404 });
+    }
+
+    const actor = actorFromAdmin(currentAdmin);
+    const patch = {
+      name,
+      email,
+      phone,
+      phoneNumber,
+      address,
+      leadSourceId,
+      description,
+      status,
+      notes,
+      nextFollowUp: nextFollowUp ? new Date(nextFollowUp) : undefined,
+      assignedAgentId,
+      amount: parseFloat(amount),
+    };
+
     // Otherwise, just update the prospect
-    const prospect = await prisma.prospect.update({
-      where: { id },
-      data: {
-        name,
-        email,
-        phone,
-        phoneNumber,
-        address,
-        leadSourceId,
-        description,
-        status,
-        notes,
-        nextFollowUp: nextFollowUp ? new Date(nextFollowUp) : undefined,
-        assignedAgentId,
-        amount: parseFloat(amount),
-      },
+    const prospect = await withActor(actor, () =>
+      prisma.prospect.update({ where: { id }, data: patch })
+    );
+
+    await recordUpdateAudit({
+      entityType: "Prospect",
+      entityId: id,
+      entityName: prospect.name,
+      changedFields: changedFields(before, patch),
+      actor,
+      req,
     });
+
     return NextResponse.json({ prospect });
   } catch (error) {
     console.error("Error in PUT /api/prospects/[id] route:", error);
@@ -245,7 +275,28 @@ export async function DELETE(
     const awaitedParams =
       typeof params.then === "function" ? await params : params;
     const { id } = awaitedParams;
-    await prisma.prospect.delete({ where: { id } });
+    const existing = await prisma.prospect.findFirst({
+      where: { id, deletedAt: null },
+    });
+    if (!existing) {
+      return NextResponse.json({ error: "Prospect not found" }, { status: 404 });
+    }
+
+    const actor = actorFromAdmin(agent);
+
+    await prisma.prospect.update({
+      where: { id },
+      data: softDeleteData(actor),
+    });
+
+    await recordDeletionAudit({
+      entityType: "Prospect",
+      entityId: id,
+      entityName: existing.name,
+      actor,
+      req,
+    });
+
     return NextResponse.json({ success: true });
   } catch (error) {
     return NextResponse.json(

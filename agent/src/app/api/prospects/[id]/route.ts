@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getCurrentAgent } from "@/lib/auth";
+import {
+  recordDeletionAudit,
+  actorFromAgent,
+  softDeleteData,
+} from "@/lib/audit";
 
 // GET: Get a single prospect by ID
 export async function GET(
@@ -280,7 +285,26 @@ export async function DELETE(
     const awaitedParams =
       typeof params.then === "function" ? await params : params;
     const { id } = awaitedParams;
-    await prisma.prospect.delete({ where: { id } });
+    const existing = await prisma.prospect.findFirst({ where: { id } });
+    if (!existing) {
+      return NextResponse.json({ error: "Prospect not found" }, { status: 404 });
+    }
+
+    const actor = actorFromAgent(agent);
+
+    await prisma.prospect.update({
+      where: { id },
+      data: softDeleteData(actor),
+    });
+
+    await recordDeletionAudit({
+      entityType: "Prospect",
+      entityId: id,
+      entityName: existing.name,
+      actor,
+      req,
+    });
+
     return NextResponse.json({ success: true });
   } catch (error) {
     return NextResponse.json(

@@ -1,6 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getCurrentAdmin } from "@/lib/auth";
+import {
+  recordDeletionAudit,
+  recordUpdateAudit,
+  changedFields,
+  actorFromAdmin,
+  softDeleteData,
+} from "@/lib/audit";
+import { withActor } from "@/lib/auditContext";
 
 // GET: Get a single opportunity by ID
 export async function GET(
@@ -74,17 +82,42 @@ export async function PUT(
     const body = await req.json();
     const { name, phoneNumber, description, amount, nextFollowUp, status } =
       body;
-    const opportunity = await prisma.opportunity.update({
-      where: { id },
-      data: {
-        name,
-        phoneNumber,
-        description,
-        amount,
-        nextFollowUp: nextFollowUp ? new Date(nextFollowUp) : undefined,
-        status,
-      },
+    const currentAdmin = await getCurrentAdmin(req);
+    if (!currentAdmin) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const before = await prisma.opportunity.findFirst({ where: { id } });
+    if (!before) {
+      return NextResponse.json(
+        { error: "Opportunity not found" },
+        { status: 404 },
+      );
+    }
+
+    const actor = actorFromAdmin(currentAdmin);
+    const patch = {
+      name,
+      phoneNumber,
+      description,
+      amount,
+      nextFollowUp: nextFollowUp ? new Date(nextFollowUp) : undefined,
+      status,
+    };
+
+    const opportunity = await withActor(actor, () =>
+      prisma.opportunity.update({ where: { id }, data: patch })
+    );
+
+    await recordUpdateAudit({
+      entityType: "Opportunity",
+      entityId: id,
+      entityName: opportunity.name,
+      changedFields: changedFields(before, patch),
+      actor,
+      req,
     });
+
     return NextResponse.json({ opportunity });
   } catch (error) {
     return NextResponse.json(
@@ -158,8 +191,38 @@ export async function DELETE(
   { params }: { params: { id: string } },
 ) {
   try {
+    const currentAdmin = await getCurrentAdmin(req);
+    if (!currentAdmin) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const { id } = await params;
-    await prisma.opportunity.delete({ where: { id } });
+
+    const existing = await prisma.opportunity.findFirst({
+      where: { id, deletedAt: null },
+    });
+    if (!existing) {
+      return NextResponse.json(
+        { error: "Opportunity not found" },
+        { status: 404 },
+      );
+    }
+
+    const actor = actorFromAdmin(currentAdmin);
+
+    await prisma.opportunity.update({
+      where: { id },
+      data: softDeleteData(actor),
+    });
+
+    await recordDeletionAudit({
+      entityType: "Opportunity",
+      entityId: id,
+      entityName: existing.name,
+      actor,
+      req,
+    });
+
     return NextResponse.json({ success: true });
   } catch (error) {
     return NextResponse.json(

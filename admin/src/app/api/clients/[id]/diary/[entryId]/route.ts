@@ -1,5 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { getCurrentAdmin } from "@/lib/auth";
+import {
+  recordDeletionAudit,
+  actorFromAdmin,
+  softDeleteData,
+} from "@/lib/audit";
+import { diaryDisplayName } from "@/lib/entityNames";
 
 // Temporary compatibility for newly added model until `prisma generate` is run.
 const prismaWithDiary = prisma as typeof prisma & {
@@ -111,9 +118,14 @@ export async function DELETE(
       );
     }
 
-    const existingEntry = await prismaWithDiary.clientDiaryEntry.findUnique({
-      where: { id: entryId },
-      select: { id: true, clientId: true },
+    const currentAdmin = await getCurrentAdmin(req);
+    if (!currentAdmin) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const existingEntry = await prismaWithDiary.clientDiaryEntry.findFirst({
+      where: { id: entryId, deletedAt: null },
+      select: { id: true, clientId: true, heading: true, entryDate: true },
     });
 
     if (!existingEntry || existingEntry.clientId !== clientId) {
@@ -123,8 +135,21 @@ export async function DELETE(
       );
     }
 
-    await prismaWithDiary.clientDiaryEntry.delete({
+    const actor = actorFromAdmin(currentAdmin);
+
+    await prismaWithDiary.clientDiaryEntry.update({
       where: { id: entryId },
+      data: softDeleteData(actor),
+    });
+
+    await recordDeletionAudit({
+      entityType: "ClientDiaryEntry",
+      entityId: entryId,
+      entityName: diaryDisplayName(existingEntry),
+      parentEntityType: "Client",
+      parentEntityId: clientId,
+      actor,
+      req,
     });
 
     return NextResponse.json({ success: true });

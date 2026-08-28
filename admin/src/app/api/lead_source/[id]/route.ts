@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getCurrentAdmin } from "@/lib/auth";
+import {
+  recordDeletionAudit,
+  actorFromAdmin,
+  softDeleteData,
+} from "@/lib/audit";
 
 export async function GET(
   req: NextRequest,
@@ -77,8 +82,30 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    await prisma.leadSource.delete({
+    const existing = await prisma.leadSource.findFirst({
+      where: { id: params.id, deletedAt: null },
+    });
+
+    if (!existing) {
+      return NextResponse.json(
+        { error: "Lead source not found" },
+        { status: 404 }
+      );
+    }
+
+    const actor = actorFromAdmin(currentAdmin);
+
+    await prisma.leadSource.update({
       where: { id: params.id },
+      data: softDeleteData(actor),
+    });
+
+    await recordDeletionAudit({
+      entityType: "LeadSource",
+      entityId: params.id,
+      entityName: existing.name,
+      actor,
+      req,
     });
 
     return NextResponse.json({ message: "Lead source deleted successfully" });

@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentAgent } from "@/lib/auth";
+import {
+  recordDeletionAudit,
+  actorFromAgent,
+  softDeleteData,
+} from "@/lib/audit";
 import prisma from "@/lib/prisma";
 
 export async function GET(
@@ -257,9 +262,19 @@ export async function DELETE(
       );
     }
 
-    // Delete the category
-    await prisma.taskCategory.delete({
+    const actor = actorFromAgent(currentAgent);
+
+    await prisma.taskCategory.update({
       where: { id },
+      data: softDeleteData(actor),
+    });
+
+    await recordDeletionAudit({
+      entityType: "TaskCategory",
+      entityId: id,
+      entityName: existingCategory.name,
+      actor,
+      req,
     });
 
     return NextResponse.json({ message: "Service deleted successfully" });

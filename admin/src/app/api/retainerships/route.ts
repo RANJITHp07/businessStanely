@@ -19,8 +19,9 @@ export async function GET(req: NextRequest) {
     const url = new URL(req.url);
     const statusParam = url.searchParams.get("status");
 
-    // Build where clause for the query
-    const where: { status?: string } = {};
+    // Build where clause for the query. Soft-deleted retainerships are never
+    // returned by normal reads.
+    const where: { status?: string; deletedAt: null } = { deletedAt: null };
     
     // If status parameter is provided, filter by status
     if (statusParam && ["approved", "pending"].includes(statusParam)) {

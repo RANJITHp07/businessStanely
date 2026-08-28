@@ -66,7 +66,7 @@ export async function GET(req: NextRequest) {
       // MongoDB, so derive client ids from legislations assigned to the
       // agent instead, which filters correctly on assignedAgentId.
       const legislations = await prisma.legislation.findMany({
-        where: { assignedAgentId: assignedToId },
+        where: { assignedAgentId: assignedToId, deletedAt: null },
         select: { retainership: { select: { clientId: true } } },
       });
       clientIds = Array.from(
@@ -94,7 +94,7 @@ export async function GET(req: NextRequest) {
       }),
       prisma.retainership.groupBy({
         by: ["clientId"],
-        where: { clientId: { in: clients.map((c) => c.id) } },
+        where: { clientId: { in: clients.map((c) => c.id) }, deletedAt: null },
         _count: { _all: true },
       }),
     ]);

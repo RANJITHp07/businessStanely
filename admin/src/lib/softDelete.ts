@@ -1,3 +1,5 @@
+import { Prisma } from "@prisma/client";
+
 import { currentActor } from "./auditContext";
 
 /**
@@ -91,6 +93,14 @@ export function withSoftDelete<T>(client: T): T {
               next.where = mergeNotDeleted(next.where);
             }
 
+            next.where = filterRelationConditions(model, next.where);
+
+            // Nested relations are loaded inside the same query, so the
+            // extension hook never fires for them. Walk include/select and add
+            // the filter to any relation pointing at a soft-deletable model.
+            if (next.include) next.include = filterNested(model, next.include);
+            if (next.select) next.select = filterNested(model, next.select);
+
             const rerouted = UNIQUE_TO_FIRST[operation];
             if (rerouted && !alreadyFiltered) {
               // @ts-expect-error - dynamic model access is untyped.
@@ -143,6 +153,92 @@ export function withSoftDelete<T>(client: T): T {
   });
 }
 
+/**
+ * Relation name -> target model, per model, taken from the generated schema so
+ * it cannot drift out of sync with prisma/schema.prisma.
+ */
+const RELATION_TARGETS: Map<string, Map<string, { type: string; isList: boolean }>> =
+  (() => {
+    const map = new Map<string, Map<string, { type: string; isList: boolean }>>();
+    try {
+      const models = (Prisma as any)?.dmmf?.datamodel?.models ?? [];
+      for (const m of models) {
+        const relations = new Map<string, { type: string; isList: boolean }>();
+        for (const f of m.fields) {
+          if (f.kind === "object") {
+            relations.set(f.name, { type: f.type, isList: !!f.isList });
+          }
+        }
+        map.set(m.name, relations);
+      }
+    } catch {
+      // If the DMMF shape ever changes, nested filtering is skipped rather than
+      // throwing. Top-level filtering still applies.
+    }
+    return map;
+  })();
+
+/**
+ * Recursively adds the not-deleted condition to nested include/select clauses.
+ *
+ * Only to-many relations get a `where`: a to-one relation cannot be filtered
+ * that way in Prisma, and nulling it out would change the shape callers expect
+ * (a task whose client was deleted still needs to render). To-one relations are
+ * still walked so deeper to-many relations underneath them are covered.
+ */
+function filterNested(model: string, clause: any): any {
+  if (!clause || typeof clause !== "object") return clause;
+
+  const relations = RELATION_TARGETS.get(model);
+  if (!relations) return clause;
+
+  const out: any = Array.isArray(clause) ? [...clause] : { ...clause };
+
+  for (const [key, value] of Object.entries(out)) {
+    // `_count: { select: { comments: true } }` counts relation rows, so its
+    // inner select needs the same treatment as a normal nested read.
+    if (key === "_count") {
+      if (value && typeof value === "object" && (value as any).select) {
+        out[key] = {
+          ...(value as any),
+          select: filterNested(model, (value as any).select),
+        };
+      }
+      continue;
+    }
+
+    const relation = relations.get(key);
+    if (!relation) continue;
+
+    const target = relation.type;
+    const targetIsSoftDeletable = SOFT_DELETE_MODEL_SET.has(target);
+
+    // `include: { comments: true }` has no object to merge into, so it is
+    // expanded to `{ where: NOT_DELETED }` first.
+    if (value === true) {
+      if (targetIsSoftDeletable && relation.isList) {
+        out[key] = { where: { ...NOT_DELETED } };
+      }
+      continue;
+    }
+
+    if (!value || typeof value !== "object") continue;
+
+    let nested: any = { ...(value as any) };
+
+    if (targetIsSoftDeletable && relation.isList && !mentionsDeletedAt(nested.where)) {
+      nested.where = mergeNotDeleted(nested.where);
+    }
+
+    if (nested.include) nested.include = filterNested(target, nested.include);
+    if (nested.select) nested.select = filterNested(target, nested.select);
+
+    out[key] = nested;
+  }
+
+  return out;
+}
+
 /** True if `deletedAt` appears anywhere in a filter, including inside AND/OR/NOT. */
 function mentionsDeletedAt(where: any): boolean {
   if (!where || typeof where !== "object") return false;
@@ -154,6 +250,55 @@ function mentionsDeletedAt(where: any): boolean {
     if (list.some(mentionsDeletedAt)) return true;
   }
   return false;
+}
+
+/**
+ * Adds the not-deleted condition inside relation filters (`some`/`none`/`every`)
+ * so a row whose only related records are deleted does not match.
+ */
+function filterRelationConditions(model: string, where: any): any {
+  if (!where || typeof where !== "object") return where;
+
+  const relations = RELATION_TARGETS.get(model);
+  if (!relations) return where;
+
+  const out: any = { ...where };
+
+  for (const [key, value] of Object.entries(out)) {
+    // Recurse through boolean combinators first.
+    if (key === "AND" || key === "OR" || key === "NOT") {
+      const list = Array.isArray(value) ? value : [value];
+      const mapped = list.map((entry) => filterRelationConditions(model, entry));
+      out[key] = Array.isArray(value) ? mapped : mapped[0];
+      continue;
+    }
+
+    const relation = relations.get(key);
+    if (!relation || !value || typeof value !== "object") continue;
+
+    const target = relation.type;
+    if (!SOFT_DELETE_MODEL_SET.has(target)) continue;
+
+    const condition: any = { ...(value as any) };
+
+    if (relation.isList) {
+      for (const op of ["some", "none", "every"]) {
+        if (condition[op] && !mentionsDeletedAt(condition[op])) {
+          condition[op] = mergeNotDeleted(
+            filterRelationConditions(target, condition[op])
+          );
+        }
+      }
+    } else if (!mentionsDeletedAt(condition)) {
+      // A to-one relation filter (`client: { name: "x" }`) should not match
+      // through a deleted parent.
+      Object.assign(condition, NOT_DELETED);
+    }
+
+    out[key] = condition;
+  }
+
+  return out;
 }
 
 /**

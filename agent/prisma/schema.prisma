@@ -453,10 +453,18 @@ model Legislation {
   // Add tasks relation to fetch tasks based on legislation
   tasks Task[] @relation
 
+  /// Soft delete: rows are never removed, only stamped. Every read filters on
+  /// deletedAt: null. See lib/audit.ts.
+  deletedAt       DateTime?
+  deletedById     String?   @db.ObjectId
   deletedByType   String? // "USER" | "AGENT"
+
+  /// Who last changed this row. Field-level history lives in DeletionAudit.
   updatedById     String?   @db.ObjectId
   updatedByType   String? // "USER" | "AGENT"
 
+
+  @@index([deletedAt])
 }
 
 model Retainership {
@@ -494,10 +502,18 @@ model Retainership {
   clientId String? @db.ObjectId
   client   Client? @relation(fields: [clientId], references: [id])
 
+  /// Soft delete: rows are never removed, only stamped. Every read filters on
+  /// deletedAt: null. See lib/audit.ts.
+  deletedAt       DateTime?
+  deletedById     String?   @db.ObjectId
   deletedByType   String? // "USER" | "AGENT"
+
+  /// Who last changed this row. Field-level history lives in DeletionAudit.
   updatedById     String?   @db.ObjectId
   updatedByType   String? // "USER" | "AGENT"
 
+
+  @@index([deletedAt])
 }
 
 model Comment {

@@ -2,10 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { getCurrentAdmin } from "@/lib/auth";
-import {
-  SUMMARY_STATUS_SECTIONS,
-  buildStatusCounts,
-} from "@/lib/taskSummary";
+import { SUMMARY_STATUS_SECTIONS, buildStatusCounts } from "@/lib/taskSummary";
 
 // Only the columns the My Tasks summary tables actually render.
 const SUMMARY_TASK_INCLUDE = {
@@ -216,12 +213,20 @@ export async function GET(req: NextRequest) {
       whereClause.status = status;
     }
     if (prioritiesParam) {
-      const prioritiesArray = prioritiesParam.split(",").map((p) => p.trim()).filter(Boolean);
-      if (prioritiesArray.length > 0) whereClause.priority = { in: prioritiesArray };
+      const prioritiesArray = prioritiesParam
+        .split(",")
+        .map((p) => p.trim())
+        .filter(Boolean);
+      if (prioritiesArray.length > 0)
+        whereClause.priority = { in: prioritiesArray };
     }
     if (followUpDurationsParam) {
-      const followUpArray = followUpDurationsParam.split(",").map((d) => d.trim()).filter(Boolean);
-      if (followUpArray.length > 0) whereClause.followUpDuration = { in: followUpArray };
+      const followUpArray = followUpDurationsParam
+        .split(",")
+        .map((d) => d.trim())
+        .filter(Boolean);
+      if (followUpArray.length > 0)
+        whereClause.followUpDuration = { in: followUpArray };
     }
 
     const appendAndFilter = (filter: Prisma.TaskWhereInput) => {
@@ -325,11 +330,15 @@ export async function GET(req: NextRequest) {
         OR: [
           { title: { contains: search, mode: "insensitive" } },
           { description: { contains: search, mode: "insensitive" } },
-          { client: { OR: [
-            { firstName: { contains: search, mode: "insensitive" } },
-            { lastName: { contains: search, mode: "insensitive" } },
-            { organizationName: { contains: search, mode: "insensitive" } },
-          ]}},
+          {
+            client: {
+              OR: [
+                { firstName: { contains: search, mode: "insensitive" } },
+                { lastName: { contains: search, mode: "insensitive" } },
+                { organizationName: { contains: search, mode: "insensitive" } },
+              ],
+            },
+          },
           { assignedTo: { name: { contains: search, mode: "insensitive" } } },
         ],
       });
@@ -348,6 +357,8 @@ export async function GET(req: NextRequest) {
         Math.max(parseInt(searchParams.get("limit") || "5", 10) || 5, 1),
         50,
       );
+
+      console.log(finalWhere);
 
       const [groups, sections] = await Promise.all([
         prisma.task.groupBy({

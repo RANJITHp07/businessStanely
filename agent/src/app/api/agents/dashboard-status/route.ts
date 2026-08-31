@@ -131,7 +131,13 @@ export async function GET(req: NextRequest) {
           { status: 400 },
         );
       }
-      snapshotDate = parsed;
+      // dateParam is "YYYY-MM-DD", which Date parses as UTC midnight. Using that
+      // raw value as the snapshot would hide everything logged later that day and
+      // measure every gap against midnight, so clamp to the end of the requested
+      // day -- but never past the present moment, so "today" means "now".
+      const endOfDay = new Date(parsed.getTime() + 24 * 60 * 60 * 1000 - 1);
+      const now = new Date();
+      snapshotDate = endOfDay > now ? now : endOfDay;
     }
 
     const snapshotDateKey = snapshotDate.toISOString().slice(0, 10);

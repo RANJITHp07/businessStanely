@@ -59,6 +59,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { fetchWithAuth } from "@/lib/fetchWithAuth"
 import { cn } from "@/lib/utils"
 import { useRouter } from "next/navigation"
+import ConvertTasksDialog from "../_components/convertTasksDialog"
 
 type ClientDiaryEntry = {
     id: string
@@ -160,39 +161,42 @@ export default function RetainershipDetail({ params }: { params: Promise<{ id: s
         assignedAgent: "",
     });
     const [loading, setLoading] = useState(true);
+    const [isConvertTasksOpen, setIsConvertTasksOpen] = useState(false);
 
+    // Pulled out of the effect so the bulk task conversion can re-run it once
+    // the server confirms, rather than leaving the page on stale data.
+    const fetchRetainership = async () => {
+        try {
+            const retainershipId = resolvedParams.id;
+            const retainershipResponse = await fetch(`/api/retainerships/${retainershipId}`);
+
+            if (!retainershipResponse.ok) {
+                throw new Error("Failed to fetch retainership");
+            }
+
+            const retainershipData = await retainershipResponse.json();
+            setRetainership({
+                ...retainershipData,
+                client: retainershipData.client || null
+            });
+
+            const tasksResponse = await fetch(`/api/tasks?retainershipId=${retainershipId}`);
+
+            if (tasksResponse.ok) {
+            } else {
+                console.error("Error fetching tasks:", await tasksResponse.text());
+            }
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+            toast.error(`Failed to load retainership: ${errorMessage}`);
+            setRetainership(null);
+        } finally {
+            setLoading(false);
+        }
+    };
 
     useEffect(() => {
-        const fetchData = async () => {
-            try {
-                const retainershipId = resolvedParams.id;
-                const retainershipResponse = await fetch(`/api/retainerships/${retainershipId}`);
-
-                if (!retainershipResponse.ok) {
-                    throw new Error("Failed to fetch retainership");
-                }
-
-                const retainershipData = await retainershipResponse.json();
-                setRetainership({
-                    ...retainershipData,
-                    client: retainershipData.client || null
-                });
-
-                const tasksResponse = await fetch(`/api/tasks?retainershipId=${retainershipId}`);
-
-                if (tasksResponse.ok) {
-                } else {
-                    console.error("Error fetching tasks:", await tasksResponse.text());
-                }
-            } catch (error) {
-                const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
-                toast.error(`Failed to load retainership: ${errorMessage}`);
-                setRetainership(null);
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetchData();
+        fetchRetainership();
     }, [resolvedParams.id]);
 
     useEffect(() => {
@@ -720,7 +724,21 @@ export default function RetainershipDetail({ params }: { params: Promise<{ id: s
                                 <FileText className="h-5 w-5" />
                                 Retainership Legislation
                             </CardTitle>
-                            <Button onClick={() => setIsModalOpen(true)}>Add Legislation</Button>
+                            <div className="flex items-center gap-2">
+                                <Button
+                                    variant="outline"
+                                    onClick={() => setIsConvertTasksOpen(true)}
+                                    disabled={!retainership?.legislation?.length}
+                                    title={
+                                        retainership?.legislation?.length
+                                            ? "Bulk convert normal tasks into legislation tasks"
+                                            : "Add a legislation before converting tasks"
+                                    }
+                                >
+                                    Convert Tasks
+                                </Button>
+                                <Button onClick={() => setIsModalOpen(true)}>Add Legislation</Button>
+                            </div>
                         </div>
                     </CardHeader>
                     <CardContent>
@@ -1316,6 +1334,13 @@ export default function RetainershipDetail({ params }: { params: Promise<{ id: s
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            <ConvertTasksDialog
+                open={isConvertTasksOpen}
+                onOpenChange={setIsConvertTasksOpen}
+                retainershipId={resolvedParams.id}
+                onConverted={() => fetchRetainership()}
+            />
         </div >
     );
 }

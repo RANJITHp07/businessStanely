@@ -558,11 +558,16 @@ export function SectionTable({ label, tasks, retainershipTasks, trigger }: { lab
       <div className="flex justify-end">
         <Link
           href={(() => {
-            if (trigger) {
-              return `/retainership?tab=my-trigger`;
-            }
             const params = new URLSearchParams();
-            params.set("status", sectionLabelToStatus(label));
+            // Trigger tasks are the scheduled/inactive occurrences, which the
+            // task list selects with `trigger=true`. A status filter would
+            // contradict that -- they are matched on triggerDate and active
+            // state, not status -- so the two are mutually exclusive.
+            if (trigger) {
+              params.set("trigger", "true");
+            } else {
+              params.set("status", sectionLabelToStatus(label));
+            }
             if (retainershipTasks) params.set("retainershipTasks", "true");
             return `/task?${params.toString()}`;
           })()}

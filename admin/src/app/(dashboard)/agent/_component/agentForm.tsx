@@ -25,6 +25,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Upload, X, User, FileText, Users, Search, UserPlus, UserCheck } from "lucide-react";
 import { toast } from "react-toastify";
 import { Agent } from "@/types";
+import TransferWorkCard from "@/app/(dashboard)/agent/_component/transferWorkCard";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   ADVISOR_AGENT_ROLE,
@@ -1151,6 +1152,9 @@ export default function AgentForm({ agent }: AgentFormProps) {
 
           </CardContent>
         </Card>
+
+        {/* Transfer existing work to another agent (edit only) */}
+        {agent && <TransferWorkCard agent={agent} allAgents={allAgents} />}
 
         {/* Submit Button */}
         <div className="flex justify-end gap-4">

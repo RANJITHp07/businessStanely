@@ -1,6 +1,49 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { getCurrentAdmin } from "@/lib/auth";
+
+/**
+ * Follow-up state only needs the assigned agent's newest comment, but comments
+ * from other authors can sit on top of it. Scanning a small newest-first window
+ * finds it in practice without loading the whole thread.
+ */
+const NEWEST_COMMENTS_SCANNED = 20;
+
+/**
+ * The list endpoint feeds tables that show a prospect's own columns plus the
+ * assigned/creator agent name, and derive a follow-up state from the assigned
+ * agent's most recent comment. Selecting explicitly keeps agent credential
+ * fields (password, resetOtp) off the wire and stops whole comment threads,
+ * attachments included, from being shipped per row.
+ */
+const PROSPECT_LIST_SELECT = {
+  id: true,
+  name: true,
+  email: true,
+  service: true,
+  phone: true,
+  phoneNumber: true,
+  description: true,
+  amount: true,
+  address: true,
+  status: true,
+  notes: true,
+  nextFollowUp: true,
+  archived: true,
+  leadSourceId: true,
+  createdAt: true,
+  updatedAt: true,
+  assignedAgentId: true,
+  createdByAgentId: true,
+  assignedAgent: { select: { id: true, name: true } },
+  createdByAgent: { select: { id: true, name: true } },
+  comments: {
+    select: { id: true, createdAt: true, authorId: true },
+    orderBy: { createdAt: "desc" as const },
+    take: NEWEST_COMMENTS_SCANNED,
+  },
+} satisfies Prisma.ProspectSelect;
 
 function getAssignedAdvisorType(assignedAgent: {
   agentType?: string | null;
@@ -24,7 +67,7 @@ function getAssignedAdvisorType(assignedAgent: {
  * This mirrors the tally the page used to run in the browser, but pulls only
  * each prospect's newest comment instead of the whole comment thread.
  */
-async function buildEngagementCounts(where: Record<string, unknown>) {
+async function buildEngagementCounts(where: Prisma.ProspectWhereInput) {
   const prospects = await prisma.prospect.findMany({
     where,
     select: {
@@ -33,6 +76,7 @@ async function buildEngagementCounts(where: Record<string, unknown>) {
       comments: {
         select: { createdAt: true, authorId: true },
         orderBy: { createdAt: "desc" },
+        take: NEWEST_COMMENTS_SCANNED,
       },
     },
   });
@@ -68,15 +112,14 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const where: Record<string, unknown> = {
+    const where: Prisma.ProspectWhereInput = {
       archived: false,
       status: { not: "opportunity" },
+      deletedAt: null,
     };
 
     const { searchParams } = new URL(req.url);
     const assignedAgentId = searchParams.get("assignedAgentId");
-
-    console.log("Assigned Agent ID:", assignedAgentId);
 
     let assignedAgent = null;
 
@@ -146,11 +189,7 @@ export async function GET(req: NextRequest) {
 
     const prospects = await prisma.prospect.findMany({
       where,
-      include: {
-        assignedAgent: true,
-        createdByAgent: true,
-        comments: true,
-      },
+      select: PROSPECT_LIST_SELECT,
       orderBy: { createdAt: "desc" },
     });
 

@@ -479,32 +479,20 @@ export default function AgentDetails() {
       }
     };
 
+    // `trigger=true` now returns the full future-trigger set (scheduled
+    // legislation tasks that are deactivated or completed), so this matches
+    // what the section's "View more" link opens on /task.
     const fetchAgentTriggerTasks = async () => {
       try {
-        const [triggerResponse, completedResponse] = await Promise.all([
-          fetchWithAuth(`/api/tasks?assignedToId=${id}&trigger=true`),
-          fetchWithAuth(
-            `/api/tasks?assignedToId=${id}&retainershipTasks=true&status=Completed`,
-          ),
-        ]);
-
-        const pendingTriggerTasks = triggerResponse.ok
-          ? parseTaskResponse(await triggerResponse.json())
-          : [];
-        const completedTriggerTasks = completedResponse.ok
-          ? parseTaskResponse(await completedResponse.json()).filter(
-            (task) => !!task.triggerDate,
-          )
-          : [];
-
-        const mergedTriggerTasks = [
-          ...pendingTriggerTasks,
-          ...completedTriggerTasks,
-        ];
-        const uniqueTriggerTasks = Array.from(
-          new Map(mergedTriggerTasks.map((task) => [task.id, task])).values(),
+        const triggerResponse = await fetchWithAuth(
+          `/api/tasks?assignedToId=${id}&trigger=true`,
         );
-        setAgentTriggerTasks(uniqueTriggerTasks);
+
+        setAgentTriggerTasks(
+          triggerResponse.ok
+            ? parseTaskResponse(await triggerResponse.json())
+            : [],
+        );
       } catch (error) {
         console.error("Error fetching agent trigger tasks:", error);
         setAgentTriggerTasks([]);

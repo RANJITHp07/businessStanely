@@ -47,18 +47,9 @@ import {
     Eraser,
     CalendarIcon,
     Eye,
+    ArrowLeftRight,
 } from "lucide-react"
 import Link from "next/link"
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
 import {
     Dialog,
     DialogContent,
@@ -69,6 +60,7 @@ import {
 } from "@/components/ui/dialog"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Calendar as CalendarComponent } from "@/components/ui/calendar"
+import TransferTasksDialog, { type TransferTasksMode } from "./transferTasksDialog"
 
 
 const clientTypes = ["All Types", "Individual", "Organization"]
@@ -133,7 +125,10 @@ export default function ClientsTable() {
     const [selectedEntityType, setSelectedEntityType] = useState("All Entity Types")
     const { currentPage, setCurrentPage, itemsPerPage, setItemsPerPage, clampToTotalPages } =
         useTablePage("admin-dashboard-client-_component-clientTable")
-    const [clientToDelete, setClientToDelete] = useState<Client | null>(null)
+    // Shared by the delete flow and the standalone transfer: `mode` decides
+    // whether the dialog offers the soft-delete branch.
+    const [transferDialogMode, setTransferDialogMode] = useState<TransferTasksMode>("delete")
+    const [clientForTransfer, setClientForTransfer] = useState<Client | null>(null)
     const [loading, setLoading] = useState(true)
     const [isDiaryOpen, setIsDiaryOpen] = useState(false)
     const [selectedClientForDiary, setSelectedClientForDiary] = useState<Client | null>(null)
@@ -250,23 +245,36 @@ export default function ClientsTable() {
     };
 
 
-    const handleDelete = async () => {
-        if (!clientToDelete) return;
+    // Opens the shared dialog. "delete" adds the soft-delete vs transfer choice;
+    // "transfer" moves tasks and leaves the client active.
+    const openTransferDialog = (client: Client, mode: TransferTasksMode) => {
+        setTransferDialogMode(mode);
+        setClientForTransfer(client);
+    };
 
+    const handleTransferCompleted = async ({
+        sourceDeleted,
+    }: {
+        sourceDeleted: boolean;
+        tasksTransferredCount: number;
+    }) => {
+        const sourceId = clientForTransfer?.id;
+        setClientForTransfer(null);
+
+        if (sourceDeleted && sourceId) {
+            setClients((current) => current.filter((client) => client.id !== sourceId));
+            return;
+        }
+
+        // A transfer changes task counts on both clients, so the cached rows are
+        // stale even though nothing was removed.
         try {
-            const response = await fetch(`/api/clients/${clientToDelete.id}`, {
-                method: 'DELETE',
-            });
-
+            const response = await fetch('/api/clients');
             if (response.ok) {
-                setClients(clients.filter((client) => client.id !== clientToDelete.id));
-                setClientToDelete(null);
-                router.push('/client'); // Redirect to the client list page after deletion
-            } else {
-                console.error("Failed to delete client");
+                setClients(await response.json());
             }
         } catch (error) {
-            console.error("Error deleting client:", error);
+            console.error("Error refreshing clients after transfer:", error);
         }
     };
 
@@ -784,12 +792,21 @@ export default function ClientsTable() {
       <Eye className="mr-2 h-4 w-4" />
   View Tasks
                                                               </DropdownMenuItem>
+                                                            <DropdownMenuItem
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    openTransferDialog(client, "transfer");
+                                                                }}
+                                                            >
+                                                                <ArrowLeftRight className="mr-2 h-4 w-4" />
+                                                                Transfer Tasks
+                                                            </DropdownMenuItem>
                                                             <DropdownMenuSeparator />
                                                             <DropdownMenuItem
                                                                 className="text-destructive"
                                                                 onClick={(e) => {
                                                                     e.stopPropagation();
-                                                                    setClientToDelete(client);
+                                                                    openTransferDialog(client, "delete");
                                                                 }}
                                                             >
                                                                 <Trash2 className="mr-2 h-4 w-4" />
@@ -895,10 +912,17 @@ export default function ClientsTable() {
                                                                     <span className="text-xs">View Tasks</span>
                                                                 </Link>
                                                             </DropdownMenuItem>
+                                                            <DropdownMenuItem
+                                                                className="text-xs"
+                                                                onClick={() => openTransferDialog(client, "transfer")}
+                                                            >
+                                                                <ArrowLeftRight className="mr-2 h-3 w-3" />
+                                                                <span className="text-xs">Transfer Tasks</span>
+                                                            </DropdownMenuItem>
                                                             <DropdownMenuSeparator />
                                                             <DropdownMenuItem
                                                                 className="text-destructive text-xs"
-                                                                onClick={() => setClientToDelete(client)}
+                                                                onClick={() => openTransferDialog(client, "delete")}
                                                             >
                                                                 <Trash2 className="mr-2 h-3 w-3" />
                                                                 Delete Client
@@ -1001,20 +1025,16 @@ export default function ClientsTable() {
 
 
             </Card>
-            <AlertDialog open={!!clientToDelete} onOpenChange={() => setClientToDelete(null)}>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            This action cannot be undone. This will permanently delete the client and remove their data from our servers.
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleDelete}>Delete</AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
+            <TransferTasksDialog
+                open={!!clientForTransfer}
+                onOpenChange={(open) => {
+                    if (!open) setClientForTransfer(null);
+                }}
+                mode={transferDialogMode}
+                client={clientForTransfer}
+                allClients={clients}
+                onCompleted={handleTransferCompleted}
+            />
 
             <Dialog
                 open={isDiaryOpen}

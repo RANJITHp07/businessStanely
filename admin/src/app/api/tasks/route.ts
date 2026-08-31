@@ -181,6 +181,9 @@ export async function GET(req: NextRequest) {
 
     // Build the where clause: if filtering by categoryId, allow any status; otherwise, only approved
     let whereClause: Prisma.TaskWhereInput;
+    // Kept out of `whereClause.OR` so it cannot be overwritten by the search
+    // filter below, which also builds an OR. Merged into finalWhere via AND.
+    let triggerStateFilter: Prisma.TaskWhereInput | null = null;
     if (categoryId) {
       whereClause = { categoryId };
     } else {
@@ -203,12 +206,19 @@ export async function GET(req: NextRequest) {
       whereClause.assignedToId = assignedToId;
     }
     if (trigger === "true") {
+      // A future-trigger row is a legislation task that has been scheduled
+      // (triggerDate set) and is no longer the live occurrence: either it was
+      // deactivated or its current period is completed. Completed rows can
+      // still be active, so `active` is not constrained here -- see finalWhere.
       whereClause.legislationId = { not: null };
-      whereClause.OR = [
-        { active: false },
-        { status: "Completed" },
-        { status: "completed" },
-      ];
+      whereClause.triggerDate = { not: null };
+      triggerStateFilter = {
+        OR: [
+          { active: false },
+          { status: "Completed" },
+          { status: "completed" },
+        ],
+      };
     } else if (retainershipTasks === "true") {
       whereClause.legislationId = { not: null };
       whereClause.active = true;
@@ -363,10 +373,21 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    const finalWhere =
-      trigger === "true"
-        ? { ...whereClause }
-        : { ...whereClause, active: true };
+    let finalWhere: Prisma.TaskWhereInput;
+    if (trigger === "true") {
+      const { AND: existingAnd, ...restOfWhere } = whereClause;
+      const andClauses: Prisma.TaskWhereInput[] = Array.isArray(existingAnd)
+        ? [...existingAnd]
+        : existingAnd
+          ? [existingAnd]
+          : [];
+      if (triggerStateFilter) andClauses.push(triggerStateFilter);
+      finalWhere = andClauses.length
+        ? { ...restOfWhere, AND: andClauses }
+        : restOfWhere;
+    } else {
+      finalWhere = { ...whereClause, active: true };
+    }
 
     // Summary mode: the My Tasks dashboard only renders the newest few rows per
     // status plus the headline counts, so fetch exactly that instead of every

@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -14,13 +13,25 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { AlertTriangle, ArrowLeftRight, Trash2 } from "lucide-react";
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  AlertTriangle,
+  ArrowLeftRight,
+  Check,
+  ChevronsUpDown,
+  Trash2,
+} from "lucide-react";
 import { toast } from "react-toastify";
 import { Client } from "@/types";
 import { cn } from "@/lib/utils";
@@ -54,6 +65,7 @@ interface TransferTasksDialogProps {
     mode: TransferTasksMode;
     sourceDeleted: boolean;
     tasksTransferredCount: number;
+    retainershipsTransferredCount: number;
   }) => void;
 }
 
@@ -84,7 +96,7 @@ export default function TransferTasksDialog({
     "soft-delete",
   );
   const [targetClientId, setTargetClientId] = useState("");
-  const [targetSearch, setTargetSearch] = useState("");
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   // The standalone card has no soft-delete branch, so its only action is the
@@ -113,31 +125,27 @@ export default function TransferTasksDialog({
     if (!open) return;
     setAction("soft-delete");
     setTargetClientId("");
-    setTargetSearch("");
+    setPickerOpen(false);
     loadSummary();
   }, [open, loadSummary]);
 
-  const candidates = useMemo(() => {
-    const term = targetSearch.trim().toLowerCase();
-    return allClients
-      .filter((candidate) => candidate.id !== client?.id)
-      .filter((candidate) => {
-        if (!term) return true;
-        return (
-          displayName(candidate).toLowerCase().includes(term) ||
-          (candidate.email || "").toLowerCase().includes(term)
-        );
-      });
-  }, [allClients, client?.id, targetSearch]);
+  // Text matching is cmdk's job; this only drops the source client, which must
+  // never be a transfer target.
+  const candidates = useMemo(
+    () => allClients.filter((candidate) => candidate.id !== client?.id),
+    [allClients, client?.id],
+  );
 
   const totalTasks = summary?.counts.totalTasks ?? 0;
+  const totalRetainerships = summary?.counts.retainerships ?? 0;
+  const hasWorkToMove = totalTasks > 0 || totalRetainerships > 0;
   const targetClient = allClients.find((c) => c.id === targetClientId);
 
   const canSubmit =
     !!client &&
     !submitting &&
     (effectiveAction === "soft-delete" || !!targetClientId) &&
-    (effectiveAction !== "transfer" || mode === "delete" || totalTasks > 0);
+    (effectiveAction !== "transfer" || mode === "delete" || hasWorkToMove);
 
   const handleSubmit = async () => {
     if (!client) return;
@@ -155,6 +163,7 @@ export default function TransferTasksDialog({
             mode,
             sourceDeleted: true,
             tasksTransferredCount: 0,
+            retainershipsTransferredCount: 0,
           });
           onOpenChange(false);
         } else {
@@ -181,6 +190,8 @@ export default function TransferTasksDialog({
           mode,
           sourceDeleted: mode === "delete",
           tasksTransferredCount: data.summary?.tasksTransferredCount ?? 0,
+          retainershipsTransferredCount:
+            data.summary?.retainershipsTransferredCount ?? 0,
         });
         onOpenChange(false);
       } else {
@@ -213,11 +224,11 @@ export default function TransferTasksDialog({
               <>
                 Choose what happens to{" "}
                 <span className="font-medium">{sourceName}</span>&apos;s tasks
-                before the client is deleted.
+                and retainerships before the client is deleted.
               </>
             ) : (
               <>
-                Move every task on{" "}
+                Move every task and retainership on{" "}
                 <span className="font-medium">{sourceName}</span> to another
                 client. The client stays active.
               </>
@@ -235,12 +246,13 @@ export default function TransferTasksDialog({
             <>
               <div className="rounded-lg border bg-muted/40 p-3 text-sm">
                 <p className="font-medium">
-                  {totalTasks} task(s) attached to this client
+                  {totalTasks} task(s) and {totalRetainerships} retainership(s)
+                  attached to this client
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  {summary?.counts.openTasks ?? 0} still open ·{" "}
-                  {summary?.counts.retainerships ?? 0} retainership(s) ·{" "}
-                  {summary?.counts.diaryEntries ?? 0} diary entr(ies)
+                  {summary?.counts.openTasks ?? 0} task(s) still open ·{" "}
+                  {summary?.counts.diaryEntries ?? 0} diary entr(ies) stay with
+                  this client
                 </p>
               </div>
 
@@ -261,8 +273,8 @@ export default function TransferTasksDialog({
                     </span>
                     <span className="block text-xs text-muted-foreground">
                       The client is hidden and recoverable. Its {totalTasks}{" "}
-                      task(s) stay attached and come back if the client is
-                      restored.
+                      task(s) and {totalRetainerships} retainership(s) stay
+                      attached and come back if the client is restored.
                     </span>
                   </button>
 
@@ -277,11 +289,12 @@ export default function TransferTasksDialog({
                     )}
                   >
                     <span className="block text-sm font-medium">
-                      Transfer tasks, then delete
+                      Transfer tasks &amp; retainerships, then delete
                     </span>
                     <span className="block text-xs text-muted-foreground">
-                      All {totalTasks} task(s) move to another client first, so
-                      they stay reachable after this client is gone.
+                      All {totalTasks} task(s) and {totalRetainerships}{" "}
+                      retainership(s) move to another client first, so they stay
+                      reachable after this client is gone.
                     </span>
                   </button>
                 </div>
@@ -290,40 +303,85 @@ export default function TransferTasksDialog({
               {effectiveAction === "transfer" && (
                 <div className="space-y-2">
                   <Label htmlFor="transfer-target">Target client</Label>
-                  <Input
-                    id="transfer-target-search"
-                    placeholder="Search clients..."
-                    value={targetSearch}
-                    onChange={(event) => setTargetSearch(event.target.value)}
-                  />
-                  <Select
-                    value={targetClientId}
-                    onValueChange={setTargetClientId}
-                  >
-                    <SelectTrigger id="transfer-target" className="w-full">
-                      <SelectValue placeholder="Select a client" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {candidates.length === 0 ? (
-                        <div className="px-2 py-3 text-sm text-muted-foreground">
-                          No matching clients
-                        </div>
-                      ) : (
-                        candidates.map((candidate) => (
-                          <SelectItem key={candidate.id} value={candidate.id}>
-                            {displayName(candidate)}
-                            {candidate.email ? ` — ${candidate.email}` : ""}
-                          </SelectItem>
-                        ))
-                      )}
-                    </SelectContent>
-                  </Select>
+                  <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        id="transfer-target"
+                        type="button"
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={pickerOpen}
+                        className="w-full justify-between bg-transparent font-normal"
+                      >
+                        <span
+                          className={cn(
+                            "truncate",
+                            !targetClient && "text-muted-foreground",
+                          )}
+                        >
+                          {targetClient
+                            ? displayName(targetClient)
+                            : "Search and select a client..."}
+                        </span>
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent
+                      className="w-[var(--radix-popover-trigger-width)] p-0"
+                      align="start"
+                    >
+                      <Command>
+                        <CommandInput placeholder="Type a name or email..." />
+                        <CommandList>
+                          <CommandEmpty>No client found.</CommandEmpty>
+                          <CommandGroup>
+                            {candidates.map((candidate) => (
+                              <CommandItem
+                                key={candidate.id}
+                                // cmdk filters on `value`, so both fields the
+                                // admin might type have to be in it.
+                                value={`${displayName(candidate)} ${candidate.email ?? ""}`}
+                                onSelect={() => {
+                                  setTargetClientId(
+                                    candidate.id === targetClientId
+                                      ? ""
+                                      : candidate.id,
+                                  );
+                                  setPickerOpen(false);
+                                }}
+                              >
+                                <Check
+                                  className={cn(
+                                    "mr-2 h-4 w-4 shrink-0",
+                                    targetClientId === candidate.id
+                                      ? "opacity-100"
+                                      : "opacity-0",
+                                  )}
+                                />
+                                <div className="flex min-w-0 flex-col">
+                                  <span className="truncate font-medium">
+                                    {displayName(candidate)}
+                                  </span>
+                                  {candidate.email && (
+                                    <span className="truncate text-xs text-muted-foreground">
+                                      {candidate.email}
+                                    </span>
+                                  )}
+                                </div>
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
 
                   {targetClient && (
                     <p className="flex items-start gap-2 text-xs text-muted-foreground">
                       <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                       <span>
-                        {totalTasks} task(s) move from{" "}
+                        {totalTasks} task(s) and {totalRetainerships}{" "}
+                        retainership(s) move from{" "}
                         <span className="font-medium">{sourceName}</span> to{" "}
                         <span className="font-medium">
                           {displayName(targetClient)}

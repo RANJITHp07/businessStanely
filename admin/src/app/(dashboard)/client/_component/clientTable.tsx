@@ -257,6 +257,7 @@ export default function ClientsTable() {
     }: {
         sourceDeleted: boolean;
         tasksTransferredCount: number;
+        retainershipsTransferredCount: number;
     }) => {
         const sourceId = clientForTransfer?.id;
         setClientForTransfer(null);

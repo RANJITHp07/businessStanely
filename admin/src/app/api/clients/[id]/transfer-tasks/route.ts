@@ -12,13 +12,17 @@ import { withActor } from "@/lib/auditContext";
 import { clientDisplayName } from "@/lib/entityNames";
 
 /**
- * Moves a client's tasks to another client.
+ * Moves a client's tasks and retainerships to another client.
  *
- * Two entry points share this route: the standalone "Transfer Tasks" card, and
+ * Two entry points share this route: the standalone "Transfer Tasks" action, and
  * the delete dialog's "transfer then delete" option (`deleteSource: true`).
  * Deleting a client is a soft delete, and soft delete does not cascade, so a
- * client deleted with tasks still attached leaves those tasks live but pointing
- * at a hidden parent. Transferring first is what keeps them reachable.
+ * client deleted with work still attached leaves that work live but pointing at
+ * a hidden parent. Transferring first is what keeps it reachable.
+ *
+ * Both models carry `clientId`, so both move together -- a retainership left on
+ * the source would be split from the tasks that belong to it. Legislations
+ * follow their retainership implicitly, since they hang off `retainershipId`.
  *
  * Every live task moves, completed ones included: the tasks are the client's
  * record of work, and splitting them across two clients on a status boundary
@@ -158,8 +162,17 @@ export async function POST(
     const targetName = clientDisplayName(targetClient);
 
     const result = await withActor(actor, async () => {
-      const moved = await prisma.task.updateMany({
+      const movedTasks = await prisma.task.updateMany({
         where: { clientId: sourceClientId, ...LIVE_TASK_FILTER },
+        data: { clientId: targetClientId },
+      });
+
+      // Retainerships carry the same clientId, so leaving them behind would
+      // strand a live retainership on a hidden client and split a task from the
+      // retainership it belongs to. Their legislations follow implicitly --
+      // those hang off retainershipId, not clientId.
+      const movedRetainerships = await prisma.retainership.updateMany({
+        where: { clientId: sourceClientId, deletedAt: null },
         data: { clientId: targetClientId },
       });
 
@@ -172,7 +185,11 @@ export async function POST(
         sourceDeleted = true;
       }
 
-      return { tasksTransferredCount: moved.count, sourceDeleted };
+      return {
+        tasksTransferredCount: movedTasks.count,
+        retainershipsTransferredCount: movedRetainerships.count,
+        sourceDeleted,
+      };
     });
 
     // One UPDATE row per client so the move is visible from either side of the
@@ -183,6 +200,7 @@ export async function POST(
       entityName: sourceName,
       changedFields: [
         `tasks: ${result.tasksTransferredCount} transferred to ${targetName}`,
+        `retainerships: ${result.retainershipsTransferredCount} transferred to ${targetName}`,
       ],
       actor,
       req,
@@ -194,6 +212,7 @@ export async function POST(
       entityName: targetName,
       changedFields: [
         `tasks: ${result.tasksTransferredCount} received from ${sourceName}`,
+        `retainerships: ${result.retainershipsTransferredCount} received from ${sourceName}`,
       ],
       actor,
       req,
@@ -204,7 +223,7 @@ export async function POST(
         entityType: "Client",
         entityId: sourceClientId,
         entityName: sourceName,
-        reason: `Tasks transferred to ${targetName} before deletion`,
+        reason: `${result.tasksTransferredCount} task(s) and ${result.retainershipsTransferredCount} retainership(s) transferred to ${targetName} before deletion`,
         affectedTaskCount: result.tasksTransferredCount,
         actor,
         req,
@@ -214,8 +233,8 @@ export async function POST(
     return NextResponse.json({
       success: true,
       message: result.sourceDeleted
-        ? `Transferred ${result.tasksTransferredCount} task(s) to ${targetName} and deleted ${sourceName}.`
-        : `Transferred ${result.tasksTransferredCount} task(s) to ${targetName}.`,
+        ? `Transferred ${result.tasksTransferredCount} task(s) and ${result.retainershipsTransferredCount} retainership(s) to ${targetName}, and deleted ${sourceName}.`
+        : `Transferred ${result.tasksTransferredCount} task(s) and ${result.retainershipsTransferredCount} retainership(s) to ${targetName}.`,
       summary: {
         sourceClientId,
         targetClientId,

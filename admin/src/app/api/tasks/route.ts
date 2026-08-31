@@ -12,6 +12,25 @@ const SUMMARY_TASK_INCLUDE = {
   category: true,
 } satisfies Prisma.TaskInclude;
 
+// Only the relation columns the task list actually renders. Pulling the whole
+// related row for six relations was most of this endpoint's payload; `createdBy`
+// and `legislation` were fetched but never read by the table at all.
+const TASK_LIST_INCLUDE = {
+  client: {
+    select: {
+      id: true,
+      clientType: true,
+      firstName: true,
+      lastName: true,
+      organizationName: true,
+      email: true,
+    },
+  },
+  ownerShipBy: { select: { id: true, name: true, agentType: true, status: true } },
+  assignedTo: { select: { id: true, name: true, agentType: true, status: true } },
+  category: { select: { id: true, name: true, status: true } },
+} satisfies Prisma.TaskInclude;
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -385,20 +404,48 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    const tasks = await prisma.task.findMany({
+    const taskQuery = {
       where: finalWhere,
-      include: {
-        client: true,
-        createdBy: true,
-        ownerShipBy: true,
-        assignedTo: true,
-        category: true,
-        legislation: true,
-      },
+      include: TASK_LIST_INCLUDE,
       orderBy: {
         createdAt: "desc",
       },
-    });
+    } satisfies Prisma.TaskFindManyArgs;
+
+    // Paginated mode is opt-in: callers that pass `page` (or `limit`) get
+    // `{ tasks, total, page, limit, totalPages }`, everyone else still gets the
+    // bare array they already expect. Without this the route serialised every
+    // matching task — ~1100 rows / 5.5MB once a status filter was cleared,
+    // which is what tipped the deployed function over its response limit.
+    const pageParam = searchParams.get("page");
+    const limitParam = searchParams.get("limit");
+
+    if (pageParam || limitParam) {
+      const limit = Math.min(
+        Math.max(parseInt(limitParam || "20", 10) || 20, 1),
+        200,
+      );
+      const page = Math.max(parseInt(pageParam || "1", 10) || 1, 1);
+
+      const [total, tasks] = await Promise.all([
+        prisma.task.count({ where: finalWhere }),
+        prisma.task.findMany({
+          ...taskQuery,
+          skip: (page - 1) * limit,
+          take: limit,
+        }),
+      ]);
+
+      return NextResponse.json({
+        tasks,
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      });
+    }
+
+    const tasks = await prisma.task.findMany(taskQuery);
     return NextResponse.json(tasks);
   } catch (error) {
     console.error("Error fetching tasks:", error);

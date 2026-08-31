@@ -76,6 +76,8 @@ export default function TasksTable() {
   const { currentPage, setCurrentPage, itemsPerPage, setItemsPerPage, clampToTotalPages } =
       useTablePage("admin-dashboard-task-_components-taskTable")
   const [taskToDelete, setTaskToDelete] = useState<Task | null>(null)
+  // Row count for the *whole* filtered set, not just the page in `tasks`.
+  const [totalTasks, setTotalTasks] = useState(0)
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const router = useRouter();
@@ -108,6 +110,9 @@ export default function TasksTable() {
     if (statusCheckDuration.length > 0) params.set("statusCheckDuration", statusCheckDuration.join(","));
     if (clientUpdate !== "all") params.set("clientUpdate", clientUpdate);
     const newUrl = params.toString() ? `?${params.toString()}` : window.location.pathname;
+    // Paging is server-side now, so a narrower filter can leave the current
+    // page past the end of the new result set. Start over at page 1.
+    setCurrentPage(1);
     router.replace(newUrl);
   };
 
@@ -167,24 +172,35 @@ export default function TasksTable() {
         if (search) params.push(`search=${encodeURIComponent(search)}`);
         if (priorities) params.push(`priorities=${encodeURIComponent(priorities)}`);
         if (followUpDurations) params.push(`followUpDurations=${encodeURIComponent(followUpDurations)}`);
+        // Page server-side. Sending these switches the API to its
+        // `{ tasks, total, ... }` shape and keeps the response small enough for
+        // the deployed function's body limit.
+        params.push(`page=${currentPage}`);
+        params.push(`limit=${itemsPerPage}`);
         if (params.length > 0) url += `?${params.join("&")}`;
         const response = await fetchWithAuth(url);
         if (response.ok) {
           const data = await response.json();
-          setTasks(data.tasks || data);
+          const rows = data.tasks || data;
+          setTasks(rows);
+          setTotalTasks(
+            typeof data.total === "number" ? data.total : rows.length,
+          );
         } else {
           console.error("Failed to fetch tasks");
           setTasks([]);
+          setTotalTasks(0);
         }
       } catch (error) {
         console.error("Error fetching tasks:", error);
         setTasks([]);
+        setTotalTasks(0);
       } finally {
         setLoading(false);
       }
     };
     fetchTasks();
-  }, [searchParams]);
+  }, [searchParams, currentPage, itemsPerPage]);
 
   const handleDelete = async () => {
     if (!taskToDelete) return
@@ -212,34 +228,18 @@ export default function TasksTable() {
   //   })
   // }
 
-  // Filter tasks based on search and filters only (backend already filters approved tasks)
-  const filteredTasks = (tasks || []).filter((task) => {
-    const matchesSearch =
-      task.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (task.client && (task.client.clientType === 'individual' ? `${task.client.firstName} ${task.client.lastName}` : task.client.organizationName)?.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (task.assignedTo && task.assignedTo.name.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (task.description && task.description.toLowerCase().includes(searchTerm.toLowerCase()));
+  // Search, priority, status, and duration filters are all applied by the API
+  // (see /api/tasks). Re-applying them here would filter only the rows in the
+  // current page, silently hiding matches that live on other pages.
+  const currentTasks = tasks || []
 
-    const matchesPriority = selectedPriorities.length === 0 || selectedPriorities.map((p) => p.toLowerCase()).includes((task.priority || "").toLowerCase());
-    const matchesStatus = selectedStatuses.length === 0 || selectedStatuses.includes(task.status);
-    const matchesFollowUp = selectedFollowUpDurations.length === 0 || (task.followUpDuration && selectedFollowUpDurations.includes(task.followUpDuration));
-    const matchesStatusCheck = selectedStatusCheckDurations.length === 0 || (task.statusCheckDuration && selectedStatusCheckDurations.includes(task.statusCheckDuration));
-
-    return matchesSearch && matchesPriority && matchesStatus && matchesFollowUp && matchesStatusCheck;
-  });
-
-  // Apply sorting to filtered tasks
-  const sortedTasks = filteredTasks
-
-  // Pagination logic
-  const totalPages = Math.ceil(sortedTasks.length / itemsPerPage)
+  // Pagination logic — page size and offset are handled server-side, so this is
+  // derived from the API's `total` rather than the length of the loaded page.
+  const totalPages = Math.ceil(totalTasks / itemsPerPage)
 
   useEffect(() => {
       clampToTotalPages(totalPages)
   }, [totalPages, clampToTotalPages])
-  const startIndex = (currentPage - 1) * itemsPerPage
-  const endIndex = startIndex + itemsPerPage
-  const currentTasks = sortedTasks.slice(startIndex, endIndex)
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page)
@@ -701,7 +701,7 @@ export default function TasksTable() {
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2">
               <FileText className="h-5 w-5" />
-              Tasks ({sortedTasks.length})
+              Tasks ({totalTasks})
             </CardTitle>
             {/* <div className="flex items-center gap-2">
               <ArrowUpDown className="h-4 w-4 text-muted-foreground" />

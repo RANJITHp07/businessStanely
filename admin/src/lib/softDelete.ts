@@ -291,8 +291,12 @@ function filterRelationConditions(model: string, where: any): any {
       }
     } else if (!mentionsDeletedAt(condition)) {
       // A to-one relation filter (`client: { name: "x" }`) should not match
-      // through a deleted parent.
-      Object.assign(condition, NOT_DELETED);
+      // through a deleted parent. Merge rather than assign: NOT_DELETED is
+      // itself an `OR`, so copying it over a filter that already has one
+      // (`client: { OR: [firstName, lastName, ...] }`, as task search builds)
+      // would drop the caller's condition and match every live row.
+      out[key] = mergeNotDeleted(filterRelationConditions(target, condition));
+      continue;
     }
 
     out[key] = condition;

@@ -720,5 +720,12 @@ model CronLog {
   status       String   @default("running")
   updatedCount Int?
 
+  /// Day key ("YYYY-MM-DD") for the run. The once-a-day guard used to be a
+  /// findFirst followed by a create, which two concurrent serverless
+  /// invocations can both pass -- each then advances every recurring task's
+  /// trigger date. The unique index makes the insert itself the lock.
+  runDate String?
+
+  @@unique([jobName, runDate])
   @@map("cron_logs")
 }

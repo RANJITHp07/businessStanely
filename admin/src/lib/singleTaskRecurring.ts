@@ -2,14 +2,11 @@ import prisma from "@/lib/prisma";
 import { createTransporter } from "./email";
 import { format } from "date-fns";
 
-// Calculate next due date based on recurring months
-export function calculateNextDueDate(
-  currentDate: Date,
-  recurringMonths: number,
-): Date {
-  const nextDate = new Date(currentDate);
-  nextDate.setMonth(nextDate.getMonth() + recurringMonths);
-  return nextDate;
+const RECURRING_TYPES = ["once", "day", "week", "month"] as const;
+type RecurringType = (typeof RECURRING_TYPES)[number];
+
+function isRecurringType(value: string): value is RecurringType {
+  return (RECURRING_TYPES as readonly string[]).includes(value);
 }
 
 // Auto-update recurring tasks based on calendar schedule (not completion)
@@ -21,23 +18,44 @@ export async function updateRecurringTaskSchedule(taskId: string) {
 
   if (!task || !task.recurring) return null;
 
-  let recurringType: "once" | "day" | "week" | "month" = "month";
-  let recurringValue = typeof task.recurring === "number" ? task.recurring : 1;
+  // The interval is two columns that must agree. Defaulting an unreadable
+  // recurringType to "month" (as this used to) turns "every 2 days" into
+  // "every 2 months" on any row whose type failed to save -- a silent 60x
+  // stretch of the schedule. An unreadable pair is a data problem, so the
+  // task is skipped and reported rather than advanced by a guessed interval.
+  let recurringType: RecurringType | null = null;
+  let recurringValue = typeof task.recurring === "number" ? task.recurring : NaN;
 
   if (typeof task.recurringType === "string" && task.recurringType) {
     const normalizedType = task.recurringType.toLowerCase();
-    if (["once", "day", "week", "month"].includes(normalizedType)) {
-      recurringType = normalizedType as "once" | "day" | "week" | "month";
+    if (isRecurringType(normalizedType)) {
+      recurringType = normalizedType;
     }
   }
 
   // Backward compatibility if recurring was previously stored as "type-value".
   if (typeof task.recurring === "string" && task.recurring.includes("-")) {
     const [type, value] = task.recurring.split("-");
-    if (["once", "day", "week", "month"].includes(type)) {
-      recurringType = type as "once" | "day" | "week" | "month";
+    if (isRecurringType(type)) {
+      recurringType = type;
     }
     recurringValue = parseInt(value, 10);
+  }
+
+  if (!recurringType) {
+    console.warn(
+      `⚠️ Task ${taskId} has recurring=${JSON.stringify(task.recurring)} but ` +
+        `recurringType=${JSON.stringify(task.recurringType)}; skipping until the pair is fixed.`,
+    );
+    return null;
+  }
+
+  if (!Number.isFinite(recurringValue) || recurringValue < 1) {
+    console.warn(
+      `⚠️ Task ${taskId} has a non-positive recurring interval ` +
+        `(${JSON.stringify(task.recurring)}); skipping.`,
+    );
+    return null;
   }
 
   const startOfToday = new Date();
@@ -52,17 +70,21 @@ export async function updateRecurringTaskSchedule(taskId: string) {
   // so a missed cron run doesn't permanently skip the task.
   if (triggerDate > endOfToday) return null;
 
-  const dueDate = new Date(task.triggerDate || task.dueDate);
-  if (task.category?.timePeriod) {
-    dueDate.setDate(dueDate.getDate() + Number(task.category.timePeriod));
-  }
+  /** Deadline of the occurrence starting on `start`: start + the service's days. */
+  const deadlineFor = (start: Date) => {
+    const deadline = new Date(start);
+    if (task.category?.timePeriod) {
+      deadline.setDate(deadline.getDate() + Number(task.category.timePeriod));
+    }
+    return deadline;
+  };
 
   if (recurringType === "once") {
     const updatedTask = await prisma.task.update({
       where: { id: taskId },
       data: {
         triggerDate: null,
-        dueDate,
+        dueDate: deadlineFor(triggerDate),
         nextDueDate: null,
         currentPeriodStart: triggerDate,
         completed: false,
@@ -91,20 +113,19 @@ export async function updateRecurringTaskSchedule(taskId: string) {
     }
   } while (nextTriggerDate <= endOfToday);
 
-  const nextDueDate = new Date(nextTriggerDate);
-  if (task.category?.timePeriod) {
-    nextDueDate.setDate(
-      nextDueDate.getDate() + Number(task.category.timePeriod),
-    );
-  }
+  const nextDueDate = deadlineFor(nextTriggerDate);
 
   const updatedTask = await prisma.task.update({
     where: { id: taskId },
     data: {
       triggerDate: nextTriggerDate,
-      dueDate,
+      // The row now represents the occurrence starting on nextTriggerDate, so
+      // its due date is that occurrence's deadline. Writing the *previous*
+      // occurrence's deadline here (the old behaviour) left rows like
+      // trigger=2026-07-09 alongside due=2026-01-29.
+      dueDate: nextDueDate,
       nextDueDate,
-      currentPeriodStart: triggerDate,
+      currentPeriodStart: nextTriggerDate,
       completed: false,
       progress: 0,
       status: "To Do",
@@ -159,26 +180,21 @@ export async function updateHoldTasks() {
         }
       }
 
-      // Extend due date by 1 day if the task is still on "Hold"
-      if (task.dueDate && task.createdAt) {
+      // A held task's deadline slips one day per day on hold, so the time it
+      // had left when it was held is preserved rather than consumed.
+      //
+      // The overdue branch used to re-add the task's *original* span
+      // (dueDate - createdAt) on top of today, so a task created 60 days
+      // before its deadline jumped 60 days forward on every single hold run.
+      // It also mixed a midnight-normalised `due` with a raw `createdAt`
+      // timestamp, leaving the Math.ceil off by a fraction of a day. Both
+      // branches now just add one day.
+      if (task.dueDate) {
         const due = new Date(task.dueDate);
         due.setHours(0, 0, 0, 0);
 
-        const created = new Date(task.createdAt);
-        created.setHours(0, 0, 0, 0);
-
-        let newDueDate: Date;
-
-        if (due < today) {
-          const diffDays = Math.ceil(
-            (due.getTime() - task.createdAt.getTime()) / (1000 * 60 * 60 * 24),
-          );
-          newDueDate = new Date(today);
-          newDueDate.setDate(newDueDate.getDate() + diffDays);
-        } else {
-          newDueDate = new Date(due);
-          newDueDate.setDate(newDueDate.getDate() + 1);
-        }
+        const newDueDate = new Date(due < today ? today : due);
+        newDueDate.setDate(newDueDate.getDate() + 1);
 
         const updatedTask = await prisma.task.update({
           where: { id: task.id },
@@ -238,24 +254,51 @@ export async function updateAllRecurringTasks() {
   return updatedTasks;
 }
 
-// Initialize recurring task fields when task is created with recurring
-export async function initializeRecurringTask(
-  taskId: string,
-  recurringMonths: number,
-  dueDate: Date,
-) {
-  const currentPeriodStart = new Date();
+/**
+ * Seed the recurring/scheduling fields right after a task is created.
+ *
+ * `nextDueDate` is the deadline of the upcoming occurrence, and the rule is the
+ * same one the cron uses when it rolls a task forward: the occurrence starts on
+ * the trigger date and the service (task category) grants `timePeriod` days to
+ * finish it. Computing it here from the stored triggerDate + timePeriod rather
+ * than from the form's dueDate keeps the value correct from creation instead of
+ * only after the first cron run — the create form derives its dueDate from
+ * *today* + timePeriod and clears the trigger date when the category changes, so
+ * the submitted dueDate is not the trigger-based deadline for retainership
+ * tasks that are scheduled to start later.
+ *
+ * Falls back to the task's own dueDate when there is no trigger date (a one-off
+ * task that starts immediately), and leaves the deadline at the trigger date
+ * when the category carries no timePeriod.
+ */
+export async function initializeRecurringTask(taskId: string) {
+  const task = await prisma.task.findUnique({
+    where: { id: taskId },
+    include: { category: { select: { timePeriod: true } } },
+  });
+
+  if (!task) return null;
+
+  const periodStart = task.triggerDate ?? task.dueDate;
+  if (!periodStart) return null;
+
+  const nextDueDate = new Date(periodStart);
+  if (task.category?.timePeriod) {
+    nextDueDate.setDate(
+      nextDueDate.getDate() + Number(task.category.timePeriod),
+    );
+  }
 
   const updatedTask = await prisma.task.update({
     where: { id: taskId },
     data: {
-      currentPeriodStart: currentPeriodStart as Date,
-      nextDueDate: dueDate as Date,
+      currentPeriodStart: new Date(periodStart),
+      nextDueDate,
     },
   });
 
   console.log(
-    `🔄 Initialized recurring task. First due: ${dueDate.toISOString()}`,
+    `🔄 Initialized task schedule. Next due: ${nextDueDate.toISOString()}`,
   );
   return updatedTask;
 }

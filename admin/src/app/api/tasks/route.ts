@@ -60,8 +60,18 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const recurringValue =
+    // The interval and its unit are only meaningful together -- a task saved
+    // with one but not the other is skipped by the recurring cron, so neither
+    // is stored unless both arrived.
+    const parsedInterval =
       recurring && recurring !== "0" ? parseInt(recurring) : null;
+    const normalizedRecurringType =
+      typeof recurringType === "string" && recurringType.trim()
+        ? recurringType.trim().toUpperCase()
+        : null;
+    const recurringValue =
+      parsedInterval && normalizedRecurringType ? parsedInterval : null;
+    const recurringTypeValue = recurringValue ? normalizedRecurringType : null;
     const taskDueDate = dueDate ? new Date(dueDate) : null;
     const taskTriggerDate = triggerDate ? new Date(triggerDate) : null;
 
@@ -80,7 +90,7 @@ export async function POST(req: NextRequest) {
         categoryId: categoryId || undefined,
         legislationId: legislationId || null, // Save legislationId
         recurring: recurringValue, // Save recurring field
-        recurringType,
+        recurringType: recurringTypeValue,
         followUpDuration: followUpDuration || "Working",
         statusCheckDuration: statusCheckDuration || "48hr",
         active,
@@ -115,19 +125,15 @@ export async function POST(req: NextRequest) {
       })),
     });
 
-    // Initialize recurring fields if this is a recurring task
-    if (recurringValue && dueDate) {
-      try {
-        const { initializeRecurringTask } =
-          await import("@/lib/singleTaskRecurring");
-        await initializeRecurringTask(
-          newTask.id,
-          recurringValue,
-          new Date(dueDate),
-        );
-      } catch (error) {
-        console.error("Error initializing recurring task:", error);
-      }
+    // Seed the schedule fields for every task, not only recurring ones: a
+    // one-off task still shows a Next Due Date, and leaving it null there was
+    // why retainership tasks displayed a blank deadline until the first cron run.
+    try {
+      const { initializeRecurringTask } =
+        await import("@/lib/singleTaskRecurring");
+      await initializeRecurringTask(newTask.id);
+    } catch (error) {
+      console.error("Error initializing task schedule:", error);
     }
 
     return NextResponse.json(newTask, { status: 201 });

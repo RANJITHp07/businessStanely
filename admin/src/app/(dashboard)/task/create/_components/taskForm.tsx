@@ -1540,7 +1540,10 @@ export default function TaskForm() {
                             cat => cat.id === formData.categoryId
                           );
 
-                          const timePeriod = selectedCategory?.timePeriod || 7; // default 7 days
+                          // No invented default: the server leaves the deadline on
+                          // the trigger date when the service grants no days, so a
+                          // 7-day fallback here would preview a date it never writes.
+                          const timePeriod = selectedCategory?.timePeriod || 0;
 
                           // End date = triggerDate + timePeriod
                           const endDate = new Date(startDate);

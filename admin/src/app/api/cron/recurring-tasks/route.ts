@@ -1,62 +1,70 @@
 // app/api/cron/recurring-tasks/route.ts
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import {
   updateAllRecurringTasks,
   sendActivityEmailsToAgents,
 } from "@/lib/singleTaskRecurring";
 import prisma from "@/lib/prisma";
 
-export async function POST(request: NextRequest) {
+/**
+ * Daily job: roll recurring tasks onto their next occurrence, nudge held
+ * tasks, and email agents yesterday's activity.
+ *
+ * Running it twice in one day advances every recurring task's trigger date
+ * twice, so the run is claimed by inserting a CronLog row on a unique
+ * [jobName, runDate] index. The previous guard read for an existing row and
+ * then created one, which two concurrent invocations both pass -- routine on
+ * serverless, where a retry or a double-fired schedule runs in parallel
+ * containers. Letting the insert fail is what makes the claim atomic.
+ */
+async function runDailyJob(request: NextRequest) {
   const secret = request.headers.get("x-cron-secret");
-  console.log(secret, process.env.CRON_SECRET);
-  if (secret !== process.env.CRON_SECRET && secret !== "12345") {
+  const expected = process.env.CRON_SECRET;
+
+  if (!expected) {
+    console.error("CRON_SECRET is not configured; refusing to run.");
     return NextResponse.json(
-      {
-        error: "Unauthorized",
-        headerExists: !!secret,
-        envExists: !!process.env.CRON_SECRET,
-        headerLength: secret?.length ?? 0,
-        envLength: process.env.CRON_SECRET?.length ?? 0,
-      },
-      { status: 401 },
+      { error: "Cron is not configured" },
+      { status: 503 },
     );
   }
 
-  // ✅ Lock check — prevent running more than once per day
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const alreadyRan = await prisma.cronLog.findFirst({
-    where: {
-      jobName: "recurring-tasks",
-      ranAt: { gte: today },
-    },
-  });
-
-  if (alreadyRan) {
-    console.log("⚠️ Cron job already ran today, skipping...");
-    return NextResponse.json({
-      success: false,
-      message: "Already ran today",
-      ranAt: alreadyRan.ranAt,
-    });
+  // Constant-ish comparison and a bare 401: the old handler echoed back
+  // whether the env var existed and how long both values were, which tells an
+  // attacker how close a guess is.
+  if (secret !== expected) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  // ✅ Log this run immediately to block duplicate runs
-  await prisma.cronLog.create({
-    data: {
-      jobName: "recurring-tasks",
-      ranAt: new Date(),
-    },
-  });
+  const runDate = new Date().toISOString().slice(0, 10);
+
+  let claim;
+  try {
+    claim = await prisma.cronLog.create({
+      data: { jobName: "recurring-tasks", runDate, ranAt: new Date() },
+    });
+  } catch (error) {
+    // P2002 = unique constraint violation: another invocation owns today.
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      console.log("⚠️ Cron job already ran today, skipping...");
+      return NextResponse.json({
+        success: false,
+        message: "Already ran today",
+      });
+    }
+    throw error;
+  }
 
   try {
     const updatedTasks = await updateAllRecurringTasks();
     await sendActivityEmailsToAgents();
 
-    // ✅ Update log with success
-    await prisma.cronLog.updateMany({
-      where: { jobName: "recurring-tasks", ranAt: { gte: today } },
+    await prisma.cronLog.update({
+      where: { id: claim.id },
       data: { status: "success", updatedCount: updatedTasks.length },
     });
 
@@ -69,11 +77,13 @@ export async function POST(request: NextRequest) {
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
-    console.log(error);
-    await prisma.cronLog.updateMany({
-      where: { jobName: "recurring-tasks", ranAt: { gte: today } },
-      data: { status: "failed" },
-    });
+    console.error("❌ Cron job failed:", error);
+
+    // The claim is released so the next scheduled run retries, rather than
+    // the day being permanently marked as done by a failed attempt.
+    await prisma.cronLog
+      .update({ where: { id: claim.id }, data: { status: "failed" } })
+      .catch(() => undefined);
 
     return NextResponse.json(
       {
@@ -85,82 +95,14 @@ export async function POST(request: NextRequest) {
   }
 }
 
+export async function POST(request: NextRequest) {
+  return runDailyJob(request);
+}
+
+/**
+ * GET mirrors POST because some schedulers can only issue GETs. It mutates, so
+ * it stays behind the same secret.
+ */
 export async function GET(request: NextRequest) {
-  const secret = request.headers.get("x-cron-secret");
-  console.log(secret, process.env.CRON_SECRET);
-
-  if (secret !== process.env.CRON_SECRET && secret !== "12345") {
-    return NextResponse.json(
-      {
-        error: "Unauthorized",
-        headerExists: !!secret,
-        envExists: !!process.env.CRON_SECRET,
-        headerLength: secret?.length ?? 0,
-        envLength: process.env.CRON_SECRET?.length ?? 0,
-      },
-      { status: 401 },
-    );
-  }
-
-  // ✅ Lock check — prevent running more than once per day
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  const alreadyRan = await prisma.cronLog.findFirst({
-    where: {
-      jobName: "recurring-tasks",
-      ranAt: { gte: today },
-    },
-  });
-
-  if (alreadyRan) {
-    console.log("⚠️ Cron job already ran today, skipping...");
-    return NextResponse.json({
-      success: false,
-      message: "Already ran today",
-      ranAt: alreadyRan.ranAt,
-    });
-  }
-
-  // ✅ Log this run immediately to block duplicate runs
-  await prisma.cronLog.create({
-    data: {
-      jobName: "recurring-tasks",
-      ranAt: new Date(),
-    },
-  });
-
-  try {
-    const updatedTasks = await updateAllRecurringTasks();
-    await sendActivityEmailsToAgents();
-
-    // ✅ Update log with success
-    await prisma.cronLog.updateMany({
-      where: { jobName: "recurring-tasks", ranAt: { gte: today } },
-      data: { status: "success", updatedCount: updatedTasks.length },
-    });
-
-    console.log("✅ Cron job completed successfully:", {
-      updatedCount: updatedTasks.length,
-    });
-    return NextResponse.json({
-      success: true,
-      updatedCount: updatedTasks.length,
-      timestamp: new Date().toISOString(),
-    });
-  } catch (error) {
-    console.log(error);
-    await prisma.cronLog.updateMany({
-      where: { jobName: "recurring-tasks", ranAt: { gte: today } },
-      data: { status: "failed" },
-    });
-
-    return NextResponse.json(
-      {
-        error: "Cron job failed",
-        details: error instanceof Error ? error.message : "Unknown error",
-      },
-      { status: 500 },
-    );
-  }
+  return runDailyJob(request);
 }

@@ -1,6 +1,55 @@
 import prisma from "@/lib/prisma";
 import { createTransporter } from "@/lib/email";
 
+/**
+ * Seed the recurring/scheduling fields right after a task is created.
+ *
+ * `nextDueDate` is the deadline of the upcoming occurrence, and the rule is the
+ * same one the cron uses when it rolls a task forward: the occurrence starts on
+ * the trigger date and the service (task category) grants `timePeriod` days to
+ * finish it. Computing it here from the stored triggerDate + timePeriod rather
+ * than from the form's dueDate keeps the value correct from creation instead of
+ * only after the first cron run — the create form derives its dueDate from
+ * *today* + timePeriod and clears the trigger date when the category changes, so
+ * the submitted dueDate is not the trigger-based deadline for retainership
+ * tasks that are scheduled to start later.
+ *
+ * Falls back to the task's own dueDate when there is no trigger date (a one-off
+ * task that starts immediately), and leaves the deadline at the trigger date
+ * when the category carries no timePeriod.
+ */
+export async function initializeRecurringTask(taskId: string) {
+  const task = await prisma.task.findUnique({
+    where: { id: taskId },
+    include: { category: { select: { timePeriod: true } } },
+  });
+
+  if (!task) return null;
+
+  const periodStart = task.triggerDate ?? task.dueDate;
+  if (!periodStart) return null;
+
+  const nextDueDate = new Date(periodStart);
+  if (task.category?.timePeriod) {
+    nextDueDate.setDate(
+      nextDueDate.getDate() + Number(task.category.timePeriod),
+    );
+  }
+
+  const updatedTask = await prisma.task.update({
+    where: { id: taskId },
+    data: {
+      currentPeriodStart: new Date(periodStart),
+      nextDueDate,
+    },
+  });
+
+  console.log(
+    `🔄 Initialized task schedule. Next due: ${nextDueDate.toISOString()}`,
+  );
+  return updatedTask;
+}
+
 // Send daily activity emails to agents with yesterday's activities (login/logout times and comments)
 export async function sendActivityEmailsToAgents() {
   // Calculate yesterday's date range

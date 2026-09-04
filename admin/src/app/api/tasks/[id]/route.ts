@@ -112,6 +112,9 @@ export async function PUT(
             recurringValue && recurringValue !== "0"
               ? parseInt(recurringValue)
               : null;
+        } else if (key === "recurringType") {
+          // Handled after the loop, together with `recurring`.
+          continue;
         } else if (key === "dueDate" || key === "triggerDate") {
           const dateValue = body[key] as string | null;
           data[key] = dateValue ? new Date(dateValue) : null;
@@ -119,6 +122,38 @@ export async function PUT(
           data[key] = body[key];
         } else {
           data[key] = body[key];
+        }
+      }
+    }
+
+    // `recurring` (the interval) and `recurringType` (its unit) only mean
+    // something as a pair: the cron reads one to size the other. Writing them
+    // independently let "No Recurring" null the interval while a stale
+    // "MONTH" stayed behind, which froze the task's trigger date, and let an
+    // interval survive with no unit, which the cron then treated as months.
+    // Clearing one clears both, and setting one requires the other.
+    if (data.recurring !== undefined || body.recurringType !== undefined) {
+      const clearedByInterval =
+        data.recurring !== undefined && data.recurring === null;
+      const type =
+        body.recurringType === undefined
+          ? currentTask.recurringType
+          : body.recurringType;
+      const normalizedType =
+        typeof type === "string" && type.trim() ? type.trim().toUpperCase() : null;
+
+      if (clearedByInterval || !normalizedType) {
+        data.recurring = null;
+        data.recurringType = null;
+      } else {
+        const interval =
+          data.recurring !== undefined ? data.recurring : currentTask.recurring;
+        if (interval === null || interval === undefined) {
+          data.recurring = null;
+          data.recurringType = null;
+        } else {
+          data.recurring = interval;
+          data.recurringType = normalizedType;
         }
       }
     }
@@ -154,10 +189,29 @@ export async function PUT(
     ) {
       data.lastCompletedDate = null;
     }
-    const updatedTask = await prisma.task.update({
+    let updatedTask = await prisma.task.update({
       where: { id },
       data,
     });
+
+    // The next deadline is derived from triggerDate + the service's timePeriod,
+    // so editing either side of that formula has to recompute it. Without this
+    // an edited task keeps the deadline of its old trigger date or old service
+    // until the cron next rolls it forward.
+    if (
+      body.triggerDate !== undefined ||
+      body.dueDate !== undefined ||
+      body.categoryId !== undefined
+    ) {
+      try {
+        const { initializeRecurringTask } =
+          await import("@/lib/singleTaskRecurring");
+        const rescheduled = await initializeRecurringTask(id);
+        if (rescheduled) updatedTask = rescheduled;
+      } catch (error) {
+        console.error("Error recalculating task schedule:", error);
+      }
+    }
 
     // Upsert daily duration audit entries
     const today = new Date().toISOString().slice(0, 10);

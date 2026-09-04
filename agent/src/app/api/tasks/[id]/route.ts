@@ -249,6 +249,10 @@ export async function PUT(
         status: true,
         followUpDuration: true,
         statusCheckDuration: true,
+        // Needed to keep the recurring interval/unit pair in sync when only
+        // one of the two arrives in the request body.
+        recurring: true,
+        recurringType: true,
       },
     });
     if (!task) {
@@ -327,13 +331,37 @@ export async function PUT(
     if (body.status === "Hold" && task.dueDate) {
       updateData.holdDate = new Date();
     }
-    // Handle recurring field conversion
-    if (updateData.recurring) {
-      const recurringValue = updateData.recurring as string;
-      updateData.recurring =
-        recurringValue && recurringValue !== "0"
-          ? parseInt(recurringValue)
+    // `recurring` (the interval) and `recurringType` (its unit) only mean
+    // something as a pair: the cron reads one to size the other. Writing them
+    // independently let "No Recurring" null the interval while a stale
+    // "MONTH" stayed behind, which froze the task's trigger date, and let an
+    // interval survive with no unit, which the cron then treated as months.
+    // Clearing one clears both, and setting one requires the other.
+    if (updateData.recurring !== undefined || updateData.recurringType !== undefined) {
+      const rawInterval = updateData.recurring;
+      const interval =
+        rawInterval === undefined
+          ? task.recurring
+          : rawInterval && rawInterval !== "0"
+            ? parseInt(rawInterval as string)
+            : null;
+
+      const rawType =
+        updateData.recurringType === undefined
+          ? task.recurringType
+          : updateData.recurringType;
+      const normalizedType =
+        typeof rawType === "string" && rawType.trim()
+          ? rawType.trim().toUpperCase()
           : null;
+
+      if (interval === null || interval === undefined || !normalizedType) {
+        updateData.recurring = null;
+        updateData.recurringType = null;
+      } else {
+        updateData.recurring = interval;
+        updateData.recurringType = normalizedType;
+      }
     }
 
     if (!updateData.triggerDate) {
@@ -384,6 +412,28 @@ export async function PUT(
         },
       },
     });
+
+    // The next deadline is derived from triggerDate + the service's timePeriod,
+    // so editing either side of that formula has to recompute it. The recomputed
+    // fields are copied back onto the response rather than replacing it, since
+    // this handler returns the task with its relations included.
+    if (
+      body.triggerDate !== undefined ||
+      body.dueDate !== undefined ||
+      body.categoryId !== undefined
+    ) {
+      try {
+        const { initializeRecurringTask } =
+          await import("@/lib/singleTaskRecurring");
+        const rescheduled = await initializeRecurringTask(taskId);
+        if (rescheduled) {
+          updatedTask.nextDueDate = rescheduled.nextDueDate;
+          updatedTask.currentPeriodStart = rescheduled.currentPeriodStart;
+        }
+      } catch (error) {
+        console.error("Error recalculating task schedule:", error);
+      }
+    }
 
     // Upsert daily duration audit entries
     const today = new Date().toISOString().slice(0, 10);

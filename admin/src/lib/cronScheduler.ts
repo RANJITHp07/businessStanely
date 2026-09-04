@@ -20,7 +20,7 @@ class InternalCronScheduler {
     // Stop existing task if any
     this.stopTask(taskName);
 
-    // Schedule to run daily at 9:00 AM UTC
+    // Schedule to run daily at 2:00 AM UTC
     const task = cron.schedule(
       "0 2 * * *",
       async () => {
@@ -55,7 +55,7 @@ class InternalCronScheduler {
     this.scheduledTasks.set(taskName, task);
 
     console.log(
-      `🚀 Recurring tasks and hold tasks cron scheduler started (daily at 9:00 AM UTC)`,
+      `🚀 Recurring tasks and hold tasks cron scheduler started (daily at 2:00 AM UTC)`,
     );
     return task;
   }

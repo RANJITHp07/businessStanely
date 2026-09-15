@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useCallback, useState, useEffect } from "react";
 import { fetchWithAuth } from "@/lib/fetchWithAuth";
 import Link from "next/link";
 import { toast } from "react-toastify";
@@ -69,6 +69,22 @@ import {
 import { useRouter } from "next/navigation";
 import { useTablePage } from "@/hooks/useTablePage";
 
+/** Row shape returned by /api/deleted-retainerships. */
+interface DeletedRetainership {
+  id: string;
+  name: string;
+  description: string;
+  color: string;
+  status: string;
+  createdAt: string;
+  deletedAt: string;
+  deletedByType?: string | null;
+  deletedBy?: string | null;
+  client?: { id: string; name: string } | null;
+  legislationCount: number;
+  taskCount: number;
+}
+
 export default function RetainershipTable() {
   const [retainerships, setRetainerships] = useState<Retainership[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -103,6 +119,14 @@ export default function RetainershipTable() {
   // State to store all retainerships for counting
   const [allRetainerships, setAllRetainerships] = useState<Retainership[]>([]);
 
+  // Soft-deleted retainerships. They are invisible to /api/retainerships by
+  // design, so they come from their own route rather than being filtered out of
+  // the list above.
+  const [deletedRetainerships, setDeletedRetainerships] = useState<
+    DeletedRetainership[]
+  >([]);
+  const [deletedLoading, setDeletedLoading] = useState(true);
+
   // Fetch all retainerships for counting tabs
   useEffect(() => {
     const fetchAllRetainerships = async () => {
@@ -122,6 +146,29 @@ export default function RetainershipTable() {
     };
     fetchAllRetainerships();
   }, []);
+
+  // Fetch soft-deleted retainerships for the Deleted tab. Hoisted out of the
+  // effect so a delete on this page can refresh the tab without a reload.
+  const fetchDeletedRetainerships = useCallback(async () => {
+    try {
+      const response = await fetchWithAuth(`/api/deleted-retainerships`);
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch deleted retainerships");
+      }
+
+      setDeletedRetainerships(await response.json());
+    } catch (error) {
+      console.error("Error fetching deleted retainerships:", error);
+      setDeletedRetainerships([]);
+    } finally {
+      setDeletedLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchDeletedRetainerships();
+  }, [fetchDeletedRetainerships]);
 
   useEffect(() => {
     const fetchRetainerships = async () => {
@@ -222,6 +269,8 @@ export default function RetainershipTable() {
         )
       );
       setRetainershipToDelete(null);
+      // The row moves into the Deleted tab, so that list is now stale.
+      fetchDeletedRetainerships();
       toast.success("Retainership deleted successfully");
     } catch (error) {
       console.error("Error deleting retainership:", error);
@@ -240,6 +289,20 @@ export default function RetainershipTable() {
   const pendingCount = allRetainerships.filter(
     (cat) => cat.status === "pending"
   ).length;
+  const deletedCount = deletedRetainerships.length;
+
+  // The Deleted tab has its own list, so it reuses the search box but not the
+  // status-based filtering above.
+  const filteredDeletedRetainerships = deletedRetainerships.filter(
+    (retainership) => {
+      const term = searchTerm.toLowerCase();
+      return (
+        retainership.name.toLowerCase().includes(term) ||
+        (retainership.description?.toLowerCase() || "").includes(term) ||
+        (retainership.client?.name?.toLowerCase() || "").includes(term)
+      );
+    }
+  );
 
   return (
     <div className="container mx-auto p-6 max-w-7xl">
@@ -320,7 +383,7 @@ export default function RetainershipTable() {
         onValueChange={setActiveTab}
         className="space-y-6"
       >
-        <TabsList className="grid w-full grid-cols-2">
+        <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="approved" className="flex items-center gap-2">
             <CheckCircle className="h-4 w-4" />
             Approved Retainerships ({approvedCount})
@@ -328,6 +391,10 @@ export default function RetainershipTable() {
           <TabsTrigger value="pending" className="flex items-center gap-2">
             <Clock className="h-4 w-4" />
             Pending Retainerships ({pendingCount})
+          </TabsTrigger>
+          <TabsTrigger value="deleted" className="flex items-center gap-2">
+            <Trash2 className="h-4 w-4" />
+            Deleted Retainerships ({deletedCount})
           </TabsTrigger>
         </TabsList>
 
@@ -936,6 +1003,132 @@ export default function RetainershipTable() {
                   )}
                 </CardContent>
               </>
+            )}
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="deleted">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <Trash2 className="h-5 w-5" />
+                  Deleted Retainerships ({filteredDeletedRetainerships.length})
+                </CardTitle>
+              </div>
+              <CardDescription>
+                Deleting a retainership hides it and its legislation. Tasks are
+                left live and keep their link.
+              </CardDescription>
+            </CardHeader>
+            {deletedLoading ? (
+              <div className="flex justify-center items-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : (
+              <CardContent>
+                <div className="rounded-md border overflow-x-auto">
+                  <Table className="table-fixed min-w-[920px]">
+                    <colgroup>
+                      <col className="w-[300px]" />
+                      <col className="w-[240px]" />
+                      <col className="w-[120px]" />
+                      <col className="w-[100px]" />
+                      <col className="w-[220px]" />
+                      <col className="w-[90px]" />
+                    </colgroup>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Retainership</TableHead>
+                        <TableHead>Client</TableHead>
+                        <TableHead>Legislation</TableHead>
+                        <TableHead>Tasks</TableHead>
+                        <TableHead>Deleted</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredDeletedRetainerships.length === 0 ? (
+                        <TableRow>
+                          <TableCell
+                            colSpan={6}
+                            className="text-center py-8 text-muted-foreground"
+                          >
+                            No deleted retainerships found matching your
+                            criteria.
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        filteredDeletedRetainerships.map((retainership) => (
+                          <TableRow
+                            key={retainership.id}
+                            className="cursor-pointer hover:bg-muted/50"
+                            onClick={() =>
+                              router.push(
+                                `/deleted-retainership/${retainership.id}`
+                              )
+                            }
+                          >
+                            <TableCell className="overflow-hidden">
+                              <div className="font-medium truncate">
+                                {retainership.name.charAt(0).toUpperCase() +
+                                  retainership.name.slice(1)}
+                              </div>
+                              <div
+                                className="text-sm text-muted-foreground truncate"
+                                title={retainership.description || ""}
+                              >
+                                {retainership.description || "-"}
+                              </div>
+                            </TableCell>
+                            <TableCell className="overflow-hidden">
+                              <div className="text-sm truncate">
+                                {retainership.client?.name || "-"}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-sm">
+                              {retainership.legislationCount}
+                            </TableCell>
+                            <TableCell className="text-sm">
+                              {retainership.taskCount}
+                            </TableCell>
+                            <TableCell className="overflow-hidden">
+                              <div className="text-sm">
+                                {new Date(
+                                  retainership.deletedAt
+                                ).toLocaleDateString()}
+                              </div>
+                              {retainership.deletedBy && (
+                                <div className="text-xs text-muted-foreground truncate">
+                                  by {retainership.deletedBy}
+                                  {retainership.deletedByType === "AGENT" &&
+                                    " (Agent)"}
+                                </div>
+                              )}
+                            </TableCell>
+                            <TableCell
+                              className="text-right"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() =>
+                                  router.push(
+                                    `/deleted-retainership/${retainership.id}`
+                                  )
+                                }
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
             )}
           </Card>
         </TabsContent>

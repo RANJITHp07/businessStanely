@@ -1,6 +1,7 @@
 "use client"
-import { fetchWithAuth } from "@/lib/fetchWithAuth";
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
+import { fetchWithAuth } from "@/lib/fetchWithAuth"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -9,7 +10,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Loader2 } from "lucide-react"
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -18,12 +18,10 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import {
-    Users,
-    Plus,
     Search,
     Filter,
     MoreHorizontal,
-    Edit,
+    Eye,
     ChevronLeft,
     ChevronRight,
     ChevronsLeft,
@@ -32,109 +30,88 @@ import {
     Building2,
     Phone,
     Mail,
+    Trash2,
 } from "lucide-react"
 import Link from "next/link"
-
-
-const clientTypes = ["All Types", "Individual", "Organization"]
-const statusOptions = ["All Status", "Active", "Inactive"]
-const communicationPreferences = ["All Communication", "Email", "Phone", "SMS", "Mail", "In-Person"]
-const entityTypes = ["All Entity Types", "Corporation", "LLC", "Partnership", "Sole Proprietorship", "Non-Profit"]
-
-import { Client } from "@/types";
-import { useRouter } from "next/navigation"
 import { useTablePage } from "@/hooks/useTablePage"
 
-export default function ClientsTable() {
-    const [clients, setClients] = useState<Client[]>([]);
+const clientTypes = ["All Types", "Individual", "Organization"]
+const entityTypes = ["All Entity Types", "Corporation", "LLC", "Partnership", "Sole Proprietorship", "Non-Profit"]
+
+interface DeletedClient {
+    id: string
+    clientType: string
+    email: string
+    phoneNumber: string
+    firstName?: string | null
+    lastName?: string | null
+    gender?: string | null
+    organizationName?: string | null
+    authorizedPersonName?: string | null
+    entityType?: string | null
+    name: string
+    deletedAt: string
+    deletedByType?: string | null
+    taskCount: number
+    retainershipCount: number
+}
+
+export default function DeletedClientsPage() {
+    const [clients, setClients] = useState<DeletedClient[]>([])
     const [searchTerm, setSearchTerm] = useState("")
     const [selectedType, setSelectedType] = useState("All Types")
-    const [selectedStatus, setSelectedStatus] = useState("All Status")
-    const [selectedCommunication, setSelectedCommunication] = useState("All Communication")
     const [selectedEntityType, setSelectedEntityType] = useState("All Entity Types")
-    const { currentPage, setCurrentPage, itemsPerPage, setItemsPerPage, clampToTotalPages } =
-        useTablePage("agent-dashboard-client-_component-clientTable")
     const [loading, setLoading] = useState(true)
+    const { currentPage, setCurrentPage, itemsPerPage, setItemsPerPage, clampToTotalPages } =
+        useTablePage("admin-dashboard-deleted-client")
 
     const router = useRouter()
 
-    const getStatusBadge = (status: string, count: number) => {
-        return (
-            <Badge key={status} className="bg-gray-200 text-black">
-                {status.charAt(0).toUpperCase() + status.slice(1)}: {count}
-            </Badge>
-        );
-    };
-
     useEffect(() => {
-        const fetchClients = async () => {
+        const fetchDeletedClients = async () => {
             try {
-                const response = await fetchWithAuth('/api/clients');
+                const response = await fetchWithAuth("/api/deleted-clients")
                 if (response.ok) {
-                    const data = await response.json();
-                    setClients(data);
+                    setClients(await response.json())
                 } else {
-                    console.error("Failed to fetch clients");
+                    console.error("Failed to fetch deleted clients")
                 }
             } catch (error) {
-                console.error("Error fetching clients:", error);
+                console.error("Error fetching deleted clients:", error)
             } finally {
-                setLoading(false);
+                setLoading(false)
             }
-        };
+        }
 
-        fetchClients();
-    }, []);
+        fetchDeletedClients()
+    }, [])
 
-    // Sort function
-    const sortClients = (clients: Client[], sortBy: string) => {
-        return [...clients].sort((a, b) => {
-            if (sortBy === "a-z") {
-                const nameA = a.clientType === "individual" ? `${a.firstName} ${a.lastName}` : a.organizationName || '';
-                const nameB = b.clientType === "individual" ? `${b.firstName} ${b.lastName}` : b.organizationName || '';
-                return nameA.localeCompare(nameB);
-            } else if (sortBy === "z-a") {
-                const nameA = a.clientType === "individual" ? `${a.firstName} ${a.lastName}` : a.organizationName || '';
-                const nameB = b.clientType === "individual" ? `${b.firstName} ${b.lastName}` : b.organizationName || '';
-                return nameB.localeCompare(nameA);
-            }
-
-            return 0;
-        });
-    }
-
-    // Filter clients based on search and filters
     const filteredClients = clients.filter((client) => {
-        const clientName =
-            client.clientType === "individual" ? `${client.firstName} ${client.lastName}` : client.organizationName
-
+        const name = getClientDisplayName(client) || ""
         const matchesSearch =
-            (clientName && clientName.toLowerCase().includes(searchTerm.toLowerCase())) ||
-            (client.email && client.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
-            (client.phoneNumber && client.phoneNumber.toLowerCase().includes(searchTerm.toLowerCase())) ||
-            (client.address && client.address.toLowerCase().includes(searchTerm.toLowerCase()))
+            name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            client.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (client.phoneNumber || "").toLowerCase().includes(searchTerm.toLowerCase())
 
-        const matchesType = selectedType === "All Types" || client.clientType === selectedType.toLowerCase()
+        const matchesType =
+            selectedType === "All Types" || client.clientType.toLowerCase() === selectedType.toLowerCase()
 
-        const matchesCommunication =
-            selectedCommunication === "All Communication" ||
-            (client.preferredCommunication && client.preferredCommunication.toLowerCase() === selectedCommunication.toLowerCase())
+        const matchesEntity =
+            selectedEntityType === "All Entity Types" ||
+            (client.entityType && client.entityType.toLowerCase() === selectedEntityType.toLowerCase())
 
-        return matchesSearch && matchesType && matchesCommunication
+        return matchesSearch && matchesType && matchesEntity
     })
 
-    // Apply sorting to filtered clients
-    const sortedClients = sortClients(filteredClients, "a-z")
-
-    // Pagination logic
-    const totalPages = Math.ceil(sortedClients.length / itemsPerPage)
+    // Newest deletion first, which is the order the API already returns.
+    const totalPages = Math.ceil(filteredClients.length / itemsPerPage)
 
     useEffect(() => {
         clampToTotalPages(totalPages)
     }, [totalPages, clampToTotalPages])
     const startIndex = (currentPage - 1) * itemsPerPage
     const endIndex = startIndex + itemsPerPage
-    const currentClients = sortedClients.slice(startIndex, endIndex)
+    const currentClients = filteredClients.slice(startIndex, endIndex)
 
     const handlePageChange = (page: number) => {
         setCurrentPage(page)
@@ -146,13 +123,20 @@ export default function ClientsTable() {
     }
 
     const resetFilters = () => {
-        setSearchTerm("");
-        setSelectedType("All Types");
-        setSelectedStatus("All Status");
-        setSelectedCommunication("All Communication")
+        setSearchTerm("")
+        setSelectedType("All Types")
         setSelectedEntityType("All Entity Types")
-    };
+    }
 
+    const handleRowClick = (client: DeletedClient) => {
+        router.push(`/deleted-client/${client.id}`)
+    }
+
+    function getClientDisplayName(client: DeletedClient) {
+        return client.clientType === "individual"
+            ? `${client.firstName ?? ""} ${client.lastName ?? ""}`.trim()
+            : client.organizationName
+    }
 
     const getClientTypeBadge = (type: string) => {
         const colors = {
@@ -173,39 +157,37 @@ export default function ClientsTable() {
         )
     }
 
-    const getCommunicationBadge = (communication: string) => {
-        const colors = {
-            email: "bg-green-100 text-green-800",
-            phone: "bg-blue-100 text-blue-800",
-            sms: "bg-yellow-100 text-yellow-800",
-            mail: "bg-gray-100 text-gray-800",
-            "in-person": "bg-orange-100 text-orange-800",
-        }
-
-        return (
-            <Badge className={colors[communication as keyof typeof colors] || "bg-gray-100 text-gray-800"}>
-                {communication.charAt(0).toUpperCase() + communication.slice(1).replace("-", " ")}
-            </Badge>
-        )
+    const formatDeletedAt = (value: string) => {
+        const date = new Date(value)
+        return Number.isNaN(date.getTime()) ? "—" : date.toLocaleString()
     }
 
-    const getClientDisplayName = (client: Client) => {
-        return client.clientType === "individual" ? `${client.firstName} ${client.lastName}` : client.organizationName
-    }
+    const getInitials = (client: DeletedClient) =>
+        client.clientType === "individual"
+            ? `${client.firstName?.[0] ?? ""}${client.lastName?.[0] ?? ""}`
+            : client.organizationName
+                ?.toUpperCase()
+                ?.split(" ")
+                .map((n) => n[0])
+                .join("")
+                .slice(0, 2)
 
     return (
         <div className="w-full container mx-auto px-3 sm:px-4 md:px-6 py-4 md:py-6 max-w-7xl">
-            <div className="mb-8">
-                <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-6 md:mb-4">
-
+            <div className="mb-6 md:mb-8">
+                <div className="flex flex-col gap-4 md:flex-row md:justify-between md:items-center mb-6">
                     <div>
-                        <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold break-words">Client Management</h1>
-                        <p className="text-sm sm:text-base text-muted-foreground mt-2">Manage and organize your client details</p>
+                        <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold break-words">Deleted Clients</h1>
+                        <p className="text-sm sm:text-base text-muted-foreground mt-2">
+                            Clients that were deleted, along with the tasks and retainerships hidden with them
+                        </p>
                     </div>
-                    <Link href='/client/create' className="w-full md:w-auto">
-                        <Button className="w-full md:w-auto bg-[#003459] hover:bg-[#003459] text-white rounded-lg px-4 py-2 flex items-center gap-2 cursor-pointer shadow-none hover:shadow-md transition-shadow duration-300 justify-center">
-                            <Plus className="h-4 w-4" />
-                            Create Client
+                    <Link href="/client" className="w-full md:w-auto">
+                        <Button
+                            variant="outline"
+                            className="w-full md:w-auto rounded-lg px-4 py-2 flex items-center justify-center gap-2 cursor-pointer"
+                        >
+                            Back to Clients
                         </Button>
                     </Link>
                 </div>
@@ -213,23 +195,21 @@ export default function ClientsTable() {
                 {/* Filters */}
                 <Card>
                     <CardHeader>
-                        <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
-                            <Filter className="h-5 w-5 flex-shrink-0" />
-                            <span className="truncate">Filters & Search</span>
+                        <CardTitle className="flex items-center gap-2">
+                            <Filter className="h-5 w-5" />
+                            Filters & Search
                         </CardTitle>
-                        <CardDescription className="text-xs sm:text-sm">Filter and search through your clients</CardDescription>
+                        <CardDescription>Filter and search through deleted clients</CardDescription>
                     </CardHeader>
-
-
 
                     <CardContent className="space-y-4">
                         {loading ? (
                             <>
                                 <div className="h-[200px] w-full bg-gray-200 rounded-2xl mb-4"></div>
 
-                                <div className="flex justify-between gap-4">
-                                    <div className="h-5 w-1/2 bg-gray-200 rounded-xl mb-3"></div>
-                                    <div className="h-5 w-1/2 bg-gray-200 rounded-xl mb-3"></div>
+                                <div className="flex flex-col md:flex-row justify-between gap-4">
+                                    <div className="h-5 w-full md:w-1/2 bg-gray-200 rounded-xl mb-3"></div>
+                                    <div className="h-5 w-full md:w-1/2 bg-gray-200 rounded-xl mb-3"></div>
                                 </div>
                             </>
                         ) : (
@@ -242,7 +222,7 @@ export default function ClientsTable() {
                                             <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                                             <Input
                                                 id="search"
-                                                placeholder="Search by name, email, phone, or address..."
+                                                placeholder="Search by name, email, phone..."
                                                 value={searchTerm}
                                                 onChange={(e) => setSearchTerm(e.target.value)}
                                                 className="pl-10 text-sm"
@@ -264,40 +244,6 @@ export default function ClientsTable() {
                                                 {clientTypes.map((type) => (
                                                     <SelectItem key={type} value={type} className="text-sm">
                                                         {type}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-
-                                    {/* Status */}
-                                    <div className="space-y-2">
-                                        <Label className="text-sm sm:text-base">Status</Label>
-                                        <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-                                            <SelectTrigger className="w-full text-sm">
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {statusOptions.map((status) => (
-                                                    <SelectItem key={status} value={status} className="text-sm">
-                                                        {status}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-
-                                    {/* Communication */}
-                                    <div className="space-y-2">
-                                        <Label className="text-sm sm:text-base">Communication</Label>
-                                        <Select value={selectedCommunication} onValueChange={setSelectedCommunication}>
-                                            <SelectTrigger className="w-full text-sm">
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {communicationPreferences.map((comm) => (
-                                                    <SelectItem key={comm} value={comm} className="text-sm">
-                                                        {comm}
                                                     </SelectItem>
                                                 ))}
                                             </SelectContent>
@@ -335,37 +281,46 @@ export default function ClientsTable() {
                             </>
                         )}
                     </CardContent>
-
-
-
                 </Card>
             </div>
 
-            {/* Clients Table */}
             <Card>
-                <CardHeader>
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                        <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
-                            <Users className="h-5 w-5 flex-shrink-0" />
-                            <span className="truncate">Clients ({sortedClients.length})</span>
+                {loading ? (
+                    <CardContent className="p-3 sm:p-6">
+                        <div className="h-[300px] w-full bg-gray-200 rounded-2xl"></div>
+                    </CardContent>
+                ) : (<>
+                    <CardHeader>
+                        <CardTitle className="text-lg sm:text-xl flex items-center gap-2">
+                            <Trash2 className="h-5 w-5" />
+                            Deleted Clients ({filteredClients.length})
                         </CardTitle>
-                    </div>
-                </CardHeader>
+                        <CardDescription className="text-sm">
+                            Task and retainership counts are of records hidden together with the client
+                        </CardDescription>
+                    </CardHeader>
 
-
-                {loading ? (<div className="flex justify-center items-center py-8">
-                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                </div>) : (<>
                     <CardContent className="p-3 sm:p-6">
                         {/* Desktop Table View */}
                         <div className="hidden md:block rounded-md border overflow-hidden">
-                            <Table>
+                            <Table className="w-full table-fixed">
+                                <colgroup>
+                                    <col className="w-[26%]" />
+                                    <col className="w-[13%]" />
+                                    <col className="w-[22%]" />
+                                    <col className="w-[8%]" />
+                                    <col className="w-[11%]" />
+                                    <col className="w-[14%]" />
+                                    <col className="w-[6%]" />
+                                </colgroup>
                                 <TableHeader>
                                     <TableRow>
                                         <TableHead className="text-xs sm:text-sm">Client</TableHead>
                                         <TableHead className="text-xs sm:text-sm">Type</TableHead>
                                         <TableHead className="text-xs sm:text-sm">Contact Info</TableHead>
-                                        <TableHead className="text-xs sm:text-sm">Communication</TableHead>
+                                        <TableHead className="text-xs sm:text-sm">Tasks</TableHead>
+                                        <TableHead className="text-xs sm:text-sm">Retainership</TableHead>
+                                        <TableHead className="text-xs sm:text-sm">Deleted</TableHead>
                                         <TableHead className="text-xs sm:text-sm text-right">Actions</TableHead>
                                     </TableRow>
                                 </TableHeader>
@@ -373,36 +328,21 @@ export default function ClientsTable() {
                                 <TableBody>
                                     {currentClients.length === 0 ? (
                                         <TableRow>
-                                            <TableCell colSpan={5} className="text-center py-8 text-sm text-muted-foreground">
-                                                No clients found matching your criteria.
+                                            <TableCell colSpan={7} className="text-center py-8 text-sm text-muted-foreground">
+                                                No deleted clients found matching your criteria.
                                             </TableCell>
                                         </TableRow>
                                     ) : (
                                         currentClients.map((client) => (
-                                            <TableRow className="cursor-pointer hover:bg-muted/50" key={client.id} onClick={() => router.push(`/client/${client.id}/edit`)}>
+                                            <TableRow className="cursor-pointer hover:bg-muted/50" key={client.id} onClick={() => handleRowClick(client)}>
                                                 <TableCell>
-                                                    <div className="flex items-center space-x-3">
+                                                    <div className="flex items-center space-x-3 ">
                                                         <Avatar className="h-10 w-10 flex-shrink-0">
-                                                            <AvatarFallback>
-                                                                {client.clientType === "individual"
-                                                                    ? `${client.firstName?.[0] ?? ''}${client.lastName?.[0] ?? ''}`
-                                                                    : client.organizationName
-                                                                        ?.toUpperCase()
-                                                                        ?.split(" ")
-                                                                        .map((n) => n[0])
-                                                                        .join("")
-                                                                        .slice(0, 2)}
-                                                            </AvatarFallback>
+                                                            <AvatarFallback>{getInitials(client)}</AvatarFallback>
                                                         </Avatar>
                                                         <div className="min-w-0">
-                                                            <div className="font-medium text-sm w-60 truncate">
-                                                                {getClientDisplayName(client)
-                                                                    ? getClientDisplayName(client)!.length > 35
-                                                                        ? getClientDisplayName(client)!.slice(0, 35) + '...'
-                                                                        : getClientDisplayName(client)
-                                                                    : 'N/A'
-                                                                }
-                                                            </div>                                                          <div className="text-xs text-muted-foreground truncate">
+                                                            <div className="font-medium text-sm truncate">{getClientDisplayName(client)}</div>
+                                                            <div className="text-xs text-muted-foreground truncate">
                                                                 {client.clientType === "organization" && client.authorizedPersonName && (
                                                                     <>Contact: {client.authorizedPersonName.charAt(0).toUpperCase() + client?.authorizedPersonName?.slice(1)}</>
                                                                 )}
@@ -426,7 +366,17 @@ export default function ClientsTable() {
                                                         </div>
                                                     </div>
                                                 </TableCell>
-                                                <TableCell>{getCommunicationBadge(client.preferredCommunication || "")}</TableCell>
+                                                <TableCell>
+                                                    <Badge className="bg-gray-200 text-black">{client.taskCount}</Badge>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Badge className="bg-gray-200 text-black">{client.retainershipCount}</Badge>
+                                                </TableCell>
+                                                <TableCell className="text-xs text-muted-foreground">
+                                                    <span className="block truncate" title={formatDeletedAt(client.deletedAt)}>
+                                                        {formatDeletedAt(client.deletedAt)}
+                                                    </span>
+                                                </TableCell>
                                                 <TableCell className="text-right">
                                                     <DropdownMenu>
                                                         <DropdownMenuTrigger asChild>
@@ -437,11 +387,14 @@ export default function ClientsTable() {
                                                         </DropdownMenuTrigger>
                                                         <DropdownMenuContent align="end">
                                                             <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                                            <DropdownMenuItem asChild>
-                                                                <Link href={`/client/${client.id}/edit`}>
-                                                                    <Edit className="mr-2 h-4 w-4" />
-                                                                    Edit Client
-                                                                </Link>
+                                                            <DropdownMenuItem
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation()
+                                                                    router.push(`/deleted-client/${client.id}`)
+                                                                }}
+                                                            >
+                                                                <Eye className="mr-2 h-4 w-4" />
+                                                                View Details
                                                             </DropdownMenuItem>
                                                         </DropdownMenuContent>
                                                     </DropdownMenu>
@@ -454,14 +407,17 @@ export default function ClientsTable() {
                         </div>
 
                         {/* Mobile Table View */}
-                        <div className="md:hidden border rounded-md overflow-x-auto">
-                            <Table>
+                        <div className="md:hidden border rounded-md overflow-hidden">
+                            <Table className="w-full table-fixed">
+                                <colgroup>
+                                    <col className="w-[40%]" />
+                                    <col className="w-[22%]" />
+                                    <col className="w-[26%]" />
+                                    <col className="w-[12%]" />
+                                </colgroup>
                                 <TableHeader>
                                     <TableRow>
-                                        <TableHead className="text-xs">Client</TableHead>
-                                        <TableHead className="text-xs">Type</TableHead>
-                                        <TableHead className="text-xs">Contact</TableHead>
-                                        <TableHead className="text-xs text-right">Actions</TableHead>
+                                        <TableHead className="text-xs">Client</TableHead><TableHead className="text-xs">Type</TableHead><TableHead className="text-xs">Deleted</TableHead><TableHead className="text-xs text-right">Actions</TableHead>
                                     </TableRow>
                                 </TableHeader>
 
@@ -469,51 +425,28 @@ export default function ClientsTable() {
                                     {currentClients.length === 0 ? (
                                         <TableRow>
                                             <TableCell colSpan={4} className="text-center py-8 text-xs text-muted-foreground">
-                                                No clients found matching your criteria.
+                                                No deleted clients found matching your criteria.
                                             </TableCell>
                                         </TableRow>
                                     ) : (
                                         currentClients.map((client) => (
-                                            <TableRow className="cursor-pointer hover:bg-muted/50" key={client.id} onClick={() => router.push(`/client/${client.id}/edit`)}>
+                                            <TableRow className="cursor-pointer hover:bg-muted/50" key={client.id} onClick={() => handleRowClick(client)}>
                                                 <TableCell>
                                                     <div className="flex items-center space-x-2">
                                                         <Avatar className="h-8 w-8 flex-shrink-0">
-                                                            <AvatarFallback className="text-xs">
-                                                                {client.clientType === "individual"
-                                                                    ? `${client.firstName?.[0] ?? ''}${client.lastName?.[0] ?? ''}`
-                                                                    : client.organizationName
-                                                                        ?.toUpperCase()
-                                                                        ?.split(" ")
-                                                                        .map((n) => n[0])
-                                                                        .join("")
-                                                                        .slice(0, 2)}
-                                                            </AvatarFallback>
+                                                            <AvatarFallback className="text-xs">{getInitials(client)}</AvatarFallback>
                                                         </Avatar>
                                                         <div className="min-w-0">
                                                             <div className="font-medium text-xs truncate">{getClientDisplayName(client)}</div>
-                                                            <div className="text-xs text-muted-foreground truncate">
-                                                                {client.clientType === "organization" && client.authorizedPersonName && (
-                                                                    <>Contact: {client.authorizedPersonName.charAt(0).toUpperCase()}{client?.authorizedPersonName?.slice(1)}</>
-                                                                )}
-                                                                {client.clientType === "individual" && client.gender && (
-                                                                    <>{client.gender.charAt(0).toUpperCase() + client.gender.slice(1)}</>
-                                                                )}
-                                                            </div>
+                                                            <div className="text-xs text-muted-foreground truncate">{client.email}</div>
                                                         </div>
                                                     </div>
                                                 </TableCell>
                                                 <TableCell className="text-xs">{getClientTypeBadge(client.clientType)}</TableCell>
-                                                <TableCell>
-                                                    <div className="space-y-0.5">
-                                                        <div className="flex items-center gap-1 text-xs">
-                                                            <Mail className="h-3 w-3 text-muted-foreground flex-shrink-0" />
-                                                            <span className="truncate text-xs">{client.email}</span>
-                                                        </div>
-                                                        <div className="flex items-center gap-1 text-xs">
-                                                            <Phone className="h-3 w-3 text-muted-foreground flex-shrink-0" />
-                                                            <span className="truncate text-xs">{client.phoneNumber}</span>
-                                                        </div>
-                                                    </div>
+                                                <TableCell className="text-xs text-muted-foreground">
+                                                    <span className="block truncate" title={formatDeletedAt(client.deletedAt)}>
+                                                        {formatDeletedAt(client.deletedAt)}
+                                                    </span>
                                                 </TableCell>
                                                 <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                                                     <DropdownMenu>
@@ -526,9 +459,9 @@ export default function ClientsTable() {
                                                         <DropdownMenuContent align="end">
                                                             <DropdownMenuLabel className="text-xs">Actions</DropdownMenuLabel>
                                                             <DropdownMenuItem asChild>
-                                                                <Link href={`/client/${client.id}/edit`}>
-                                                                    <Edit className="mr-2 h-3 w-3" />
-                                                                    <span className="text-xs">Edit Client</span>
+                                                                <Link href={`/deleted-client/${client.id}`}>
+                                                                    <Eye className="mr-2 h-3 w-3" />
+                                                                    <span className="text-xs">View Details</span>
                                                                 </Link>
                                                             </DropdownMenuItem>
                                                         </DropdownMenuContent>
@@ -617,10 +550,6 @@ export default function ClientsTable() {
                         )}
                     </CardContent>
                 </>)}
-
-
-
-
             </Card>
         </div>
     )

@@ -75,6 +75,7 @@ export async function POST(req: NextRequest) {
     // with it, but only those deleted in the same action — anything deleted
     // separately beforehand stays deleted.
     let restoredLegislationCount = 0;
+    let restoredTaskCount = 0;
     if (entityType === "Retainership") {
       const cascaded = await prismaRaw.legislation.updateMany({
         where: { retainershipId: entityId, deletedAt: existing.deletedAt },
@@ -83,11 +84,52 @@ export async function POST(req: NextRequest) {
       restoredLegislationCount = cascaded.count;
     }
 
+    // Restoring a client brings back the tasks, retainerships, legislations and
+    // diary entries cascaded with it, matched on the shared delete timestamp so
+    // anything deleted separately beforehand stays deleted.
+    if (entityType === "Client") {
+      const retainershipIds = (
+        await prismaRaw.retainership.findMany({
+          where: { clientId: entityId, deletedAt: existing.deletedAt },
+          select: { id: true },
+        })
+      ).map((r) => r.id);
+
+      const [tasks] = await prismaRaw.$transaction([
+        prismaRaw.task.updateMany({
+          where: { clientId: entityId, deletedAt: existing.deletedAt },
+          data: restoreData(),
+        }),
+        prismaRaw.retainership.updateMany({
+          where: { clientId: entityId, deletedAt: existing.deletedAt },
+          data: restoreData(),
+        }),
+        prismaRaw.clientDiaryEntry.updateMany({
+          where: { clientId: entityId, deletedAt: existing.deletedAt },
+          data: restoreData(),
+        }),
+      ]);
+
+      if (retainershipIds.length) {
+        const legislations = await prismaRaw.legislation.updateMany({
+          where: {
+            retainershipId: { in: retainershipIds },
+            deletedAt: existing.deletedAt,
+          },
+          data: restoreData(),
+        });
+        restoredLegislationCount = legislations.count;
+      }
+
+      restoredTaskCount = tasks.count;
+    }
+
     await recordDeletionAudit({
       entityType: entityType as AuditEntityType,
       entityId,
       entityName: displayName(existing),
       action: "RESTORE",
+      affectedTaskCount: restoredTaskCount,
       affectedLegislationCount: restoredLegislationCount,
       actor: actorFromAdmin(currentAdmin),
       req,
@@ -96,6 +138,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       message: "Record restored successfully",
       restoredLegislationCount,
+      restoredTaskCount,
     });
   } catch (error) {
     console.error("Error restoring record:", error);

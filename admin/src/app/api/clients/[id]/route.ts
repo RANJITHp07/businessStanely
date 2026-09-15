@@ -9,6 +9,7 @@ import {
   softDeleteData,
 } from "@/lib/audit";
 import { withActor } from "@/lib/auditContext";
+import { NOT_DELETED } from "@/lib/softDelete";
 import { clientDisplayName } from "@/lib/entityNames";
 
 export async function GET(
@@ -120,16 +121,60 @@ export async function DELETE(
     }
 
     const actor = actorFromAdmin(currentAdmin);
+    const deletedAt = new Date();
 
-    await prisma.client.update({
-      where: { id },
-      data: softDeleteData(actor),
-    });
+    // Captured before the cascade, while these rows are still live.
+    const retainershipIds = (
+      await prisma.retainership.findMany({
+        where: { clientId: id },
+        select: { id: true },
+      })
+    ).map((r) => r.id);
+
+    // Soft delete the client together with the work hanging off it. Prisma's
+    // onDelete: Cascade only fires on a real delete, so the cascade is explicit.
+    // Children share the parent's exact `deletedAt`, which is what lets a
+    // restore bring back only the rows deleted in this action.
+    const [, cascadedTasks, cascadedRetainerships, cascadedDiaryEntries] =
+      await prisma.$transaction([
+        prisma.client.update({
+          where: { id },
+          data: softDeleteData(actor, deletedAt),
+        }),
+        prisma.task.updateMany({
+          where: { clientId: id, OR: [...NOT_DELETED.OR] },
+          data: softDeleteData(actor, deletedAt),
+        }),
+        prisma.retainership.updateMany({
+          where: { clientId: id, OR: [...NOT_DELETED.OR] },
+          data: softDeleteData(actor, deletedAt),
+        }),
+        prisma.clientDiaryEntry.updateMany({
+          where: { clientId: id, OR: [...NOT_DELETED.OR] },
+          data: softDeleteData(actor, deletedAt),
+        }),
+      ]);
+
+    // Legislations hang off retainershipId, not clientId, so they need their own
+    // pass. The ids are collected up front rather than filtered through the
+    // `retainership` relation, which is unreliable on MongoDB.
+    const cascadedLegislations = retainershipIds.length
+      ? await prisma.legislation.updateMany({
+          where: {
+            retainershipId: { in: retainershipIds },
+            OR: [...NOT_DELETED.OR],
+          },
+          data: softDeleteData(actor, deletedAt),
+        })
+      : { count: 0 };
 
     await recordDeletionAudit({
       entityType: "Client",
       entityId: id,
       entityName: clientDisplayName(existing),
+      reason: `Cascaded to ${cascadedTasks.count} task(s), ${cascadedRetainerships.count} retainership(s), ${cascadedLegislations.count} legislation(s) and ${cascadedDiaryEntries.count} diary entr(ies)`,
+      affectedTaskCount: cascadedTasks.count,
+      affectedLegislationCount: cascadedLegislations.count,
       actor,
       req,
     });

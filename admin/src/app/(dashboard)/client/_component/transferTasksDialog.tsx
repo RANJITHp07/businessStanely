@@ -273,8 +273,9 @@ export default function TransferTasksDialog({
                     </span>
                     <span className="block text-xs text-muted-foreground">
                       The client is hidden and recoverable. Its {totalTasks}{" "}
-                      task(s) and {totalRetainerships} retainership(s) stay
-                      attached and come back if the client is restored.
+                      task(s) and {totalRetainerships} retainership(s) are
+                      hidden with it, and all come back if the client is
+                      restored.
                     </span>
                   </button>
 

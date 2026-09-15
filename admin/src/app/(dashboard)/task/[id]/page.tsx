@@ -37,6 +37,7 @@ import {
   CheckCircle,
   Send,
   Paperclip,
+  Trash2,
 } from "lucide-react";
 import { format } from "date-fns";
 import { Task, Agent, Comment, TimeLog } from "@/types";
@@ -148,11 +149,17 @@ export default function TaskDetails() {
   const params = useParams();
   const { id } = params;
 
+  // A soft-deleted task is shown for reference only: every control that would
+  // write to it is disabled, since the row is hidden everywhere else.
+  const isDeleted = Boolean((taskData as (Task & { deletedAt?: string | null }) | null)?.deletedAt);
+
   useEffect(() => {
     const fetchTask = async () => {
       if (id) {
         try {
-          const response = await fetch(`/api/tasks/${id}`);
+          // Ask for deleted rows too: a task whose client was deleted is
+          // cascaded, and this page shows it read-only rather than 404ing.
+          const response = await fetch(`/api/tasks/${id}?includeDeleted=true`);
           if (response.ok) {
             const data = await response.json();
             setTaskData(data.task);
@@ -873,7 +880,7 @@ export default function TaskDetails() {
               Comprehensive view of task progress and activity
             </p>
           </div>
-          {taskData.active && < div className="flex justify-end">
+          {taskData.active && !isDeleted && < div className="flex justify-end">
             <Button className="mt-[20px] md:mt-0 w-fit f bg-[#003459] hover:bg-[#003459] text-white rounded-lg px-4 py-2 flex items-center gap-2 cursor-pointer shadow-none hover:shadow-md transition-shadow duration-300">
               <a href={`/task/${id}/edit`} className="flex items-center gap-1">
                 <Edit className="h-4 w-4" />
@@ -882,6 +889,16 @@ export default function TaskDetails() {
             </Button>
           </div>}
         </div>
+
+        {isDeleted && (
+          <div className="mb-4 flex items-start gap-2 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">
+            <Trash2 className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>
+              This task was deleted along with its client, so it is shown for
+              reference only. Editing, commenting and reassigning are disabled.
+            </span>
+          </div>
+        )}
 
         {/* Task Summary Card */}
         <Card>
@@ -949,6 +966,7 @@ export default function TaskDetails() {
                   <Select
                     value={taskData.followUpDuration || "Working"}
                     onValueChange={handleFollowUpDurationChange}
+                    disabled={isDeleted}
                   >
                     <SelectTrigger id="follow-up-duration" className="w-full">
                       <SelectValue placeholder="Working" />
@@ -967,6 +985,7 @@ export default function TaskDetails() {
                   <Select
                     value={taskData.statusCheckDuration || "Working"}
                     onValueChange={handleStatusCheckDurationChange}
+                    disabled={isDeleted}
                   >
                     <SelectTrigger id="status-check-duration" className="w-full">
                       <SelectValue placeholder="Working" />
@@ -1064,7 +1083,7 @@ export default function TaskDetails() {
                         }
                       }}
                       // disabled={!selectedAgentId || isFromRetainership}
-                      disabled={!selectedOwnershipAgentId || isTransferringOwnership}
+                      disabled={isDeleted || !selectedOwnershipAgentId || isTransferringOwnership}
                       className="px-4"
                     >
                       {isTransferringOwnership ? "Transferring Ownership" : "Transfer Ownership"}
@@ -1154,7 +1173,7 @@ export default function TaskDetails() {
                         }
                       }}
                       // disabled={!selectedAgentId || isFromRetainership}
-                      disabled={!selectedAgentId || isReassigning}
+                      disabled={isDeleted || !selectedAgentId || isReassigning}
                       className="px-4"
                     >
                       {isReassigning ? "Reassigning" : "Reassign"}
@@ -1210,6 +1229,7 @@ export default function TaskDetails() {
                       <Select
                         value={taskData.status}
                         onValueChange={handleStatusChange}
+                        disabled={isDeleted}
                       >
                         <SelectTrigger>
                           <SelectValue />
@@ -1597,6 +1617,7 @@ export default function TaskDetails() {
                     <Select
                       value={taskData.followUpDuration || "Working"}
                       onValueChange={handleFollowUpDurationChange}
+                      disabled={isDeleted}
                     >
                       <SelectTrigger id="follow-up-duration" className="w-full">
                         <SelectValue placeholder="Working" />
@@ -1615,6 +1636,7 @@ export default function TaskDetails() {
                     <Select
                       value={taskData.statusCheckDuration || "Working"}
                       onValueChange={handleStatusCheckDurationChange}
+                      disabled={isDeleted}
                     >
                       <SelectTrigger id="status-check-duration" className="w-full">
                         <SelectValue placeholder="Working" />
@@ -1663,7 +1685,7 @@ export default function TaskDetails() {
                     <Textarea
                       placeholder="Add a comment..."
                       value={newComment}
-                      disabled={!taskData.active}
+                      disabled={!taskData.active || isDeleted}
                       onChange={(e) => setNewComment(e.target.value)}
                       rows={3}
                     />
@@ -1675,7 +1697,7 @@ export default function TaskDetails() {
                           onCheckedChange={(checked) =>
                             setIsClientUpdateInteraction(Boolean(checked))
                           }
-                          disabled={!taskData.active}
+                          disabled={!taskData.active || isDeleted}
                         />
                         <Label
                           htmlFor="interaction-client-update"
@@ -1695,7 +1717,7 @@ export default function TaskDetails() {
                         <Label className="text-sm">Work Date</Label>
                         <Popover>
                           <PopoverTrigger asChild>
-                            <Button variant="outline" className="w-full justify-start text-left font-normal">
+                            <Button variant="outline" disabled={isDeleted} className="w-full justify-start text-left font-normal">
                               <Calendar className="mr-2 h-4 w-4" />
                               {commentDate ? format(commentDate, "MMM dd, yyyy") : "Pick a date"}
                             </Button>
@@ -1718,6 +1740,7 @@ export default function TaskDetails() {
                           <Input
                             type="time"
                             value={startTime}
+                            disabled={isDeleted}
                             onChange={(e) => setStartTime(e.target.value)}
                           />
                           <div className="flex items-center gap-1">
@@ -1733,6 +1756,7 @@ export default function TaskDetails() {
                           type="number"
                           min={1}
                           value={duration}
+                          disabled={isDeleted}
                           onChange={(e) => {
                             const mins = Number(e.target.value)
                             setDuration(mins)
@@ -1777,6 +1801,7 @@ export default function TaskDetails() {
                         <Button
                           variant="outline"
                           size="sm"
+                          disabled={isDeleted}
                           onClick={() => fileInputRef.current?.click()}
                         >
                           <Paperclip className="h-4 w-4 mr-2" />
@@ -1801,7 +1826,7 @@ export default function TaskDetails() {
                       <Button
                         type="button"
                         onClick={handleAddComment}
-                        disabled={!newComment.trim() || !commentDate || !startTime || !endTime || submittingComment}
+                        disabled={isDeleted || !newComment.trim() || !commentDate || !startTime || !endTime || submittingComment}
                       >
                         <Send className="h-4 w-4 mr-2" />
                         {submittingComment ? "Adding..." : "Add Comment"}
@@ -1820,7 +1845,7 @@ export default function TaskDetails() {
                             variant="outline"
                             size="sm"
                             onClick={handleAddComment}
-                            disabled={submittingComment || !newComment.trim() || !commentDate || !startTime || !endTime}
+                            disabled={isDeleted || submittingComment || !newComment.trim() || !commentDate || !startTime || !endTime}
                           >
                             Retry Upload
                           </Button>

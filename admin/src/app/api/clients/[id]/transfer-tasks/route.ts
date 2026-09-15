@@ -9,6 +9,7 @@ import {
   softDeleteData,
 } from "@/lib/audit";
 import { withActor } from "@/lib/auditContext";
+import { NOT_DELETED } from "@/lib/softDelete";
 import { clientDisplayName } from "@/lib/entityNames";
 
 /**
@@ -16,9 +17,9 @@ import { clientDisplayName } from "@/lib/entityNames";
  *
  * Two entry points share this route: the standalone "Transfer Tasks" action, and
  * the delete dialog's "transfer then delete" option (`deleteSource: true`).
- * Deleting a client is a soft delete, and soft delete does not cascade, so a
- * client deleted with work still attached leaves that work live but pointing at
- * a hidden parent. Transferring first is what keeps it reachable.
+ * Deleting a client now cascades the soft delete to its tasks and retainerships,
+ * so work left behind is hidden rather than orphaned. Transferring first is what
+ * keeps it *live* under another client instead.
  *
  * Both models carry `clientId`, so both move together -- a retainership left on
  * the source would be split from the tasks that belong to it. Legislations
@@ -29,8 +30,14 @@ import { clientDisplayName } from "@/lib/entityNames";
  * would leave the target with a partial history.
  */
 
-/** Tasks that still exist. Soft-deleted rows are already hidden by the client extension. */
-const LIVE_TASK_FILTER: Prisma.TaskWhereInput = { deletedAt: null };
+/**
+ * Note on not-deleted filtering: reads here carry no `deletedAt` condition on
+ * purpose. The client extension injects the correct one, and an explicit
+ * `deletedAt: null` would both suppress that injection and silently match
+ * nothing -- on MongoDB `null` does not match a document where the field is
+ * absent, which is every row written before soft delete shipped. Writes are not
+ * rewritten by the extension, so they spell the condition out with NOT_DELETED.
+ */
 
 const CLIENT_NAME_SELECT = {
   id: true,
@@ -69,16 +76,15 @@ export async function GET(
 
     const [totalTasks, openTasks, retainerships, diaryEntries] =
       await Promise.all([
-        prisma.task.count({ where: { clientId, ...LIVE_TASK_FILTER } }),
+        prisma.task.count({ where: { clientId } }),
         prisma.task.count({
           where: {
             clientId,
             status: { notIn: ["Completed", "completed", "Abandoned"] },
-            ...LIVE_TASK_FILTER,
           },
         }),
-        prisma.retainership.count({ where: { clientId, deletedAt: null } }),
-        prisma.clientDiaryEntry.count({ where: { clientId, deletedAt: null } }),
+        prisma.retainership.count({ where: { clientId } }),
+        prisma.clientDiaryEntry.count({ where: { clientId } }),
       ]);
 
     return NextResponse.json({
@@ -163,7 +169,7 @@ export async function POST(
 
     const result = await withActor(actor, async () => {
       const movedTasks = await prisma.task.updateMany({
-        where: { clientId: sourceClientId, ...LIVE_TASK_FILTER },
+        where: { clientId: sourceClientId, OR: [...NOT_DELETED.OR] },
         data: { clientId: targetClientId },
       });
 
@@ -172,7 +178,7 @@ export async function POST(
       // retainership it belongs to. Their legislations follow implicitly --
       // those hang off retainershipId, not clientId.
       const movedRetainerships = await prisma.retainership.updateMany({
-        where: { clientId: sourceClientId, deletedAt: null },
+        where: { clientId: sourceClientId, OR: [...NOT_DELETED.OR] },
         data: { clientId: targetClientId },
       });
 

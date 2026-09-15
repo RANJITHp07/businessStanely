@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { includeDeleted } from "@/lib/softDelete";
 
 export async function GET(
   req: NextRequest,
@@ -7,8 +8,15 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const task = await prisma.task.findUnique({
-      where: { id },
+
+    // ?includeDeleted=true lets the task page open a soft-deleted task in a
+    // read-only state. Without it the extension hides deleted rows, which is
+    // what every other caller wants.
+    const { searchParams } = new URL(req.url);
+    const allowDeleted = searchParams.get("includeDeleted") === "true";
+
+    const task = await prisma.task.findFirst({
+      where: allowDeleted ? { id, ...includeDeleted } : { id },
       include: {
         ownerShipBy: true,
         client: true,

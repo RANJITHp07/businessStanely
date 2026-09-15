@@ -66,7 +66,7 @@ export async function GET(req: NextRequest) {
       // MongoDB, so derive client ids from legislations assigned to the
       // agent instead, which filters correctly on assignedAgentId.
       const legislations = await prisma.legislation.findMany({
-        where: { assignedAgentId: assignedToId, deletedAt: null },
+        where: { assignedAgentId: assignedToId },
         select: { retainership: { select: { clientId: true } } },
       });
       clientIds = Array.from(
@@ -92,9 +92,13 @@ export async function GET(req: NextRequest) {
         where: { clientId: { in: clients.map((c) => c.id) } },
         select: { clientId: true, status: true },
       }),
+      // The soft-delete extension injects the not-deleted filter here. An
+      // explicit `deletedAt: null` would suppress that injection and, on
+      // MongoDB, match nothing at all for rows written before soft delete
+      // shipped -- where the field is absent rather than null.
       prisma.retainership.groupBy({
         by: ["clientId"],
-        where: { clientId: { in: clients.map((c) => c.id) }, deletedAt: null },
+        where: { clientId: { in: clients.map((c) => c.id) } },
         _count: { _all: true },
       }),
     ]);

@@ -4,6 +4,9 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Input } from "@/components/ui/input";
 import {
   Dialog,
   DialogContent,
@@ -30,11 +33,23 @@ import {
   ArrowLeftRight,
   Check,
   ChevronsUpDown,
+  Search,
   Trash2,
 } from "lucide-react";
 import { toast } from "react-toastify";
 import { Client } from "@/types";
 import { cn } from "@/lib/utils";
+
+/** One row in the "selected tasks" picker. */
+export interface TransferableTask {
+  id: string;
+  title: string;
+  status: string;
+  priority: string;
+  dueDate?: string | null;
+  isRetainershipTask: boolean;
+  assignedTo?: string | null;
+}
 
 export interface TransferSummary {
   clientId: string;
@@ -45,7 +60,15 @@ export interface TransferSummary {
     retainerships: number;
     diaryEntries: number;
   };
+  tasks: TransferableTask[];
 }
+
+/**
+ * "all" moves every task plus the retainerships; "selected" moves only the
+ * picked tasks and leaves retainerships on the source. The API draws the same
+ * line -- see the note at the top of the transfer-tasks route.
+ */
+export type TransferScope = "all" | "selected";
 
 /**
  * "delete" opens with the soft-delete / transfer-then-delete choice.
@@ -98,6 +121,9 @@ export default function TransferTasksDialog({
   const [targetClientId, setTargetClientId] = useState("");
   const [pickerOpen, setPickerOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [scope, setScope] = useState<TransferScope>("all");
+  const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([]);
+  const [taskSearch, setTaskSearch] = useState("");
 
   // The standalone card has no soft-delete branch, so its only action is the
   // transfer itself.
@@ -126,6 +152,9 @@ export default function TransferTasksDialog({
     setAction("soft-delete");
     setTargetClientId("");
     setPickerOpen(false);
+    setScope("all");
+    setSelectedTaskIds([]);
+    setTaskSearch("");
     loadSummary();
   }, [open, loadSummary]);
 
@@ -141,11 +170,53 @@ export default function TransferTasksDialog({
   const hasWorkToMove = totalTasks > 0 || totalRetainerships > 0;
   const targetClient = allClients.find((c) => c.id === targetClientId);
 
+  const tasks = summary?.tasks ?? [];
+
+  const visibleTasks = useMemo(() => {
+    const term = taskSearch.trim().toLowerCase();
+    if (!term) return tasks;
+    return tasks.filter(
+      (task) =>
+        task.title.toLowerCase().includes(term) ||
+        (task.assignedTo ?? "").toLowerCase().includes(term) ||
+        task.status.toLowerCase().includes(term),
+    );
+  }, [tasks, taskSearch]);
+
+  // Transfer-then-delete has to take everything, or the tasks left behind would
+  // be hidden with the source client. The API rejects the combination too.
+  const scopePickerAvailable = mode === "transfer";
+  const effectiveScope: TransferScope = scopePickerAvailable ? scope : "all";
+  const isPartial = effectiveScope === "selected";
+
+  const toggleTask = (taskId: string) =>
+    setSelectedTaskIds((current) =>
+      current.includes(taskId)
+        ? current.filter((id) => id !== taskId)
+        : [...current, taskId],
+    );
+
+  // Acts on what is currently filtered, so "select all" during a search means
+  // the search results rather than the whole list.
+  const allVisibleSelected =
+    visibleTasks.length > 0 &&
+    visibleTasks.every((task) => selectedTaskIds.includes(task.id));
+
+  const toggleAllVisible = () =>
+    setSelectedTaskIds((current) => {
+      const visibleIds = visibleTasks.map((task) => task.id);
+      if (allVisibleSelected) {
+        return current.filter((id) => !visibleIds.includes(id));
+      }
+      return Array.from(new Set([...current, ...visibleIds]));
+    });
+
   const canSubmit =
     !!client &&
     !submitting &&
     (effectiveAction === "soft-delete" || !!targetClientId) &&
-    (effectiveAction !== "transfer" || mode === "delete" || hasWorkToMove);
+    (effectiveAction !== "transfer" || mode === "delete" || hasWorkToMove) &&
+    (effectiveAction !== "transfer" || !isPartial || selectedTaskIds.length > 0);
 
   const handleSubmit = async () => {
     if (!client) return;
@@ -179,6 +250,8 @@ export default function TransferTasksDialog({
         body: JSON.stringify({
           targetClientId,
           deleteSource: mode === "delete",
+          // Omitted entirely for a full move -- the API reads absent as "all".
+          ...(isPartial ? { taskIds: selectedTaskIds } : {}),
         }),
       });
 
@@ -228,7 +301,7 @@ export default function TransferTasksDialog({
               </>
             ) : (
               <>
-                Move every task and retainership on{" "}
+                Move tasks and retainerships from{" "}
                 <span className="font-medium">{sourceName}</span> to another
                 client. The client stays active.
               </>
@@ -298,6 +371,123 @@ export default function TransferTasksDialog({
                       reachable after this client is gone.
                     </span>
                   </button>
+                </div>
+              )}
+
+              {effectiveAction === "transfer" && scopePickerAvailable && (
+                <div className="space-y-2">
+                  <Label>What to transfer</Label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setScope("all")}
+                      className={cn(
+                        "cursor-pointer rounded-lg border p-3 text-left transition-colors",
+                        effectiveScope === "all"
+                          ? "border-primary bg-primary/5"
+                          : "hover:bg-muted/50",
+                      )}
+                    >
+                      <span className="block text-sm font-medium">
+                        All tasks
+                      </span>
+                      <span className="block text-xs text-muted-foreground">
+                        {totalTasks} task(s) and {totalRetainerships}{" "}
+                        retainership(s)
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setScope("selected")}
+                      className={cn(
+                        "cursor-pointer rounded-lg border p-3 text-left transition-colors",
+                        effectiveScope === "selected"
+                          ? "border-primary bg-primary/5"
+                          : "hover:bg-muted/50",
+                      )}
+                    >
+                      <span className="block text-sm font-medium">
+                        Selected tasks
+                      </span>
+                      <span className="block text-xs text-muted-foreground">
+                        Pick tasks to move. Retainerships stay.
+                      </span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {effectiveAction === "transfer" && isPartial && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label>
+                      Tasks to move ({selectedTaskIds.length} selected)
+                    </Label>
+                    {visibleTasks.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={toggleAllVisible}
+                        className="cursor-pointer text-xs text-primary hover:underline"
+                      >
+                        {allVisibleSelected ? "Clear all" : "Select all"}
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="relative">
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      value={taskSearch}
+                      onChange={(event) => setTaskSearch(event.target.value)}
+                      placeholder="Search tasks..."
+                      className="pl-8"
+                    />
+                  </div>
+
+                  <ScrollArea className="h-56 rounded-lg border">
+                    {visibleTasks.length === 0 ? (
+                      <p className="p-4 text-center text-sm text-muted-foreground">
+                        {tasks.length === 0
+                          ? "This client has no tasks to transfer."
+                          : "No tasks match your search."}
+                      </p>
+                    ) : (
+                      <div className="divide-y">
+                        {visibleTasks.map((task) => (
+                          <label
+                            key={task.id}
+                            className="flex cursor-pointer items-start gap-3 p-3 hover:bg-muted/50"
+                          >
+                            <Checkbox
+                              checked={selectedTaskIds.includes(task.id)}
+                              onCheckedChange={() => toggleTask(task.id)}
+                              className="mt-0.5"
+                            />
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-sm font-medium">
+                                {task.title}
+                              </p>
+                              <p className="truncate text-xs text-muted-foreground">
+                                {task.status}
+                                {task.assignedTo && ` · ${task.assignedTo}`}
+                                {task.isRetainershipTask && " · Retainership"}
+                              </p>
+                            </div>
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </ScrollArea>
+
+                  <p className="flex items-start gap-2 text-xs text-muted-foreground">
+                    <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                    <span>
+                      Retainerships stay with{" "}
+                      <span className="font-medium">{sourceName}</span>. A
+                      retainership task moved on its own keeps its link, so its
+                      retainership will sit under the other client.
+                    </span>
+                  </p>
                 </div>
               )}
 
@@ -381,8 +571,10 @@ export default function TransferTasksDialog({
                     <p className="flex items-start gap-2 text-xs text-muted-foreground">
                       <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
                       <span>
-                        {totalTasks} task(s) and {totalRetainerships}{" "}
-                        retainership(s) move from{" "}
+                        {isPartial
+                          ? `${selectedTaskIds.length} selected task(s)`
+                          : `${totalTasks} task(s) and ${totalRetainerships} retainership(s)`}{" "}
+                        move from{" "}
                         <span className="font-medium">{sourceName}</span> to{" "}
                         <span className="font-medium">
                           {displayName(targetClient)}
@@ -421,7 +613,9 @@ export default function TransferTasksDialog({
             {submitting
               ? "Working..."
               : mode === "transfer"
-                ? "Transfer tasks"
+                ? isPartial
+                  ? `Transfer ${selectedTaskIds.length} task(s)`
+                  : "Transfer all"
                 : effectiveAction === "soft-delete"
                   ? "Delete client"
                   : "Transfer & delete"}

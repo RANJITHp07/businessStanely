@@ -25,9 +25,16 @@ import { clientDisplayName } from "@/lib/entityNames";
  * the source would be split from the tasks that belong to it. Legislations
  * follow their retainership implicitly, since they hang off `retainershipId`.
  *
- * Every live task moves, completed ones included: the tasks are the client's
- * record of work, and splitting them across two clients on a status boundary
+ * Scope is the caller's choice. With no `taskIds` the whole client moves --
+ * every live task, completed ones included, plus the retainerships, because the
+ * tasks are the client's record of work and splitting them on a status boundary
  * would leave the target with a partial history.
+ *
+ * With `taskIds` only those tasks move. Retainerships stay put in that case: a
+ * retainership belongs to the client as a whole, and moving it because one of
+ * its tasks was picked would drag along every sibling task still on the source.
+ * A retainership task moved on its own keeps its retainershipId, so it stays
+ * readable, but its retainership now sits under the other client.
  */
 
 /**
@@ -74,7 +81,7 @@ export async function GET(
       return NextResponse.json({ error: "Client not found" }, { status: 404 });
     }
 
-    const [totalTasks, openTasks, retainerships, diaryEntries] =
+    const [totalTasks, openTasks, retainerships, diaryEntries, tasks] =
       await Promise.all([
         prisma.task.count({ where: { clientId } }),
         prisma.task.count({
@@ -85,12 +92,36 @@ export async function GET(
         }),
         prisma.retainership.count({ where: { clientId } }),
         prisma.clientDiaryEntry.count({ where: { clientId } }),
+        // The dialog's "selected tasks" mode picks from this list, so it ships
+        // with the summary rather than costing a second round trip.
+        prisma.task.findMany({
+          where: { clientId },
+          orderBy: { createdAt: "desc" },
+          select: {
+            id: true,
+            title: true,
+            status: true,
+            priority: true,
+            dueDate: true,
+            retainershipId: true,
+            assignedTo: { select: { id: true, name: true } },
+          },
+        }),
       ]);
 
     return NextResponse.json({
       clientId,
       clientName: clientDisplayName(client),
       counts: { totalTasks, openTasks, retainerships, diaryEntries },
+      tasks: tasks.map((task) => ({
+        id: task.id,
+        title: task.title,
+        status: task.status,
+        priority: task.priority,
+        dueDate: task.dueDate,
+        isRetainershipTask: !!task.retainershipId,
+        assignedTo: task.assignedTo?.name ?? null,
+      })),
     });
   } catch (error) {
     console.error("Error loading client transfer summary:", error);
@@ -104,7 +135,10 @@ export async function GET(
 /**
  * POST — move the tasks, optionally soft deleting the source afterwards.
  *
- * Body: { targetClientId: string, deleteSource?: boolean }
+ * Body: { targetClientId: string, deleteSource?: boolean, taskIds?: string[] }
+ *
+ * Omit `taskIds` to move everything. Pass it to move only those tasks; see the
+ * note above on why retainerships do not follow a partial move.
  */
 export async function POST(
   req: NextRequest,
@@ -121,6 +155,30 @@ export async function POST(
 
     const targetClientId: string | undefined = body.targetClientId;
     const deleteSource: boolean = body.deleteSource === true;
+
+    // Absent means "everything". An explicit empty array is a caller bug rather
+    // than a request to move nothing, so it is rejected below.
+    const taskIds: string[] | undefined = Array.isArray(body.taskIds)
+      ? body.taskIds
+      : undefined;
+    const isPartial = taskIds !== undefined;
+
+    if (isPartial && taskIds.length === 0) {
+      return NextResponse.json(
+        { error: "taskIds cannot be empty" },
+        { status: 400 },
+      );
+    }
+
+    // Deleting the source while leaving some of its tasks behind would hide the
+    // ones that did not move, which is the opposite of what transfer-then-delete
+    // is for.
+    if (isPartial && deleteSource) {
+      return NextResponse.json(
+        { error: "Cannot delete the source client during a partial transfer" },
+        { status: 400 },
+      );
+    }
 
     if (!targetClientId) {
       return NextResponse.json(
@@ -167,20 +225,45 @@ export async function POST(
     const sourceName = clientDisplayName(sourceClient);
     const targetName = clientDisplayName(targetClient);
 
+    // Scoping by id alone would let a caller move another client's tasks, so the
+    // source clientId stays in the filter and the ids only narrow it further.
+    const taskWhere = {
+      clientId: sourceClientId,
+      ...(isPartial ? { id: { in: taskIds } } : {}),
+      OR: [...NOT_DELETED.OR],
+    };
+
+    // A requested id that is not on this client (or was already deleted) is
+    // dropped by that filter; the response reports the shortfall rather than
+    // failing. Zero matches means the whole request was wrong, so reject it.
+    if (
+      isPartial &&
+      (await prisma.task.count({ where: taskWhere })) === 0
+    ) {
+      return NextResponse.json(
+        { error: "None of the selected tasks belong to this client" },
+        { status: 400 },
+      );
+    }
+
     const result = await withActor(actor, async () => {
       const movedTasks = await prisma.task.updateMany({
-        where: { clientId: sourceClientId, OR: [...NOT_DELETED.OR] },
+        where: taskWhere,
         data: { clientId: targetClientId },
       });
 
-      // Retainerships carry the same clientId, so leaving them behind would
-      // strand a live retainership on a hidden client and split a task from the
-      // retainership it belongs to. Their legislations follow implicitly --
-      // those hang off retainershipId, not clientId.
-      const movedRetainerships = await prisma.retainership.updateMany({
-        where: { clientId: sourceClientId, OR: [...NOT_DELETED.OR] },
-        data: { clientId: targetClientId },
-      });
+      // Retainerships carry the same clientId, so on a full move leaving them
+      // behind would strand a live retainership on a hidden client and split a
+      // task from the retainership it belongs to. Their legislations follow
+      // implicitly -- those hang off retainershipId, not clientId.
+      //
+      // A partial move leaves them alone: see the note at the top of the file.
+      const movedRetainerships = isPartial
+        ? { count: 0 }
+        : await prisma.retainership.updateMany({
+            where: { clientId: sourceClientId, OR: [...NOT_DELETED.OR] },
+            data: { clientId: targetClientId },
+          });
 
       let sourceDeleted = false;
       if (deleteSource) {
@@ -198,6 +281,10 @@ export async function POST(
       };
     });
 
+    // Reads as "3 of 12 tasks" in the audit trail, so a partial move is not
+    // mistaken for a full one that happened to find only three tasks.
+    const scopeLabel = isPartial ? ` (${taskIds.length} selected)` : "";
+
     // One UPDATE row per client so the move is visible from either side of the
     // audit trail, which is keyed by entityId.
     await recordUpdateAudit({
@@ -205,8 +292,12 @@ export async function POST(
       entityId: sourceClientId,
       entityName: sourceName,
       changedFields: [
-        `tasks: ${result.tasksTransferredCount} transferred to ${targetName}`,
-        `retainerships: ${result.retainershipsTransferredCount} transferred to ${targetName}`,
+        `tasks: ${result.tasksTransferredCount} transferred to ${targetName}${scopeLabel}`,
+        ...(isPartial
+          ? []
+          : [
+              `retainerships: ${result.retainershipsTransferredCount} transferred to ${targetName}`,
+            ]),
       ],
       actor,
       req,
@@ -217,8 +308,12 @@ export async function POST(
       entityId: targetClientId,
       entityName: targetName,
       changedFields: [
-        `tasks: ${result.tasksTransferredCount} received from ${sourceName}`,
-        `retainerships: ${result.retainershipsTransferredCount} received from ${sourceName}`,
+        `tasks: ${result.tasksTransferredCount} received from ${sourceName}${scopeLabel}`,
+        ...(isPartial
+          ? []
+          : [
+              `retainerships: ${result.retainershipsTransferredCount} received from ${sourceName}`,
+            ]),
       ],
       actor,
       req,
@@ -240,11 +335,17 @@ export async function POST(
       success: true,
       message: result.sourceDeleted
         ? `Transferred ${result.tasksTransferredCount} task(s) and ${result.retainershipsTransferredCount} retainership(s) to ${targetName}, and deleted ${sourceName}.`
-        : `Transferred ${result.tasksTransferredCount} task(s) and ${result.retainershipsTransferredCount} retainership(s) to ${targetName}.`,
+        : isPartial
+          ? `Transferred ${result.tasksTransferredCount} selected task(s) to ${targetName}.`
+          : `Transferred ${result.tasksTransferredCount} task(s) and ${result.retainershipsTransferredCount} retainership(s) to ${targetName}.`,
       summary: {
         sourceClientId,
         targetClientId,
         transferredAt: new Date().toISOString(),
+        partial: isPartial,
+        // Differs from tasksTransferredCount when an id was already moved,
+        // deleted, or never belonged to this client.
+        requestedTaskCount: isPartial ? taskIds.length : undefined,
         ...result,
       },
     });

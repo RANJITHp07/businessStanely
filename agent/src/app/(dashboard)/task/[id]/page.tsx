@@ -1464,7 +1464,11 @@ export default function TaskDetails() {
                   <div className="flex items-center gap-2">
                     <Calendar className="h-4 w-4 text-muted-foreground" />
                     <div>
-                      <div className="text-sm font-medium">Completion Date</div>
+                      <div className="text-sm font-medium">
+                        {task.recurring && task.recurring > 0
+                          ? "Last Task Completion Date"
+                          : "Completion Date"}
+                      </div>
                       <div className="text-sm text-muted-foreground">
                         {formatDateTime(task.lastCompletedDate, true)}
                       </div>

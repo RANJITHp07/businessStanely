@@ -22,8 +22,9 @@ import { withActor } from "@/lib/auditContext";
  */
 
 /** Only live, still-normal tasks can be converted. */
+/* Used only by reads, so the not-deleted condition is left to the soft-delete
+   extension; naming deletedAt here would suppress its absent-aware filter. */
 const CONVERTIBLE_TASK_FILTER: Prisma.TaskWhereInput = {
-  deletedAt: null,
   legislationId: null,
 };
 
@@ -66,13 +67,12 @@ export async function GET(
     );
 
     const retainership = await prisma.retainership.findFirst({
-      where: { id: retainershipId, deletedAt: null },
+      where: { id: retainershipId },
       select: {
         id: true,
         name: true,
         clientId: true,
         legislation: {
-          where: { deletedAt: null },
           select: {
             id: true,
             title: true,
@@ -196,7 +196,7 @@ export async function POST(
     }
 
     const retainership = await prisma.retainership.findFirst({
-      where: { id: retainershipId, deletedAt: null },
+      where: { id: retainershipId },
       select: { id: true, name: true, clientId: true },
     });
 
@@ -217,7 +217,7 @@ export async function POST(
     // The legislation is looked up through the retainership so a caller cannot
     // file tasks under another retainership's legislation by passing its id.
     const legislation = await prisma.legislation.findFirst({
-      where: { id: legislationId, retainershipId, deletedAt: null },
+      where: { id: legislationId, retainershipId },
       select: { id: true, title: true, assignedAgentId: true },
     });
 

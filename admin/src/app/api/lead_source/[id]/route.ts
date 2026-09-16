@@ -83,7 +83,7 @@ export async function DELETE(
     }
 
     const existing = await prisma.leadSource.findFirst({
-      where: { id: params.id, deletedAt: null },
+      where: { id: params.id },
     });
 
     if (!existing) {

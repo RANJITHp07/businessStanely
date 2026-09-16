@@ -112,10 +112,15 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // No deletedAt filter here on purpose. The soft-delete extension adds one
+    // that matches both null and an absent field, which matters on MongoDB:
+    // rows created without ever being deleted have no deletedAt key at all, so
+    // a literal `deletedAt: null` hides every newly created prospect. Naming
+    // deletedAt here would also make the extension back off and leave this
+    // filter as the only one. See lib/softDelete.ts.
     const where: Prisma.ProspectWhereInput = {
       archived: false,
       status: { not: "opportunity" },
-      deletedAt: null,
     };
 
     const { searchParams } = new URL(req.url);

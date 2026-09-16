@@ -1,16 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentAdmin } from "@/lib/auth";
 import prisma from "@/lib/prisma";
+import { NOT_DELETED } from "@/lib/softDelete";
 import {
   recordDeletionAudit,
   actorFromAdmin,
   softDeleteData,
 } from "@/lib/audit";
-import { NOT_DELETED } from "@/lib/softDelete";
 
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: { id: string } },
 ) {
   try {
     // Get the current admin user
@@ -25,7 +25,7 @@ export async function GET(
     if (!id) {
       return NextResponse.json(
         { error: "Retainership ID is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -35,7 +35,7 @@ export async function GET(
     // Find the retainership in database with creator information (user or agent)
     // Include legislation relation in the query
     const retainership = await prisma.retainership.findFirst({
-      where: { id, deletedAt: null },
+      where: { id },
       include: {
         createdByUser: true,
         createdByAgent: true,
@@ -85,7 +85,7 @@ export async function GET(
     if (!retainership) {
       return NextResponse.json(
         { error: "Retainership not found" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -175,13 +175,13 @@ export async function GET(
     // Add debugging logs to inspect legislation details
     console.log(
       "Legislation details fetched from database:",
-      retainership.legislation
+      retainership.legislation,
     );
 
     // Add debugging logs to inspect the formatted retainership object
     console.log(
       "Formatted Retainership object being sent to frontend:",
-      formattedRetainership
+      formattedRetainership,
     );
 
     return NextResponse.json(formattedRetainership);
@@ -189,14 +189,14 @@ export async function GET(
     console.error("Error fetching retainership:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
 
 export async function PUT(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: { id: string } },
 ) {
   try {
     const currentAdmin = await getCurrentAdmin(req);
@@ -208,7 +208,7 @@ export async function PUT(
     if (currentAdmin.adminType !== "owner") {
       return NextResponse.json(
         { error: "Only owners can edit retainerships" },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
@@ -221,22 +221,22 @@ export async function PUT(
     }
 
     const existingRetainership = await prisma.retainership.findFirst({
-      where: { id, deletedAt: null },
+      where: { id },
       include: {
-        legislation: { where: { deletedAt: null } },
+        legislation: true,
       },
     });
 
     if (!existingRetainership) {
       return NextResponse.json(
         { error: "Retainership not found" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
     // 🔹 Map existing legislation by ID
     const existingLegislationMap = new Map(
-      existingRetainership.legislation.map((l) => [l.id, l.assignedAgentId])
+      existingRetainership.legislation.map((l) => [l.id, l.assignedAgentId]),
     );
 
     await prisma.$transaction(async (tx) => {
@@ -277,7 +277,7 @@ export async function PUT(
                 title: leg.title,
                 description: leg.description,
                 assignedAgentId: leg.assignedAgent,
-              })
+              }),
             ),
           },
         },
@@ -285,7 +285,7 @@ export async function PUT(
     });
 
     const updatedRetainership = await prisma.retainership.findFirst({
-      where: { id, deletedAt: null },
+      where: { id },
       include: {
         createdByUser: {
           select: { id: true, username: true },
@@ -304,20 +304,20 @@ export async function PUT(
     if (error instanceof Error && "code" in error && error.code === "P2002") {
       return NextResponse.json(
         { error: "A retainership with this name already exists" },
-        { status: 409 }
+        { status: 409 },
       );
     }
 
     return NextResponse.json(
       { error: "Failed to update retainership" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
 
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: { id: string } },
 ) {
   try {
     // Get the current admin user
@@ -331,7 +331,7 @@ export async function DELETE(
     if (currentAdmin.adminType !== "owner") {
       return NextResponse.json(
         { error: "Only owners can delete retainerships" },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
@@ -339,10 +339,9 @@ export async function DELETE(
 
     // Check if retainership exists and is not already deleted
     const existingRetainership = await prisma.retainership.findFirst({
-      where: { id, deletedAt: null },
+      where: { id },
       include: {
         legislation: {
-          where: { deletedAt: null },
           select: { id: true, title: true },
         },
       },
@@ -351,7 +350,7 @@ export async function DELETE(
     if (!existingRetainership) {
       return NextResponse.json(
         { error: "Retainership not found" },
-        { status: 404 }
+        { status: 404 },
       );
     }
 
@@ -434,7 +433,7 @@ export async function DELETE(
 
     return NextResponse.json(
       { error: "Failed to delete retainership" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

@@ -114,7 +114,7 @@ export async function DELETE(
     }
 
     const existing = await prisma.client.findFirst({
-      where: { id, deletedAt: null },
+      where: { id },
     });
     if (!existing) {
       return NextResponse.json({ error: "Client not found" }, { status: 404 });

@@ -16,9 +16,11 @@ export async function GET(req: NextRequest) {
     const url = new URL(req.url);
     const statusParam = url.searchParams.get("status");
 
-    // Build where clause for the query. Soft-deleted retainerships are never
-    // returned by normal reads.
-    const where: { status?: string; deletedAt: null } = { deletedAt: null };
+    // Build where clause for the query. No deletedAt condition here: the
+    // soft-delete extension injects one that matches both null and an absent
+    // field. Spelling out `deletedAt: null` would suppress that injection and,
+    // on MongoDB, hide every row where the field was never written.
+    const where: { status?: string } = {};
 
     // If status parameter is provided, filter by status
     if (statusParam && ["approved", "pending"].includes(statusParam)) {

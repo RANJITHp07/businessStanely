@@ -124,7 +124,7 @@ export async function DELETE(
     }
 
     const existingEntry = await prismaWithDiary.clientDiaryEntry.findFirst({
-      where: { id: entryId, deletedAt: null },
+      where: { id: entryId },
       select: { id: true, clientId: true, heading: true, entryDate: true },
     });
 

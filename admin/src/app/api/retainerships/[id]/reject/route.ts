@@ -47,7 +47,7 @@ export async function PUT(
 
     // Find retainership and ensure it exists
     const existingRetainership = await prisma.retainership.findFirst({
-      where: { id, deletedAt: null }
+      where: { id }
     });
 
     if (!existingRetainership) {

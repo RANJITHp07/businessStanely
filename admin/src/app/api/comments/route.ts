@@ -219,7 +219,7 @@ export async function DELETE(req: NextRequest) {
     }
 
     const comment = await prisma.comment.findFirst({
-      where: { id: commentId, deletedAt: null },
+      where: { id: commentId },
     });
 
     if (!comment) {

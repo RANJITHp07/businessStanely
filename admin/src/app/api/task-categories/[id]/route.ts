@@ -261,7 +261,7 @@ export async function DELETE(
 
     // Check if category exists
     const existingCategory = await prisma.taskCategory.findFirst({
-      where: { id, deletedAt: null },
+      where: { id },
     });
 
     if (!existingCategory) {

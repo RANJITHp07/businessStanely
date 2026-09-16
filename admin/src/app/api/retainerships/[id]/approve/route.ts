@@ -35,7 +35,7 @@ export async function PUT(
     }
 
     const existingRetainership = await prisma.retainership.findFirst({
-      where: { id, deletedAt: null },
+      where: { id },
       select: { id: true },
     });
 

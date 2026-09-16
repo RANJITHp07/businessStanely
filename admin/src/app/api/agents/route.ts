@@ -38,6 +38,7 @@ export async function POST(req: NextRequest) {
       executionAgentType,
       advisorAgentType,
       autoAssign,
+      enquiryAutoAssign,
       canCreateTask,
       ...agentData
     } = body;
@@ -167,6 +168,9 @@ export async function POST(req: NextRequest) {
       photo: photoS3Key,
       status: "active",
       autoAssign,
+      // Opt-in, not opt-out: a new agent joins the website enquiry rotation
+      // only when someone ticks the box.
+      enquiryAutoAssign: enquiryAutoAssign ?? false,
       // Default to allowed so agents created before this flag existed, and any
       // client that omits it, keep the previous behaviour.
       canCreateTask: canCreateTask ?? true,

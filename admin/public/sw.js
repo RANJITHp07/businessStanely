@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'v1';
+const CACHE_VERSION = '1789537931221';
 const CACHE_NAME = `legalstanley-admin-${CACHE_VERSION}`;
 
 const STATIC_ASSETS = ['/', '/favicon.ico', '/manifest.json'];

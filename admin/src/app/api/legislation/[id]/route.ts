@@ -13,7 +13,7 @@ export async function GET(req: Request, context: { params: { id: string } }) {
 
   try {
     const legislation = await prisma.legislation.findFirst({
-      where: { id, deletedAt: null },
+      where: { id },
       include: {
         assignedAgent: true,
         retainership: {
@@ -132,7 +132,7 @@ export async function DELETE(
     }
 
     const existingLegislation = await prisma.legislation.findFirst({
-      where: { id, deletedAt: null },
+      where: { id },
       include: {
         assignedAgent: true,
         retainership: {

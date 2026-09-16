@@ -6,7 +6,7 @@ interface RateLimitEntry {
   resetTime: number;
 }
 
-class RateLimiter {
+export class RateLimiter {
   private attempts: Map<string, RateLimitEntry> = new Map();
   private readonly maxAttempts: number;
   private readonly windowMs: number;
@@ -81,6 +81,14 @@ class RateLimiter {
 // Create a global rate limiter instance
 export const otpRateLimiter = new RateLimiter(3, 15 * 60 * 1000); // 3 attempts per 15 minutes
 
+/**
+ * Public website enquiry submissions, keyed by client IP. The endpoint is
+ * unauthenticated, so this is the only thing standing between the form and an
+ * automated flood. In-memory like the limiter above: it resets on redeploy and
+ * is per-instance, which is a floor rather than a guarantee.
+ */
+export const enquiryRateLimiter = new RateLimiter(5, 10 * 60 * 1000); // 5 per 10 minutes
+
 // Helper function to format remaining time
 export function formatRemainingTime(ms: number): string {
   const minutes = Math.ceil(ms / (60 * 1000));
@@ -91,5 +99,6 @@ export function formatRemainingTime(ms: number): string {
 if (typeof global !== "undefined") {
   setInterval(() => {
     otpRateLimiter.cleanup();
+    enquiryRateLimiter.cleanup();
   }, 60 * 60 * 1000); // 1 hour
 }

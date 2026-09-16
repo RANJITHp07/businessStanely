@@ -199,7 +199,7 @@ export async function DELETE(
     const { id } = await params;
 
     const existing = await prisma.opportunity.findFirst({
-      where: { id, deletedAt: null },
+      where: { id },
     });
     if (!existing) {
       return NextResponse.json(

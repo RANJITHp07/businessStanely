@@ -39,7 +39,8 @@ export type AuditEntityType =
   | "ClientDiaryEntry"
   | "DiaryEntry"
   | "Retainership"
-  | "Legislation";
+  | "Legislation"
+  | "Enquiry";
 
 /** Builds an actor from the admin app's getCurrentAdmin() result. */
 export function actorFromAdmin(admin: {

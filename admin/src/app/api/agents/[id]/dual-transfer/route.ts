@@ -139,7 +139,7 @@ export async function PUT(
     });
 
     const legislations = await prisma.legislation.findMany({
-      where: { assignedAgentId: agentId, deletedAt: null },
+      where: { assignedAgentId: agentId },
       select: { id: true },
     });
 

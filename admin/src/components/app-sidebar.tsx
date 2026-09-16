@@ -7,6 +7,7 @@ import {
   Settings,
   UserRoundPen,
   UserSearch,
+  Inbox,
   Boxes,
   ShieldUser,
   ChevronDown,
@@ -66,6 +67,7 @@ const allItems: MenuItem[] = [
   { title: "Execution Dashboard", icon: Home, url: "/" },
   { title: "Leads Dashboard", url: "/dashboard/prospects", icon: UserSearch },
   { title: "Leads", url: "/dashboard/prospects/tables", icon: UserSearch },
+  { title: "BusinessPlus Enquiries", url: "/dashboard/enquiries", icon: Inbox },
   { title: "Opportunities Dashboard", url: "/dashboard/opportunities", icon: ClipboardList },
   { title: "Opportunities", url: "/dashboard/opportunities/tables", icon: ClipboardList },
   { title: "Execution Agent", url: "/agent", icon: UserRoundPen },
@@ -89,10 +91,10 @@ const allItems: MenuItem[] = [
 
 // Split items into two panels
 const agentPanelItems = allItems.filter(
-  (item) => !["Leads", "Advisor Agent", "Opportunities Dashboard", "Client Advisor", "Leads Dashboard", "Deleted Client Advisor", "Opportunities", "Lead Source", "My Diary", "Settings"].includes(item.title)
+  (item) => !["Leads", "Advisor Agent", "Opportunities Dashboard", "Client Advisor", "Leads Dashboard", "Deleted Client Advisor", "Opportunities", "Lead Source", "BusinessPlus Enquiries", "My Diary", "Settings"].includes(item.title)
 );
 const salesPanelItems = allItems.filter((item) =>
-  ["Advisor Agent", "Leads", "Opportunities", "Opportunities Dashboard", "Client Advisor", "Deleted Client Advisor", "Leads Dashboard", "Lead Source"].includes(item.title)
+  ["Advisor Agent", "Leads", "Opportunities", "Opportunities Dashboard", "Client Advisor", "Deleted Client Advisor", "Leads Dashboard", "Lead Source", "BusinessPlus Enquiries"].includes(item.title)
 );
 
 const settingsPanelItems = allItems.filter((item) => item.title === "Settings" || item.title === "My Diary");

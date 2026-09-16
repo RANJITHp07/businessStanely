@@ -276,7 +276,7 @@ export async function DELETE(
       typeof params.then === "function" ? await params : params;
     const { id } = awaitedParams;
     const existing = await prisma.prospect.findFirst({
-      where: { id, deletedAt: null },
+      where: { id },
     });
     if (!existing) {
       return NextResponse.json({ error: "Prospect not found" }, { status: 404 });

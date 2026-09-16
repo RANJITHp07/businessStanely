@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
+import { NOT_DELETED } from "@/lib/softDelete";
 import { getCurrentAdmin } from "@/lib/auth";
 import { hasAdvisorRole, hasExecutionRole } from "@/lib/agentRole";
 
@@ -21,9 +22,16 @@ import { hasAdvisorRole, hasExecutionRole } from "@/lib/agentRole";
 
 type Scope = "tasks" | "prospects";
 
+/**
+ * Shared by the preview counts and the updateMany that performs the handover,
+ * so both must agree or the reported count will not match what moved. The
+ * extension does not rewrite writes, so the not-deleted condition is spelled
+ * out here -- as NOT_DELETED, which also matches rows where the field is
+ * absent. A literal `deletedAt: null` would match none of those on MongoDB.
+ */
 const OPEN_TASK_FILTER: Prisma.TaskWhereInput = {
   status: { notIn: ["Completed", "Abandoned"] },
-  deletedAt: null,
+  OR: [...NOT_DELETED.OR],
 };
 
 export async function GET(
@@ -51,12 +59,12 @@ export async function GET(
         where: { ownerShipId: agentId, ...OPEN_TASK_FILTER },
       }),
       prisma.prospect.count({
-        where: { assignedAgentId: agentId, deletedAt: null },
+        where: { assignedAgentId: agentId, OR: [...NOT_DELETED.OR] },
       }),
       prisma.opportunity.count({
         where: {
-          deletedAt: null,
-          prospect: { assignedAgentId: agentId, deletedAt: null },
+          OR: [...NOT_DELETED.OR],
+          prospect: { assignedAgentId: agentId, OR: [...NOT_DELETED.OR] },
         },
       }),
     ]);
@@ -217,13 +225,13 @@ export async function PUT(
         // through their prospect's assignment.
         opportunitiesTransferredCount = await tx.opportunity.count({
           where: {
-            deletedAt: null,
-            prospect: { assignedAgentId: agentId, deletedAt: null },
+            OR: [...NOT_DELETED.OR],
+            prospect: { assignedAgentId: agentId, OR: [...NOT_DELETED.OR] },
           },
         });
 
         const prospects = await tx.prospect.updateMany({
-          where: { assignedAgentId: agentId, deletedAt: null },
+          where: { assignedAgentId: agentId, OR: [...NOT_DELETED.OR] },
           data: { assignedAgentId: prospectTransferAgentId },
         });
         prospectsTransferredCount = prospects.count;

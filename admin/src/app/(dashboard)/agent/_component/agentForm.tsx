@@ -201,6 +201,7 @@ export default function AgentForm({ agent }: AgentFormProps) {
     barAssociationId: string;
     jurisdiction: string;
     autoAssign?: boolean
+    enquiryAutoAssign?: boolean
     canCreateTask?: boolean
   };
   const searchParams = useSearchParams();
@@ -225,6 +226,7 @@ export default function AgentForm({ agent }: AgentFormProps) {
     barAssociationId: agent?.barAssociationId || "",
     jurisdiction: agent?.jurisdiction || "",
     autoAssign: agent?.autoAssign || true,
+    enquiryAutoAssign: agent?.enquiryAutoAssign ?? false,
     // `??` rather than `||` so an agent explicitly set to false stays false
     // when the edit form reloads.
     canCreateTask: agent?.canCreateTask ?? true
@@ -714,6 +716,26 @@ export default function AgentForm({ agent }: AgentFormProps) {
                     />
                     <Label htmlFor="auto-assign" className="ml-2 text-xs font-medium">
                       If this checkbox is selected, the prospect will be automatically assigned to this agent.
+                    </Label>
+                  </div>
+                )}
+
+                {hasAdvisorRole(formData.agentRole) && selectedAdvisorType && selectedAdvisorType !== "Lead Maker" && (
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id="enquiry-auto-assign"
+                      className="h-4 w-4"
+                      checked={formData.enquiryAutoAssign}
+                      onChange={(e) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          enquiryAutoAssign: e.target.checked,
+                        }))
+                      }
+                    />
+                    <Label htmlFor="enquiry-auto-assign" className="ml-2 text-xs font-medium">
+                      If this checkbox is selected, BusinessPlus website enquiries will be automatically assigned to this agent.
                     </Label>
                   </div>
                 )}

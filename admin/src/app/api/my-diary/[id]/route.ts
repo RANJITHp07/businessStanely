@@ -97,7 +97,7 @@ export async function DELETE(
     }
 
     const existing = await prismaWithDiary.diaryEntry.findFirst({
-      where: { id: entryId, deletedAt: null },
+      where: { id: entryId },
     });
 
     if (!existing || existing.createdByUserId !== currentAdmin.id) {

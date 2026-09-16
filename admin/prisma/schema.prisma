@@ -266,6 +266,11 @@ model Agent {
   photo                String?
   status               String    @default("active") // "active" or "inactive"
   autoAssign           Boolean   @default(true)
+  /// Include this Advisor Agent in the round-robin for website (businessPlus)
+  /// enquiries. Separate from autoAssign, which governs leads only, so an agent
+  /// can take one queue without the other. Defaults to false: agents created
+  /// before this existed are opted out until someone ticks them in.
+  enquiryAutoAssign    Boolean   @default(false)
   // Admin-controlled: may this agent create normal (non-legislation, non-service)
   // tasks from the agent app? Legislation/retainership and service-linked task
   // creation is unaffected.
@@ -308,6 +313,11 @@ model Agent {
   createdProspects      Prospect[]     @relation("AgentCreatedProspects")
   createdQuoteRequests  QuoteRequest[] @relation("AgentCreatedQuoteRequests")
   assignedQuoteRequests QuoteRequest[] @relation("AgentAssignedQuoteRequests")
+
+  // Website enquiries this agent converted into prospects
+  convertedEnquiries    Enquiry[]      @relation("AgentConvertedEnquiries")
+  // Website enquiries auto-assigned to this agent for first response
+  assignedEnquiries     Enquiry[]      @relation("AgentAssignedEnquiries")
 
   // Service Records relation
   serviceRecords   ServiceRecord[]     @relation("AgentServiceRecords")
@@ -538,12 +548,25 @@ model Comment {
   prospect      Prospect?    @relation(fields: [prospectId], references: [id])
   opportunityId String?      @db.ObjectId
   opportunity   Opportunity? @relation(fields: [opportunityId], references: [id])
+  enquiryId     String?      @db.ObjectId
+  enquiry       Enquiry?     @relation(fields: [enquiryId], references: [id])
 
-  // Author can be either a User or an Agent
+  // Author can be a User, an Agent, or — on an enquiry — the client themselves
+  // through the website portal.
   authorId   String @db.ObjectId
-  authorType String @default("USER") // "USER" or "AGENT"
+  authorType String @default("USER") // "USER" | "AGENT" | "CLIENT"
   user       User?  @relation("UserComments", fields: [authorId], references: [id])
   agent      Agent? @relation("CommentAuthor", fields: [authorId], references: [id])
+
+  /// Whether the person who submitted the enquiry can see this on the website
+  /// portal.
+  ///
+  /// The enquiry API always writes this field explicitly, and sends true unless
+  /// the agent marked the message internal. The column default stays false on
+  /// purpose: it is what rows written before this field existed read back as,
+  /// and those were written with no expectation a client would ever see them.
+  /// Anything the client writes is stored true, since they wrote it.
+  visibleToClient Boolean @default(false)
 
   /// Soft delete: rows are never removed, only stamped. Every read filters on
   /// deletedAt: null. See lib/audit.ts.
@@ -672,6 +695,10 @@ model LeadSource {
 model ProspectAssignmentSetting {
   id                String   @id @default(auto()) @map("_id") @db.ObjectId
   prospectsPerAgent Int      @default(1)
+  /// How many website enquiries one agent takes before the round-robin moves
+  /// on. Kept on this row rather than a second settings collection so both
+  /// queues read one document.
+  enquiriesPerAgent Int      @default(1)
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 }
@@ -728,4 +755,93 @@ model CronLog {
 
   @@unique([jobName, runDate])
   @@map("cron_logs")
+}
+
+/// A service request submitted from the public businessPlus website.
+///
+/// Website submissions are unauthenticated and unvetted, so they are kept out
+/// of the Prospect pipeline until an agent has looked at them. Reviewing an
+/// enquiry converts it into a Prospect, and `convertedProspectId` records the
+/// row that was created so the same enquiry cannot be converted twice.
+model Enquiry {
+  id      String  @id @default(auto()) @map("_id") @db.ObjectId
+  name    String
+  email   String
+  phone   String?
+  company String?
+
+  /// Service titles ticked on the website form, stored as submitted. These are
+  /// free text from the site's own content file, not a relation to TaskCategory.
+  services String[]
+
+  /// Payment preference chosen on the form ("later" | "now" at the time of
+  /// writing). Kept as a string so a new option on the site does not require a
+  /// migration here.
+  payment String?
+  notes   String?
+
+  /// Which website form produced this row, for when a second form is wired up.
+  source String @default("service-request")
+
+  status String @default("New") // New | Reviewed | Converted | Spam
+
+  /// Advisor Agent this enquiry was handed to, picked by the same round-robin
+  /// the leads queue uses but over agents with enquiryAutoAssign set. Null when
+  /// no agent was eligible at submission time; such rows stay unassigned and an
+  /// admin picks someone by hand.
+  assignedAgentId String? @db.ObjectId
+  assignedAgent   Agent?  @relation("AgentAssignedEnquiries", fields: [assignedAgentId], references: [id])
+  assignedAt      DateTime?
+
+  /// Set once an agent converts the enquiry. Non-null means "already converted".
+  convertedProspectId String?   @db.ObjectId
+  convertedAt         DateTime?
+  convertedByAgentId  String?   @db.ObjectId
+  convertedByAgent    Agent?    @relation("AgentConvertedEnquiries", fields: [convertedByAgentId], references: [id])
+
+  /// Interactions logged by agents while reviewing the enquiry, same Comment
+  /// rows the leads screen uses.
+  comments Comment[]
+
+  /// The website portal login this enquiry belongs to, created by the
+  /// businessPlus site when the form is submitted. The admin app only reads it;
+  /// portal accounts are owned by the website (see businessPlus/prisma).
+  portalAccountId String?        @db.ObjectId
+  portalAccount   PortalAccount? @relation(fields: [portalAccountId], references: [id])
+
+  /// Request metadata, kept for spam triage only.
+  ipAddress String?
+  userAgent String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// Soft delete: rows are never removed, only stamped. Every read filters on
+  /// deletedAt: null. See lib/audit.ts.
+  deletedAt     DateTime?
+  deletedById   String?   @db.ObjectId
+  deletedByType String? // "USER" | "AGENT"
+
+  /// Who last changed this row. Field-level history lives in DeletionAudit.
+  updatedById   String?   @db.ObjectId
+  updatedByType String? // "USER" | "AGENT"
+}
+
+/// Website portal login for someone who submitted a service request on the
+/// businessPlus site. Written and owned by that app; declared here so the admin
+/// app can read the account behind an enquiry. Never write these from admin.
+model PortalAccount {
+  id    String @id @default(auto()) @map("_id") @db.ObjectId
+  email String @unique
+  name  String
+
+  passwordHash String
+
+  active      Boolean   @default(true)
+  lastLoginAt DateTime?
+
+  enquiries Enquiry[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

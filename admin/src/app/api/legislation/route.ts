@@ -9,10 +9,11 @@ export async function GET(req: NextRequest) {
     const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
     const pageSize = Math.min(100, Math.max(1, parseInt(searchParams.get("pageSize") || "10", 10)));
 
+    // No deletedAt condition here: the soft-delete extension injects one that
+    // matches both null and an absent field, and it cascades deletes from a
+    // deleted retainership. Spelling out `deletedAt: null` would suppress that
+    // injection and hide every row where the field was never written.
     const where = {
-      // Soft-deleted legislations, including ones cascaded from a deleted
-      // retainership, stay out of normal reads.
-      deletedAt: null,
       ...(assignedAgent ? { assignedAgentId: assignedAgent } : {}),
       ...(retainershipClientId
         ? { retainership: { clientId: retainershipClientId } }

@@ -33,6 +33,7 @@ export const SOFT_DELETE_MODELS = [
   "DiaryEntry",
   "Retainership",
   "Legislation",
+  "Enquiry",
 ] as const;
 
 const SOFT_DELETE_MODEL_SET: ReadonlySet<string> = new Set(SOFT_DELETE_MODELS);

@@ -1,8 +1,7 @@
 "use client"
 import { useState, useEffect, useRef, type ClipboardEvent, type RefObject } from "react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
@@ -19,8 +18,6 @@ import {
 } from "@/components/ui/dropdown-menu"
 import {
     Users,
-    Plus,
-    Search,
     Filter,
     MoreHorizontal,
     Edit,
@@ -63,10 +60,10 @@ import { Calendar as CalendarComponent } from "@/components/ui/calendar"
 import TransferTasksDialog, { type TransferTasksMode } from "./transferTasksDialog"
 
 
-const clientTypes = ["All Types", "Individual", "Organization"]
-const statusOptions = ["All Status", "Active", "Inactive"]
-const communicationPreferences = ["All Communication", "Email", "Phone", "SMS", "Mail", "In-Person"]
-const entityTypes = ["All Entity Types", "Corporation", "LLC", "Partnership", "Sole Proprietorship", "Non-Profit"]
+export const clientTypes = ["All Types", "Individual", "Organization"]
+export const statusOptions = ["All Status", "Active", "Inactive"]
+export const communicationPreferences = ["All Communication", "Email", "Phone", "SMS", "Mail", "In-Person"]
+export const entityTypes = ["All Entity Types", "Corporation", "LLC", "Partnership", "Sole Proprietorship", "Non-Profit"]
 
 import { Client } from "@/types";
 import { useRouter } from "next/navigation"
@@ -116,13 +113,27 @@ const normalizeDiaryEntries = (entries: ClientDiaryEntry[]) => {
     }));
 };
 
-export default function ClientsTable() {
+/**
+ * `onCountChange` reports the row count up to the clients page for its tab
+ * label. Watching the list rather than each setter keeps it correct after a
+ * delete or a transfer, which both rewrite `clients` on their own.
+ */
+export default function ClientsTable({
+    onCountChange,
+    searchTerm = "",
+    selectedType = "All Types",
+    selectedStatus = "All Status",
+    selectedCommunication = "All Communication",
+    selectedEntityType = "All Entity Types",
+}: {
+    onCountChange?: (count: number) => void
+    searchTerm?: string
+    selectedType?: string
+    selectedStatus?: string
+    selectedCommunication?: string
+    selectedEntityType?: string
+} = {}) {
     const [clients, setClients] = useState<Client[]>([]);
-    const [searchTerm, setSearchTerm] = useState("")
-    const [selectedType, setSelectedType] = useState("All Types")
-    const [selectedStatus, setSelectedStatus] = useState("All Status")
-    const [selectedCommunication, setSelectedCommunication] = useState("All Communication")
-    const [selectedEntityType, setSelectedEntityType] = useState("All Entity Types")
     const { currentPage, setCurrentPage, itemsPerPage, setItemsPerPage, clampToTotalPages } =
         useTablePage("admin-dashboard-client-_component-clientTable")
     // Shared by the delete flow and the standalone transfer: `mode` decides
@@ -191,6 +202,10 @@ export default function ClientsTable() {
     }
 
     // Filter clients based on search and filters
+    useEffect(() => {
+        onCountChange?.(clients.length)
+    }, [clients.length, onCountChange])
+
     const filteredClients = clients.filter((client) => {
         const clientName =
             client.clientType === "individual" ? `${client.firstName} ${client.lastName}` : client.organizationName
@@ -236,13 +251,6 @@ export default function ClientsTable() {
         setCurrentPage(1)
     }
 
-    const resetFilters = () => {
-        setSearchTerm("");
-        setSelectedType("All Types");
-        setSelectedStatus("All Status");
-        setSelectedCommunication("All Communication")
-        setSelectedEntityType("All Entity Types")
-    };
 
 
     // Opens the shared dialog. "delete" adds the soft-delete vs transfer choice;
@@ -525,153 +533,10 @@ export default function ClientsTable() {
         }
     };
 
+    // The clients page owns the heading, the filters card and the tabs; this
+    // renders the table only, filtered by the values passed in.
     return (
-        <div className="w-full container mx-auto px-3 sm:px-4 md:px-6 py-4 md:py-6 max-w-7xl">
-            <div className="mb-6 md:mb-8">
-                <div className="flex flex-col gap-4 md:flex-row md:justify-between md:items-center mb-6">
-                    <div>
-                        <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold break-words">Client Management</h1>
-                        <p className="text-sm sm:text-base text-muted-foreground mt-2">Manage and organize your client details</p>
-                    </div>
-                    <Link href='/client/create' className="w-full md:w-auto">
-                        <Button className="w-full md:w-auto bg-[#003459] hover:bg-[#003459] text-white rounded-lg px-4 py-2 flex items-center justify-center gap-2 cursor-pointer shadow-none hover:shadow-md transition-shadow duration-300">
-                            <Plus className="h-4 w-4" />
-                            Create Client
-                        </Button>
-                    </Link>
-                </div>
-
-                {/* Filters */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <Filter className="h-5 w-5" />
-                            Filters & Search
-                        </CardTitle>
-                        <CardDescription>Filter and search through your clients</CardDescription>
-                    </CardHeader>
-
-
-
-                    <CardContent className="space-y-4">
-                        {loading ? (
-                            <>
-                                <div className="h-[200px] w-full bg-gray-200 rounded-2xl mb-4"></div>
-
-                                <div className="flex flex-col md:flex-row justify-between gap-4">
-                                    <div className="h-5 w-full md:w-1/2 bg-gray-200 rounded-xl mb-3"></div>
-                                    <div className="h-5 w-full md:w-1/2 bg-gray-200 rounded-xl mb-3"></div>
-                                </div>
-                            </>
-                        ) : (
-                            <>
-                                {/* Search */}
-                                <div className="flex flex-col items-start gap-2 md:gap-4">
-                                    <div className="w-full">
-                                        <Label htmlFor="search" className="text-sm sm:text-base">Search Clients</Label>
-                                        <div className="relative mt-2">
-                                            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                                            <Input
-                                                id="search"
-                                                placeholder="Search by name, email, phone..."
-                                                value={searchTerm}
-                                                onChange={(e) => setSearchTerm(e.target.value)}
-                                                className="pl-10 text-sm"
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Filter Controls */}
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
-                                    {/* Client Type */}
-                                    <div className="space-y-2">
-                                        <Label className="text-sm sm:text-base">Client Type</Label>
-                                        <Select value={selectedType} onValueChange={setSelectedType}>
-                                            <SelectTrigger className="w-full text-sm">
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {clientTypes.map((type) => (
-                                                    <SelectItem key={type} value={type} className="text-sm">
-                                                        {type}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-
-                                    {/* Status */}
-                                    <div className="space-y-2">
-                                        <Label className="text-sm sm:text-base">Status</Label>
-                                        <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-                                            <SelectTrigger className="w-full text-sm">
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {statusOptions.map((status) => (
-                                                    <SelectItem key={status} value={status} className="text-sm">
-                                                        {status}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-
-                                    {/* Communication */}
-                                    <div className="space-y-2">
-                                        <Label className="text-sm sm:text-base">Communication</Label>
-                                        <Select value={selectedCommunication} onValueChange={setSelectedCommunication}>
-                                            <SelectTrigger className="w-full text-sm">
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {communicationPreferences.map((comm) => (
-                                                    <SelectItem key={comm} value={comm} className="text-sm">
-                                                        {comm}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-
-                                    {/* Entity Type */}
-                                    <div className="space-y-2">
-                                        <Label className="text-sm sm:text-base">Entity Type</Label>
-                                        <Select value={selectedEntityType} onValueChange={setSelectedEntityType}>
-                                            <SelectTrigger className="w-full text-sm">
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {entityTypes.map((entity) => (
-                                                    <SelectItem key={entity} value={entity} className="text-sm">
-                                                        {entity}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                </div>
-
-                                {/* Results Summary */}
-                                <div className="flex items-center justify-end gap-2 text-xs sm:text-sm text-muted-foreground">
-                                    <Button
-                                        onClick={resetFilters}
-                                        className="cursor-pointer hover:text-white text-white bg-[#f42b03] hover:bg-[#f42b03] rounded-lg px-3 sm:px-4 py-2 text-xs sm:text-sm shadow-none hover:shadow-lg transition-shadow duration-300"
-                                        variant="outline"
-                                    >
-                                        Clear
-                                    </Button>
-                                </div>
-                            </>
-                        )}
-                    </CardContent>
-
-
-
-                </Card>
-            </div>
-
+        <div className="w-full">
             {/* Clients Table */}
             <Card>
                 <CardHeader>

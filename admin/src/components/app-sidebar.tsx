@@ -16,7 +16,6 @@ import {
   Calendar,
   FileText,
   MessageSquare,
-  Trash2,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -84,7 +83,8 @@ const allItems: MenuItem[] = [
   { title: "My Diary", url: "/my-diary", icon: UserRoundPen },
   { title: "Settings", url: "/setting", icon: Settings },
   { title: "Deleted Agent", url: "/deleted-agent", icon: UserRoundPen },
-  { title: "Deleted Client", url: "/deleted-client", icon: Trash2 },
+  // Deleted clients are a tab on the clients page; /deleted-client still
+  // resolves for existing links but no longer needs its own entry here.
 ];
 
 // Split items into two panels

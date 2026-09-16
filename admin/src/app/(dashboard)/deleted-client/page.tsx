@@ -1,126 +1,26 @@
 "use client"
-import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
-import { fetchWithAuth } from "@/lib/fetchWithAuth"
+
+import { useState } from "react"
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Badge } from "@/components/ui/badge"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuLabel,
-    DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import {
-    Search,
-    Filter,
-    MoreHorizontal,
-    Eye,
-    ChevronLeft,
-    ChevronRight,
-    ChevronsLeft,
-    ChevronsRight,
-    User,
-    Building2,
-    Phone,
-    Mail,
-    Trash2,
-} from "lucide-react"
-import Link from "next/link"
-import { useTablePage } from "@/hooks/useTablePage"
+import { Filter, Search } from "lucide-react"
+import { clientTypes, entityTypes } from "../client/_component/clientTable"
+import DeletedClientTable from "../client/_component/deletedClientTable"
 
-const clientTypes = ["All Types", "Individual", "Organization"]
-const entityTypes = ["All Entity Types", "Corporation", "LLC", "Partnership", "Sole Proprietorship", "Non-Profit"]
-
-interface DeletedClient {
-    id: string
-    clientType: string
-    email: string
-    phoneNumber: string
-    firstName?: string | null
-    lastName?: string | null
-    gender?: string | null
-    organizationName?: string | null
-    authorizedPersonName?: string | null
-    entityType?: string | null
-    name: string
-    deletedAt: string
-    deletedByType?: string | null
-    taskCount: number
-    retainershipCount: number
-}
-
+/**
+ * Deleted clients now live as a tab on the clients page. This route stays so
+ * existing links — the deleted-client detail page's back button among them —
+ * keep resolving. The shared table renders only filters and rows, so the
+ * heading and container it used to own are supplied here.
+ */
 export default function DeletedClientsPage() {
-    const [clients, setClients] = useState<DeletedClient[]>([])
     const [searchTerm, setSearchTerm] = useState("")
     const [selectedType, setSelectedType] = useState("All Types")
     const [selectedEntityType, setSelectedEntityType] = useState("All Entity Types")
-    const [loading, setLoading] = useState(true)
-    const { currentPage, setCurrentPage, itemsPerPage, setItemsPerPage, clampToTotalPages } =
-        useTablePage("admin-dashboard-deleted-client")
-
-    const router = useRouter()
-
-    useEffect(() => {
-        const fetchDeletedClients = async () => {
-            try {
-                const response = await fetchWithAuth("/api/deleted-clients")
-                if (response.ok) {
-                    setClients(await response.json())
-                } else {
-                    console.error("Failed to fetch deleted clients")
-                }
-            } catch (error) {
-                console.error("Error fetching deleted clients:", error)
-            } finally {
-                setLoading(false)
-            }
-        }
-
-        fetchDeletedClients()
-    }, [])
-
-    const filteredClients = clients.filter((client) => {
-        const name = getClientDisplayName(client) || ""
-        const matchesSearch =
-            name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            client.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            (client.phoneNumber || "").toLowerCase().includes(searchTerm.toLowerCase())
-
-        const matchesType =
-            selectedType === "All Types" || client.clientType.toLowerCase() === selectedType.toLowerCase()
-
-        const matchesEntity =
-            selectedEntityType === "All Entity Types" ||
-            (client.entityType && client.entityType.toLowerCase() === selectedEntityType.toLowerCase())
-
-        return matchesSearch && matchesType && matchesEntity
-    })
-
-    // Newest deletion first, which is the order the API already returns.
-    const totalPages = Math.ceil(filteredClients.length / itemsPerPage)
-
-    useEffect(() => {
-        clampToTotalPages(totalPages)
-    }, [totalPages, clampToTotalPages])
-    const startIndex = (currentPage - 1) * itemsPerPage
-    const endIndex = startIndex + itemsPerPage
-    const currentClients = filteredClients.slice(startIndex, endIndex)
-
-    const handlePageChange = (page: number) => {
-        setCurrentPage(page)
-    }
-
-    const handleItemsPerPageChange = (value: string) => {
-        setItemsPerPage(Number.parseInt(value))
-        setCurrentPage(1)
-    }
 
     const resetFilters = () => {
         setSearchTerm("")
@@ -128,429 +28,104 @@ export default function DeletedClientsPage() {
         setSelectedEntityType("All Entity Types")
     }
 
-    const handleRowClick = (client: DeletedClient) => {
-        router.push(`/deleted-client/${client.id}`)
-    }
-
-    function getClientDisplayName(client: DeletedClient) {
-        return client.clientType === "individual"
-            ? `${client.firstName ?? ""} ${client.lastName ?? ""}`.trim()
-            : client.organizationName
-    }
-
-    const getClientTypeBadge = (type: string) => {
-        const colors = {
-            individual: "bg-blue-100 text-blue-800 border-blue-200",
-            organization: "bg-purple-100 text-purple-800 border-purple-200",
-        }
-
-        const icons = {
-            individual: <User className="w-3 h-3 mr-1" />,
-            organization: <Building2 className="w-3 h-3 mr-1" />,
-        }
-
-        return (
-            <Badge className={`${colors[type as keyof typeof colors]} border`}>
-                {icons[type as keyof typeof icons]}
-                {type.charAt(0).toUpperCase() + type.slice(1)}
-            </Badge>
-        )
-    }
-
-    const formatDeletedAt = (value: string) => {
-        const date = new Date(value)
-        return Number.isNaN(date.getTime()) ? "—" : date.toLocaleString()
-    }
-
-    const getInitials = (client: DeletedClient) =>
-        client.clientType === "individual"
-            ? `${client.firstName?.[0] ?? ""}${client.lastName?.[0] ?? ""}`
-            : client.organizationName
-                ?.toUpperCase()
-                ?.split(" ")
-                .map((n) => n[0])
-                .join("")
-                .slice(0, 2)
-
     return (
         <div className="w-full container mx-auto px-3 sm:px-4 md:px-6 py-4 md:py-6 max-w-7xl">
-            <div className="mb-6 md:mb-8">
-                <div className="flex flex-col gap-4 md:flex-row md:justify-between md:items-center mb-6">
-                    <div>
-                        <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold break-words">Deleted Clients</h1>
-                        <p className="text-sm sm:text-base text-muted-foreground mt-2">
-                            Clients that were deleted, along with the tasks and retainerships hidden with them
-                        </p>
-                    </div>
-                    <Link href="/client" className="w-full md:w-auto">
-                        <Button
-                            variant="outline"
-                            className="w-full md:w-auto rounded-lg px-4 py-2 flex items-center justify-center gap-2 cursor-pointer"
-                        >
-                            Back to Clients
-                        </Button>
-                    </Link>
+            <div className="flex flex-col gap-4 md:flex-row md:justify-between md:items-center mb-6">
+                <div>
+                    <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold break-words">
+                        Deleted Clients
+                    </h1>
+                    <p className="text-sm sm:text-base text-muted-foreground mt-2">
+                        Clients that were deleted, along with the tasks and retainerships hidden with them
+                    </p>
                 </div>
-
-                {/* Filters */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <Filter className="h-5 w-5" />
-                            Filters & Search
-                        </CardTitle>
-                        <CardDescription>Filter and search through deleted clients</CardDescription>
-                    </CardHeader>
-
-                    <CardContent className="space-y-4">
-                        {loading ? (
-                            <>
-                                <div className="h-[200px] w-full bg-gray-200 rounded-2xl mb-4"></div>
-
-                                <div className="flex flex-col md:flex-row justify-between gap-4">
-                                    <div className="h-5 w-full md:w-1/2 bg-gray-200 rounded-xl mb-3"></div>
-                                    <div className="h-5 w-full md:w-1/2 bg-gray-200 rounded-xl mb-3"></div>
-                                </div>
-                            </>
-                        ) : (
-                            <>
-                                {/* Search */}
-                                <div className="flex flex-col items-start gap-2 md:gap-4">
-                                    <div className="w-full">
-                                        <Label htmlFor="search" className="text-sm sm:text-base">Search Clients</Label>
-                                        <div className="relative mt-2">
-                                            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                                            <Input
-                                                id="search"
-                                                placeholder="Search by name, email, phone..."
-                                                value={searchTerm}
-                                                onChange={(e) => setSearchTerm(e.target.value)}
-                                                className="pl-10 text-sm"
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Filter Controls */}
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
-                                    {/* Client Type */}
-                                    <div className="space-y-2">
-                                        <Label className="text-sm sm:text-base">Client Type</Label>
-                                        <Select value={selectedType} onValueChange={setSelectedType}>
-                                            <SelectTrigger className="w-full text-sm">
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {clientTypes.map((type) => (
-                                                    <SelectItem key={type} value={type} className="text-sm">
-                                                        {type}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-
-                                    {/* Entity Type */}
-                                    <div className="space-y-2">
-                                        <Label className="text-sm sm:text-base">Entity Type</Label>
-                                        <Select value={selectedEntityType} onValueChange={setSelectedEntityType}>
-                                            <SelectTrigger className="w-full text-sm">
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {entityTypes.map((entity) => (
-                                                    <SelectItem key={entity} value={entity} className="text-sm">
-                                                        {entity}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                </div>
-
-                                {/* Results Summary */}
-                                <div className="flex items-center justify-end gap-2 text-xs sm:text-sm text-muted-foreground">
-                                    <Button
-                                        onClick={resetFilters}
-                                        className="cursor-pointer hover:text-white text-white bg-[#f42b03] hover:bg-[#f42b03] rounded-lg px-3 sm:px-4 py-2 text-xs sm:text-sm shadow-none hover:shadow-lg transition-shadow duration-300"
-                                        variant="outline"
-                                    >
-                                        Clear
-                                    </Button>
-                                </div>
-                            </>
-                        )}
-                    </CardContent>
-                </Card>
+                <Link href="/client" className="w-full md:w-auto">
+                    <Button
+                        variant="outline"
+                        className="w-full md:w-auto rounded-lg px-4 py-2 flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                        Back to Clients
+                    </Button>
+                </Link>
             </div>
 
-            <Card>
-                {loading ? (
-                    <CardContent className="p-3 sm:p-6">
-                        <div className="h-[300px] w-full bg-gray-200 rounded-2xl"></div>
-                    </CardContent>
-                ) : (<>
-                    <CardHeader>
-                        <CardTitle className="text-lg sm:text-xl flex items-center gap-2">
-                            <Trash2 className="h-5 w-5" />
-                            Deleted Clients ({filteredClients.length})
-                        </CardTitle>
-                        <CardDescription className="text-sm">
-                            Task and retainership counts are of records hidden together with the client
-                        </CardDescription>
-                    </CardHeader>
+            {/* The shared table renders rows only, so this route supplies the
+                same filters the clients page keeps above its tabs. */}
+            <Card className="mb-6 md:mb-8">
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        <Filter className="h-5 w-5" />
+                        Filters & Search
+                    </CardTitle>
+                    <CardDescription>Filter and search through deleted clients</CardDescription>
+                </CardHeader>
 
-                    <CardContent className="p-3 sm:p-6">
-                        {/* Desktop Table View */}
-                        <div className="hidden md:block rounded-md border overflow-hidden">
-                            <Table className="w-full table-fixed">
-                                <colgroup>
-                                    <col className="w-[26%]" />
-                                    <col className="w-[13%]" />
-                                    <col className="w-[22%]" />
-                                    <col className="w-[8%]" />
-                                    <col className="w-[11%]" />
-                                    <col className="w-[14%]" />
-                                    <col className="w-[6%]" />
-                                </colgroup>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead className="text-xs sm:text-sm">Client</TableHead>
-                                        <TableHead className="text-xs sm:text-sm">Type</TableHead>
-                                        <TableHead className="text-xs sm:text-sm">Contact Info</TableHead>
-                                        <TableHead className="text-xs sm:text-sm">Tasks</TableHead>
-                                        <TableHead className="text-xs sm:text-sm">Retainership</TableHead>
-                                        <TableHead className="text-xs sm:text-sm">Deleted</TableHead>
-                                        <TableHead className="text-xs sm:text-sm text-right">Actions</TableHead>
-                                    </TableRow>
-                                </TableHeader>
+                <CardContent className="space-y-4">
+                    <div className="w-full">
+                        <Label htmlFor="search" className="text-sm sm:text-base">Search Clients</Label>
+                        <div className="relative mt-2">
+                            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                            <Input
+                                id="search"
+                                placeholder="Search by name, email, phone..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="pl-10 text-sm"
+                            />
+                        </div>
+                    </div>
 
-                                <TableBody>
-                                    {currentClients.length === 0 ? (
-                                        <TableRow>
-                                            <TableCell colSpan={7} className="text-center py-8 text-sm text-muted-foreground">
-                                                No deleted clients found matching your criteria.
-                                            </TableCell>
-                                        </TableRow>
-                                    ) : (
-                                        currentClients.map((client) => (
-                                            <TableRow className="cursor-pointer hover:bg-muted/50" key={client.id} onClick={() => handleRowClick(client)}>
-                                                <TableCell>
-                                                    <div className="flex items-center space-x-3 ">
-                                                        <Avatar className="h-10 w-10 flex-shrink-0">
-                                                            <AvatarFallback>{getInitials(client)}</AvatarFallback>
-                                                        </Avatar>
-                                                        <div className="min-w-0">
-                                                            <div className="font-medium text-sm truncate">{getClientDisplayName(client)}</div>
-                                                            <div className="text-xs text-muted-foreground truncate">
-                                                                {client.clientType === "organization" && client.authorizedPersonName && (
-                                                                    <>Contact: {client.authorizedPersonName.charAt(0).toUpperCase() + client?.authorizedPersonName?.slice(1)}</>
-                                                                )}
-                                                                {client.clientType === "individual" && client.gender && (
-                                                                    <>{client.gender.charAt(0).toUpperCase() + client.gender.slice(1)}</>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell>{getClientTypeBadge(client.clientType)}</TableCell>
-                                                <TableCell>
-                                                    <div className="space-y-1">
-                                                        <div className="flex items-center gap-1 text-xs">
-                                                            <Mail className="h-3 w-3 text-muted-foreground" />
-                                                            <span className="truncate">{client.email}</span>
-                                                        </div>
-                                                        <div className="flex items-center gap-1 text-xs">
-                                                            <Phone className="h-3 w-3 text-muted-foreground" />
-                                                            <span className="truncate">{client.phoneNumber}</span>
-                                                        </div>
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Badge className="bg-gray-200 text-black">{client.taskCount}</Badge>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Badge className="bg-gray-200 text-black">{client.retainershipCount}</Badge>
-                                                </TableCell>
-                                                <TableCell className="text-xs text-muted-foreground">
-                                                    <span className="block truncate" title={formatDeletedAt(client.deletedAt)}>
-                                                        {formatDeletedAt(client.deletedAt)}
-                                                    </span>
-                                                </TableCell>
-                                                <TableCell className="text-right">
-                                                    <DropdownMenu>
-                                                        <DropdownMenuTrigger asChild>
-                                                            <Button variant="ghost" className="h-8 w-8 p-0">
-                                                                <span className="sr-only">Open menu</span>
-                                                                <MoreHorizontal className="h-4 w-4" />
-                                                            </Button>
-                                                        </DropdownMenuTrigger>
-                                                        <DropdownMenuContent align="end">
-                                                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                                            <DropdownMenuItem
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation()
-                                                                    router.push(`/deleted-client/${client.id}`)
-                                                                }}
-                                                            >
-                                                                <Eye className="mr-2 h-4 w-4" />
-                                                                View Details
-                                                            </DropdownMenuItem>
-                                                        </DropdownMenuContent>
-                                                    </DropdownMenu>
-                                                </TableCell>
-                                            </TableRow>
-                                        ))
-                                    )}
-                                </TableBody>
-                            </Table>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+                        <div className="space-y-2">
+                            <Label className="text-sm sm:text-base">Client Type</Label>
+                            <Select value={selectedType} onValueChange={setSelectedType}>
+                                <SelectTrigger className="w-full text-sm">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {clientTypes.map((type) => (
+                                        <SelectItem key={type} value={type} className="text-sm">
+                                            {type}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
                         </div>
 
-                        {/* Mobile Table View */}
-                        <div className="md:hidden border rounded-md overflow-hidden">
-                            <Table className="w-full table-fixed">
-                                <colgroup>
-                                    <col className="w-[40%]" />
-                                    <col className="w-[22%]" />
-                                    <col className="w-[26%]" />
-                                    <col className="w-[12%]" />
-                                </colgroup>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead className="text-xs">Client</TableHead><TableHead className="text-xs">Type</TableHead><TableHead className="text-xs">Deleted</TableHead><TableHead className="text-xs text-right">Actions</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-
-                                <TableBody>
-                                    {currentClients.length === 0 ? (
-                                        <TableRow>
-                                            <TableCell colSpan={4} className="text-center py-8 text-xs text-muted-foreground">
-                                                No deleted clients found matching your criteria.
-                                            </TableCell>
-                                        </TableRow>
-                                    ) : (
-                                        currentClients.map((client) => (
-                                            <TableRow className="cursor-pointer hover:bg-muted/50" key={client.id} onClick={() => handleRowClick(client)}>
-                                                <TableCell>
-                                                    <div className="flex items-center space-x-2">
-                                                        <Avatar className="h-8 w-8 flex-shrink-0">
-                                                            <AvatarFallback className="text-xs">{getInitials(client)}</AvatarFallback>
-                                                        </Avatar>
-                                                        <div className="min-w-0">
-                                                            <div className="font-medium text-xs truncate">{getClientDisplayName(client)}</div>
-                                                            <div className="text-xs text-muted-foreground truncate">{client.email}</div>
-                                                        </div>
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell className="text-xs">{getClientTypeBadge(client.clientType)}</TableCell>
-                                                <TableCell className="text-xs text-muted-foreground">
-                                                    <span className="block truncate" title={formatDeletedAt(client.deletedAt)}>
-                                                        {formatDeletedAt(client.deletedAt)}
-                                                    </span>
-                                                </TableCell>
-                                                <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
-                                                    <DropdownMenu>
-                                                        <DropdownMenuTrigger asChild>
-                                                            <Button variant="ghost" className="h-7 w-7 p-0">
-                                                                <span className="sr-only">Open menu</span>
-                                                                <MoreHorizontal className="h-3 w-3" />
-                                                            </Button>
-                                                        </DropdownMenuTrigger>
-                                                        <DropdownMenuContent align="end">
-                                                            <DropdownMenuLabel className="text-xs">Actions</DropdownMenuLabel>
-                                                            <DropdownMenuItem asChild>
-                                                                <Link href={`/deleted-client/${client.id}`}>
-                                                                    <Eye className="mr-2 h-3 w-3" />
-                                                                    <span className="text-xs">View Details</span>
-                                                                </Link>
-                                                            </DropdownMenuItem>
-                                                        </DropdownMenuContent>
-                                                    </DropdownMenu>
-                                                </TableCell>
-                                            </TableRow>
-                                        ))
-                                    )}
-                                </TableBody>
-                            </Table>
+                        <div className="space-y-2">
+                            <Label className="text-sm sm:text-base">Entity Type</Label>
+                            <Select value={selectedEntityType} onValueChange={setSelectedEntityType}>
+                                <SelectTrigger className="w-full text-sm">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {entityTypes.map((entity) => (
+                                        <SelectItem key={entity} value={entity} className="text-sm">
+                                            {entity}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
                         </div>
+                    </div>
 
-                        {/* Pagination */}
-                        {totalPages > 1 && (
-                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mt-6 pt-4 border-t">
-                                <div className="text-xs sm:text-sm text-muted-foreground">
-                                    Page {currentPage} of {totalPages}
-                                </div>
-                                <div className="flex items-center flex-wrap gap-2">
-                                    <Select value={itemsPerPage.toString()} onValueChange={handleItemsPerPageChange}>
-                                        <SelectTrigger className="w-24 text-xs sm:text-sm">
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {[5, 10, 20, 50].map((value) => (
-                                                <SelectItem key={value} value={value.toString()} className="text-xs sm:text-sm">
-                                                    {value} / page
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                    <Button variant="outline" size="sm" onClick={() => handlePageChange(1)} disabled={currentPage === 1} className="text-xs">
-                                        <ChevronsLeft className="h-4 w-4" />
-                                    </Button>
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => handlePageChange(currentPage - 1)}
-                                        disabled={currentPage === 1}
-                                        className="text-xs"
-                                    >
-                                        <ChevronLeft className="h-4 w-4" />
-                                    </Button>
-
-                                    {/* Page Numbers - Hidden on mobile */}
-                                    <div className="hidden sm:flex items-center gap-1">
-                                        {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                                            const pageNumber = Math.max(1, Math.min(totalPages - 4, currentPage - 2)) + i
-                                            if (pageNumber <= totalPages) {
-                                                return (
-                                                    <Button
-                                                        key={pageNumber}
-                                                        variant={currentPage === pageNumber ? "default" : "outline"}
-                                                        size="sm"
-                                                        onClick={() => handlePageChange(pageNumber)}
-                                                        className="text-xs"
-                                                    >
-                                                        {pageNumber}
-                                                    </Button>
-                                                )
-                                            }
-                                            return null
-                                        })}
-                                    </div>
-
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => handlePageChange(currentPage + 1)}
-                                        disabled={currentPage === totalPages}
-                                        className="text-xs"
-                                    >
-                                        <ChevronRight className="h-4 w-4" />
-                                    </Button>
-                                    <Button
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() => handlePageChange(totalPages)}
-                                        disabled={currentPage === totalPages}
-                                        className="text-xs"
-                                    >
-                                        <ChevronsRight className="h-4 w-4" />
-                                    </Button>
-                                </div>
-                            </div>
-                        )}
-                    </CardContent>
-                </>)}
+                    <div className="flex items-center justify-end gap-2 text-xs sm:text-sm text-muted-foreground">
+                        <Button
+                            onClick={resetFilters}
+                            className="cursor-pointer hover:text-white text-white bg-[#f42b03] hover:bg-[#f42b03] rounded-lg px-3 sm:px-4 py-2 text-xs sm:text-sm shadow-none hover:shadow-lg transition-shadow duration-300"
+                            variant="outline"
+                        >
+                            Clear
+                        </Button>
+                    </div>
+                </CardContent>
             </Card>
+
+            <DeletedClientTable
+                searchTerm={searchTerm}
+                selectedType={selectedType}
+                selectedEntityType={selectedEntityType}
+            />
         </div>
     )
 }

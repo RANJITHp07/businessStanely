@@ -1,10 +1,10 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useCallback, useState, useEffect } from "react"
 import { fetchWithAuth } from "@/lib/fetchWithAuth"
 import Link from "next/link"
 import { toast } from "react-toastify"
-import { TaskCategory } from "@/types"
+import { DeletedTaskCategory, TaskCategory } from "@/types"
 import {
     ChevronLeft,
     ChevronRight,
@@ -65,6 +65,8 @@ export default function TaskCategoryTable() {
     const [categoryToDelete, setCategoryToDelete] = useState<TaskCategory | null>(null)
     const [loading, setLoading] = useState(true)
     const [activeTab, setActiveTab] = useState("approved")
+    const [deletedCategories, setDeletedCategories] = useState<DeletedTaskCategory[]>([])
+    const [deletedLoading, setDeletedLoading] = useState(false)
     const [currentUserRole, setCurrentUserRole] = useState<string>("")
 
     const router = useRouter()
@@ -109,7 +111,39 @@ export default function TaskCategoryTable() {
         fetchAllCategories();
     }, []);
 
+    // Deleted services live behind their own endpoint: the normal read path
+    // filters them out, so they can only be listed separately.
+    const fetchDeletedCategories = useCallback(async () => {
+        try {
+            setDeletedLoading(true);
+            const response = await fetchWithAuth(`/api/deleted-task-categories`);
+
+            if (!response.ok) {
+                throw new Error('Failed to fetch deleted services');
+            }
+
+            const data = await response.json();
+            setDeletedCategories(Array.isArray(data) ? data : []);
+        } catch (error) {
+            console.error("Error fetching deleted services:", error);
+            setDeletedCategories([]);
+            if (error instanceof Error) {
+                toast.error(error.message);
+            }
+        } finally {
+            setDeletedLoading(false);
+        }
+    }, []);
+
     useEffect(() => {
+        fetchDeletedCategories();
+    }, [fetchDeletedCategories]);
+
+    useEffect(() => {
+        // The deleted tab has its own fetch above; this one only serves the
+        // approved and pending tabs.
+        if (activeTab === 'deleted') return;
+
         const fetchCategories = async () => {
             try {
                 setLoading(true);
@@ -188,11 +222,21 @@ export default function TaskCategoryTable() {
                 throw new Error('Failed to delete category')
             }
 
+            const result = await response.json().catch(() => ({}))
+
             // Update both category lists in the UI
             setCategories(categories.filter((category) => category.id !== categoryToDelete.id))
             setAllCategories(allCategories.filter((category) => category.id !== categoryToDelete.id))
             setCategoryToDelete(null)
-            toast.success("Category deleted successfully")
+            // The delete cascades to the service's tasks, so the deleted tab is
+            // refetched rather than patched locally.
+            fetchDeletedCategories()
+            const deletedTaskCount = result?.deletedTaskCount ?? 0
+            toast.success(
+                deletedTaskCount > 0
+                    ? `Service deleted along with ${deletedTaskCount} task${deletedTaskCount === 1 ? "" : "s"}`
+                    : "Service deleted successfully"
+            )
         } catch (error) {
             console.error("Error deleting category:", error)
             const errorMessage = error instanceof Error ? error.message : "Failed to delete category"
@@ -216,6 +260,19 @@ export default function TaskCategoryTable() {
     // Get counts for tabs from allCategories to always show correct counts
     const approvedCount = allCategories.filter((cat) => cat.status === "approved").length
     const pendingCount = allCategories.filter((cat) => cat.status === "pending").length
+    const deletedCount = deletedCategories.length
+
+    // The deleted tab has its own list, so it gets its own search filter rather
+    // than going through the status-based one above.
+    const filteredDeletedCategories = deletedCategories.filter((category) => {
+        const term = searchTerm.toLowerCase()
+        return (
+            category.name.toLowerCase().includes(term) ||
+            (category.description?.toLowerCase() || "").includes(term) ||
+            (category.createdBy?.toLowerCase() || "").includes(term) ||
+            (category.deletedBy?.toLowerCase() || "").includes(term)
+        )
+    })
 
     return (
         <div className="container mx-auto p-6 max-w-7xl">
@@ -288,7 +345,7 @@ export default function TaskCategoryTable() {
 
             {/* Categories Table with Tabs */}
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-                <TabsList className="grid w-full grid-cols-2">
+                <TabsList className="grid w-full grid-cols-3">
                     <TabsTrigger value="approved" className="flex items-center gap-2">
                         <CheckCircle className="h-4 w-4" />
                         Approved Services ({approvedCount})
@@ -296,6 +353,10 @@ export default function TaskCategoryTable() {
                     <TabsTrigger value="pending" className="flex items-center gap-2">
                         <Clock className="h-4 w-4" />
                         Pending Services ({pendingCount})
+                    </TabsTrigger>
+                    <TabsTrigger value="deleted" className="flex items-center gap-2">
+                        <Trash2 className="h-4 w-4" />
+                        Deleted Services ({deletedCount})
                     </TabsTrigger>
                 </TabsList>
 
@@ -736,6 +797,120 @@ export default function TaskCategoryTable() {
                         )}
                     </Card>
                 </TabsContent>
+
+                <TabsContent value="deleted">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <Trash2 className="h-5 w-5" />
+                                Deleted Services ({filteredDeletedCategories.length})
+                            </CardTitle>
+                            <CardDescription>
+                                Deleted services and the tasks removed with them. Kept for
+                                reference — they no longer appear anywhere else in the app.
+                            </CardDescription>
+                        </CardHeader>
+                        {deletedLoading ? (
+                            <div className="flex justify-center items-center py-8">
+                                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                            </div>
+                        ) : (
+                            <CardContent>
+                                <div className="rounded-md border">
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow>
+                                                <TableHead>Service</TableHead>
+                                                <TableHead>Description</TableHead>
+                                                <TableHead>Tasks Removed</TableHead>
+                                                <TableHead>Deleted By</TableHead>
+                                                <TableHead>Deleted On</TableHead>
+                                                <TableHead className="text-right">Actions</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {filteredDeletedCategories.length === 0 ? (
+                                                <TableRow>
+                                                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                                                        No deleted services found matching your criteria.
+                                                    </TableCell>
+                                                </TableRow>
+                                            ) : (
+                                                filteredDeletedCategories.map((category) => (
+                                                    <TableRow
+                                                        key={category.id}
+                                                        className="cursor-pointer hover:bg-muted/50"
+                                                        onClick={() => router.push(`/deleted-task_category/${category.id}`)}
+                                                    >
+                                                        <TableCell>
+                                                            <div className="flex items-center space-x-3">
+                                                                <Avatar className="h-10 w-10">
+                                                                    <AvatarFallback>
+                                                                        {category.name
+                                                                            .toUpperCase()
+                                                                            .split(" ")
+                                                                            .map((n) => n[0])
+                                                                            .join("")}
+                                                                    </AvatarFallback>
+                                                                </Avatar>
+                                                                <div>
+                                                                    <div className="font-medium">
+                                                                        {category.name.charAt(0).toUpperCase() + category.name.slice(1)}
+                                                                    </div>
+                                                                    <div className="text-sm text-muted-foreground">
+                                                                        Created: {new Date(category.createdAt).toLocaleDateString()}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <div className="max-w-xs">
+                                                                <p className="text-sm truncate" title={category.description}>
+                                                                    {category.description}
+                                                                </p>
+                                                            </div>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <Badge variant="outline">{category.taskCount || 0} tasks</Badge>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <div className="text-sm">
+                                                                {category.deletedBy || "Unknown"}
+                                                                {category.deletedByType === "AGENT" && (
+                                                                    <span className="ml-1 text-xs text-blue-600">(Agent)</span>
+                                                                )}
+                                                            </div>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <div className="text-sm">
+                                                                {category.deletedAt
+                                                                    ? new Date(category.deletedAt).toLocaleDateString()
+                                                                    : "-"}
+                                                            </div>
+                                                        </TableCell>
+                                                        <TableCell className="text-right">
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation()
+                                                                    router.push(`/deleted-task_category/${category.id}`)
+                                                                }}
+                                                            >
+                                                                <Eye className="mr-2 h-4 w-4" />
+                                                                View
+                                                            </Button>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ))
+                                            )}
+                                        </TableBody>
+                                    </Table>
+                                </div>
+                            </CardContent>
+                        )}
+                    </Card>
+                </TabsContent>
             </Tabs>
 
             <AlertDialog open={!!categoryToDelete} onOpenChange={() => setCategoryToDelete(null)}>
@@ -743,8 +918,9 @@ export default function TaskCategoryTable() {
                     <AlertDialogHeader>
                         <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                         <AlertDialogDescription>
-                            This action cannot be undone. This will permanently delete the service and may affect existing tasks
-                            Ownership to this category.
+                            This removes the service and every task filed under it from the
+                            app. Nothing is erased — both stay visible in the Deleted Services
+                            tab.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>

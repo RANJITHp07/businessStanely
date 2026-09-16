@@ -6,6 +6,7 @@ import {
   softDeleteData,
 } from "@/lib/audit";
 import prisma from "@/lib/prisma";
+import { NOT_DELETED } from "@/lib/softDelete";
 
 export async function GET(
   req: NextRequest,
@@ -273,20 +274,63 @@ export async function DELETE(
 
     const actor = actorFromAdmin(currentAdmin);
 
-    await prisma.taskCategory.update({
-      where: { id },
-      data: softDeleteData(actor),
+    // Tasks filed under this service. Counted for the audit and soft deleted
+    // with it below.
+    const tasks = await prisma.task.findMany({
+      where: { categoryId: id },
+      select: { id: true, title: true },
     });
+
+    const deletedAt = new Date();
+
+    // Soft delete the service and its tasks together. Prisma's onDelete only
+    // fires on a real delete, so the cascade is explicit. One shared
+    // `deletedAt` is what lets a restore bring back exactly the rows this
+    // action removed and leave earlier deletions alone.
+    await prisma.$transaction([
+      prisma.taskCategory.update({
+        where: { id },
+        data: softDeleteData(actor, deletedAt),
+      }),
+      prisma.task.updateMany({
+        // updateMany is not a read, so the soft-delete extension adds no filter
+        // here: scope it explicitly so a task deleted earlier keeps its
+        // original stamp and is not swept into this action's timestamp.
+        // NOT_DELETED rather than `deletedAt: null`, because on MongoDB null
+        // does not match rows written before soft delete shipped, where the
+        // field is absent entirely.
+        where: { categoryId: id, OR: [...NOT_DELETED.OR] },
+        data: softDeleteData(actor, deletedAt),
+      }),
+    ]);
 
     await recordDeletionAudit({
       entityType: "TaskCategory",
       entityId: id,
       entityName: existingCategory.name,
+      affectedTaskCount: tasks.length,
       actor,
       req,
     });
 
-    return NextResponse.json({ message: "Category deleted successfully" });
+    // One audit row per cascaded task, so each is traceable on its own.
+    for (const task of tasks) {
+      await recordDeletionAudit({
+        entityType: "Task",
+        entityId: task.id,
+        entityName: task.title,
+        reason: "Cascaded from service deletion",
+        parentEntityType: "TaskCategory",
+        parentEntityId: id,
+        actor,
+        req,
+      });
+    }
+
+    return NextResponse.json({
+      message: "Category deleted successfully",
+      deletedTaskCount: tasks.length,
+    });
   } catch (error) {
     console.error("Error deleting task category:", error);
 

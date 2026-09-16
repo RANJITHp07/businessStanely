@@ -120,6 +120,24 @@ export interface Prospect {
   updatedAt: string;
   archived?: boolean;
 }
+/** A soft-deleted service, as returned by /api/deleted-task-categories. */
+export interface DeletedTaskCategory {
+  id: string;
+  name: string;
+  description?: string;
+  color: string;
+  status: "pending" | "approved";
+  createdAt: string;
+  deletedAt: string | null;
+  deletedBy: string | null;
+  deletedByType?: "USER" | "AGENT" | null;
+  createdBy: string | null;
+  createdByType?: "user" | "agent" | null;
+  createdByRole?: "owner" | "admin" | null;
+  timePeriod?: number | null;
+  taskCount?: number;
+}
+
 export interface TaskCategory {
   id: string;
   name: string;

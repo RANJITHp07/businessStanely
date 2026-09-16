@@ -12,10 +12,9 @@ import { onlyDeleted } from "@/lib/softDelete";
  * all of it — which is why this route exists rather than reusing
  * /api/retainerships/[id].
  *
- * Tasks are the exception: a retainership delete leaves them untouched, so the
- * per-legislation task count is read through the default (not-deleted) path.
- * Tasks keep their legislationId/retainershipId and reappear under the
- * retainership if it is restored.
+ * Tasks cascade too and are returned in full, read with `onlyDeleted` as well.
+ * They keep their legislationId/retainershipId and are restored alongside the
+ * retainership.
  */
 export async function GET(
   req: NextRequest,
@@ -64,20 +63,40 @@ export async function GET(
 
     const legislationIds = legislations.map((l) => l.id);
 
-    // A retainership delete leaves its tasks live, so these are read through the
-    // default (not-deleted) path. Only the per-legislation count is shown, so
-    // group in the database rather than pulling the rows back.
-    const taskGroups = legislationIds.length
-      ? await prisma.task.groupBy({
-          by: ["legislationId"],
-          where: { legislationId: { in: legislationIds } },
-          _count: { _all: true },
-        })
-      : [];
+    // Tasks were soft deleted with the retainership, so they are read with
+    // `onlyDeleted`. They hang off the retainership directly or off one of its
+    // legislations, so both paths are matched.
+    const tasks = await prisma.task.findMany({
+      where: {
+        AND: [
+          {
+            OR: [
+              { retainershipId: id },
+              ...(legislationIds.length
+                ? [{ legislationId: { in: legislationIds } }]
+                : []),
+            ],
+          },
+          onlyDeleted,
+        ],
+      },
+      orderBy: { createdAt: "desc" },
+      include: {
+        assignedTo: { select: { id: true, name: true } },
+        legislation: { select: { id: true, title: true } },
+      },
+    });
 
-    const taskCountByLegislationId = new Map(
-      taskGroups.map((g) => [g.legislationId, g._count._all])
-    );
+    // The legislation table shows a per-legislation count, derived from the
+    // same rows rather than a second query.
+    const taskCountByLegislationId = new Map<string, number>();
+    for (const task of tasks) {
+      if (!task.legislationId) continue;
+      taskCountByLegislationId.set(
+        task.legislationId,
+        (taskCountByLegislationId.get(task.legislationId) || 0) + 1
+      );
+    }
 
     return NextResponse.json({
       retainership: {
@@ -112,6 +131,20 @@ export async function GET(
             }
           : null,
       },
+      tasks: tasks.map((task) => ({
+        id: task.id,
+        title: task.title,
+        description: task.description || "",
+        status: task.status,
+        priority: task.priority,
+        dueDate: task.dueDate,
+        createdAt: task.createdAt,
+        deletedAt: task.deletedAt,
+        assignedTo: task.assignedTo?.name || null,
+        assignedToId: task.assignedTo?.id || null,
+        legislationId: task.legislation?.id || null,
+        legislationTitle: task.legislation?.title || null,
+      })),
       legislations: legislations.map((legislation) => ({
         id: legislation.id,
         title: legislation.title,

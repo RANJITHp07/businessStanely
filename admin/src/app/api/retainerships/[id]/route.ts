@@ -6,6 +6,7 @@ import {
   actorFromAdmin,
   softDeleteData,
 } from "@/lib/audit";
+import { NOT_DELETED } from "@/lib/softDelete";
 
 export async function GET(
   req: NextRequest,
@@ -356,31 +357,44 @@ export async function DELETE(
 
     const legislationIds = existingRetainership.legislation.map((l) => l.id);
 
-    // Count what stays behind so the audit reflects the state at delete time.
-    // Tasks are intentionally left untouched: they keep their legislationId and
-    // become visible again if the retainership is restored.
-    const taskCount = await prisma.task.count({
-      where: {
-        OR: [
-          { retainershipId: id },
-          ...(legislationIds.length
-            ? [{ legislationId: { in: legislationIds } }]
-            : []),
-        ],
-      },
-    });
+    // Tasks reachable from this retainership, either directly or through one of
+    // its legislations. Counted for the audit and soft deleted below.
+    const taskFilter = {
+      OR: [
+        { retainershipId: id },
+        ...(legislationIds.length
+          ? [{ legislationId: { in: legislationIds } }]
+          : []),
+      ],
+    };
+
+    const taskCount = await prisma.task.count({ where: taskFilter });
 
     const deletedAt = new Date();
 
-    // Soft delete the retainership and its legislations together. Prisma's
-    // onDelete: Cascade only fires on a real delete, so the cascade is explicit.
+    // Soft delete the retainership, its legislations and their tasks together.
+    // Prisma's onDelete: Cascade only fires on a real delete, so the cascade is
+    // explicit. One shared `deletedAt` is what lets a restore bring back exactly
+    // the rows this action removed and leave earlier deletions alone.
     await prisma.$transaction([
       prisma.retainership.update({
         where: { id },
         data: softDeleteData(actorFromAdmin(currentAdmin), deletedAt),
       }),
       prisma.legislation.updateMany({
-        where: { retainershipId: id, deletedAt: null },
+        // NOT_DELETED rather than `deletedAt: null`: on MongoDB null does not
+        // match rows written before soft delete shipped, where the field is
+        // absent entirely.
+        where: { retainershipId: id, OR: [...NOT_DELETED.OR] },
+        data: softDeleteData(actorFromAdmin(currentAdmin), deletedAt),
+      }),
+      prisma.task.updateMany({
+        // updateMany is not a read, so the soft-delete extension adds no
+        // filter here: scope it explicitly so a task deleted earlier keeps its
+        // original stamp and is not swept into this action's timestamp. Both
+        // conditions are ORs, so they are combined under AND rather than
+        // spread, which would drop one.
+        where: { AND: [taskFilter, { OR: [...NOT_DELETED.OR] }] },
         data: softDeleteData(actorFromAdmin(currentAdmin), deletedAt),
       }),
     ]);
@@ -412,6 +426,7 @@ export async function DELETE(
     return NextResponse.json({
       message: "Retainership deleted successfully",
       deletedLegislationCount: legislationIds.length,
+      deletedTaskCount: taskCount,
       affectedTaskCount: taskCount,
     });
   } catch (error) {

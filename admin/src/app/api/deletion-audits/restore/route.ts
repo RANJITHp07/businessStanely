@@ -71,9 +71,9 @@ export async function POST(req: NextRequest) {
       data: restoreData(),
     });
 
-    // Restoring a retainership brings back the legislations that were cascaded
-    // with it, but only those deleted in the same action — anything deleted
-    // separately beforehand stays deleted.
+    // Restoring a retainership brings back the legislations and tasks that were
+    // cascaded with it, but only those deleted in the same action — anything
+    // deleted separately beforehand stays deleted.
     let restoredLegislationCount = 0;
     let restoredTaskCount = 0;
     if (entityType === "Retainership") {
@@ -82,6 +82,34 @@ export async function POST(req: NextRequest) {
         data: restoreData(),
       });
       restoredLegislationCount = cascaded.count;
+
+      // Tasks hang off the retainership directly or off one of its
+      // legislations, so both paths are matched. The legislation ids are read
+      // after the restore above, when they are live again.
+      const legislationIds = (
+        await prismaRaw.legislation.findMany({
+          where: { retainershipId: entityId },
+          select: { id: true },
+        })
+      ).map((l) => l.id);
+
+      const tasks = await prismaRaw.task.updateMany({
+        where: {
+          AND: [
+            {
+              OR: [
+                { retainershipId: entityId },
+                ...(legislationIds.length
+                  ? [{ legislationId: { in: legislationIds } }]
+                  : []),
+              ],
+            },
+            { deletedAt: existing.deletedAt },
+          ],
+        },
+        data: restoreData(),
+      });
+      restoredTaskCount = tasks.count;
     }
 
     // Restoring a client brings back the tasks, retainerships, legislations and

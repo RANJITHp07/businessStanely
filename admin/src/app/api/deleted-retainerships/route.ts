@@ -12,8 +12,8 @@ import { onlyDeleted } from "@/lib/softDelete";
  * with `onlyDeleted` for that reason: the default read path would report zero
  * for every one of them.
  *
- * Tasks are deliberately not cascaded by the delete, so the task count is of
- * live tasks still pointing at the hidden retainership.
+ * Tasks cascade the same way, and hang off either the retainership directly or
+ * one of its legislations, so both paths are counted — also with `onlyDeleted`.
  */
 export async function GET(req: NextRequest) {
   try {
@@ -40,25 +40,72 @@ export async function GET(req: NextRequest) {
 
     const retainershipIds = retainerships.map((r) => r.id);
 
-    const [legislationGroups, taskGroups] = await Promise.all([
-      prisma.legislation.groupBy({
+    const [legislations, directTaskGroups] = await Promise.all([
+      prisma.legislation.findMany({
+        where: { retainershipId: { in: retainershipIds }, ...onlyDeleted },
+        select: { id: true, retainershipId: true },
+      }),
+      prisma.task.groupBy({
         by: ["retainershipId"],
         where: { retainershipId: { in: retainershipIds }, ...onlyDeleted },
         _count: { _all: true },
       }),
-      prisma.task.groupBy({
-        by: ["retainershipId"],
-        where: { retainershipId: { in: retainershipIds } },
-        _count: { _all: true },
-      }),
     ]);
 
-    const legislationCountById = new Map(
-      legislationGroups.map((g) => [g.retainershipId, g._count._all])
-    );
-    const taskCountById = new Map(
-      taskGroups.map((g) => [g.retainershipId, g._count._all])
-    );
+    const legislationCountById = new Map<string, number>();
+    const retainershipIdByLegislationId = new Map<string, string>();
+    for (const legislation of legislations) {
+      legislationCountById.set(
+        legislation.retainershipId,
+        (legislationCountById.get(legislation.retainershipId) || 0) + 1
+      );
+      retainershipIdByLegislationId.set(
+        legislation.id,
+        legislation.retainershipId
+      );
+    }
+
+    const taskCountById = new Map<string, number>();
+    for (const group of directTaskGroups) {
+      if (!group.retainershipId) continue;
+      taskCountById.set(group.retainershipId, group._count._all);
+    }
+
+    // Tasks linked only through a legislation carry no retainershipId, so they
+    // are counted separately and folded into the same totals.
+    const legislationIds = [...retainershipIdByLegislationId.keys()];
+    if (legislationIds.length) {
+      const viaLegislation = await prisma.task.groupBy({
+        by: ["legislationId"],
+        where: {
+          AND: [
+            { legislationId: { in: legislationIds } },
+            // Exclude tasks already counted above. On MongoDB `null` does not
+            // match an absent field, so both spellings are matched.
+            {
+              OR: [
+                { retainershipId: null },
+                { retainershipId: { isSet: false } },
+              ],
+            },
+            onlyDeleted,
+          ],
+        },
+        _count: { _all: true },
+      });
+
+      for (const group of viaLegislation) {
+        if (!group.legislationId) continue;
+        const retainershipId = retainershipIdByLegislationId.get(
+          group.legislationId
+        );
+        if (!retainershipId) continue;
+        taskCountById.set(
+          retainershipId,
+          (taskCountById.get(retainershipId) || 0) + group._count._all
+        );
+      }
+    }
 
     return NextResponse.json(
       retainerships.map((retainership) => ({

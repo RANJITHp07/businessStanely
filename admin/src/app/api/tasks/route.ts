@@ -227,10 +227,28 @@ export async function GET(req: NextRequest) {
       };
     } else if (retainershipTasks === "true") {
       whereClause.legislationId = { not: null };
-      whereClause.active = true;
 
       if (!statusesArray?.length && !status) {
-        whereClause.status = { notIn: ["Completed", "completed"] };
+        // A completed one-off retainership task is terminal work and belongs
+        // in the Completed section -- blanket-excluding every completed row
+        // left that section permanently empty. Only the recurring rows
+        // (triggerDate set) are held back, because once completed they are
+        // the future-trigger view's and showing them in both places
+        // double-counts the same occurrence.
+        const currentAnd = whereClause.AND;
+        const retainershipStateFilter: Prisma.TaskWhereInput = {
+          OR: [
+            { triggerDate: null },
+            { active: true, status: { notIn: ["Completed", "completed"] } },
+          ],
+        };
+        whereClause.AND = Array.isArray(currentAnd)
+          ? [...currentAnd, retainershipStateFilter]
+          : currentAnd
+            ? [currentAnd, retainershipStateFilter]
+            : [retainershipStateFilter];
+      } else {
+        whereClause.active = true;
       }
     } else if (!categoryId) {
       // Default assigned-task view: exclude legislation/retainership tasks

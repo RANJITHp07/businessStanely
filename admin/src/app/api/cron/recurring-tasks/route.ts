@@ -61,7 +61,17 @@ async function runDailyJob(request: NextRequest) {
 
   try {
     const updatedTasks = await updateAllRecurringTasks();
-    await sendActivityEmailsToAgents();
+
+    // The activity emails are reporting, not scheduling. Letting them throw
+    // here failed the whole run *after* the tasks had already been advanced,
+    // which released the claim and let the next run advance them a second
+    // time. They get their own boundary so mail trouble cannot move a
+    // trigger date.
+    try {
+      await sendActivityEmailsToAgents();
+    } catch (error) {
+      console.error("Activity emails failed; recurrence roll-forward stands:", error);
+    }
 
     await prisma.cronLog.update({
       where: { id: claim.id },
@@ -81,9 +91,12 @@ async function runDailyJob(request: NextRequest) {
 
     // The claim is released so the next scheduled run retries, rather than
     // the day being permanently marked as done by a failed attempt.
-    await prisma.cronLog
-      .update({ where: { id: claim.id }, data: { status: "failed" } })
-      .catch(() => undefined);
+    // Deleting (not just flagging) the claim is what actually releases the
+    // day. A row left behind still occupies the unique [jobName, runDate]
+    // index, so every retry that day hits P2002 and reports "Already ran
+    // today" -- one transient failure (a bad SMTP handshake in the activity
+    // emails, say) permanently skipped that day's recurrence roll-forward.
+    await prisma.cronLog.delete({ where: { id: claim.id } }).catch(() => undefined);
 
     return NextResponse.json(
       {

@@ -206,10 +206,26 @@ export async function PUT(
     // so editing either side of that formula has to recompute it. Without this
     // an edited task keeps the deadline of its old trigger date or old service
     // until the cron next rolls it forward.
+    //
+    // A status-only change is explicitly not a reschedule. Completing a task
+    // resubmits the whole form, so `dueDate` arrives unchanged and used to
+    // re-run this block, re-deriving currentPeriodStart/nextDueDate from the
+    // *current* (still un-advanced) triggerDate. On a recurring task that
+    // silently dragged the displayed next trigger date back onto the period
+    // that had just been completed. Only recompute when one of the inputs to
+    // the formula actually changed value.
+    const changedDate = (incoming: unknown, existing: Date | null) => {
+      if (incoming === undefined) return false;
+      const next = incoming ? new Date(incoming as string).getTime() : null;
+      const prev = existing ? new Date(existing).getTime() : null;
+      return next !== prev;
+    };
+
     if (
-      body.triggerDate !== undefined ||
-      body.dueDate !== undefined ||
-      body.categoryId !== undefined
+      changedDate(body.triggerDate, currentTask.triggerDate) ||
+      changedDate(body.dueDate, currentTask.dueDate) ||
+      (body.categoryId !== undefined &&
+        body.categoryId !== currentTask.categoryId)
     ) {
       try {
         const { initializeRecurringTask } =

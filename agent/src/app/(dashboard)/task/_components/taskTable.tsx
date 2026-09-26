@@ -71,6 +71,7 @@ import { Task } from "@/types";
 import { useSearchParams } from "next/navigation";
 import { X } from "lucide-react";
 import { useTablePage } from "@/hooks/useTablePage";
+import ServiceFilter from "./serviceFilter";
 import { useAgentContext } from "@/lib/agent-context";
 
 const priorities = ["All Priorities", "Low", "Medium", "High"];
@@ -95,6 +96,7 @@ export default function TasksTable() {
   // Multi-select status check durations
   const [selectedStatusCheckDurations, setSelectedStatusCheckDurations] = useState<string[]>([]);
   const [clientUpdateFilter, setClientUpdateFilter] = useState<"all" | "updated" | "not-updated">("all");
+  const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([]);
   const [sortBy, setSortBy] = useState("a-z");
   const { currentPage, setCurrentPage, itemsPerPage, setItemsPerPage, clampToTotalPages } =
       useTablePage("agent-dashboard-task-_components-taskTable");
@@ -149,6 +151,7 @@ export default function TasksTable() {
         const search = searchParams?.get("search");
         const priorities = searchParams?.get("priorities");
         const followUpDurations = searchParams?.get("followUpDurations");
+        const serviceIds = searchParams?.get("serviceIds");
         let url = '/api/tasks';
         const params = [];
         if (assignedToId) params.push(`assignedToId=${assignedToId}`);
@@ -164,6 +167,7 @@ export default function TasksTable() {
         if (search) params.push(`search=${encodeURIComponent(search)}`);
         if (priorities) params.push(`priorities=${encodeURIComponent(priorities)}`);
         if (followUpDurations) params.push(`followUpDurations=${encodeURIComponent(followUpDurations)}`);
+        if (serviceIds) params.push(`serviceIds=${encodeURIComponent(serviceIds)}`);
         if (params.length) url += `?${params.join('&')}`;
         const response = await fetchWithAuth(url);
         if (response.ok) {
@@ -254,6 +258,7 @@ export default function TasksTable() {
     followUpDurations: string[],
     statusCheckDuration: string[],
     clientUpdate: "all" | "updated" | "not-updated" = clientUpdateFilter,
+    serviceIds: string[] = selectedServiceIds,
   ) => {
     const params = new URLSearchParams();
     const assignedToId = searchParams.get("assignedToId");
@@ -270,6 +275,7 @@ export default function TasksTable() {
     if (followUpDurations.length > 0) params.set("followUpDurations", followUpDurations.join(","));
     if (statusCheckDuration.length > 0) params.set("statusCheckDuration", statusCheckDuration.join(","));
     if (clientUpdate !== "all") params.set("clientUpdate", clientUpdate);
+    if (serviceIds.length > 0) params.set("serviceIds", serviceIds.join(","));
     const newUrl = params.toString() ? `?${params.toString()}` : window.location.pathname;
     router.replace(newUrl);
   };
@@ -283,6 +289,8 @@ export default function TasksTable() {
       const urlFollowUpDurations = searchParams?.get("followUpDurations");
       const urlStatusCheckDurations = searchParams?.get("statusCheckDuration");
       const urlClientUpdate = searchParams?.get("clientUpdate");
+      const urlServiceIds = searchParams?.get("serviceIds");
+      setSelectedServiceIds(urlServiceIds ? urlServiceIds.split(",").filter(Boolean) : []);
 
       if (urlSearch) setSearchTerm(urlSearch);
       if (urlPriorities) setSelectedPriorities(urlPriorities.split(","));
@@ -721,6 +729,23 @@ export default function TasksTable() {
                         </SelectContent>
                       </Select>
                     </div>
+
+                    <ServiceFilter
+                      selectedIds={selectedServiceIds}
+                      onChange={(ids) => {
+                        setSelectedServiceIds(ids);
+                        setCurrentPage(1);
+                        updateUrlFilters(
+                          selectedPriorities,
+                          selectedStatuses,
+                          searchTerm,
+                          selectedFollowUpDurations,
+                          selectedStatusCheckDurations,
+                          clientUpdateFilter,
+                          ids,
+                        );
+                      }}
+                    />
                   </div>
 
                   {/* Results Summary */}
@@ -733,7 +758,8 @@ export default function TasksTable() {
                         setSelectedFollowUpDurations([]);
                         setSelectedStatusCheckDurations([]);
                         setClientUpdateFilter("all");
-                        updateUrlFilters([], [], "", [], [], "all");
+                        setSelectedServiceIds([]);
+                        updateUrlFilters([], [], "", [], [], "all", []);
                       }}
                       className="cursor-pointer hover:text-white text-white bg-[#f42b03] hover:bg-[#f42b03] rounded-lg px-4 py-2 shadow-none hover:shadow-lg transition-shadow duration-300"
                       variant="outline"

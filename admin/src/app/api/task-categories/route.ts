@@ -19,6 +19,9 @@ export async function GET(req: NextRequest) {
     const url = new URL(req.url);
     const statusParam = url.searchParams.get("status");
     const includeAll = url.searchParams.get("includeAll") === "true";
+    // `lite=true` returns only id/name for pickers such as the task list's
+    // service filter, skipping the relations and per-category task counts.
+    const lite = url.searchParams.get("lite") === "true";
 
     // Build where clause for the query
     const where: { status?: string | { not: string } } = {};
@@ -34,6 +37,15 @@ export async function GET(req: NextRequest) {
       where.status = { not: "rejected" };
     }
     
+    if (lite) {
+      const categories = await prisma.taskCategory.findMany({
+        where,
+        select: { id: true, name: true },
+        orderBy: { name: "asc" },
+      });
+      return NextResponse.json(categories);
+    }
+
     // Get categories from the database with proper relations
     // Get categories from the database with proper relations
     const categories = await prisma.taskCategory.findMany({

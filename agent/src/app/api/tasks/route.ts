@@ -95,6 +95,7 @@ export async function GET(req: NextRequest) {
     const search = searchParams.get("search");
     const prioritiesParam = searchParams.get("priorities");
     const followUpDurationsParam = searchParams.get("followUpDurations");
+    const serviceIdsParam = searchParams.get("serviceIds");
 
     const statusCheckDurations = statusCheckDurationParam
       ? statusCheckDurationParam
@@ -186,6 +187,12 @@ export async function GET(req: NextRequest) {
     if (followUpDurationsParam) {
       const followUpArray = followUpDurationsParam.split(",").map((d) => d.trim()).filter(Boolean);
       if (followUpArray.length > 0) where.followUpDuration = { in: followUpArray };
+    }
+    // Service (task category) filter from the task list. Distinct from
+    // `categoryId`, which also lifts the approved-only restriction.
+    if (serviceIdsParam && !categoryId) {
+      const serviceIds = serviceIdsParam.split(",").map((id) => id.trim()).filter(Boolean);
+      if (serviceIds.length > 0) where.categoryId = { in: serviceIds };
     }
 
     const appendAndFilter = (filter: Prisma.TaskWhereInput) => {

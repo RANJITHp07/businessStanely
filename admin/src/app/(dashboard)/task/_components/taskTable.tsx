@@ -55,6 +55,7 @@ import Link from "next/link"
 import { Task } from "@/types"
 import { useSearchParams } from "next/navigation"
 import { useTablePage } from "@/hooks/useTablePage"
+import ServiceFilter from "./serviceFilter"
 
 const priorities = ["All Priorities", "Low", "Medium", "High"]
 const statuses = ["All Status", "To Do", "In Progress", "Hold", "Completed", "Abandoned"]
@@ -73,6 +74,7 @@ export default function TasksTable() {
   // Multi-select status check durations
   const [selectedStatusCheckDurations, setSelectedStatusCheckDurations] = useState<string[]>([])
   const [clientUpdateFilter, setClientUpdateFilter] = useState<"all" | "updated" | "not-updated">("all")
+  const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([])
   const { currentPage, setCurrentPage, itemsPerPage, setItemsPerPage, clampToTotalPages } =
       useTablePage("admin-dashboard-task-_components-taskTable")
   const [taskToDelete, setTaskToDelete] = useState<Task | null>(null)
@@ -91,6 +93,7 @@ export default function TasksTable() {
     search: string,
     statusCheckDuration: string[],
     clientUpdate: "all" | "updated" | "not-updated" = clientUpdateFilter,
+    serviceIds: string[] = selectedServiceIds,
   ) => {
     const params = new URLSearchParams();
     const assignedToId = searchParams.get("assignedToId");
@@ -109,6 +112,7 @@ export default function TasksTable() {
     if (followUpDurations.length > 0) params.set("followUpDurations", followUpDurations.join(","));
     if (statusCheckDuration.length > 0) params.set("statusCheckDuration", statusCheckDuration.join(","));
     if (clientUpdate !== "all") params.set("clientUpdate", clientUpdate);
+    if (serviceIds.length > 0) params.set("serviceIds", serviceIds.join(","));
     const newUrl = params.toString() ? `?${params.toString()}` : window.location.pathname;
     // Paging is server-side now, so a narrower filter can leave the current
     // page past the end of the new result set. Start over at page 1.
@@ -126,6 +130,8 @@ export default function TasksTable() {
       const urlFollowUpDurations = searchParams?.get("followUpDurations");
       const urlStatusCheckDurations = searchParams?.get("statusCheckDuration");
       const urlClientUpdate = searchParams?.get("clientUpdate");
+      const urlServiceIds = searchParams?.get("serviceIds");
+      setSelectedServiceIds(urlServiceIds ? urlServiceIds.split(",").filter(Boolean) : []);
       if (urlSearch) setSearchTerm(urlSearch);
       if (urlPriorities) setSelectedPriorities(urlPriorities.split(","));
       if (urlStatuses) setSelectedStatuses(urlStatuses.split(","));
@@ -158,6 +164,7 @@ export default function TasksTable() {
         const search = searchParams.get("search");
         const priorities = searchParams.get("priorities");
         const followUpDurations = searchParams.get("followUpDurations");
+        const serviceIds = searchParams.get("serviceIds");
         let url = "/api/tasks";
         const params = [];
         if (assignedToId) params.push(`assignedToId=${encodeURIComponent(assignedToId)}`);
@@ -172,6 +179,7 @@ export default function TasksTable() {
         if (search) params.push(`search=${encodeURIComponent(search)}`);
         if (priorities) params.push(`priorities=${encodeURIComponent(priorities)}`);
         if (followUpDurations) params.push(`followUpDurations=${encodeURIComponent(followUpDurations)}`);
+        if (serviceIds) params.push(`serviceIds=${encodeURIComponent(serviceIds)}`);
         // Page server-side. Sending these switches the API to its
         // `{ tasks, total, ... }` shape and keeps the response small enough for
         // the deployed function's body limit.
@@ -668,6 +676,22 @@ export default function TasksTable() {
                       </SelectContent>
                     </Select>
                   </div>
+
+                  <ServiceFilter
+                    selectedIds={selectedServiceIds}
+                    onChange={(ids) => {
+                      setSelectedServiceIds(ids);
+                      updateUrlFilters(
+                        selectedPriorities,
+                        selectedStatuses,
+                        selectedFollowUpDurations,
+                        searchTerm,
+                        selectedStatusCheckDurations,
+                        clientUpdateFilter,
+                        ids,
+                      );
+                    }}
+                  />
                 </div>
 
                 {/* Results Summary */}
@@ -680,7 +704,8 @@ export default function TasksTable() {
                       setSelectedFollowUpDurations([]);
                       setSelectedStatusCheckDurations([]);
                       setClientUpdateFilter("all");
-                      updateUrlFilters([], [], [], "", []);
+                      setSelectedServiceIds([]);
+                      updateUrlFilters([], [], [], "", [], "all", []);
                     }}
                     className="cursor-pointer hover:text-white text-white bg-[#f42b03] hover:bg-[#f42b03] rounded-lg px-4 py-2 shadow-none hover:shadow-lg transition-shadow duration-300"
                     variant="outline"

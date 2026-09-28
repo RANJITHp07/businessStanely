@@ -29,6 +29,7 @@ export const SOFT_DELETE_MODELS = [
   "TaskCategory",
   "LeadSource",
   "TimeLog",
+  "ClientDiaryEntry",
   "DiaryEntry",
   "Retainership",
   "Legislation",

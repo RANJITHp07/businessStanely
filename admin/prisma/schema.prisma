@@ -214,16 +214,49 @@ model ClientDiaryEntry {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  revisions ClientDiaryRevision[]
+
   /// Soft delete: rows are never removed, only stamped. Every read filters on
   /// deletedAt: null. See lib/audit.ts.
   deletedAt       DateTime?
   deletedById     String?   @db.ObjectId
   deletedByType   String? // "USER" | "AGENT"
 
-  /// Who last changed this row. Field-level history lives in DeletionAudit.
+  /// Who last changed this row. Field-level history lives in
+  /// ClientDiaryRevision.
   updatedById     String?   @db.ObjectId
   updatedByType   String? // "USER" | "AGENT"
 
+}
+
+/// Field-level history for client diary entries.
+///
+/// DeletionAudit deliberately records only *which* fields an UPDATE touched --
+/// it answers who and when, not what the old value was. Diary entries need the
+/// values themselves so an edit can be reviewed, and `content` is rich-text
+/// HTML that would bloat the audit table it shares indexes with. So revisions
+/// get their own collection: one row per edited field per save, holding the
+/// value before and after.
+model ClientDiaryRevision {
+  id      String           @id @default(auto()) @map("_id") @db.ObjectId
+  entryId String           @db.ObjectId
+  entry   ClientDiaryEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+
+  field    String // "heading" | "content" | "entryDate"
+  oldValue String?
+  newValue String?
+
+  /// The actor is a User (admin app) or an Agent (agent app), never both, so
+  /// identity is denormalized here the way DeletionAudit does it -- the log
+  /// still reads correctly once an actor is removed.
+  editedByType     String // "USER" | "AGENT"
+  editedById       String  @db.ObjectId
+  editedByEmail    String
+  editedByUsername String
+
+  createdAt DateTime @default(now())
+
+  @@index([entryId, createdAt])
 }
 
 model DiaryEntry {
@@ -374,8 +407,15 @@ model Task {
   followUpDuration    String? // e.g., "24hr", "48hr", "1w", "Working"
   statusCheckDuration String? // e.g., "24hr", "48hr", "1w", "Working"
   completed           Boolean   @default(false)
-  recurring           Int? // Recurring in months (1-12), null means not recurring
-  recurringType       String? // 'DAY' | 'WEEK' | 'MONTH'
+  recurring           Int? // Interval count, paired with recurringType; null means not recurring
+  recurringType       String? // 'DAY' | 'WEEK' | 'MONTH' | 'YEAR'
+
+  /// Weekdays a WEEK task fires on, as ISO numbers (1 = Monday ... 7 = Sunday).
+  /// Empty means the legacy behaviour: fire every `recurring` weeks on whatever
+  /// weekday the trigger date already falls on. When populated it overrides the
+  /// interval, so [1,3] fires every Monday and Wednesday. Only read for
+  /// recurringType 'WEEK'.
+  recurringWeekDays   Int[]
   active              Boolean   @default(true)
   holdDate            DateTime?
   holdDaysLeft        Int?

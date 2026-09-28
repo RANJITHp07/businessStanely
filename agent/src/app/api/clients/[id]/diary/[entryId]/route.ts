@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { getCurrentAdmin } from "@/lib/auth";
+import { getCurrentAgent } from "@/lib/auth";
 import {
   recordDeletionAudit,
   recordUpdateAudit,
-  actorFromAdmin,
+  actorFromAgent,
   softDeleteData,
   updateStampData,
 } from "@/lib/audit";
@@ -13,8 +13,6 @@ import {
   fetchDiaryRevisions,
   recordDiaryRevisions,
 } from "@/lib/clientDiaryRevisions";
-
-const prismaWithDiary = prisma;
 
 const DATE_ONLY_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -48,6 +46,11 @@ export async function PUT(
       );
     }
 
+    const currentAgent = await getCurrentAgent(req);
+    if (!currentAgent) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const body = await req.json();
     const entryDate =
       typeof body.entryDate === "string"
@@ -70,12 +73,7 @@ export async function PUT(
       );
     }
 
-    const currentAdmin = await getCurrentAdmin(req);
-    if (!currentAdmin) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const existingEntry = await prismaWithDiary.clientDiaryEntry.findFirst({
+    const existingEntry = await prisma.clientDiaryEntry.findFirst({
       where: { id: entryId },
       select: {
         id: true,
@@ -93,10 +91,10 @@ export async function PUT(
       );
     }
 
-    const actor = actorFromAdmin(currentAdmin);
+    const actor = actorFromAgent(currentAgent);
     const nextValues = { entryDate, heading: heading || null, content };
 
-    const updatedEntry = await prismaWithDiary.clientDiaryEntry.update({
+    const updatedEntry = await prisma.clientDiaryEntry.update({
       where: { id: entryId },
       data: { ...nextValues, ...updateStampData(actor) },
     });
@@ -149,12 +147,12 @@ export async function DELETE(
       );
     }
 
-    const currentAdmin = await getCurrentAdmin(req);
-    if (!currentAdmin) {
+    const currentAgent = await getCurrentAgent(req);
+    if (!currentAgent) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const existingEntry = await prismaWithDiary.clientDiaryEntry.findFirst({
+    const existingEntry = await prisma.clientDiaryEntry.findFirst({
       where: { id: entryId },
       select: { id: true, clientId: true, heading: true, entryDate: true },
     });
@@ -166,9 +164,9 @@ export async function DELETE(
       );
     }
 
-    const actor = actorFromAdmin(currentAdmin);
+    const actor = actorFromAgent(currentAgent);
 
-    await prismaWithDiary.clientDiaryEntry.update({
+    await prisma.clientDiaryEntry.update({
       where: { id: entryId },
       data: softDeleteData(actor),
     });

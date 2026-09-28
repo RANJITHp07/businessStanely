@@ -32,6 +32,7 @@ import {
     Building2,
     Phone,
     Mail,
+    NotebookPen,
 } from "lucide-react"
 import Link from "next/link"
 
@@ -192,6 +193,10 @@ export default function ClientsTable() {
     const getClientDisplayName = (client: Client) => {
         return client.clientType === "individual" ? `${client.firstName} ${client.lastName}` : client.organizationName
     }
+
+    const openClientDiary = (client: Client) => {
+        window.open(`/client/${client.id}/diary`, "_blank");
+    };
 
     return (
         <div className="w-full container mx-auto px-3 sm:px-4 md:px-6 py-4 md:py-6 max-w-7xl">
@@ -427,7 +432,7 @@ export default function ClientsTable() {
                                                     </div>
                                                 </TableCell>
                                                 <TableCell>{getCommunicationBadge(client.preferredCommunication || "")}</TableCell>
-                                                <TableCell className="text-right">
+                                                <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                                                     <DropdownMenu>
                                                         <DropdownMenuTrigger asChild>
                                                             <Button variant="ghost" className="h-8 w-8 p-0">
@@ -442,6 +447,15 @@ export default function ClientsTable() {
                                                                     <Edit className="mr-2 h-4 w-4" />
                                                                     Edit Client
                                                                 </Link>
+                                                            </DropdownMenuItem>
+                                                            <DropdownMenuItem
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    openClientDiary(client);
+                                                                }}
+                                                            >
+                                                                <NotebookPen className="mr-2 h-4 w-4" />
+                                                                Client Diary
                                                             </DropdownMenuItem>
                                                         </DropdownMenuContent>
                                                     </DropdownMenu>
@@ -530,6 +544,15 @@ export default function ClientsTable() {
                                                                     <Edit className="mr-2 h-3 w-3" />
                                                                     <span className="text-xs">Edit Client</span>
                                                                 </Link>
+                                                            </DropdownMenuItem>
+                                                            <DropdownMenuItem
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    openClientDiary(client);
+                                                                }}
+                                                            >
+                                                                <NotebookPen className="mr-2 h-3 w-3" />
+                                                                <span className="text-xs">Client Diary</span>
                                                             </DropdownMenuItem>
                                                         </DropdownMenuContent>
                                                     </DropdownMenu>

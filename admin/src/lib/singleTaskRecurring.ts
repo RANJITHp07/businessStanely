@@ -2,11 +2,81 @@ import prisma from "@/lib/prisma";
 import { createTransporter } from "./email";
 import { format } from "date-fns";
 
-const RECURRING_TYPES = ["once", "day", "week", "month"] as const;
+const RECURRING_TYPES = ["once", "day", "week", "month", "year"] as const;
 type RecurringType = (typeof RECURRING_TYPES)[number];
 
 function isRecurringType(value: string): value is RecurringType {
   return (RECURRING_TYPES as readonly string[]).includes(value);
+}
+
+/**
+ * Normalise a stored weekday set to sorted, unique ISO weekdays (1 = Monday ...
+ * 7 = Sunday). Anything out of range is dropped rather than clamped: a bad
+ * value is a data problem, and clamping would silently fire the task on a day
+ * nobody picked.
+ */
+function normalizeWeekDays(value: unknown): number[] {
+  if (!Array.isArray(value)) return [];
+  const days = value
+    .map((day) => Number(day))
+    .filter((day) => Number.isInteger(day) && day >= 1 && day <= 7);
+  return [...new Set(days)].sort((a, b) => a - b);
+}
+
+/** ISO weekday of a date: 1 = Monday ... 7 = Sunday (JS Sunday 0 becomes 7). */
+function isoWeekDay(date: Date): number {
+  return date.getDay() === 0 ? 7 : date.getDay();
+}
+
+/**
+ * The next occurrence strictly after `from` for a task that fires on specific
+ * weekdays, e.g. every Monday and Wednesday.
+ *
+ * `weekInterval` spaces out the *weeks* the task runs in: 1 is every week, 2
+ * fires on the chosen weekdays every other week. Weeks are counted from the
+ * Monday of the anchor's week, so the rhythm stays fixed to the schedule's
+ * origin instead of drifting each time the job rolls forward.
+ */
+function nextWeekDayOccurrence(
+  from: Date,
+  weekDays: number[],
+  weekInterval: number,
+  anchor: Date,
+): Date {
+  const mondayOf = (date: Date) => {
+    const monday = new Date(date);
+    monday.setHours(0, 0, 0, 0);
+    monday.setDate(monday.getDate() - (isoWeekDay(monday) - 1));
+    return monday;
+  };
+
+  const anchorMonday = mondayOf(anchor);
+  const interval = weekInterval >= 1 ? weekInterval : 1;
+  const msPerWeek = 7 * 24 * 60 * 60 * 1000;
+
+  const candidate = new Date(from);
+  candidate.setHours(0, 0, 0, 0);
+
+  // Walk day by day. Bounded by interval * 7 + 7 days, so this terminates even
+  // if `from` sits far from the anchor.
+  for (let step = 1; step <= interval * 7 + 7; step++) {
+    candidate.setDate(candidate.getDate() + 1);
+
+    if (!weekDays.includes(isoWeekDay(candidate))) continue;
+
+    // Only accept weekdays that land in an "on" week for this interval.
+    const weeksFromAnchor = Math.round(
+      (mondayOf(candidate).getTime() - anchorMonday.getTime()) / msPerWeek,
+    );
+    if (((weeksFromAnchor % interval) + interval) % interval !== 0) continue;
+
+    return candidate;
+  }
+
+  // Unreachable for a non-empty weekDays set; falls back to the plain interval.
+  const fallback = new Date(from);
+  fallback.setDate(fallback.getDate() + interval * 7);
+  return fallback;
 }
 
 // Auto-update recurring tasks based on calendar schedule (not completion)
@@ -99,15 +169,47 @@ export async function updateRecurringTaskSchedule(taskId: string) {
     return updatedTask;
   }
 
+  // A WEEK task may pin itself to specific weekdays (e.g. Monday and
+  // Wednesday). The weekday set overrides the plain "+N weeks" hop, since the
+  // interval alone can only ever produce one occurrence per cycle and would
+  // drift onto whatever weekday the trigger date happened to start on.
+  const weekDays =
+    recurringType === "week" ? normalizeWeekDays(task.recurringWeekDays) : [];
+
+  // `currentPeriodStart` is the schedule's origin, so an every-other-week
+  // rhythm stays fixed to the week it started in rather than re-basing (and
+  // slipping a week) on each roll-forward. Falls back to the trigger date for
+  // rows created before this field was populated.
+  const weekAnchor = new Date(task.currentPeriodStart || triggerDate);
+
   // Advance repeatedly (not just once) so a task that's been dormant for
   // several missed periods lands on the next occurrence that is actually
   // upcoming, instead of one interval past a still-overdue triggerDate.
-  const nextTriggerDate = new Date(triggerDate);
+  let nextTriggerDate = new Date(triggerDate);
   do {
-    if (recurringType === "day") {
+    if (weekDays.length > 0) {
+      nextTriggerDate = nextWeekDayOccurrence(
+        nextTriggerDate,
+        weekDays,
+        recurringValue,
+        isNaN(weekAnchor.getTime()) ? triggerDate : weekAnchor,
+      );
+    } else if (recurringType === "day") {
       nextTriggerDate.setDate(nextTriggerDate.getDate() + recurringValue);
     } else if (recurringType === "week") {
       nextTriggerDate.setDate(nextTriggerDate.getDate() + recurringValue * 7);
+    } else if (recurringType === "year") {
+      // setFullYear keeps the month/day, except 29 Feb in a non-leap year,
+      // which JS rolls into 1 March. Clamping back to 28 Feb keeps a task
+      // seeded on a leap day inside February for every other year.
+      const day = nextTriggerDate.getDate();
+      const month = nextTriggerDate.getMonth();
+      nextTriggerDate.setFullYear(
+        nextTriggerDate.getFullYear() + recurringValue,
+      );
+      if (nextTriggerDate.getMonth() !== month || nextTriggerDate.getDate() !== day) {
+        nextTriggerDate.setDate(0);
+      }
     } else {
       nextTriggerDate.setMonth(nextTriggerDate.getMonth() + recurringValue);
     }

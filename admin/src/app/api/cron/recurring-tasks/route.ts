@@ -39,6 +39,20 @@ async function runDailyJob(request: NextRequest) {
 
   const runDate = new Date().toISOString().slice(0, 10);
 
+  /**
+   * A claim only releases itself on a thrown error. A run killed mid-flight --
+   * a Lambda timeout, an OOM, a container recycle -- never reaches that catch,
+   * so its row stays `running` and keeps owning the day on the unique
+   * [jobName, runDate] index. Every retry then reports "Already ran today" and
+   * the day's roll-forward is skipped for good.
+   *
+   * A `running` row older than this window is therefore treated as abandoned
+   * and may be taken over. The window has to exceed the job's real runtime
+   * (it emails every active agent) so a slow-but-alive run is never stolen
+   * from underneath itself and the tasks advanced twice.
+   */
+  const STALE_CLAIM_MS = 60 * 60 * 1000; // 1 hour
+
   let claim;
   try {
     claim = await prisma.cronLog.create({
@@ -50,13 +64,48 @@ async function runDailyJob(request: NextRequest) {
       error instanceof Prisma.PrismaClientKnownRequestError &&
       error.code === "P2002"
     ) {
-      console.log("⚠️ Cron job already ran today, skipping...");
-      return NextResponse.json({
-        success: false,
-        message: "Already ran today",
+      const staleBefore = new Date(Date.now() - STALE_CLAIM_MS);
+
+      // Reclaiming is a conditional write, not a read-then-write: the filter
+      // on status + ranAt is part of the update, so of two invocations racing
+      // to adopt the same abandoned row only the first matches.
+      const reclaimed = await prisma.cronLog.updateMany({
+        where: {
+          jobName: "recurring-tasks",
+          runDate,
+          status: "running",
+          ranAt: { lt: staleBefore },
+        },
+        data: { ranAt: new Date(), status: "running" },
       });
+
+      if (reclaimed.count === 0) {
+        console.log("⚠️ Cron job already ran today, skipping...");
+        return NextResponse.json({
+          success: false,
+          message: "Already ran today",
+        });
+      }
+
+      const adopted = await prisma.cronLog.findFirst({
+        where: { jobName: "recurring-tasks", runDate },
+      });
+
+      if (!adopted) {
+        return NextResponse.json({
+          success: false,
+          message: "Already ran today",
+        });
+      }
+
+      console.warn(
+        `♻️ Adopted an abandoned ${runDate} claim (previous run died without ` +
+          `releasing it); continuing.`,
+      );
+      claim = adopted;
+    } else {
+      throw error;
     }
-    throw error;
   }
 
   try {

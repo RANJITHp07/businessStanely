@@ -47,6 +47,7 @@ export async function POST(req: NextRequest) {
       legislationId,
       recurring,
       recurringType,
+      recurringWeekDays,
       triggerDate,
       active,
       followUpDuration,
@@ -72,6 +73,20 @@ export async function POST(req: NextRequest) {
     const recurringValue =
       parsedInterval && normalizedRecurringType ? parsedInterval : null;
     const recurringTypeValue = recurringValue ? normalizedRecurringType : null;
+
+    // Weekdays are only read for a WEEK schedule. Storing them for any other
+    // type would leave a set behind that silently overrides the interval if the
+    // task is later switched back to weekly.
+    const recurringWeekDaysValue =
+      recurringTypeValue === "WEEK" && Array.isArray(recurringWeekDays)
+        ? [
+            ...new Set(
+              recurringWeekDays
+                .map((day: unknown) => Number(day))
+                .filter((day: number) => Number.isInteger(day) && day >= 1 && day <= 7),
+            ),
+          ].sort((a, b) => a - b)
+        : [];
     const taskDueDate = dueDate ? new Date(dueDate) : null;
     const taskTriggerDate = triggerDate ? new Date(triggerDate) : null;
 
@@ -91,6 +106,7 @@ export async function POST(req: NextRequest) {
         legislationId: legislationId || null, // Save legislationId
         recurring: recurringValue, // Save recurring field
         recurringType: recurringTypeValue,
+        recurringWeekDays: recurringWeekDaysValue,
         followUpDuration: followUpDuration || "Working",
         statusCheckDuration: statusCheckDuration || "48hr",
         active,

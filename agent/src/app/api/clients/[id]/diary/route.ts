@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-
-const prismaWithDiary = prisma;
+import { getCurrentAgent } from "@/lib/auth";
 
 const DATE_ONLY_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -32,6 +31,11 @@ export async function GET(
       return NextResponse.json({ error: "Missing client id" }, { status: 400 });
     }
 
+    const currentAgent = await getCurrentAgent(req);
+    if (!currentAgent) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const date = req.nextUrl.searchParams.get("date")?.trim() || "";
     const normalizedDate = date ? normalizeEntryDate(date) : "";
 
@@ -42,7 +46,7 @@ export async function GET(
       );
     }
 
-    const entries = await prismaWithDiary.clientDiaryEntry.findMany({
+    const entries = await prisma.clientDiaryEntry.findMany({
       include: {
         revisions: { orderBy: { createdAt: "desc" } },
       },
@@ -89,6 +93,11 @@ export async function POST(
       return NextResponse.json({ error: "Missing client id" }, { status: 400 });
     }
 
+    const currentAgent = await getCurrentAgent(req);
+    if (!currentAgent) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
     const body = await req.json();
     const entryDate =
       typeof body.entryDate === "string"
@@ -111,7 +120,7 @@ export async function POST(
       );
     }
 
-    const client = await prisma.client.findUnique({
+    const client = await prisma.client.findFirst({
       where: { id: clientId },
       select: { id: true },
     });
@@ -120,12 +129,16 @@ export async function POST(
       return NextResponse.json({ error: "Client not found" }, { status: 404 });
     }
 
-    const entry = await prismaWithDiary.clientDiaryEntry.create({
+    // The creating agent is stamped as the last editor too, so a brand new
+    // entry already reads as "added by <agent>" before any edit happens.
+    const entry = await prisma.clientDiaryEntry.create({
       data: {
         clientId,
         entryDate,
         heading: heading || null,
         content,
+        updatedById: currentAgent.id,
+        updatedByType: "AGENT",
       },
     });
 

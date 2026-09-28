@@ -66,6 +66,27 @@ import { toast } from "react-toastify";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useAgentContext } from "@/lib/agent-context";
 
+/** ISO weekday numbers: 1 = Monday ... 7 = Sunday, matching the stored value. */
+const WEEKDAY_OPTIONS = [
+  { value: 1, short: "Mon", label: "Monday" },
+  { value: 2, short: "Tue", label: "Tuesday" },
+  { value: 3, short: "Wed", label: "Wednesday" },
+  { value: 4, short: "Thu", label: "Thursday" },
+  { value: 5, short: "Fri", label: "Friday" },
+  { value: 6, short: "Sat", label: "Saturday" },
+  { value: 7, short: "Sun", label: "Sunday" },
+];
+
+function describeWeekDays(days: number[]): string {
+  const names = [...days]
+    .sort((a, b) => a - b)
+    .map((d) => WEEKDAY_OPTIONS.find((o) => o.value === d)?.label)
+    .filter(Boolean) as string[];
+  if (names.length === 0) return "";
+  if (names.length === 1) return names[0];
+  return names.slice(0, -1).join(", ") + " and " + names[names.length - 1];
+}
+
 const taskPriorities = [
   {
     value: "low",
@@ -102,6 +123,7 @@ export default function TaskForm({ id }: TaskFormProps) {
     recurring: "0",
     triggerDate: "", // Added triggerDate to formData
     recurringType: "",
+    recurringWeekDays: [] as number[],
     status: "",
     active: true
   });
@@ -395,6 +417,9 @@ export default function TaskForm({ id }: TaskFormProps) {
               legislationName: task.legislation?.title || "",
               recurring: task.recurring?.toString() || "0",
               recurringType: task.recurringType || "",
+              recurringWeekDays: Array.isArray(task.recurringWeekDays)
+                ? task.recurringWeekDays
+                : [],
               triggerDate: task.triggerDate || "", // Ensure triggerDate is included
               status: task?.status,
               active: task?.active !== false || true
@@ -441,7 +466,10 @@ export default function TaskForm({ id }: TaskFormProps) {
     }
   }, [formData.legislationId, legislationList]);
 
-  const handleInputChange = (field: string, value: string | boolean) => {
+  const handleInputChange = (
+    field: string,
+    value: string | boolean | number[],
+  ) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
@@ -726,16 +754,35 @@ export default function TaskForm({ id }: TaskFormProps) {
 
 
   // Add handler for recurring selection to show information
+  const toggleWeekDay = (day: number) => {
+    setFormData((prev: any) => {
+      const current: number[] = Array.isArray(prev.recurringWeekDays)
+        ? prev.recurringWeekDays
+        : [];
+      const next = current.includes(day)
+        ? current.filter((d) => d !== day)
+        : [...current, day].sort((a, b) => a - b);
+      return { ...prev, recurringWeekDays: next };
+    });
+  };
+
   const handleRecurringChange = (value: string) => {
     if (value === "0") {
       handleInputChange("recurring", "0");
       handleInputChange("recurringType", "");
+      handleInputChange("recurringWeekDays", []);
       return;
     }
 
     const [type, interval] = value.split("-");
     handleInputChange("recurring", interval || "1");
     handleInputChange("recurringType", type.toLocaleUpperCase());
+
+    // Weekdays only mean something for a weekly schedule; leaving a stale set
+    // behind would keep overriding the interval of whatever type came next.
+    if (type !== "week") {
+      handleInputChange("recurringWeekDays", []);
+    }
 
     // Show information about next task creation if recurring is selected
     if (dueDate && interval) {
@@ -1713,6 +1760,11 @@ export default function TaskForm({ id }: TaskFormProps) {
                           Every {month} {month === 1 ? "month" : "months"}
                         </SelectItem>
                       ))}
+                      {[1, 2, 3, 5, 10].map((year) => (
+                        <SelectItem key={`year-${year}`} value={`year-${year}`}>
+                          Every {year} {year === 1 ? "year" : "years"}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                   <p className="text-xs text-muted-foreground">
@@ -1721,6 +1773,41 @@ export default function TaskForm({ id }: TaskFormProps) {
                 </div>
                 {formData.recurring && formData.recurring !== "0" && (
                   <div className="space-y-2 w-1/2">
+                    {formData.recurringType === "WEEK" && (
+                      <div className="space-y-2 pb-2">
+                        <Label>Repeat on</Label>
+                        <div className="flex flex-wrap gap-1">
+                          {WEEKDAY_OPTIONS.map((day) => {
+                            const selected =
+                              formData.recurringWeekDays.includes(day.value);
+                            return (
+                              <Button
+                                key={day.value}
+                                type="button"
+                                variant={selected ? "default" : "outline"}
+                                size="sm"
+                                className="h-8 w-10 p-0 text-xs"
+                                aria-pressed={selected}
+                                onClick={() => toggleWeekDay(day.value)}
+                              >
+                                {day.short}
+                              </Button>
+                            );
+                          })}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {formData.recurringWeekDays.length > 0
+                            ? `Triggers on ${describeWeekDays(
+                                formData.recurringWeekDays
+                              )}${
+                                Number(formData.recurring) > 1
+                                  ? ` every ${formData.recurring} weeks`
+                                  : " every week"
+                              }.`
+                            : "Leave empty to repeat on the same weekday as the trigger date."}
+                        </p>
+                      </div>
+                    )}
                     <Label className="flex items-center gap-1">
                       Trigger Date
                       <span className="text-red-500">*</span>

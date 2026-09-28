@@ -37,6 +37,7 @@ export type AuditEntityType =
   | "LeadSource"
   | "TimeLog"
   | "DiaryEntry"
+  | "ClientDiaryEntry"
   | "Retainership"
   | "Legislation";
 

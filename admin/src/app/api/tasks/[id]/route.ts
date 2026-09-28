@@ -106,6 +106,7 @@ export async function PUT(
       "completed",
       "recurring",
       "recurringType",
+      "recurringWeekDays",
       "followUpDuration",
       "statusCheckDuration",
       "statusProgressMap",
@@ -120,7 +121,7 @@ export async function PUT(
             recurringValue && recurringValue !== "0"
               ? parseInt(recurringValue)
               : null;
-        } else if (key === "recurringType") {
+        } else if (key === "recurringType" || key === "recurringWeekDays") {
           // Handled after the loop, together with `recurring`.
           continue;
         } else if (key === "dueDate" || key === "triggerDate") {
@@ -153,15 +154,37 @@ export async function PUT(
       if (clearedByInterval || !normalizedType) {
         data.recurring = null;
         data.recurringType = null;
+        data.recurringWeekDays = [];
       } else {
         const interval =
           data.recurring !== undefined ? data.recurring : currentTask.recurring;
         if (interval === null || interval === undefined) {
           data.recurring = null;
           data.recurringType = null;
+          data.recurringWeekDays = [];
         } else {
           data.recurring = interval;
           data.recurringType = normalizedType;
+
+          // Weekdays belong to a WEEK schedule only. Switching a weekly task to
+          // any other type drops the set, so a stale [Mon, Wed] cannot keep
+          // overriding the interval after the change.
+          if (normalizedType !== "WEEK") {
+            data.recurringWeekDays = [];
+          } else if (body.recurringWeekDays !== undefined) {
+            data.recurringWeekDays = Array.isArray(body.recurringWeekDays)
+              ? [
+                  ...new Set<number>(
+                    body.recurringWeekDays
+                      .map((day: unknown) => Number(day))
+                      .filter(
+                        (day: number) =>
+                          Number.isInteger(day) && day >= 1 && day <= 7,
+                      ),
+                  ),
+                ].sort((a: number, b: number) => a - b)
+              : [];
+          }
         }
       }
     }
@@ -187,15 +210,27 @@ export async function PUT(
     if (body.status === "Hold" && currentTask.dueDate) {
       data.holdDate = new Date();
     }
+    // `status` is the visible state and `completed` is the boolean the
+    // recurrence helpers read; they have to move together. Setting only
+    // `lastCompletedDate` here left rows reading status="Completed" alongside
+    // completed=false, so getRecurringTaskStatus() computed isOverdue from a
+    // flag that disagreed with what the task page showed. An explicit
+    // `completed` in the body still wins, so a caller can override.
     if (body.status === "Completed") {
       if (currentTask.status !== "Completed") {
         data.lastCompletedDate = new Date();
+      }
+      if (body.completed === undefined) {
+        data.completed = true;
       }
     } else if (
       body.status !== undefined &&
       currentTask.status === "Completed"
     ) {
       data.lastCompletedDate = null;
+      if (body.completed === undefined) {
+        data.completed = false;
+      }
     }
     let updatedTask = await prisma.task.update({
       where: { id },

@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState, useMemo, useCallback } from "react"
-import { addDays, startOfWeek } from "date-fns"
+import { addDays, endOfDay, startOfDay } from "date-fns"
 import { Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { TimesheetFilters } from "./_component/timesheet-filters"
@@ -45,8 +45,13 @@ export default function TimesheetPage() {
     const [showLoginLogout, setShowLoginLogout] = useState(true)
     const [selectedEntry, setSelectedEntry] = useState<TimeEntry | null>(null)
     const [detailDialogOpen, setDetailDialogOpen] = useState(false)
-    const [startDate, setStartDate] = useState(() => startOfWeek(new Date(), { weekStartsOn: 1 }))
     const [daysToShow, setDaysToShow] = useState(7)
+    // The range runs backwards from today: "14 days" means today and the 13
+    // days before it. Anchoring on the start of the week instead ran the
+    // window forward, so a 14-day view was mostly future dates with no logs.
+    const [startDate, setStartDate] = useState(() =>
+        startOfDay(addDays(new Date(), -6)),
+    )
 
     // Fetch all agents for selection
     useEffect(() => {
@@ -69,7 +74,10 @@ export default function TimesheetPage() {
         fetchAgents();
     }, [selectedAgent]);
 
-    const endDate = useMemo(() => addDays(startDate, daysToShow), [startDate, daysToShow])
+    const endDate = useMemo(
+        () => endOfDay(addDays(startDate, daysToShow - 1)),
+        [startDate, daysToShow],
+    )
 
     // Fetch timesheet data for selected agent, with polling to reflect new entries
     useEffect(() => {
@@ -103,14 +111,14 @@ export default function TimesheetPage() {
                 return false;
             }
             const entryDate = new Date(entry.date).getTime();
-            const start = startDate.getTime();
-            const end = addDays(startDate, daysToShow).getTime();
-            if (entryDate < start || entryDate >= end) {
+            const start = startOfDay(startDate).getTime();
+            const end = endDate.getTime();
+            if (entryDate < start || entryDate > end) {
                 return false;
             }
             return true;
         });
-    }, [entries, selectedStatuses, startDate, daysToShow])
+    }, [entries, selectedStatuses, startDate, endDate])
 
     const totalHours = useMemo(() => {
         const taskEntries = filteredEntries.filter((e) => e.type === "task")
@@ -167,10 +175,15 @@ export default function TimesheetPage() {
                 onSelectedAgentChange={setSelectedAgent}
                 startDate={startDate}
                 endDate={endDate}
-                onStartDateChange={setStartDate}
-                onEndDateChange={(date) => setStartDate(addDays(date, -daysToShow + 1))}
+                onStartDateChange={(date) => setStartDate(startOfDay(date))}
+                onEndDateChange={(date) =>
+                    setStartDate(startOfDay(addDays(date, -daysToShow + 1)))
+                }
                 daysToShow={daysToShow}
-                onDaysToShowChange={setDaysToShow}
+                onDaysToShowChange={(days) => {
+                    setDaysToShow(days)
+                    setStartDate(startOfDay(addDays(new Date(), -days + 1)))
+                }}
                 selectedStatuses={selectedStatuses}
                 onSelectedStatusesChange={setSelectedStatuses}
                 showLoginLogout={showLoginLogout}

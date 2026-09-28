@@ -253,6 +253,7 @@ export async function PUT(
         // one of the two arrives in the request body.
         recurring: true,
         recurringType: true,
+        recurringWeekDays: true,
       },
     });
     if (!task) {
@@ -358,9 +359,32 @@ export async function PUT(
       if (interval === null || interval === undefined || !normalizedType) {
         updateData.recurring = null;
         updateData.recurringType = null;
+        updateData.recurringWeekDays = [];
       } else {
         updateData.recurring = interval;
         updateData.recurringType = normalizedType;
+
+        // Weekdays belong to a WEEK schedule only. Switching a weekly task to
+        // any other type drops the set, so a stale [Mon, Wed] cannot keep
+        // overriding the interval after the change.
+        if (normalizedType !== "WEEK") {
+          updateData.recurringWeekDays = [];
+        } else if (updateData.recurringWeekDays !== undefined) {
+          updateData.recurringWeekDays = Array.isArray(
+            updateData.recurringWeekDays,
+          )
+            ? [
+                ...new Set<number>(
+                  (updateData.recurringWeekDays as unknown[])
+                    .map((day: unknown) => Number(day))
+                    .filter(
+                      (day: number) =>
+                        Number.isInteger(day) && day >= 1 && day <= 7,
+                    ),
+                ),
+              ].sort((a: number, b: number) => a - b)
+            : [];
+        }
       }
     }
 

@@ -293,7 +293,7 @@ export default function ClientsTable({
             console.warn("Attempted to navigate to a deleted client.");
             return;
         }
-        router.push(`/client/${client.id}/edit`);
+        router.push(`/client/${client.id}/tasks`);
     };
 
     const getClientTypeBadge = (type: string) => {

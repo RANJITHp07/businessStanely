@@ -68,6 +68,7 @@ export interface Task {
   active: boolean;
   comments?: Comment[];
   recurringType?: string;
+  recurringWeekDays?: number[];
   legislationId?: string; // Added to link tasks to legislations
   currentPeriodStart?: string;
   legislation?: {

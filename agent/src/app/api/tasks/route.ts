@@ -13,6 +13,7 @@ interface TaskWithAdditionalFields {
   followUpRequired?: boolean;
   completed?: boolean;
   recurringType?: string | null;
+  recurringWeekDays?: number[];
   triggerDate?: Date | null;
   nextDueDate?: Date | null;
   currentPeriodStart?: Date | null;
@@ -389,6 +390,7 @@ export async function GET(req: NextRequest) {
       completed: (task as TaskWithAdditionalFields).completed,
       recurring: task.recurring,
       recurringType: (task as TaskWithAdditionalFields).recurringType,
+      recurringWeekDays: (task as TaskWithAdditionalFields).recurringWeekDays,
       triggerDate: (task as TaskWithAdditionalFields).triggerDate,
       nextDueDate: (task as TaskWithAdditionalFields).nextDueDate,
       currentPeriodStart: (task as TaskWithAdditionalFields).currentPeriodStart,
@@ -455,6 +457,7 @@ export async function POST(req: NextRequest) {
       recurring,
       triggerDate, // Added triggerDate to destructured fields
       recurringType,
+      recurringWeekDays,
       active,
       followUpDuration,
       statusCheckDuration,
@@ -496,6 +499,22 @@ export async function POST(req: NextRequest) {
     const recurringValue =
       parsedInterval && normalizedRecurringType ? parsedInterval : null;
     const recurringTypeValue = recurringValue ? normalizedRecurringType : null;
+
+    // Weekdays are only read for a WEEK schedule. Storing them for any other
+    // type would leave a set behind that silently overrides the interval if the
+    // task is later switched back to weekly.
+    const recurringWeekDaysValue =
+      recurringTypeValue === "WEEK" && Array.isArray(recurringWeekDays)
+        ? [
+            ...new Set<number>(
+              recurringWeekDays
+                .map((day: unknown) => Number(day))
+                .filter(
+                  (day: number) => Number.isInteger(day) && day >= 1 && day <= 7,
+                ),
+            ),
+          ].sort((a: number, b: number) => a - b)
+        : [];
     const taskDueDate = dueDate ? new Date(dueDate) : null;
     const taskTriggerDate = triggerDate ? new Date(triggerDate) : null;
 
@@ -517,6 +536,7 @@ export async function POST(req: NextRequest) {
         legislationId: legislationId || null, // Save legislationId
         recurring: recurringValue, // Save recurring field
         recurringType: recurringTypeValue,
+        recurringWeekDays: recurringWeekDaysValue,
         followUpDuration: followUpDuration || "Working",
         statusCheckDuration: statusCheckDuration || "48hr",
         active,

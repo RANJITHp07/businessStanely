@@ -149,6 +149,7 @@ export interface Task {
   }; // Added legislation object to include detailed information
   triggerDate?: string; // Added triggerDate property to Task interface
   recurringType?: string;
+  recurringWeekDays?: number[];
   lastCompletedDate?: string;
   nextDueDate?: string;
   currentPeriodStart?: string;

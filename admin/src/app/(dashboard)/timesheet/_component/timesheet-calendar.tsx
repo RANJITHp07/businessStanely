@@ -3,7 +3,9 @@
 import { useMemo, useState, useEffect } from "react"
 import { addDays } from "date-fns"
 import { LogIn, LogOut } from "lucide-react"
+import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover"
 import { TimeEntry } from "../page"
+import { TimeEntryFields, TimeEntryHeading } from "./task-detail-dialog"
 
 interface TimesheetCalendarProps {
   entries: TimeEntry[]
@@ -129,6 +131,7 @@ export function TimesheetCalendar({
   onEntryClick,
 }: TimesheetCalendarProps) {
   const [currentTime, setCurrentTime] = useState(new Date())
+  const [hoveredEntry, setHoveredEntry] = useState<TimeEntry | null>(null)
 
   useEffect(() => {
     const interval = setInterval(() => setCurrentTime(new Date()), 60000)
@@ -235,6 +238,8 @@ export function TimesheetCalendar({
                       }
                       : { left: "4px", right: "4px" }
 
+                    const isHovered = hoveredEntry?.id === entry.id
+
                     return (
                       <div
                         key={entry.id}
@@ -247,7 +252,42 @@ export function TimesheetCalendar({
                           zIndex: isLoginLogout ? 30 : 10,
                         }}
                         onClick={() => onEntryClick(entry)}
+                        onMouseEnter={() => setHoveredEntry(entry)}
+                        onMouseLeave={() =>
+                          setHoveredEntry((current) =>
+                            current?.id === entry.id ? null : current,
+                          )
+                        }
+                        onFocus={() => setHoveredEntry(entry)}
+                        onBlur={() =>
+                          setHoveredEntry((current) =>
+                            current?.id === entry.id ? null : current,
+                          )
+                        }
+                        tabIndex={0}
                       >
+                        {isHovered && (
+                          <Popover open>
+                            <PopoverAnchor asChild>
+                              <span className="absolute inset-0 pointer-events-none" />
+                            </PopoverAnchor>
+                            {/* The card is a read-only preview of what the click
+                                dialog shows. It takes no pointer events so it
+                                cannot sit between the cursor and the entry and
+                                flicker the hover off, and no focus so tabbing
+                                through the grid is unaffected. */}
+                            <PopoverContent
+                              side="right"
+                              align="start"
+                              className="w-80 pointer-events-none"
+                              onOpenAutoFocus={(event) => event.preventDefault()}
+                              onCloseAutoFocus={(event) => event.preventDefault()}
+                            >
+                              <TimeEntryHeading entry={entry} />
+                              <TimeEntryFields entry={entry} compact />
+                            </PopoverContent>
+                          </Popover>
+                        )}
                         {isLoginLogout ? (
                           <div className="flex items-center gap-1.5 text-xs font-medium">
                             {entry.type === "login" ? <LogIn className="h-3 w-3" /> : <LogOut className="h-3 w-3" />}

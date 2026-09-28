@@ -8,6 +8,7 @@ import { toast } from "react-toastify"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Calendar } from "@/components/ui/calendar"
 import { cn } from "@/lib/utils"
+import { fetchWithAuth } from "@/lib/fetchWithAuth"
 
 type ClientDiaryRevision = {
     id: string
@@ -45,6 +46,13 @@ const formatDateDisplay = (dateStr: string) => {
     })
 }
 
+const toDateStringLocal = (date: Date) => {
+    const y = date.getFullYear()
+    const m = String(date.getMonth() + 1).padStart(2, "0")
+    const d = String(date.getDate()).padStart(2, "0")
+    return `${y}-${m}-${d}`
+}
+
 const FIELD_LABELS: Record<string, string> = {
     heading: "Heading",
     content: "Content",
@@ -64,13 +72,6 @@ const formatRevisionValue = (field: string, value: string | null) => {
     }
     if (field === "entryDate") return formatDateDisplay(value)
     return value
-}
-
-const toDateStringLocal = (date: Date) => {
-    const y = date.getFullYear()
-    const m = String(date.getMonth() + 1).padStart(2, "0")
-    const d = String(date.getDate()).padStart(2, "0")
-    return `${y}-${m}-${d}`
 }
 
 export default function ClientDiaryPage() {
@@ -105,22 +106,9 @@ export default function ClientDiaryPage() {
     )
     const revisions = selectedEntry?.revisions ?? []
 
-    /** A saved PUT returns the refreshed edit log, so history stays current. */
-    const applyUpdatedEntry = (updated: ClientDiaryEntry, revisions?: ClientDiaryRevision[]) => {
-        setEntries((prev) =>
-            prev
-                .map((e) =>
-                    e.id === updated.id
-                        ? { ...updated, revisions: revisions ?? updated.revisions ?? e.revisions }
-                        : e,
-                )
-                .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
-        )
-    }
-
     useEffect(() => {
         if (!clientId) return
-        fetch(`/api/clients/${clientId}`)
+        fetchWithAuth(`/api/clients/${clientId}`)
             .then((r) => r.json())
             .then((data) => {
                 if (data?.clientType === "individual") {
@@ -135,7 +123,7 @@ export default function ClientDiaryPage() {
     const fetchEntries = async () => {
         try {
             setIsLoading(true)
-            const response = await fetch(`/api/clients/${clientId}/diary`, { cache: "no-store" })
+            const response = await fetchWithAuth(`/api/clients/${clientId}/diary`, { cache: "no-store" })
             if (!response.ok) {
                 toast.error("Failed to load diary entries")
                 return
@@ -190,6 +178,19 @@ export default function ClientDiaryPage() {
         setDraftHtml(editorRef.current.innerHTML)
     }
 
+    /** A saved PUT returns the refreshed edit log, so history stays current. */
+    const applyUpdatedEntry = (updated: ClientDiaryEntry, revisions?: ClientDiaryRevision[]) => {
+        setEntries((prev) =>
+            prev
+                .map((e) =>
+                    e.id === updated.id
+                        ? { ...updated, revisions: revisions ?? updated.revisions ?? e.revisions }
+                        : e,
+                )
+                .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+        )
+    }
+
     const handleSave = async () => {
         const text = getPlainText(draftHtml)
         if (!text) {
@@ -200,7 +201,7 @@ export default function ClientDiaryPage() {
 
         try {
             if (selectedEntryId) {
-                const response = await fetch(`/api/clients/${clientId}/diary/${selectedEntryId}`, {
+                const response = await fetchWithAuth(`/api/clients/${clientId}/diary/${selectedEntryId}`, {
                     method: "PUT",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ entryDate, heading: draftHeading, content: draftHtml }),
@@ -209,7 +210,7 @@ export default function ClientDiaryPage() {
                 const data = await response.json()
                 applyUpdatedEntry(data.entry, data.revisions)
             } else {
-                const response = await fetch(`/api/clients/${clientId}/diary`, {
+                const response = await fetchWithAuth(`/api/clients/${clientId}/diary`, {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ entryDate, heading: draftHeading, content: draftHtml }),
@@ -229,7 +230,7 @@ export default function ClientDiaryPage() {
     const handleDelete = async () => {
         if (!selectedEntryId) return
         try {
-            const response = await fetch(`/api/clients/${clientId}/diary/${selectedEntryId}`, {
+            const response = await fetchWithAuth(`/api/clients/${clientId}/diary/${selectedEntryId}`, {
                 method: "DELETE",
             })
             if (!response.ok) throw new Error("Failed to delete entry")
@@ -258,7 +259,7 @@ export default function ClientDiaryPage() {
             try {
                 setIsSaving(true)
                 if (selectedEntryId) {
-                    const response = await fetch(`/api/clients/${clientId}/diary/${selectedEntryId}`, {
+                    const response = await fetchWithAuth(`/api/clients/${clientId}/diary/${selectedEntryId}`, {
                         method: "PUT",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({ entryDate, heading: draftHeading, content: draftHtml }),
@@ -267,7 +268,7 @@ export default function ClientDiaryPage() {
                     const data = await response.json()
                     applyUpdatedEntry(data.entry, data.revisions)
                 } else {
-                    const response = await fetch(`/api/clients/${clientId}/diary`, {
+                    const response = await fetchWithAuth(`/api/clients/${clientId}/diary`, {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({ entryDate, heading: draftHeading, content: draftHtml }),

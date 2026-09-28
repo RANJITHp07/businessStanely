@@ -8,7 +8,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { ArrowLeft, Edit, User, Building2 } from 'lucide-react';
+import { ArrowLeft, Edit, User, Building2, FileText } from 'lucide-react';
 import { Skeleton } from "@/components/ui/skeleton";
 
 import { Client } from '@/types';
@@ -62,6 +62,12 @@ export default function ClientDetailsPage() {
                     </Link>
                 </Button>
                 <div className="flex gap-2">
+                    <Button asChild variant="outline">
+                        <Link href={`/client/${client.id}/diary`}>
+                            <FileText className="mr-2 h-4 w-4" />
+                            Client Diary
+                        </Link>
+                    </Button>
                     <Button asChild>
                         <Link href={`/client/${client.id}/edit`}>
                             <Edit className="mr-2 h-4 w-4" />

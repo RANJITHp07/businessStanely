@@ -79,6 +79,63 @@ function nextWeekDayOccurrence(
   return fallback;
 }
 
+/**
+ * Days spanned by one interval of a recurrence, or null when it has no fixed
+ * span. Used to bound a service window that would otherwise outlast the
+ * interval and let occurrences overlap.
+ *
+ * A weekday set has no single span (Mon+Wed is 2 days then 5), so the caller
+ * computes its real next occurrence instead of using an approximation. Month
+ * and year are approximated only for comparison, never for a stored date.
+ */
+function intervalSpanDays(
+  recurringType: RecurringType,
+  recurringValue: number,
+  weekDays: number[],
+): number | null {
+  if (weekDays.length > 0) return null;
+  if (recurringType === "day") return recurringValue;
+  if (recurringType === "week") return recurringValue * 7;
+  if (recurringType === "month") return recurringValue * 28;
+  if (recurringType === "year") return recurringValue * 365;
+  return null;
+}
+
+/**
+ * The deadline for an occurrence starting on `start`.
+ *
+ * The service (task category) grants `timePeriod` days, but a repeating task
+ * must also close before its next occurrence opens. When the service window is
+ * the longer of the two the periods overlap -- a task repeating every 1 day
+ * with a 5-day service was given a deadline 5 days out, so four later
+ * occurrences opened while the first was still pending, each resetting status
+ * and progress on the same row. The shorter bound wins.
+ *
+ * `spanDays` is null for a one-off (no successor) or a weekday set (no single
+ * span), and the full service window then applies.
+ */
+export function occurrenceDeadline(
+  start: Date,
+  timePeriodDays: number | null | undefined,
+  spanDays: number | null,
+): Date {
+  const deadline = new Date(start);
+  if (timePeriodDays) {
+    deadline.setDate(deadline.getDate() + Number(timePeriodDays));
+  }
+
+  if (spanDays !== null && spanDays >= 1) {
+    // One day before the next occurrence opens, so the two never share a day.
+    // At a 1-day interval this collapses onto the start date itself: a daily
+    // task is due the day it is raised.
+    const bounded = new Date(start);
+    bounded.setDate(bounded.getDate() + spanDays - 1);
+    if (bounded < deadline) return bounded;
+  }
+
+  return deadline;
+}
+
 // Auto-update recurring tasks based on calendar schedule (not completion)
 export async function updateRecurringTaskSchedule(taskId: string) {
   const task: any = await prisma.task.findUnique({
@@ -140,13 +197,33 @@ export async function updateRecurringTaskSchedule(taskId: string) {
   // so a missed cron run doesn't permanently skip the task.
   if (triggerDate > endOfToday) return null;
 
-  /** Deadline of the occurrence starting on `start`: start + the service's days. */
-  const deadlineFor = (start: Date) => {
-    const deadline = new Date(start);
-    if (task.category?.timePeriod) {
-      deadline.setDate(deadline.getDate() + Number(task.category.timePeriod));
+  // A weekday set has no single span, so its bound comes from the real next
+  // occurrence (computed below) rather than an interval approximation.
+  const weekDaysForSpan =
+    recurringType === "week" ? normalizeWeekDays(task.recurringWeekDays) : [];
+  const spanDays = intervalSpanDays(
+    recurringType,
+    recurringValue,
+    weekDaysForSpan,
+  );
+
+  const deadlineFor = (start: Date, nextStart?: Date) => {
+    // For a weekday schedule the bound is the day before the actual next
+    // occurrence; for everything else it is the interval span.
+    if (nextStart) {
+      const dayBefore = new Date(nextStart);
+      dayBefore.setDate(dayBefore.getDate() - 1);
+      const serviceDeadline = occurrenceDeadline(
+        start,
+        task.category?.timePeriod,
+        null,
+      );
+      if (dayBefore < serviceDeadline) {
+        return dayBefore < start ? new Date(start) : dayBefore;
+      }
+      return serviceDeadline;
     }
-    return deadline;
+    return occurrenceDeadline(start, task.category?.timePeriod, spanDays);
   };
 
   if (recurringType === "once") {
@@ -154,7 +231,9 @@ export async function updateRecurringTaskSchedule(taskId: string) {
       where: { id: taskId },
       data: {
         triggerDate: null,
-        dueDate: deadlineFor(triggerDate),
+        // A one-off has no successor to collide with, so it keeps the full
+        // service window regardless of the interval it was created with.
+        dueDate: occurrenceDeadline(triggerDate, task.category?.timePeriod, null),
         nextDueDate: null,
         currentPeriodStart: triggerDate,
         completed: false,
@@ -182,40 +261,50 @@ export async function updateRecurringTaskSchedule(taskId: string) {
   // rows created before this field was populated.
   const weekAnchor = new Date(task.currentPeriodStart || triggerDate);
 
+  /** One hop forward from `from`, by whichever rule this schedule uses. */
+  const advanceOnce = (from: Date): Date => {
+    if (weekDays.length > 0) {
+      return nextWeekDayOccurrence(
+        from,
+        weekDays,
+        recurringValue,
+        isNaN(weekAnchor.getTime()) ? triggerDate : weekAnchor,
+      );
+    }
+
+    const next = new Date(from);
+    if (recurringType === "day") {
+      next.setDate(next.getDate() + recurringValue);
+    } else if (recurringType === "week") {
+      next.setDate(next.getDate() + recurringValue * 7);
+    } else if (recurringType === "year") {
+      // setFullYear keeps the month/day, except 29 Feb in a non-leap year,
+      // which JS rolls into 1 March. Clamping back to 28 Feb keeps a task
+      // seeded on a leap day inside February for every other year.
+      const day = next.getDate();
+      const month = next.getMonth();
+      next.setFullYear(next.getFullYear() + recurringValue);
+      if (next.getMonth() !== month || next.getDate() !== day) {
+        next.setDate(0);
+      }
+    } else {
+      next.setMonth(next.getMonth() + recurringValue);
+    }
+    return next;
+  };
+
   // Advance repeatedly (not just once) so a task that's been dormant for
   // several missed periods lands on the next occurrence that is actually
   // upcoming, instead of one interval past a still-overdue triggerDate.
   let nextTriggerDate = new Date(triggerDate);
   do {
-    if (weekDays.length > 0) {
-      nextTriggerDate = nextWeekDayOccurrence(
-        nextTriggerDate,
-        weekDays,
-        recurringValue,
-        isNaN(weekAnchor.getTime()) ? triggerDate : weekAnchor,
-      );
-    } else if (recurringType === "day") {
-      nextTriggerDate.setDate(nextTriggerDate.getDate() + recurringValue);
-    } else if (recurringType === "week") {
-      nextTriggerDate.setDate(nextTriggerDate.getDate() + recurringValue * 7);
-    } else if (recurringType === "year") {
-      // setFullYear keeps the month/day, except 29 Feb in a non-leap year,
-      // which JS rolls into 1 March. Clamping back to 28 Feb keeps a task
-      // seeded on a leap day inside February for every other year.
-      const day = nextTriggerDate.getDate();
-      const month = nextTriggerDate.getMonth();
-      nextTriggerDate.setFullYear(
-        nextTriggerDate.getFullYear() + recurringValue,
-      );
-      if (nextTriggerDate.getMonth() !== month || nextTriggerDate.getDate() !== day) {
-        nextTriggerDate.setDate(0);
-      }
-    } else {
-      nextTriggerDate.setMonth(nextTriggerDate.getMonth() + recurringValue);
-    }
+    nextTriggerDate = advanceOnce(nextTriggerDate);
   } while (nextTriggerDate <= endOfToday);
 
-  const nextDueDate = deadlineFor(nextTriggerDate);
+  // The occurrence after this one bounds the deadline: a period must close
+  // before its successor opens.
+  const followingTriggerDate = advanceOnce(nextTriggerDate);
+  const nextDueDate = deadlineFor(nextTriggerDate, followingTriggerDate);
 
   const updatedTask = await prisma.task.update({
     where: { id: taskId },
@@ -384,12 +473,35 @@ export async function initializeRecurringTask(taskId: string) {
   const periodStart = task.triggerDate ?? task.dueDate;
   if (!periodStart) return null;
 
-  const nextDueDate = new Date(periodStart);
-  if (task.category?.timePeriod) {
-    nextDueDate.setDate(
-      nextDueDate.getDate() + Number(task.category.timePeriod),
+  // The same bound the cron applies when it rolls the task forward: a
+  // repeating occurrence cannot outlast its own interval, so a daily task with
+  // a 5-day service is due on its trigger date rather than four days into the
+  // next four occurrences. Applying it here too means the deadline is right
+  // from creation instead of only after the first cron run.
+  let initialSpanDays: number | null = null;
+  const storedType =
+    typeof task.recurringType === "string"
+      ? task.recurringType.toLowerCase()
+      : null;
+  if (
+    storedType &&
+    storedType !== "once" &&
+    isRecurringType(storedType) &&
+    typeof task.recurring === "number" &&
+    task.recurring >= 1
+  ) {
+    initialSpanDays = intervalSpanDays(
+      storedType,
+      task.recurring,
+      storedType === "week" ? normalizeWeekDays(task.recurringWeekDays) : [],
     );
   }
+
+  const nextDueDate = occurrenceDeadline(
+    new Date(periodStart),
+    task.category?.timePeriod,
+    initialSpanDays,
+  );
 
   const updatedTask = await prisma.task.update({
     where: { id: taskId },

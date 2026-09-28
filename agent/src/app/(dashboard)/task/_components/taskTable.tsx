@@ -145,6 +145,7 @@ export default function TasksTable() {
         const retainershipTasks = searchParams?.get("retainershipTasks")
         const retainershipId = searchParams?.get("retainershipId")
         const trigger = searchParams?.get("trigger")
+        const scope = searchParams?.get("scope")
         const statuses = searchParams?.get("statuses");
         const statusCheckDuration = searchParams?.get("statusCheckDuration");
         const clientUpdate = searchParams?.get("clientUpdate");
@@ -158,6 +159,9 @@ export default function TasksTable() {
         if (retainershipTasks) params.push(`retainershipTasks=${retainershipTasks}`);
         if (retainershipId) params.push(`retainershipId=${encodeURIComponent(retainershipId)}`);
         if (trigger) params.push(`trigger=${trigger}`);
+        // Narrows the trigger query to standard (non-legislation,
+        // non-retainership) tasks when the Future Tasks section links here.
+        if (trigger && scope) params.push(`scope=${encodeURIComponent(scope)}`);
         // Trigger tasks are completed/inactive occurrences; a status filter
         // (e.g. the "New Task" section's "To Do") would wrongly empty the list.
         if (status && !trigger) params.push(`status=${encodeURIComponent(status)}`);

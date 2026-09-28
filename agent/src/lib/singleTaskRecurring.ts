@@ -1,6 +1,69 @@
 import prisma from "@/lib/prisma";
 import { createTransporter } from "@/lib/email";
 
+const RECURRING_TYPES = ["once", "day", "week", "month", "year"] as const;
+type RecurringType = (typeof RECURRING_TYPES)[number];
+
+function isRecurringType(value: string): value is RecurringType {
+  return (RECURRING_TYPES as readonly string[]).includes(value);
+}
+
+/**
+ * Days spanned by one interval of a recurrence, or null when it has no fixed
+ * span (a one-off, or a weekday set like Mon+Wed whose gaps are uneven).
+ *
+ * Kept in step with the same helper in the admin app, which owns the cron that
+ * rolls these tasks forward.
+ */
+function intervalSpanDays(
+  recurringType: RecurringType,
+  recurringValue: number,
+  weekDays: number[],
+): number | null {
+  if (weekDays.length > 0) return null;
+  if (recurringType === "day") return recurringValue;
+  if (recurringType === "week") return recurringValue * 7;
+  if (recurringType === "month") return recurringValue * 28;
+  if (recurringType === "year") return recurringValue * 365;
+  return null;
+}
+
+/**
+ * The deadline for an occurrence starting on `start`.
+ *
+ * The service (task category) grants `timePeriod` days, but a repeating task
+ * must also close before its next occurrence opens. When the service window is
+ * the longer of the two the periods overlap -- a task repeating every 1 day
+ * with a 5-day service was given a deadline 5 days out, so four later
+ * occurrences opened while the first was still pending. The shorter bound wins.
+ */
+function occurrenceDeadline(
+  start: Date,
+  timePeriodDays: number | null | undefined,
+  spanDays: number | null,
+): Date {
+  const deadline = new Date(start);
+  if (timePeriodDays) {
+    deadline.setDate(deadline.getDate() + Number(timePeriodDays));
+  }
+
+  if (spanDays !== null && spanDays >= 1) {
+    const bounded = new Date(start);
+    bounded.setDate(bounded.getDate() + spanDays - 1);
+    if (bounded < deadline) return bounded;
+  }
+
+  return deadline;
+}
+
+function normalizeWeekDays(value: unknown): number[] {
+  if (!Array.isArray(value)) return [];
+  const days = value
+    .map((day) => Number(day))
+    .filter((day) => Number.isInteger(day) && day >= 1 && day <= 7);
+  return [...new Set(days)].sort((a, b) => a - b);
+}
+
 /**
  * Seed the recurring/scheduling fields right after a task is created.
  *
@@ -29,12 +92,33 @@ export async function initializeRecurringTask(taskId: string) {
   const periodStart = task.triggerDate ?? task.dueDate;
   if (!periodStart) return null;
 
-  const nextDueDate = new Date(periodStart);
-  if (task.category?.timePeriod) {
-    nextDueDate.setDate(
-      nextDueDate.getDate() + Number(task.category.timePeriod),
+  // A repeating occurrence cannot outlast its own interval, so a daily task
+  // with a 5-day service is due on its trigger date rather than four days into
+  // the next four occurrences. Mirrors the bound the admin cron applies.
+  let initialSpanDays: number | null = null;
+  const storedType =
+    typeof task.recurringType === "string"
+      ? task.recurringType.toLowerCase()
+      : null;
+  if (
+    storedType &&
+    storedType !== "once" &&
+    isRecurringType(storedType) &&
+    typeof task.recurring === "number" &&
+    task.recurring >= 1
+  ) {
+    initialSpanDays = intervalSpanDays(
+      storedType,
+      task.recurring,
+      storedType === "week" ? normalizeWeekDays(task.recurringWeekDays) : [],
     );
   }
+
+  const nextDueDate = occurrenceDeadline(
+    new Date(periodStart),
+    task.category?.timePeriod,
+    initialSpanDays,
+  );
 
   const updatedTask = await prisma.task.update({
     where: { id: taskId },

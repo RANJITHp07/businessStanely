@@ -149,7 +149,7 @@ function StatCard({
   );
 }
 
-export function SectionTable({ label, tasks, retainershipTasks, trigger }: { label: string; tasks: Task[], retainershipTasks?: boolean, trigger?: boolean }) {
+export function SectionTable({ label, tasks, retainershipTasks, trigger, triggerScope }: { label: string; tasks: Task[], retainershipTasks?: boolean, trigger?: boolean, triggerScope?: string }) {
   const labelColor = (() => {
     const l = label.toLowerCase();
     if (l.includes("progress")) return "text-sky-600";
@@ -565,6 +565,10 @@ export function SectionTable({ label, tasks, retainershipTasks, trigger }: { lab
             // state, not status -- so the two are mutually exclusive.
             if (trigger) {
               params.set("trigger", "true");
+              // Without the scope the task list falls back to the
+              // legislation-only trigger query, which is a different set of
+              // tasks than the section the link sits under.
+              if (triggerScope) params.set("scope", triggerScope);
             } else {
               params.set("status", sectionLabelToStatus(label));
             }
@@ -591,6 +595,7 @@ export default function MyTasksPage() {
     todo: 0,
   });
   const [loading, setLoading] = useState(true);
+  const [futureTasks, setFutureTasks] = useState<Task[]>([]);
   const { agent, isLoading: authLoading } = useAuth();
   // Read the permission from the live profile rather than the localStorage copy
   // in useAuth, so an admin revoking it takes effect without a re-login.
@@ -608,7 +613,19 @@ export default function MyTasksPage() {
         const url = `/api/tasks?summary=true&limit=${SECTION_LIMIT}&assignedToId=${encodeURIComponent(
           agent.id
         )}`;
-        const res = await fetchWithAuth(url);
+        // A completed recurring standard task drops out of every status
+        // section until the cron rolls it over, so the agent had no way to see
+        // when it comes back. `scope=standard` returns exactly those upcoming
+        // occurrences (no legislation, no retainership) for the Future Tasks
+        // section.
+        const futureUrl = `/api/tasks?trigger=true&scope=standard&assignedToId=${encodeURIComponent(
+          agent.id
+        )}`;
+
+        const [res, futureRes] = await Promise.all([
+          fetchWithAuth(url),
+          fetchWithAuth(futureUrl, { silent401: true }),
+        ]);
         if (!res.ok) throw new Error("Failed to fetch tasks");
         const data = await res.json();
         setSections(data.sections ?? {});
@@ -620,9 +637,22 @@ export default function MyTasksPage() {
             todo: 0,
           }
         );
+
+        // The future list is supplementary: a failure there must not blank out
+        // the status sections the page is actually for.
+        if (futureRes.ok) {
+          const futureData = await futureRes.json();
+          const upcoming = (futureData.tasks ?? []).filter(
+            (t: Task) => !!t.triggerDate
+          );
+          setFutureTasks(upcoming);
+        } else {
+          setFutureTasks([]);
+        }
       } catch (e) {
         console.error(e);
         setSections({});
+        setFutureTasks([]);
       } finally {
         setLoading(false);
       }
@@ -707,6 +737,14 @@ export default function MyTasksPage() {
           <SectionTable label="In Progress" tasks={tasksInProgress} />
           <SectionTable label="Completed" tasks={tasksCompleted} />
           <SectionTable label="Hold" tasks={tasksHold} />
+          {futureTasks.length > 0 && (
+            <SectionTable
+              label="Future Tasks"
+              tasks={futureTasks.slice(0, SECTION_LIMIT)}
+              trigger={true}
+              triggerScope="standard"
+            />
+          )}
         </div>
       )}
     </section>

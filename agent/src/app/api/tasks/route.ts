@@ -113,10 +113,29 @@ export async function GET(req: NextRequest) {
     }
 
     // TRIGGER TASKS
+    //
+    // `scope` picks which slice of the agent's upcoming triggers to return.
+    // "standard" is the My Tasks (Standard Tasks) page: tasks that belong to no
+    // legislation and no retainership. Those were previously unreachable from
+    // the agent portal -- this branch hardcoded `legislationId: { not: null }`,
+    // so a completed recurring standard task simply disappeared until the cron
+    // rolled it over and only an admin could see when that would be.
+    // Omitting `scope` keeps the original legislation-only behaviour, which is
+    // what the retainership page still asks for.
     else if (trigger === "true") {
+      const scope = searchParams.get("scope");
+
       where = {
         assignedToId,
-        legislationId: { not: null },
+        // Only `legislationId` is filtered. `retainershipId` is absent (not
+        // null) on most task documents, and in MongoDB a `null` filter does
+        // not match a missing field -- adding it here returned zero rows for
+        // every agent. Retainership tasks are reached through the retainership
+        // page's own trigger query, so excluding them here is not needed to
+        // keep the two sections distinct.
+        ...(scope === "standard"
+          ? { legislationId: null }
+          : { legislationId: { not: null } }),
         OR: [
           { active: false },
           { status: "Completed" },

@@ -825,10 +825,10 @@ model Enquiry {
 
   status String @default("New") // New | Reviewed | Converted | Spam
 
-  /// Advisor Agent this enquiry was handed to, picked by the same round-robin
-  /// the leads queue uses but over agents with enquiryAutoAssign set. Null when
-  /// no agent was eligible at submission time; such rows stay unassigned and an
-  /// admin picks someone by hand.
+  /// Agent this enquiry was handed to. Website enquiries arrive unassigned and
+  /// get an agent only when an admin accepts them: either picked by hand or by
+  /// the round-robin in src/lib/assignEnquiry.ts over agents with
+  /// enquiryAutoAssign set.
   assignedAgentId String? @db.ObjectId
   assignedAgent   Agent?  @relation("AgentAssignedEnquiries", fields: [assignedAgentId], references: [id])
   assignedAt      DateTime?

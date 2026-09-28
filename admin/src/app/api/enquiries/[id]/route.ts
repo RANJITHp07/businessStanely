@@ -8,9 +8,10 @@ import {
   softDeleteData,
 } from "@/lib/audit";
 import { withActor } from "@/lib/auditContext";
+import { pickEnquiryAssignee } from "@/lib/assignEnquiry";
 
 /** Statuses an agent may set by hand. "Converted" is set by the convert action. */
-const SETTABLE_STATUSES = ["New", "Reviewed", "Spam"] as const;
+const SETTABLE_STATUSES = ["New", "Spam"] as const;
 
 /** Next 15 passes route params as a promise. */
 type RouteContext = { params: Promise<{ id: string }> };
@@ -158,9 +159,11 @@ export async function POST(
 /**
  * Two actions share this handler:
  *
- *  - `{ status }` marks an enquiry Reviewed or Spam.
- *  - `{ action: "convert", assignedAgentId, leadSourceId? }` creates the
- *    Prospect and links it back.
+ *  - `{ status }` marks an enquiry Spam (or back to New).
+ *  - `{ action: "convert", assignedAgentId | autoAssign: true }` creates the
+ *    Prospect, assigns it (and the enquiry) to the agent, and links it back.
+ *    Website enquiries arrive unassigned; this is the only place they get an
+ *    agent. `autoAssign` picks one with the enquiry round-robin.
  *
  * Conversion is guarded on the enquiry's own status rather than only on
  * convertedProspectId, so two agents clicking Convert at the same moment
@@ -186,19 +189,27 @@ export async function PATCH(
     }
 
     if (body.action === "convert") {
-      const { assignedAgentId, leadSourceId } = body;
-
-      if (!assignedAgentId) {
-        return NextResponse.json(
-          { error: "An agent must be selected to convert this enquiry" },
-          { status: 400 },
-        );
-      }
+      const { leadSourceId } = body;
 
       if (existing.status === "Converted" || existing.convertedProspectId) {
         return NextResponse.json(
           { error: "This enquiry has already been converted" },
           { status: 409 },
+        );
+      }
+
+      const assignedAgentId: string | null = body.autoAssign
+        ? await pickEnquiryAssignee()
+        : body.assignedAgentId || null;
+
+      if (!assignedAgentId) {
+        return NextResponse.json(
+          {
+            error: body.autoAssign
+              ? "No agent is set to take enquiries automatically. Tick agents in Set Enquiries per Agent, or pick an agent."
+              : "An agent must be selected to convert this enquiry",
+          },
+          { status: 400 },
         );
       }
 
@@ -228,7 +239,12 @@ export async function PATCH(
             { convertedProspectId: { isSet: false } },
           ],
         },
-        data: { status: "Converted", convertedAt: new Date() },
+        data: {
+          status: "Converted",
+          convertedAt: new Date(),
+          assignedAgentId,
+          assignedAt: new Date(),
+        },
       });
 
       if (claim.count === 0) {
@@ -280,7 +296,7 @@ export async function PATCH(
         entityType: "Enquiry",
         entityId: id,
         entityName: existing.name,
-        changedFields: ["status", "convertedProspectId"],
+        changedFields: ["status", "convertedProspectId", "assignedAgentId"],
         actor,
         req,
       });

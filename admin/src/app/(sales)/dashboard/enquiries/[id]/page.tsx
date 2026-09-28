@@ -49,6 +49,10 @@ import {
 } from "@/components/ui/select"
 import { toast } from "react-toastify"
 import { fetchWithAuth } from "@/lib/fetchWithAuth"
+
+/* Accept-dialog choice that lets the server pick the agent with the enquiry
+   round-robin instead of the admin picking one. */
+const AUTO_ASSIGN = "__auto__"
 import { uploadFileToS3Direct } from "@/lib/directUpload"
 
 /* Detail view for a single website enquiry, built to match the lead detail
@@ -158,9 +162,7 @@ export default function EnquiryDetailPage({ params }: { params: Promise<{ id: st
        lead-source choice the enquiries list asks for. */
     const [acceptOpen, setAcceptOpen] = useState(false)
     const [agents, setAgents] = useState<{ id: string; name: string }[]>([])
-    const [leadSources, setLeadSources] = useState<{ id: string; name: string }[]>([])
     const [assignedAgentId, setAssignedAgentId] = useState("")
-    const [leadSourceId, setLeadSourceId] = useState("")
 
     const load = useCallback(async () => {
         setLoading(true)
@@ -202,23 +204,17 @@ export default function EnquiryDetailPage({ params }: { params: Promise<{ id: st
         }
     }
 
-    /* Agents and lead sources are only needed once Accept is opened, so they
-       are fetched on demand rather than on every page load. */
+    /* Agents are only needed once Accept is opened, so they are fetched on
+       demand rather than on every page load. */
     async function openAccept() {
-        setAssignedAgentId(enquiry?.assignedAgent?.id ?? "")
-        setLeadSourceId("")
+        setAssignedAgentId(enquiry?.assignedAgent?.id ?? AUTO_ASSIGN)
         setAcceptOpen(true)
         try {
-            const [agentsRes, sourcesRes] = await Promise.all([
-                fetchWithAuth("/api/agents"),
-                fetchWithAuth("/api/lead_source"),
-            ])
+            const agentsRes = await fetchWithAuth("/api/agents")
             const agentsData = await agentsRes.json()
-            const sourcesData = await sourcesRes.json()
             setAgents(Array.isArray(agentsData) ? agentsData : agentsData?.agents ?? [])
-            setLeadSources(Array.isArray(sourcesData) ? sourcesData : sourcesData?.leadSources ?? [])
         } catch {
-            toast.error("Could not load agents and lead sources")
+            toast.error("Could not load agents")
         }
     }
 
@@ -235,8 +231,9 @@ export default function EnquiryDetailPage({ params }: { params: Promise<{ id: st
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     action: "convert",
-                    assignedAgentId,
-                    leadSourceId: leadSourceId || undefined,
+                    ...(assignedAgentId === AUTO_ASSIGN
+                        ? { autoAssign: true }
+                        : { assignedAgentId }),
                 }),
             })
             const data = await res.json()
@@ -398,12 +395,6 @@ export default function EnquiryDetailPage({ params }: { params: Promise<{ id: st
                                     </>
                                 ) : (
                                     <>
-                                        {enquiry.status !== "Reviewed" && (
-                                            <Button variant="outline" disabled={busy} onClick={() => setStatus("Reviewed")}>
-                                                <CheckCircle2 className="mr-2 h-4 w-4" />
-                                                Mark Reviewed
-                                            </Button>
-                                        )}
                                         <Button disabled={busy} onClick={openAccept}>
                                             <ThumbsUp className="mr-2 h-4 w-4" />
                                             Accept
@@ -830,25 +821,12 @@ export default function EnquiryDetailPage({ params }: { params: Promise<{ id: st
                                     <SelectValue placeholder="Select an agent" />
                                 </SelectTrigger>
                                 <SelectContent>
+                                    <SelectItem value={AUTO_ASSIGN}>
+                                        Assign automatically (round-robin)
+                                    </SelectItem>
                                     {agents.map((agent) => (
                                         <SelectItem key={agent.id} value={agent.id}>
                                             {agent.name}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-
-                        <div className="space-y-2">
-                            <Label>Lead source (optional)</Label>
-                            <Select value={leadSourceId} onValueChange={setLeadSourceId}>
-                                <SelectTrigger className="w-full">
-                                    <SelectValue placeholder="Select a lead source" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {leadSources.map((source) => (
-                                        <SelectItem key={source.id} value={source.id}>
-                                            {source.name}
                                         </SelectItem>
                                     ))}
                                 </SelectContent>

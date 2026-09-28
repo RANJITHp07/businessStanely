@@ -24,7 +24,6 @@ import {
     Phone,
     Building2,
     ArrowRight,
-    CheckCircle2,
     Ban,
     RefreshCcw,
     UserPlus,
@@ -68,6 +67,10 @@ import {
 import { toast } from "react-toastify"
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip"
 import { fetchWithAuth } from "@/lib/fetchWithAuth"
+
+/* Accept-dialog choice that lets the server pick the agent with the enquiry
+   round-robin instead of the admin picking one. */
+const AUTO_ASSIGN = "__auto__"
 import { useTablePage } from "@/hooks/useTablePage"
 
 /* Enquiries arrive from the public businessPlus website with no agent attached.
@@ -92,7 +95,6 @@ type Enquiry = {
 }
 
 type Agent = { id: string; name: string }
-type LeadSource = { id: string; name: string }
 
 const STATUSES = ["New", "Reviewed", "Converted", "Spam"]
 
@@ -149,13 +151,11 @@ export default function EnquiriesPage() {
         useTablePage("admin-sales-dashboard-enquiries-page")
 
     const [agents, setAgents] = useState<Agent[]>([])
-    const [leadSources, setLeadSources] = useState<LeadSource[]>([])
 
     const [selected, setSelected] = useState<Enquiry | null>(null)
     const [convertTarget, setConvertTarget] = useState<Enquiry | null>(null)
     const [enquiryToDelete, setEnquiryToDelete] = useState<Enquiry | null>(null)
     const [assignedAgentId, setAssignedAgentId] = useState("")
-    const [leadSourceId, setLeadSourceId] = useState("")
     const [busy, setBusy] = useState(false)
 
     const resetFilters = () => {
@@ -188,18 +188,13 @@ export default function EnquiriesPage() {
         load()
     }, [load])
 
-    /* Agents and lead sources only matter once someone opens the convert
-       dialog, but both lists are small and shared by every row. */
+    /* Agents only matter once someone opens the convert dialog, but the list
+       is small and shared by every row. */
     useEffect(() => {
         fetchWithAuth("/api/agents")
             .then((r) => (r.ok ? r.json() : []))
             .then((data) => setAgents(Array.isArray(data) ? data : []))
             .catch(() => setAgents([]))
-
-        fetchWithAuth("/api/lead_source")
-            .then((r) => (r.ok ? r.json() : []))
-            .then((data) => setLeadSources(Array.isArray(data) ? data : []))
-            .catch(() => setLeadSources([]))
     }, [])
 
     const filteredEnquiries = useMemo(() => {
@@ -255,8 +250,9 @@ export default function EnquiriesPage() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     action: "convert",
-                    assignedAgentId,
-                    leadSourceId: leadSourceId || undefined,
+                    ...(assignedAgentId === AUTO_ASSIGN
+                        ? { autoAssign: true }
+                        : { assignedAgentId }),
                 }),
             })
             const data = await res.json()
@@ -265,7 +261,6 @@ export default function EnquiriesPage() {
             setConvertTarget(null)
             setSelected(null)
             setAssignedAgentId("")
-            setLeadSourceId("")
             load()
         } catch (error: any) {
             toast.error(error.message || "Failed to convert enquiry")
@@ -576,21 +571,12 @@ export default function EnquiriesPage() {
                                                                         <DropdownMenuItem
                                                                             onClick={() => {
                                                                                 setConvertTarget(enquiry)
-                                                                                setAssignedAgentId("")
-                                                                                setLeadSourceId("")
+                                                                                setAssignedAgentId(AUTO_ASSIGN)
                                                                             }}
                                                                         >
                                                                             <UserPlus className="mr-2 h-4 w-4" />
                                                                             Accept
                                                                         </DropdownMenuItem>
-                                                                        {enquiry.status !== "Reviewed" && (
-                                                                            <DropdownMenuItem
-                                                                                onClick={() => setStatus(enquiry, "Reviewed")}
-                                                                            >
-                                                                                <CheckCircle2 className="mr-2 h-4 w-4" />
-                                                                                Mark reviewed
-                                                                            </DropdownMenuItem>
-                                                                        )}
                                                                         <DropdownMenuItem
                                                                             onClick={() => setStatus(enquiry, "Spam")}
                                                                         >
@@ -768,21 +754,10 @@ export default function EnquiriesPage() {
                                             <Ban className="h-4 w-4 mr-2" />
                                             Spam
                                         </Button>
-                                        {selected.status !== "Reviewed" && (
-                                            <Button
-                                                variant="outline"
-                                                onClick={() => setStatus(selected, "Reviewed")}
-                                                disabled={busy}
-                                            >
-                                                <CheckCircle2 className="h-4 w-4 mr-2" />
-                                                Mark reviewed
-                                            </Button>
-                                        )}
                                         <Button
                                             onClick={() => {
                                                 setConvertTarget(selected)
-                                                setAssignedAgentId("")
-                                                setLeadSourceId("")
+                                                setAssignedAgentId(AUTO_ASSIGN)
                                             }}
                                             disabled={busy}
                                         >
@@ -816,25 +791,12 @@ export default function EnquiriesPage() {
                                     <SelectValue placeholder="Select an agent" />
                                 </SelectTrigger>
                                 <SelectContent>
+                                    <SelectItem value={AUTO_ASSIGN}>
+                                        Assign automatically (round-robin)
+                                    </SelectItem>
                                     {agents.map((agent) => (
                                         <SelectItem key={agent.id} value={agent.id}>
                                             {agent.name}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-
-                        <div className="space-y-2">
-                            <Label>Lead source (optional)</Label>
-                            <Select value={leadSourceId} onValueChange={setLeadSourceId}>
-                                <SelectTrigger className="w-full">
-                                    <SelectValue placeholder="Select a lead source" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {leadSources.map((source) => (
-                                        <SelectItem key={source.id} value={source.id}>
-                                            {source.name}
                                         </SelectItem>
                                     ))}
                                 </SelectContent>

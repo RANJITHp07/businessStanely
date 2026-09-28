@@ -52,11 +52,14 @@ import { toast } from "react-toastify"
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip"
 import { fetchWithAuth } from "@/lib/fetchWithAuth"
 
-/* Enquiries arrive from the public businessPlus website already routed to an
-   Advisor Agent by the round-robin in businessPlus/lib/assignEnquiry.ts, which
-   only considers agents ticked into "Set Enquiries per Agent" below. Rows can
-   still arrive unassigned if nobody was ticked in at the time.
-   This screen is the review step before one becomes a lead. */
+/* Accept-dialog choice that lets the server pick the agent with the enquiry
+   round-robin instead of the admin picking one. */
+const AUTO_ASSIGN = "__auto__"
+
+/* Enquiries arrive from the public businessPlus website unassigned. This screen
+   is the review step: on Accept the admin either picks an agent or lets the
+   round-robin in src/lib/assignEnquiry.ts pick one from the agents ticked into
+   "Set Enquiries per Agent" below. Only then does the lead reach an agent. */
 
 type Enquiry = {
     id: string
@@ -509,7 +512,9 @@ export default function EnquiriesPage() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     action: "convert",
-                    assignedAgentId,
+                    ...(assignedAgentId === AUTO_ASSIGN
+                        ? { autoAssign: true }
+                        : { assignedAgentId }),
                 }),
             })
             const data = await res.json()
@@ -656,9 +661,9 @@ export default function EnquiriesPage() {
                     <DialogHeader>
                         <DialogTitle>Assign Enquiries Automatically</DialogTitle>
                         <DialogDescription>
-                            Choose how many website enquiries each agent is assigned
-                            before the next agent's turn, and which Advisor Agents take
-                            part. Only ticked agents receive new enquiries.
+                            Used when you accept an enquiry with &quot;Assign automatically&quot;.
+                            Choose how many enquiries each agent is given before the next
+                            agent&apos;s turn, and which Advisor Agents take part.
                         </DialogDescription>
                     </DialogHeader>
 
@@ -753,8 +758,8 @@ export default function EnquiriesPage() {
                                 )}
                                 {selectedAssignees.length === 0 && assignAgents.length > 0 && (
                                     <p className="text-xs text-amber-600">
-                                        With nobody ticked, new enquiries arrive unassigned and
-                                        must be routed by hand.
+                                        With nobody ticked, &quot;Assign automatically&quot; will not
+                                        work and each enquiry must be given to an agent by hand.
                                     </p>
                                 )}
                             </div>
@@ -868,20 +873,10 @@ export default function EnquiriesPage() {
                                             <Ban className="h-4 w-4 mr-2" />
                                             Spam
                                         </Button>
-                                        {selected.status !== "Reviewed" && (
-                                            <Button
-                                                variant="outline"
-                                                onClick={() => setStatus(selected, "Reviewed")}
-                                                disabled={busy}
-                                            >
-                                                <CheckCircle2 className="h-4 w-4 mr-2" />
-                                                Mark reviewed
-                                            </Button>
-                                        )}
                                         <Button
                                             onClick={() => {
                                                 setConvertTarget(selected)
-                                                setAssignedAgentId("")
+                                                setAssignedAgentId(AUTO_ASSIGN)
                                             }}
                                             disabled={busy}
                                         >
@@ -915,6 +910,9 @@ export default function EnquiriesPage() {
                                     <SelectValue placeholder="Select an agent" />
                                 </SelectTrigger>
                                 <SelectContent>
+                                    <SelectItem value={AUTO_ASSIGN}>
+                                        Assign automatically (round-robin)
+                                    </SelectItem>
                                     {agents.map((agent) => (
                                         <SelectItem key={agent.id} value={agent.id}>
                                             {agent.name}

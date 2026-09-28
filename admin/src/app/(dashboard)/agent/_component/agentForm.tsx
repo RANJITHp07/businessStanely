@@ -226,7 +226,7 @@ export default function AgentForm({ agent }: AgentFormProps) {
     barAssociationId: agent?.barAssociationId || "",
     jurisdiction: agent?.jurisdiction || "",
     autoAssign: agent?.autoAssign || true,
-    enquiryAutoAssign: agent?.enquiryAutoAssign ?? false,
+    enquiryAutoAssign: agent?.enquiryAutoAssign ?? true,
     // `??` rather than `||` so an agent explicitly set to false stays false
     // when the edit form reloads.
     canCreateTask: agent?.canCreateTask ?? true

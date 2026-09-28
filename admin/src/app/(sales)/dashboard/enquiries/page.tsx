@@ -1,10 +1,11 @@
 "use client"
 
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
+import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import {
     Loader2,
@@ -20,6 +21,7 @@ import {
     Inbox,
     UserPlus,
     Users,
+    Search,
 } from "lucide-react"
 import {
     AlertDialog,
@@ -85,7 +87,6 @@ type AssignableAgent = {
     advisorAgentType?: string | null
     enquiryAutoAssign: boolean
 }
-type LeadSource = { id: string; name: string }
 
 const STATUSES = ["New", "Reviewed", "Converted", "Spam"]
 
@@ -366,6 +367,32 @@ export default function EnquiriesPage() {
     const [enquiriesPerAgent, setEnquiriesPerAgent] = useState(1)
     const [assignSaving, setAssignSaving] = useState(false)
     const [assignLoading, setAssignLoading] = useState(false)
+    const [assigneeSearch, setAssigneeSearch] = useState("")
+
+    const visibleAssignAgents = useMemo(() => {
+        const q = assigneeSearch.trim().toLowerCase()
+        if (!q) return assignAgents
+        return assignAgents.filter((agent) =>
+            [agent.name, agent.email, agent.advisorAgentType, agent.agentType]
+                .filter(Boolean)
+                .some((field) => field!.toLowerCase().includes(q)),
+        )
+    }, [assignAgents, assigneeSearch])
+
+    /* Select all acts on what the search currently shows, so an admin can
+       filter to a group and tick just those. */
+    const allVisibleSelected =
+        visibleAssignAgents.length > 0 &&
+        visibleAssignAgents.every((agent) => selectedAssignees.includes(agent.id))
+
+    const toggleSelectAllVisible = () => {
+        const visibleIds = visibleAssignAgents.map((agent) => agent.id)
+        setSelectedAssignees((prev) =>
+            allVisibleSelected
+                ? prev.filter((id) => !visibleIds.includes(id))
+                : Array.from(new Set([...prev, ...visibleIds])),
+        )
+    }
 
     const loadAssignmentSetting = useCallback(async () => {
         setAssignLoading(true)
@@ -375,7 +402,11 @@ export default function EnquiriesPage() {
             const data = await res.json()
             const agents: AssignableAgent[] = data.agents ?? []
             setAssignAgents(agents)
-            setSelectedAssignees(agents.filter((a) => a.enquiryAutoAssign).map((a) => a.id))
+            setAssigneeSearch("")
+            /* Everyone takes enquiries by default: until at least one agent has
+               been saved as ticked, open with the whole list ticked. */
+            const ticked = agents.filter((a) => a.enquiryAutoAssign).map((a) => a.id)
+            setSelectedAssignees(ticked.length ? ticked : agents.map((a) => a.id))
             setEnquiriesPerAgent(data.enquiriesPerAgent ?? 1)
         } catch {
             toast.error("Could not load the assignment settings")
@@ -411,13 +442,11 @@ export default function EnquiriesPage() {
 
 
     const [agents, setAgents] = useState<Agent[]>([])
-    const [leadSources, setLeadSources] = useState<LeadSource[]>([])
 
     const [selected, setSelected] = useState<Enquiry | null>(null)
     const [convertTarget, setConvertTarget] = useState<Enquiry | null>(null)
     const [enquiryToDelete, setEnquiryToDelete] = useState<Enquiry | null>(null)
     const [assignedAgentId, setAssignedAgentId] = useState("")
-    const [leadSourceId, setLeadSourceId] = useState("")
     const [busy, setBusy] = useState(false)
 
     const load = useCallback(async () => {
@@ -438,18 +467,13 @@ export default function EnquiriesPage() {
         load()
     }, [load])
 
-    /* Agents and lead sources only matter once someone opens the convert
-       dialog, but both lists are small and shared by every row. */
+    /* Agents only matter once someone opens the convert dialog, but the list
+       is small and shared by every row. */
     useEffect(() => {
         fetchWithAuth("/api/agents")
             .then((r) => (r.ok ? r.json() : []))
             .then((data) => setAgents(Array.isArray(data) ? data : []))
             .catch(() => setAgents([]))
-
-        fetchWithAuth("/api/lead_source")
-            .then((r) => (r.ok ? r.json() : []))
-            .then((data) => setLeadSources(Array.isArray(data) ? data : []))
-            .catch(() => setLeadSources([]))
     }, [])
 
     async function setStatus(enquiry: Enquiry, status: string) {
@@ -486,7 +510,6 @@ export default function EnquiriesPage() {
                 body: JSON.stringify({
                     action: "convert",
                     assignedAgentId,
-                    leadSourceId: leadSourceId || undefined,
                 }),
             })
             const data = await res.json()
@@ -495,7 +518,6 @@ export default function EnquiriesPage() {
             setConvertTarget(null)
             setSelected(null)
             setAssignedAgentId("")
-            setLeadSourceId("")
             load()
         } catch (error: any) {
             toast.error(error.message || "Failed to convert enquiry")
@@ -661,14 +683,47 @@ export default function EnquiriesPage() {
                             </div>
 
                             <div className="space-y-2">
-                                <Label>Advisor Agents</Label>
+                                <div className="flex items-center justify-between">
+                                    <Label>Advisor Agents</Label>
+                                    {assignAgents.length > 0 && (
+                                        <span className="text-xs text-muted-foreground">
+                                            {selectedAssignees.length} of {assignAgents.length} selected
+                                        </span>
+                                    )}
+                                </div>
                                 {assignAgents.length === 0 ? (
                                     <p className="text-sm text-muted-foreground">
                                         No active Advisor Agents to choose from.
                                     </p>
                                 ) : (
+                                    <>
+                                    <div className="flex items-center gap-2">
+                                        <div className="relative flex-1">
+                                            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                                            <Input
+                                                value={assigneeSearch}
+                                                onChange={(e) => setAssigneeSearch(e.target.value)}
+                                                placeholder="Search agents"
+                                                className="pl-8"
+                                            />
+                                        </div>
+                                        <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={toggleSelectAllVisible}
+                                            disabled={visibleAssignAgents.length === 0}
+                                        >
+                                            {allVisibleSelected ? "Deselect all" : "Select all"}
+                                        </Button>
+                                    </div>
                                     <div className="max-h-56 space-y-1 overflow-y-auto rounded-md border border-slate-200 p-2">
-                                        {assignAgents.map((agent) => (
+                                        {visibleAssignAgents.length === 0 && (
+                                            <p className="px-2 py-1.5 text-sm text-muted-foreground">
+                                                No agents match &quot;{assigneeSearch}&quot;.
+                                            </p>
+                                        )}
+                                        {visibleAssignAgents.map((agent) => (
                                             <label
                                                 key={agent.id}
                                                 className="flex cursor-pointer items-center gap-2 rounded px-2 py-1.5 hover:bg-slate-50"
@@ -694,6 +749,7 @@ export default function EnquiriesPage() {
                                             </label>
                                         ))}
                                     </div>
+                                    </>
                                 )}
                                 {selectedAssignees.length === 0 && assignAgents.length > 0 && (
                                     <p className="text-xs text-amber-600">
@@ -826,7 +882,6 @@ export default function EnquiriesPage() {
                                             onClick={() => {
                                                 setConvertTarget(selected)
                                                 setAssignedAgentId("")
-                                                setLeadSourceId("")
                                             }}
                                             disabled={busy}
                                         >
@@ -863,22 +918,6 @@ export default function EnquiriesPage() {
                                     {agents.map((agent) => (
                                         <SelectItem key={agent.id} value={agent.id}>
                                             {agent.name}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-
-                        <div className="space-y-2">
-                            <Label>Lead source (optional)</Label>
-                            <Select value={leadSourceId} onValueChange={setLeadSourceId}>
-                                <SelectTrigger className="w-full">
-                                    <SelectValue placeholder="Select a lead source" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {leadSources.map((source) => (
-                                        <SelectItem key={source.id} value={source.id}>
-                                            {source.name}
                                         </SelectItem>
                                     ))}
                                 </SelectContent>

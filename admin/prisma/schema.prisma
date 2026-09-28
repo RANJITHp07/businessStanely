@@ -301,9 +301,9 @@ model Agent {
   autoAssign           Boolean   @default(true)
   /// Include this Advisor Agent in the round-robin for website (businessPlus)
   /// enquiries. Separate from autoAssign, which governs leads only, so an agent
-  /// can take one queue without the other. Defaults to false: agents created
-  /// before this existed are opted out until someone ticks them in.
-  enquiryAutoAssign    Boolean   @default(false)
+  /// can take one queue without the other. Defaults to true: every new agent
+  /// takes enquiries unless someone unticks them.
+  enquiryAutoAssign    Boolean   @default(true)
   // Admin-controlled: may this agent create normal (non-legislation, non-service)
   // tasks from the agent app? Legislation/retainership and service-linked task
   // creation is unaffected.

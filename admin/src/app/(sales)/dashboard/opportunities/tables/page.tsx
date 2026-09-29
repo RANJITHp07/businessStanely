@@ -1,5 +1,6 @@
 "use client"
 
+import { prospectCreatorName } from "@/lib/prospectCreator"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Users, UserPlus, Calendar, TrendingUp, ArrowRight, Activity, BarChart3, Loader2, Eye } from "lucide-react"
@@ -177,7 +178,7 @@ export function ProspectsTable({ label, prospects, statusFilter, assignedId }: {
                                                     </div>
                                                 </td>
                                                 <td className="py-3 px-4">
-                                                    <p className="text-sm text-slate-700">{prospect?.prospect?.createdByAgent?.name || "Unknown"}</p>
+                                                    <p className="text-sm text-slate-700">{prospectCreatorName(prospect?.prospect)}</p>
                                                 </td>
                                                 <td className="py-3 px-4">
                                                     <p className="text-sm ">{formatDate(prospect.nextFollowUp)}</p>
@@ -226,7 +227,7 @@ export function ProspectsTable({ label, prospects, statusFilter, assignedId }: {
                                             </div>
                                             <div>
                                                 <p className="text-slate-500 mb-1">Created By</p>
-                                                <p className="text-slate-700 font-medium">{prospect?.prospect?.createdByAgent?.name || "Unknown"}</p>
+                                                <p className="text-slate-700 font-medium">{prospectCreatorName(prospect?.prospect)}</p>
                                             </div>
                                             <div>
                                                 <p className="text-slate-500 mb-1">Follow Up</p>
@@ -388,7 +389,7 @@ function SegregationTable({
                                                     </div>
                                                 </td>
                                                 <td className="py-3 px-4">
-                                                    <p className="text-sm text-slate-700">{lead?.prospect?.createdByAgent?.name || "Unknown"}</p>
+                                                    <p className="text-sm text-slate-700">{prospectCreatorName(lead?.prospect)}</p>
                                                 </td>
                                                 <td className="py-3 px-4">
                                                     <p className="text-sm ">
@@ -455,7 +456,7 @@ function SegregationTable({
                                             </div>
                                             <div>
                                                 <p className="text-slate-500 mb-1">Created By</p>
-                                                <p className="text-slate-700 font-medium">{lead?.prospect?.createdByAgent?.name || "Unknown"}</p>
+                                                <p className="text-slate-700 font-medium">{prospectCreatorName(lead?.prospect)}</p>
                                             </div>
                                             <div>
                                                 <p className="text-slate-500 mb-1">{dateLabel}</p>

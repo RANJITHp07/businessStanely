@@ -1,4 +1,5 @@
 "use client"
+import { prospectCreatorName } from "@/lib/prospectCreator"
 import { useState, useEffect } from "react"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Calendar as CalendarComponent } from "@/components/ui/calendar"
@@ -538,7 +539,7 @@ export default function ProspectsTable() {
                                                         </div>
                                                     </TableCell>
                                                     <TableCell onClick={() => router.push(`/dashboard/opportunities/${prospect.id}`)}>
-                                                        <span className="text-sm text-slate-700">{prospect?.prospect?.createdByAgent?.name || "Unknown"}</span>
+                                                        <span className="text-sm text-slate-700">{prospectCreatorName(prospect?.prospect)}</span>
                                                     </TableCell>
                                                     <TableCell onClick={() => router.push(`/dashboard/opportunities/${prospect.id}`)}>
                                                         <Badge

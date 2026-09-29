@@ -38,6 +38,7 @@ const PROSPECT_LIST_SELECT = {
   createdByAgentId: true,
   assignedAgent: { select: { id: true, name: true } },
   createdByAgent: { select: { id: true, name: true } },
+  leadSource: { select: { name: true } },
   comments: {
     select: { id: true, createdAt: true, authorId: true },
     orderBy: { createdAt: "desc" as const },

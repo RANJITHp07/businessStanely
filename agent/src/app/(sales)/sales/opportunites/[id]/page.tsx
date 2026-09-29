@@ -1,5 +1,6 @@
 "use client"
 
+import { prospectCreatorName } from "@/lib/prospectCreator"
 import { useParams } from "next/navigation"
 import React, { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -795,7 +796,7 @@ export default function OppurtunitiesDetailPage() {
                                     <div className="h-6 w-6 rounded-full bg-emerald-100 flex items-center justify-center">
                                         <User className="h-3 w-3 text-emerald-700" />
                                     </div>
-                                    <p className="font-medium">{oppurtunities.prospect?.createdByAgent?.name || "Unknown"}</p>
+                                    <p className="font-medium">{prospectCreatorName(oppurtunities.prospect)}</p>
                                 </div>
                             </div>
                             <Separator />

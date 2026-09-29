@@ -1,5 +1,6 @@
 "use client"
 
+import { prospectCreatorName } from "@/lib/prospectCreator"
 import type React from "react"
 
 import { useState, useEffect, use } from "react"
@@ -629,7 +630,7 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
                                     <div className="h-6 w-6 rounded-full bg-emerald-100 flex items-center justify-center">
                                         <User className="h-3 w-3 text-emerald-700" />
                                     </div>
-                                    <p className="font-medium">{prospect.createdByAgent?.name || "Unknown"}</p>
+                                    <p className="font-medium">{prospectCreatorName(prospect)}</p>
                                 </div>
                             </div>
                             <Separator />

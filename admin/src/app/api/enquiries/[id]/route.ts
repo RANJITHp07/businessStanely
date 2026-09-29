@@ -9,12 +9,10 @@ import {
 } from "@/lib/audit";
 import { withActor } from "@/lib/auditContext";
 import { pickEnquiryAssignee } from "@/lib/assignEnquiry";
+import { BUSINESS_PLUS_LEAD_SOURCE } from "@/lib/prospectCreator";
 
 /** Statuses an agent may set by hand. "Converted" is set by the convert action. */
 const SETTABLE_STATUSES = ["New", "Spam"] as const;
-
-/** Lead source every accepted website enquiry is tagged with. */
-const BUSINESS_PLUS_LEAD_SOURCE = "BusinessPlus";
 
 /** Finds the BusinessPlus lead source, creating it the first time. */
 async function businessPlusLeadSourceId(): Promise<string> {

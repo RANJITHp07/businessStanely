@@ -880,6 +880,12 @@ model PortalAccount {
   active      Boolean   @default(true)
   lastLoginAt DateTime?
 
+  /// Forgot-password code written by the website portal. Declared so this
+  /// schema matches the collection; the admin app never reads it.
+  resetCodeHash      String?
+  resetCodeExpiresAt DateTime?
+  resetCodeAttempts  Int       @default(0)
+
   enquiries Enquiry[]
 
   createdAt DateTime @default(now())

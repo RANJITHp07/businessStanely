@@ -41,19 +41,27 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const status = searchParams.get("status");
 
+    /* Only New, Converted (shown as "Accepted") and Spam are used now. Rows
+       from the retired "Reviewed" status are treated as New everywhere. */
     const where: Prisma.EnquiryWhereInput = {};
     if (status && status !== "all") {
-      where.status = status;
+      where.status = status === "New" ? { in: ["New", "Reviewed"] } : status;
     }
 
     // The page shows per-status tab counts alongside the filtered list, so the
     // counts are grouped server-side rather than derived from the rows sent.
     const [enquiries, statusGroups] = await Promise.all([
-      prisma.enquiry.findMany({
-        where,
-        select: ENQUIRY_LIST_SELECT,
-        orderBy: { createdAt: "desc" },
-      }),
+      prisma.enquiry
+        .findMany({
+          where,
+          select: ENQUIRY_LIST_SELECT,
+          orderBy: { createdAt: "desc" },
+        })
+        .then((rows) =>
+          rows.map((row) =>
+            row.status === "Reviewed" ? { ...row, status: "New" } : row,
+          ),
+        ),
       prisma.enquiry.groupBy({
         by: ["status"],
         _count: { _all: true },
@@ -64,7 +72,9 @@ export async function GET(req: NextRequest) {
     let total = 0;
     for (const group of statusGroups) {
       total += group._count._all;
-      if (group.status) statusCounts[group.status] = group._count._all;
+      if (!group.status) continue;
+      const key = group.status === "Reviewed" ? "New" : group.status;
+      statusCounts[key] = (statusCounts[key] ?? 0) + group._count._all;
     }
 
     return NextResponse.json({ enquiries, statusCounts, total });

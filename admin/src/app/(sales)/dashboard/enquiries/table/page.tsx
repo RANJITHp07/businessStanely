@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
-import { useSearchParams } from "next/navigation"
+import { useSearchParams, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -96,7 +96,11 @@ type Enquiry = {
 
 type Agent = { id: string; name: string }
 
-const STATUSES = ["New", "Reviewed", "Converted", "Spam"]
+const STATUSES = ["New", "Converted", "Spam"]
+
+/* "Converted" is the stored value; admins see it as "Accepted". */
+const STATUS_LABELS: Record<string, string> = { Converted: "Accepted" }
+const statusLabel = (status: string) => STATUS_LABELS[status] ?? status
 
 
 function getStatusBadge(status: string) {
@@ -107,16 +111,10 @@ function getStatusBadge(status: string) {
                 New
             </Badge>
         )
-    if (s === "reviewed")
-        return (
-            <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                Reviewed
-            </Badge>
-        )
     if (s === "converted")
         return (
             <Badge variant="outline" className="bg-violet-50 text-violet-700 border-violet-200">
-                Converted
+                Accepted
             </Badge>
         )
     if (s === "spam")
@@ -152,7 +150,8 @@ export default function EnquiriesPage() {
 
     const [agents, setAgents] = useState<Agent[]>([])
 
-    const [selected, setSelected] = useState<Enquiry | null>(null)
+    const router = useRouter()
+    const openEnquiry = (enquiry: Enquiry) => router.push(`/dashboard/enquiries/${enquiry.id}`)
     const [convertTarget, setConvertTarget] = useState<Enquiry | null>(null)
     const [enquiryToDelete, setEnquiryToDelete] = useState<Enquiry | null>(null)
     const [assignedAgentId, setAssignedAgentId] = useState("")
@@ -228,7 +227,6 @@ export default function EnquiriesPage() {
             const data = await res.json()
             if (!res.ok) throw new Error(data.error || "Failed to update")
             toast.success(`Marked as ${status}`)
-            setSelected(null)
             load()
         } catch (error: any) {
             toast.error(error.message || "Failed to update enquiry")
@@ -259,7 +257,6 @@ export default function EnquiriesPage() {
             if (!res.ok) throw new Error(data.error || "Failed to convert")
             toast.success("Enquiry converted to a lead")
             setConvertTarget(null)
-            setSelected(null)
             setAssignedAgentId("")
             load()
         } catch (error: any) {
@@ -276,7 +273,6 @@ export default function EnquiriesPage() {
             if (!res.ok) throw new Error("Failed to delete")
             toast.success("Enquiry deleted")
             setEnquiryToDelete(null)
-            setSelected(null)
             load()
         } catch (error: any) {
             toast.error(error.message || "Failed to delete enquiry")
@@ -389,7 +385,7 @@ export default function EnquiriesPage() {
                                                             setCurrentPage(1)
                                                         }}
                                                     >
-                                                        {status}
+                                                        {statusLabel(status)}
                                                     </DropdownMenuCheckboxItem>
                                                 ))}
                                             </DropdownMenuContent>
@@ -399,7 +395,7 @@ export default function EnquiriesPage() {
                                             <div className="flex flex-wrap gap-2 pt-2 justify-end">
                                                 {selectedStatuses.map((status) => (
                                                     <Badge key={status} variant="secondary" className="px-2 py-1">
-                                                        <span>{status}</span>
+                                                        <span>{statusLabel(status)}</span>
                                                         <button
                                                             type="button"
                                                             aria-label={`Remove ${status}`}
@@ -474,7 +470,7 @@ export default function EnquiriesPage() {
                                                 <TableRow key={enquiry.id} className="cursor-pointer">
                                                     <TableCell
                                                         className="font-medium max-w-[180px]"
-                                                        onClick={() => setSelected(enquiry)}
+                                                        onClick={() => openEnquiry(enquiry)}
                                                     >
                                                         <p className="truncate">{enquiry.name}</p>
                                                         {enquiry.company && (
@@ -484,7 +480,7 @@ export default function EnquiriesPage() {
                                                             </p>
                                                         )}
                                                     </TableCell>
-                                                    <TableCell onClick={() => setSelected(enquiry)}>
+                                                    <TableCell onClick={() => openEnquiry(enquiry)}>
                                                         <p className="text-sm flex items-center gap-1.5">
                                                             <Mail className="h-3.5 w-3.5 text-muted-foreground" />
                                                             {enquiry.email}
@@ -498,7 +494,7 @@ export default function EnquiriesPage() {
                                                     </TableCell>
                                                     <TableCell
                                                         className="max-w-[240px]"
-                                                        onClick={() => setSelected(enquiry)}
+                                                        onClick={() => openEnquiry(enquiry)}
                                                     >
                                                         <div className="flex flex-wrap gap-1">
                                                             {enquiry.services.slice(0, 2).map((s) => (
@@ -520,12 +516,12 @@ export default function EnquiriesPage() {
                                                             )}
                                                         </div>
                                                     </TableCell>
-                                                    <TableCell onClick={() => setSelected(enquiry)}>
+                                                    <TableCell onClick={() => openEnquiry(enquiry)}>
                                                         <span className="text-sm text-slate-700">
                                                             {formatDate(enquiry.createdAt)}
                                                         </span>
                                                     </TableCell>
-                                                    <TableCell onClick={() => setSelected(enquiry)}>
+                                                    <TableCell onClick={() => openEnquiry(enquiry)}>
                                                         {enquiry.assignedAgent ? (
                                                             <span className="text-sm text-slate-700">
                                                                 {enquiry.assignedAgent.name}
@@ -536,7 +532,7 @@ export default function EnquiriesPage() {
                                                             </span>
                                                         )}
                                                     </TableCell>
-                                                    <TableCell onClick={() => setSelected(enquiry)}>
+                                                    <TableCell onClick={() => openEnquiry(enquiry)}>
                                                         {getStatusBadge(enquiry.status)}
                                                     </TableCell>
                                                     <TableCell className="text-right">
@@ -656,120 +652,6 @@ export default function EnquiriesPage() {
                     )}
                 </CardContent>
             </Card>
-
-            {/* ---------------- Detail ---------------- */}
-            <Dialog open={!!selected} onOpenChange={(open) => !open && setSelected(null)}>
-                <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
-                    {selected && (
-                        <>
-                            <DialogHeader>
-                                <DialogTitle className="flex items-center gap-3">
-                                    {selected.name}
-                                    {getStatusBadge(selected.status)}
-                                </DialogTitle>
-                                <DialogDescription>
-                                    Received {formatDate(selected.createdAt)} from the businessPlus website.
-                                </DialogDescription>
-                            </DialogHeader>
-
-                            <div className="space-y-4 text-sm">
-                                <div className="grid gap-3 sm:grid-cols-2">
-                                    <div>
-                                        <p className="text-muted-foreground text-xs">Email</p>
-                                        <p>{selected.email}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-muted-foreground text-xs">Phone</p>
-                                        <p>{selected.phone || "N/A"}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-muted-foreground text-xs">Company</p>
-                                        <p>{selected.company || "N/A"}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-muted-foreground text-xs">Payment preference</p>
-                                        <p>{selected.payment || "N/A"}</p>
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <p className="text-muted-foreground text-xs mb-1.5">Services requested</p>
-                                    {selected.services.length ? (
-                                        <div className="flex flex-wrap gap-1.5">
-                                            {selected.services.map((s) => (
-                                                <Badge key={s} variant="outline" className="font-normal">
-                                                    {s}
-                                                </Badge>
-                                            ))}
-                                        </div>
-                                    ) : (
-                                        <p>N/A</p>
-                                    )}
-                                </div>
-
-                                <div>
-                                    <p className="text-muted-foreground text-xs mb-1">Notes</p>
-                                    <p className="whitespace-pre-wrap">{selected.notes || "N/A"}</p>
-                                </div>
-
-                                {selected.status === "Converted" && (
-                                    <div className="rounded-md bg-violet-50 border border-violet-200 p-3">
-                                        <p className="text-violet-800">
-                                            Converted {formatDate(selected.convertedAt)}
-                                            {selected.convertedByAgent
-                                                ? `, assigned to ${selected.convertedByAgent.name}`
-                                                : ""}
-                                            .
-                                        </p>
-                                        {selected.convertedProspectId && (
-                                            <Link
-                                                href={`/dashboard/prospects/${selected.convertedProspectId}`}
-                                                className="text-violet-900 underline text-xs"
-                                            >
-                                                Open the lead
-                                            </Link>
-                                        )}
-                                    </div>
-                                )}
-                            </div>
-
-                            <DialogFooter className="flex-wrap gap-2 sm:justify-between">
-                                <Button
-                                    variant="outline"
-                                    className="text-destructive"
-                                    onClick={() => setEnquiryToDelete(selected)}
-                                    disabled={busy}
-                                >
-                                    <Trash2 className="h-4 w-4 mr-2" />
-                                    Delete
-                                </Button>
-
-                                {selected.status !== "Converted" && (
-                                    <div className="flex flex-wrap gap-2">
-                                        <Button
-                                            variant="outline"
-                                            onClick={() => setStatus(selected, "Spam")}
-                                            disabled={busy}
-                                        >
-                                            <Ban className="h-4 w-4 mr-2" />
-                                            Spam
-                                        </Button>
-                                        <Button
-                                            onClick={() => {
-                                                setConvertTarget(selected)
-                                                setAssignedAgentId(AUTO_ASSIGN)
-                                            }}
-                                            disabled={busy}
-                                        >
-                                            Accept
-                                        </Button>
-                                    </div>
-                                )}
-                            </DialogFooter>
-                        </>
-                    )}
-                </DialogContent>
-            </Dialog>
 
             {/* ---------------- Convert ---------------- */}
             <Dialog open={!!convertTarget} onOpenChange={(open) => !open && setConvertTarget(null)}>

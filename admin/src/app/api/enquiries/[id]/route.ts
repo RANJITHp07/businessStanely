@@ -13,6 +13,30 @@ import { pickEnquiryAssignee } from "@/lib/assignEnquiry";
 /** Statuses an agent may set by hand. "Converted" is set by the convert action. */
 const SETTABLE_STATUSES = ["New", "Spam"] as const;
 
+/** Lead source every accepted website enquiry is tagged with. */
+const BUSINESS_PLUS_LEAD_SOURCE = "BusinessPlus";
+
+/** Finds the BusinessPlus lead source, creating it the first time. */
+async function businessPlusLeadSourceId(): Promise<string> {
+  const existing = await prisma.leadSource.findFirst({
+    where: {
+      name: BUSINESS_PLUS_LEAD_SOURCE,
+      OR: [{ deletedAt: null }, { deletedAt: { isSet: false } }],
+    },
+    select: { id: true },
+  });
+  if (existing) return existing.id;
+
+  const created = await prisma.leadSource.create({
+    data: {
+      name: BUSINESS_PLUS_LEAD_SOURCE,
+      description: "Service requests submitted on the businessPlus website",
+    },
+    select: { id: true },
+  });
+  return created.id;
+}
+
 /** Next 15 passes route params as a promise. */
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -50,6 +74,9 @@ export async function GET(
     if (!enquiry) {
       return NextResponse.json({ error: "Enquiry not found" }, { status: 404 });
     }
+
+    // The retired "Reviewed" status reads as New.
+    if (enquiry.status === "Reviewed") enquiry.status = "New";
 
     return NextResponse.json({ enquiry });
   } catch (error) {
@@ -161,7 +188,8 @@ export async function POST(
  *
  *  - `{ status }` marks an enquiry Spam (or back to New).
  *  - `{ action: "convert", assignedAgentId | autoAssign: true }` creates the
- *    Prospect, assigns it (and the enquiry) to the agent, and links it back.
+ *    Prospect tagged with the "BusinessPlus" lead source, assigns it (and the
+ *    enquiry) to the agent, and links it back.
  *    Website enquiries arrive unassigned; this is the only place they get an
  *    agent. `autoAssign` picks one with the enquiry round-robin.
  *
@@ -189,7 +217,6 @@ export async function PATCH(
     }
 
     if (body.action === "convert") {
-      const { leadSourceId } = body;
 
       if (existing.status === "Converted" || existing.convertedProspectId) {
         return NextResponse.json(
@@ -263,6 +290,8 @@ export async function PATCH(
         "Source: businessPlus website enquiry",
       ].filter(Boolean);
 
+      const leadSourceId = await businessPlusLeadSourceId();
+
       const prospect = await withActor(actor, () =>
         prisma.prospect.create({
           data: {
@@ -274,7 +303,9 @@ export async function PATCH(
             service,
             description: descriptionParts.join("\n"),
             status: "New",
-            leadSourceId: leadSourceId || undefined,
+            // Tags the lead so admins and agents can tell it came from the
+            // businessPlus website.
+            leadSourceId,
             assignedAgentId,
           },
           select: { id: true, name: true },

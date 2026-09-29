@@ -122,10 +122,8 @@ function statusBadge(status: string) {
     const s = status.toLowerCase()
     if (s === "new")
         return <Badge variant="outline" className="bg-emerald-50 text-emerald-700 border-emerald-200">New</Badge>
-    if (s === "reviewed")
-        return <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">Reviewed</Badge>
     if (s === "converted")
-        return <Badge variant="outline" className="bg-violet-50 text-violet-700 border-violet-200">Converted</Badge>
+        return <Badge variant="outline" className="bg-violet-50 text-violet-700 border-violet-200">Accepted</Badge>
     return <Badge variant="outline" className="bg-rose-50 text-rose-700 border-rose-200">Spam</Badge>
 }
 
@@ -382,7 +380,7 @@ export default function EnquiryDetailPage({ params }: { params: Promise<{ id: st
                                             className="bg-violet-600 hover:bg-violet-600 disabled:opacity-100"
                                         >
                                             <CheckCircle2 className="mr-2 h-4 w-4" />
-                                            Converted
+                                            Accepted
                                         </Button>
                                         {enquiry.convertedProspectId && (
                                             <Link href={`/dashboard/prospects/${enquiry.convertedProspectId}`}>
@@ -762,7 +760,7 @@ export default function EnquiryDetailPage({ params }: { params: Promise<{ id: st
                                 <>
                                     <Separator />
                                     <div>
-                                        <p className="text-sm text-muted-foreground">Converted By</p>
+                                        <p className="text-sm text-muted-foreground">Accepted By</p>
                                         <div className="flex items-center gap-2 mt-1">
                                             <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center">
                                                 <User className="h-3 w-3 text-primary" />
@@ -772,7 +770,7 @@ export default function EnquiryDetailPage({ params }: { params: Promise<{ id: st
                                     </div>
                                     <Separator />
                                     <div>
-                                        <p className="text-sm text-muted-foreground">Converted On</p>
+                                        <p className="text-sm text-muted-foreground">Accepted On</p>
                                         <div className="flex items-center gap-2 mt-1">
                                             <Calendar className="h-4 w-4 text-muted-foreground" />
                                             <p className="font-medium">{formatDate(enquiry.convertedAt)}</p>

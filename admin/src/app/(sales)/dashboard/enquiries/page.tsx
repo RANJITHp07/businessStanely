@@ -2,14 +2,14 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import {
     Loader2,
-    Trash2,
     Eye,
     Mail,
     Phone,
@@ -23,16 +23,7 @@ import {
     Users,
     Search,
 } from "lucide-react"
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
+
 import {
     Dialog,
     DialogContent,
@@ -41,20 +32,9 @@ import {
     DialogHeader,
     DialogTitle,
 } from "@/components/ui/dialog"
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from "@/components/ui/select"
 import { toast } from "react-toastify"
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from "@/components/ui/tooltip"
 import { fetchWithAuth } from "@/lib/fetchWithAuth"
-
-/* Accept-dialog choice that lets the server pick the agent with the enquiry
-   round-robin instead of the admin picking one. */
-const AUTO_ASSIGN = "__auto__"
 
 /* Enquiries arrive from the public businessPlus website unassigned. This screen
    is the review step: on Accept the admin either picks an agent or lets the
@@ -79,7 +59,6 @@ type Enquiry = {
     createdAt: string
 }
 
-type Agent = { id: string; name: string }
 
 /** An Advisor Agent as offered in the enquiry auto-assignment picker. */
 type AssignableAgent = {
@@ -91,7 +70,11 @@ type AssignableAgent = {
     enquiryAutoAssign: boolean
 }
 
-const STATUSES = ["New", "Reviewed", "Converted", "Spam"]
+const STATUSES = ["New", "Converted", "Spam"]
+
+/* "Converted" is the stored value; admins see it as "Accepted". */
+const STATUS_LABELS: Record<string, string> = { Converted: "Accepted" }
+const statusLabel = (status: string) => STATUS_LABELS[status] ?? status
 
 /** Stat card accents, one per status, matching the section colours below. */
 const STAT_COLORS: Record<
@@ -111,11 +94,6 @@ const STAT_COLORS: Record<
         border: "border-emerald-200", cardBg: "bg-emerald-50/50", bar: "bg-emerald-300",
         iconBg: "bg-emerald-100", iconText: "text-emerald-600",
         trackBg: "bg-emerald-200", fill: "bg-emerald-500", icon: UserPlus,
-    },
-    Reviewed: {
-        border: "border-blue-200", cardBg: "bg-blue-50/50", bar: "bg-blue-300",
-        iconBg: "bg-blue-100", iconText: "text-blue-600",
-        trackBg: "bg-blue-200", fill: "bg-blue-500", icon: Eye,
     },
     Converted: {
         border: "border-violet-200", cardBg: "bg-violet-50/50", bar: "bg-violet-300",
@@ -137,7 +115,6 @@ const STAT_COLORS: Record<
 /** Section accents, keyed by status and matching the badge colours above. */
 const SECTION_COLORS: Record<string, { text: string; bg: string; border: string }> = {
     New: { text: "text-emerald-600", bg: "bg-emerald-50", border: "border-emerald-100" },
-    Reviewed: { text: "text-blue-600", bg: "bg-blue-50", border: "border-blue-100" },
     Converted: { text: "text-violet-600", bg: "bg-violet-50", border: "border-violet-100" },
     Spam: { text: "text-rose-600", bg: "bg-rose-50", border: "border-rose-100" },
     Default: { text: "text-slate-700", bg: "bg-slate-50", border: "border-slate-200" },
@@ -152,16 +129,10 @@ function getStatusBadge(status: string) {
                 New
             </Badge>
         )
-    if (s === "reviewed")
-        return (
-            <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                Reviewed
-            </Badge>
-        )
     if (s === "converted")
         return (
             <Badge variant="outline" className="bg-violet-50 text-violet-700 border-violet-200">
-                Converted
+                Accepted
             </Badge>
         )
     if (s === "spam")
@@ -187,7 +158,7 @@ const formatDate = (dateString: string | undefined | null) => {
 /**
  * One status section, styled after the ProspectTable blocks on the leads
  * dashboard: a rotated colour-coded label beside a compact table of the most
- * recent rows. `onSelect` opens the enquiry dialog, which is how every status
+ * recent rows. `onSelect` opens the enquiry details page, which is how every status
  * is viewed — a converted enquiry included.
  */
 function EnquirySection({
@@ -211,14 +182,14 @@ function EnquirySection({
                     className={`font-semibold text-sm tracking-wide whitespace-nowrap ${text}`}
                     style={{ writingMode: "vertical-rl", transform: "rotate(180deg)" }}
                 >
-                    {label}
+                    {statusLabel(label)}
                 </span>
             </div>
 
             <Card className="flex-1 border py-0 border-slate-200 bg-slate-50 rounded-xl shadow-sm overflow-hidden">
                 {/* Mobile keeps the label on top, where a rotated column will not fit. */}
                 <div className={`lg:hidden ${bg} px-4 py-3 border-b ${border}`}>
-                    <h3 className={`font-semibold text-sm ${text}`}>{label}</h3>
+                    <h3 className={`font-semibold text-sm ${text}`}>{statusLabel(label)}</h3>
                 </div>
 
                 <CardContent className="p-0">
@@ -444,13 +415,7 @@ export default function EnquiriesPage() {
     const [loading, setLoading] = useState(true)
 
 
-    const [agents, setAgents] = useState<Agent[]>([])
-
-    const [selected, setSelected] = useState<Enquiry | null>(null)
-    const [convertTarget, setConvertTarget] = useState<Enquiry | null>(null)
-    const [enquiryToDelete, setEnquiryToDelete] = useState<Enquiry | null>(null)
-    const [assignedAgentId, setAssignedAgentId] = useState("")
-    const [busy, setBusy] = useState(false)
+    const router = useRouter()
 
     const load = useCallback(async () => {
         setLoading(true)
@@ -469,83 +434,6 @@ export default function EnquiriesPage() {
     useEffect(() => {
         load()
     }, [load])
-
-    /* Agents only matter once someone opens the convert dialog, but the list
-       is small and shared by every row. */
-    useEffect(() => {
-        fetchWithAuth("/api/agents")
-            .then((r) => (r.ok ? r.json() : []))
-            .then((data) => setAgents(Array.isArray(data) ? data : []))
-            .catch(() => setAgents([]))
-    }, [])
-
-    async function setStatus(enquiry: Enquiry, status: string) {
-        setBusy(true)
-        try {
-            const res = await fetchWithAuth(`/api/enquiries/${enquiry.id}`, {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ status }),
-            })
-            const data = await res.json()
-            if (!res.ok) throw new Error(data.error || "Failed to update")
-            toast.success(`Marked as ${status}`)
-            setSelected(null)
-            load()
-        } catch (error: any) {
-            toast.error(error.message || "Failed to update enquiry")
-        } finally {
-            setBusy(false)
-        }
-    }
-
-    async function convert() {
-        if (!convertTarget) return
-        if (!assignedAgentId) {
-            toast.error("Select an agent to assign this lead to")
-            return
-        }
-        setBusy(true)
-        try {
-            const res = await fetchWithAuth(`/api/enquiries/${convertTarget.id}`, {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    action: "convert",
-                    ...(assignedAgentId === AUTO_ASSIGN
-                        ? { autoAssign: true }
-                        : { assignedAgentId }),
-                }),
-            })
-            const data = await res.json()
-            if (!res.ok) throw new Error(data.error || "Failed to convert")
-            toast.success("Enquiry converted to a lead")
-            setConvertTarget(null)
-            setSelected(null)
-            setAssignedAgentId("")
-            load()
-        } catch (error: any) {
-            toast.error(error.message || "Failed to convert enquiry")
-        } finally {
-            setBusy(false)
-        }
-    }
-
-    async function handleDelete(id: string) {
-        setBusy(true)
-        try {
-            const res = await fetchWithAuth(`/api/enquiries/${id}`, { method: "DELETE" })
-            if (!res.ok) throw new Error("Failed to delete")
-            toast.success("Enquiry deleted")
-            setEnquiryToDelete(null)
-            setSelected(null)
-            load()
-        } catch (error: any) {
-            toast.error(error.message || "Failed to delete enquiry")
-        } finally {
-            setBusy(false)
-        }
-    }
 
     return (
         <div className="container mx-auto p-6 max-w-7xl">
@@ -587,7 +475,7 @@ export default function EnquiriesPage() {
                 </div>
 
                 {/* Stats Cards */}
-                <div className="grid gap-4 md:grid-cols-4">
+                <div className="grid gap-4 md:grid-cols-3">
                     {STATUSES.map((status) => {
                         const accent = STAT_COLORS[status] ?? STAT_COLORS.Default
                         const count = enquiries.filter((enquiry) => enquiry.status === status).length
@@ -605,7 +493,7 @@ export default function EnquiriesPage() {
                                 <CardHeader className="pb-2">
                                     <div className="flex items-center justify-between">
                                         <CardTitle className="text-sm font-medium text-slate-700">
-                                            {status}
+                                            {statusLabel(status)}
                                         </CardTitle>
                                         <div className={`h-10 w-10 rounded-xl ${accent.iconBg} flex items-center justify-center`}>
                                             <Icon className={`h-5 w-5 ${accent.iconText}`} />
@@ -646,13 +534,12 @@ export default function EnquiriesPage() {
                             enquiries={enquiries
                                 .filter((enquiry) => enquiry.status === status)
                                 .slice(0, 5)}
-                            onSelect={setSelected}
+                            onSelect={(enquiry) => router.push(`/dashboard/enquiries/${enquiry.id}`)}
                         />
                     ))}
                 </div>
             )}
 
-            {/* ---------------- Detail ---------------- */}
             {/* Auto-assignment settings. Mirrors "Set Leads per Agent" on the
                 leads dashboard, but writes enquiryAutoAssign so the two queues
                 stay independent. */}
@@ -777,188 +664,6 @@ export default function EnquiriesPage() {
                 </DialogContent>
             </Dialog>
 
-            <Dialog open={!!selected} onOpenChange={(open) => !open && setSelected(null)}>
-                <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
-                    {selected && (
-                        <>
-                            <DialogHeader>
-                                <DialogTitle className="flex items-center gap-3">
-                                    {selected.name}
-                                    {getStatusBadge(selected.status)}
-                                </DialogTitle>
-                                <DialogDescription>
-                                    Received {formatDate(selected.createdAt)} from the businessPlus website.
-                                </DialogDescription>
-                            </DialogHeader>
-
-                            <div className="space-y-4 text-sm">
-                                <div className="grid gap-3 sm:grid-cols-2">
-                                    <div>
-                                        <p className="text-muted-foreground text-xs">Email</p>
-                                        <p>{selected.email}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-muted-foreground text-xs">Phone</p>
-                                        <p>{selected.phone || "N/A"}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-muted-foreground text-xs">Company</p>
-                                        <p>{selected.company || "N/A"}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-muted-foreground text-xs">Payment preference</p>
-                                        <p>{selected.payment || "N/A"}</p>
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <p className="text-muted-foreground text-xs mb-1.5">Services requested</p>
-                                    {selected.services.length ? (
-                                        <div className="flex flex-wrap gap-1.5">
-                                            {selected.services.map((s) => (
-                                                <Badge key={s} variant="outline" className="font-normal">
-                                                    {s}
-                                                </Badge>
-                                            ))}
-                                        </div>
-                                    ) : (
-                                        <p>N/A</p>
-                                    )}
-                                </div>
-
-                                <div>
-                                    <p className="text-muted-foreground text-xs mb-1">Notes</p>
-                                    <p className="whitespace-pre-wrap">{selected.notes || "N/A"}</p>
-                                </div>
-
-                                {selected.status === "Converted" && (
-                                    <div className="rounded-md bg-violet-50 border border-violet-200 p-3">
-                                        <p className="text-violet-800">
-                                            Converted {formatDate(selected.convertedAt)}
-                                            {selected.convertedByAgent
-                                                ? `, assigned to ${selected.convertedByAgent.name}`
-                                                : ""}
-                                            .
-                                        </p>
-                                        {selected.convertedProspectId && (
-                                            <Link
-                                                href={`/dashboard/prospects/${selected.convertedProspectId}`}
-                                                className="text-violet-900 underline text-xs"
-                                            >
-                                                Open the lead
-                                            </Link>
-                                        )}
-                                    </div>
-                                )}
-                            </div>
-
-                            <DialogFooter className="flex-wrap gap-2 sm:justify-between">
-                                <Button
-                                    variant="outline"
-                                    className="text-destructive"
-                                    onClick={() => setEnquiryToDelete(selected)}
-                                    disabled={busy}
-                                >
-                                    <Trash2 className="h-4 w-4 mr-2" />
-                                    Delete
-                                </Button>
-
-                                {selected.status !== "Converted" && (
-                                    <div className="flex flex-wrap gap-2">
-                                        <Button
-                                            variant="outline"
-                                            onClick={() => setStatus(selected, "Spam")}
-                                            disabled={busy}
-                                        >
-                                            <Ban className="h-4 w-4 mr-2" />
-                                            Spam
-                                        </Button>
-                                        <Button
-                                            onClick={() => {
-                                                setConvertTarget(selected)
-                                                setAssignedAgentId(AUTO_ASSIGN)
-                                            }}
-                                            disabled={busy}
-                                        >
-                                            Accept
-                                        </Button>
-                                    </div>
-                                )}
-                            </DialogFooter>
-                        </>
-                    )}
-                </DialogContent>
-            </Dialog>
-
-            {/* ---------------- Convert ---------------- */}
-            <Dialog open={!!convertTarget} onOpenChange={(open) => !open && setConvertTarget(null)}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>Accept</DialogTitle>
-                        <DialogDescription>
-                            Accepting creates a lead from {convertTarget?.name}&apos;s enquiry and
-                            assigns it to an agent. The enquiry is marked as converted and the
-                            client sees it as accepted. This cannot be undone.
-                        </DialogDescription>
-                    </DialogHeader>
-
-                    <div className="space-y-4">
-                        <div className="space-y-2">
-                            <Label>Assign to agent</Label>
-                            <Select value={assignedAgentId} onValueChange={setAssignedAgentId}>
-                                <SelectTrigger className="w-full">
-                                    <SelectValue placeholder="Select an agent" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value={AUTO_ASSIGN}>
-                                        Assign automatically (round-robin)
-                                    </SelectItem>
-                                    {agents.map((agent) => (
-                                        <SelectItem key={agent.id} value={agent.id}>
-                                            {agent.name}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                        </div>
-                    </div>
-
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => setConvertTarget(null)} disabled={busy}>
-                            Cancel
-                        </Button>
-                        <Button onClick={convert} disabled={busy || !assignedAgentId}>
-                            {busy && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                            Accept
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-
-            {/* ---------------- Delete ---------------- */}
-            <AlertDialog
-                open={!!enquiryToDelete}
-                onOpenChange={() => setEnquiryToDelete(null)}
-            >
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            This will delete the enquiry from &quot;{enquiryToDelete?.name}&quot;. Any lead
-                            already created from it is not affected.
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction
-                            onClick={() => handleDelete(enquiryToDelete?.id!)}
-                            className="bg-red-600 hover:bg-red-700"
-                        >
-                            Delete
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
         </div>
     )
 }

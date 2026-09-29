@@ -329,8 +329,18 @@ export async function PUT(
       // Remove legislationId from updateData regardless
       delete updateData.legislationId;
     }
-    if (body.status === "Hold" && task.dueDate) {
+    // Stamp holdDate only when the task enters Hold (see admin tasks route):
+    // restamping on every save restarted the 10-day auto-resume clock, and
+    // requiring a dueDate left undated tasks unresumable.
+    if (body.status === "Hold" && task.status !== "Hold") {
       updateData.holdDate = new Date();
+    } else if (
+      body.status !== undefined &&
+      body.status !== "Hold" &&
+      task.status === "Hold"
+    ) {
+      updateData.holdDate = null;
+      updateData.holdDaysLeft = null;
     }
     // `recurring` (the interval) and `recurringType` (its unit) only mean
     // something as a pair: the cron reads one to size the other. Writing them

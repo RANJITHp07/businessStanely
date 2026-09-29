@@ -329,21 +329,29 @@ export async function updateRecurringTaskSchedule(taskId: string) {
 
 // Update due dates for tasks in "Hold" status
 export async function updateHoldTasks() {
+  // No dueDate filter: an undated task still has to come back off hold after
+  // 10 days. Filtering on dueDate left such tasks stuck in Hold forever.
   const holdTasks = await prisma.task.findMany({
-    where: {
-      status: "Hold",
-      dueDate: { not: null },
-    },
+    where: { status: "Hold" },
   });
 
   const updatedTasks = [];
 
   for (const task of holdTasks) {
     try {
-      if (!task.dueDate) continue; // Ensure dueDate is not null
-
       const today = new Date();
       today.setHours(0, 0, 0, 0);
+
+      // Tasks held before holdDate was stamped unconditionally have none, so
+      // the resume clock could never start. Start it now.
+      if (!task.holdDate) {
+        const stamped = await prisma.task.update({
+          where: { id: task.id },
+          data: { holdDate: new Date() },
+        });
+        updatedTasks.push(stamped);
+        continue;
+      }
 
       // Auto-resume: if task has been on hold for 10+ days, move to "To Do" (New Tasks)
       if (task.holdDate) {

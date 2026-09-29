@@ -206,9 +206,20 @@ export async function PUT(
       data.legislation = { connect: { id: body.legislationId } };
     }
 
-    // Extend due date if status is set to "Hold"
-    if (body.status === "Hold" && currentTask.dueDate) {
+    // holdDate starts the 10-day auto-resume clock, so it is stamped only when
+    // the task *enters* Hold. Stamping it on every save that carried
+    // status="Hold" (edit forms resend the current status) restarted the clock
+    // each time, and gating it on dueDate left undated tasks with no holdDate,
+    // which the cron can never resume.
+    if (body.status === "Hold" && currentTask.status !== "Hold") {
       data.holdDate = new Date();
+    } else if (
+      body.status !== undefined &&
+      body.status !== "Hold" &&
+      currentTask.status === "Hold"
+    ) {
+      data.holdDate = null;
+      data.holdDaysLeft = null;
     }
     // `status` is the visible state and `completed` is the boolean the
     // recurrence helpers read; they have to move together. Setting only

@@ -29,15 +29,15 @@ export default function ClientDetailsPage() {
         const fetchClient = async () => {
             try {
                 const response = await fetch(`/api/clients/${id}`);
+                // notFound() only works during render, not from this async
+                // callback, so a miss just leaves `client` null and the render
+                // below shows the 404 once loading is over.
                 if (response.ok) {
                     const data = await response.json();
                     setClient(data);
-                } else {
-                    notFound();
                 }
             } catch (error) {
                 console.error("Error fetching client:", error);
-                notFound();
             } finally {
                 setLoading(false);
             }
@@ -72,6 +72,20 @@ export default function ClientDetailsPage() {
             router.push('/client');
         }
     };
+
+    // Without this, the first render (before the fetch resolves) has no
+    // client yet and went straight to notFound(), so the page always 404'd.
+    if (loading) {
+        return (
+            <div className="mx-auto p-6 max-w-4xl space-y-8">
+                <div className="flex justify-between items-center">
+                    <Skeleton className="h-10 w-40" />
+                    <Skeleton className="h-10 w-72" />
+                </div>
+                <Skeleton className="h-[420px] w-full" />
+            </div>
+        );
+    }
 
     if (!client) {
         return notFound();

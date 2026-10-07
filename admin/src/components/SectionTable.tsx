@@ -49,6 +49,7 @@ export function SectionTable({
   agentId,
   retainershipTasks,
   trigger,
+  viewMoreHref,
 }: {
   label: string;
   tasks: Task[];
@@ -57,6 +58,8 @@ export function SectionTable({
   // `true` links to the legislation future-trigger view, "standard" to the
   // normal-task one.
   trigger?: boolean | "standard";
+  // Overrides the "View more" link built from the props above.
+  viewMoreHref?: string;
 }) {
   const labelColor = (() => {
     const l = label.toLowerCase();
@@ -251,7 +254,7 @@ export function SectionTable({
       </div>
       <div className="flex justify-end">
         <Link
-          href={(() => {
+          href={viewMoreHref ?? (() => {
             const params = new URLSearchParams();
             if (agentId) params.set("assignedToId", agentId);
             if (trigger) {

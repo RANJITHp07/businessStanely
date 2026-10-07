@@ -107,11 +107,13 @@ export default function TasksTable() {
     const retainershipTasks = searchParams.get("retainershipTasks");
     const retainershipId = searchParams.get("retainershipId");
     const trigger = searchParams.get("trigger");
+    const categoryId = searchParams.get("categoryId");
     if (assignedToId) params.set("assignedToId", assignedToId);
     if (clientId) params.set("clientId", clientId);
     if (retainershipTasks) params.set("retainershipTasks", retainershipTasks);
     if (retainershipId) params.set("retainershipId", retainershipId);
     if (trigger) params.set("trigger", trigger);
+    if (categoryId) params.set("categoryId", categoryId);
     if (search) params.set("search", search);
     if (priorities.length > 0) params.set("priorities", priorities.join(","));
     if (statuses.length > 0) params.set("statuses", statuses.join(","));
@@ -166,6 +168,9 @@ export default function TasksTable() {
         const retainershipTasks = searchParams.get("retainershipTasks");
         const retainershipId = searchParams.get("retainershipId");
         const trigger = searchParams.get("trigger");
+        // Set by a service page's "View more": every task of that service,
+        // legislation ones included, whatever the service's approval state.
+        const categoryId = searchParams.get("categoryId");
         const clientUpdate = searchParams.get("clientUpdate");
         const search = searchParams.get("search");
         const priorities = searchParams.get("priorities");
@@ -181,6 +186,7 @@ export default function TasksTable() {
         if (retainershipTasks) params.push(`retainershipTasks=${encodeURIComponent(retainershipTasks)}`);
         if (retainershipId) params.push(`retainershipId=${encodeURIComponent(retainershipId)}`);
         if (trigger) params.push(`trigger=${encodeURIComponent(trigger)}`);
+        if (categoryId) params.push(`categoryId=${encodeURIComponent(categoryId)}`);
         if (clientUpdate) params.push(`clientUpdate=${encodeURIComponent(clientUpdate)}`);
         if (search) params.push(`search=${encodeURIComponent(search)}`);
         if (priorities) params.push(`priorities=${encodeURIComponent(priorities)}`);

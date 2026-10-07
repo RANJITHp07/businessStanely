@@ -1,48 +1,31 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect } from "react"
 import { use } from "react"
 import { toast } from "react-toastify"
-import Link from "next/link"
 
 // UI Components
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuLabel,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Skeleton } from "@/components/ui/skeleton";
+import { SectionTable } from "@/components/SectionTable"
 
 // Icons
 import {
-    Loader2,
-    MoreHorizontal,
-    Edit,
-    Trash2,
-    Eye,
-    ChevronLeft,
-    ChevronRight,
-    ChevronsLeft,
-    ChevronsRight,
     Calendar,
     User,
     Clock,
     Tag,
     FileText,
-    Router,
+    Users,
 } from "lucide-react"
 import { useRouter } from "next/navigation"
-import { useTablePage } from "@/hooks/useTablePage"
+import { clientDisplayName } from "@/lib/entityNames"
+import { Task } from "@/types"
 
 export interface TaskCategory {
     id: string
@@ -67,47 +50,25 @@ export interface TaskCategory {
     photo?: string
 }
 
+type TaskClient = NonNullable<Task["client"]>
 
-export interface Task {
-    id: string
-    title: string
-    description: string
-    status: "pending" | "in_progress" | "completed" | "cancelled"
-    priority: "low" | "medium" | "high" | "urgent"
-    assignedTo: string | UserInfo
-    assignedToId: string
-    assignedBy: string | UserInfo
-    assignedById: string
-    dueDate: string
-    createdAt: string
-    updatedAt: string
-    categoryId: string
-    categoryName?: string
-    estimatedHours: number
-    actualHours?: number
-    completionPercent?: number
-    tags: string[]
-    attachments?: string[]
+// Same buckets as the agent and client task views, so a section here holds
+// the same rows its "View more" list does.
+function statusKey(s?: string) {
+    const k = (s || "").toLowerCase().replace(/\s+/g, "")
+    if (["todo", "pending"].includes(k)) return "todo"
+    if (["inprogress", "progress"].includes(k)) return "inprogress"
+    if (["completed"].includes(k)) return "completed"
+    if (["hold"].includes(k)) return "hold"
+    return k || "todo"
 }
 
-
-// User type definition for assignedTo and assignedBy
-interface UserInfo {
-    id: string
-    name: string
-    email: string
-    phoneNumber?: string
-    secondaryPhoneNumber?: string
-    agentType?: string
-    barAssociationId?: string
-    jurisdiction?: string
-    specializations?: string[]
-    photo?: string
-    createdAt?: string
-    updatedAt?: string
-    superiorId?: string
-}
-
+const STATUS_SECTIONS = [
+    { label: "New Task", key: "todo", status: "To Do" },
+    { label: "In Progress", key: "inprogress", status: "In Progress" },
+    { label: "Completed", key: "completed", status: "Completed" },
+    { label: "Hold", key: "hold", status: "Hold" },
+] as const
 
 export default function CategoryDetail({ params }: { params: Promise<{ id: string }> | { id: string } }) {
 
@@ -133,30 +94,9 @@ export default function CategoryDetail({ params }: { params: Promise<{ id: strin
     const resolvedParams = params instanceof Promise ? use(params) : params
     const [category, setCategory] = useState<TaskCategory | null>(null)
     const [tasks, setTasks] = useState<Task[]>([])
-    const [sortBy] = useState("a-z")
-    const [sortByDate] = useState("newest")
-    const { currentPage, setCurrentPage, itemsPerPage, setItemsPerPage, clampToTotalPages } =
-        useTablePage("admin-dashboard-task_category-id-page")
     const [loading, setLoading] = useState(true)
-    const [taskToDelete, setTaskToDelete] = useState<Task | null>(null)
-    // We only need the loading state for this view page
-    // Other states were needed for approve page but not here
+    const [activeTab, setActiveTab] = useState("tasks")
 
-    const handleDelete = useCallback(async () => {
-        if (!taskToDelete) return;
-        try {
-            const response = await fetch(`/api/tasks/${taskToDelete.id}`, { method: 'DELETE' });
-            if (response.ok) {
-                setTasks((prev) => prev.filter((t) => t.id !== taskToDelete.id));
-                setTaskToDelete(null);
-                toast.success('Task deleted successfully');
-            } else {
-                toast.error('Failed to delete task');
-            }
-        } catch {
-            toast.error('Failed to delete task');
-        }
-    }, [taskToDelete, setTasks]);
     useEffect(() => {
         const fetchData = async () => {
             try {
@@ -194,59 +134,16 @@ export default function CategoryDetail({ params }: { params: Promise<{ id: strin
         fetchData()
     }, [resolvedParams.id])
 
-    // Sort function
-    const sortTasks = (tasks: Task[], sortBy: string, sortByDate: string) => {
-        return [...tasks].sort((a, b) => {
-            if (sortBy === "a-z") {
-                return a.title.localeCompare(b.title)
-            } else if (sortBy === "z-a") {
-                return b.title.localeCompare(a.title)
-            }
-
-            if (sortByDate === "newest") {
-                return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-            } else if (sortByDate === "oldest") {
-                return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-            }
-
-            return 0
-        })
-    }
-
-    // Apply sorting to tasks
-    const sortedTasks = sortTasks(tasks, sortBy, sortByDate)
-
-    // Pagination logic
-    const totalPages = Math.ceil(sortedTasks.length / itemsPerPage)
-
-    useEffect(() => {
-        clampToTotalPages(totalPages)
-    }, [totalPages, clampToTotalPages])
-    const startIndex = (currentPage - 1) * itemsPerPage
-    const endIndex = startIndex + itemsPerPage
-    const currentTasks = sortedTasks.slice(startIndex, endIndex)
-
-    const handlePageChange = (page: number) => {
-        setCurrentPage(page)
-    }
-
-    const handleItemsPerPageChange = (value: string) => {
-        setItemsPerPage(Number.parseInt(value))
-        setCurrentPage(1)
-    }
-
-    // These functions were for approval/rejection and aren't needed in the detail view page
-
-    // Only keeping the priority badge function that's actually used
-    const getPriorityBadge = (priority: string) => {
-        const colors = {
-            low: "bg-gray-100 text-gray-800",
-            medium: "bg-blue-100 text-blue-800",
-            high: "bg-orange-100 text-orange-800",
-            urgent: "bg-red-100 text-red-800",
-        }
-        return <Badge className={colors[priority as keyof typeof colors]}>{priority}</Badge>
-    }
+    // Distinct clients this service's tasks are for, with how many tasks each.
+    const serviceClients = Array.from(
+        tasks.reduce((byId, task) => {
+            if (!task.client) return byId
+            const entry = byId.get(task.client.id)
+            if (entry) entry.taskCount += 1
+            else byId.set(task.client.id, { client: task.client, taskCount: 1 })
+            return byId
+        }, new Map<string, { client: TaskClient; taskCount: number }>()).values(),
+    ).sort((a, b) => clientDisplayName(a.client).localeCompare(clientDisplayName(b.client)))
 
     if (loading) {
         return (
@@ -372,6 +269,10 @@ export default function CategoryDetail({ params }: { params: Promise<{ id: strin
                                                 <Tag className="h-4 w-4 text-muted-foreground" />
                                                 <span>Tasks: {tasks.length}</span>
                                             </div>
+                                            <div className="flex items-center gap-2">
+                                                <Users className="h-4 w-4 text-muted-foreground" />
+                                                <span>Clients: {serviceClients.length}</span>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -380,262 +281,91 @@ export default function CategoryDetail({ params }: { params: Promise<{ id: strin
                     </div>
                 </div>
 
-                <Card>
-                    <CardHeader>
-                        <div className="flex items-center justify-between">
-                            <div className="flex justify-between items-center">
-                                <CardTitle className="flex items-center gap-2">
-                                    <FileText className="h-5 w-5" />
-                                    Service Tasks ({tasks.length})
-                                </CardTitle>
+                <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <TabsList className="grid h-auto w-full md:w-auto grid-cols-2">
+                            <TabsTrigger value="tasks" className="flex items-center gap-1 px-4 py-2">
+                                <FileText className="h-4 w-4" />
+                                Tasks ({tasks.length})
+                            </TabsTrigger>
+                            <TabsTrigger value="clients" className="flex items-center gap-1 px-4 py-2">
+                                <Users className="h-4 w-4" />
+                                Clients ({serviceClients.length})
+                            </TabsTrigger>
+                        </TabsList>
+                        <Button onClick={() => router.push(`/task/create?serviceId=${resolvedParams.id}`)}>Add Task</Button>
+                    </div>
 
+                    <TabsContent value="tasks" className="space-y-6">
+                        {tasks.length === 0 ? (
+                            <Card>
+                                <CardContent className="text-center py-8 text-muted-foreground">
+                                    No tasks found in this service.
+                                </CardContent>
+                            </Card>
+                        ) : (
+                            <div className="space-y-[40px]">
+                                {STATUS_SECTIONS.map((section) => (
+                                    <SectionTable
+                                        key={section.key}
+                                        label={section.label}
+                                        tasks={tasks.filter((task) => statusKey(task.status) === section.key).slice(0, 3)}
+                                        viewMoreHref={`/task?categoryId=${resolvedParams.id}&status=${encodeURIComponent(section.status)}`}
+                                    />
+                                ))}
                             </div>
-                            <Button onClick={() => router.push(`/task/create?serviceId=${resolvedParams.id}`)}>Add Task</Button>
-                            {/* <div className="flex items-center gap-2">
-                                <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
-                                <Select value={sortBy} onValueChange={setSortBy}>
-                                    <SelectTrigger className="w-32">
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="a-z">A-Z</SelectItem>
-                                        <SelectItem value="z-a">Z-A</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                                <Select>
-                                    <SelectTrigger className="w-28">
-                                        <SelectValue className="text-black" placeholder="Priority" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="low">Low</SelectItem>
-                                        <SelectItem value="medium">Medium</SelectItem>
-                                        <SelectItem value="high">High</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                                <Select value={sortByDate} onValueChange={setSortByDate}>
-                                    <SelectTrigger className="w-32">
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="newest">Newest</SelectItem>
-                                        <SelectItem value="oldest">Oldest</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div> */}
-                        </div>
-                    </CardHeader>
-                    {loading ? (
-                        <div className="flex justify-center items-center py-8">
-                            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                        </div>
-                    ) : (
-                        <>
+                        )}
+                    </TabsContent>
+
+                    <TabsContent value="clients" className="space-y-6">
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2">
+                                    <Users className="h-5 w-5" />
+                                    Clients ({serviceClients.length})
+                                </CardTitle>
+                            </CardHeader>
                             <CardContent>
                                 <div className="rounded-md border overflow-x-auto">
-                                    <Table className="min-w-[700px]">
+                                    <Table className="min-w-[600px]">
                                         <TableHeader>
                                             <TableRow>
-                                                <TableHead>Task</TableHead>
-                                                <TableHead>Ownership to</TableHead>
-                                                <TableHead>Priority</TableHead>
-                                                <TableHead>Due Date</TableHead>
-                                                <TableHead>Progress</TableHead>
-                                                <TableHead className="text-right">Actions</TableHead>
+                                                <TableHead>Client</TableHead>
+                                                <TableHead>Type</TableHead>
+                                                <TableHead>Email</TableHead>
+                                                <TableHead className="text-right">Tasks in this service</TableHead>
                                             </TableRow>
                                         </TableHeader>
                                         <TableBody>
-                                            {currentTasks.length === 0 ? (
+                                            {serviceClients.length === 0 ? (
                                                 <TableRow>
-                                                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                                                        No tasks found in this category.
+                                                    <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                                                        No clients mapped to this service yet.
                                                     </TableCell>
                                                 </TableRow>
                                             ) : (
-                                                currentTasks.map((task) => (
-                                                    <TableRow key={task.id}>
-                                                        <TableCell className="max-w-[220px] align-middle">
-                                                            <div className="space-y-1">
-                                                                <div className="font-medium truncate" style={{ maxWidth: '200px' }} title={task.title}>{task.title}</div>
-                                                                <div
-                                                                    className="text-sm text-muted-foreground truncate"
-                                                                    style={{ maxWidth: '200px' }}
-                                                                    title={task.description}
-                                                                >
-                                                                    {task.description}
-                                                                </div>
-                                                            </div>
-                                                        </TableCell>
+                                                serviceClients.map(({ client, taskCount }) => (
+                                                    <TableRow
+                                                        key={client.id}
+                                                        className="cursor-pointer hover:bg-muted/50"
+                                                        onClick={() => router.push(`/client/${client.id}/tasks`)}
+                                                    >
+                                                        <TableCell className="font-medium">{clientDisplayName(client)}</TableCell>
                                                         <TableCell>
-                                                            <div className="flex items-center space-x-2">
-                                                                <Avatar className="h-8 w-8">
-                                                                    <AvatarFallback className="text-xs">
-                                                                        {typeof task.assignedTo === 'string'
-                                                                            ? task.assignedTo
-                                                                                .toUpperCase()
-                                                                                .split(" ")
-                                                                                .map((n) => n[0])
-                                                                                .join("")
-                                                                            : "U"}
-                                                                    </AvatarFallback>
-                                                                </Avatar>
-                                                                <div>
-                                                                    <div className="font-medium text-sm">
-                                                                        {typeof task.assignedTo === 'string'
-                                                                            ? task.assignedTo
-                                                                            : task.assignedTo?.name || 'Unassigned'}
-                                                                    </div>
-                                                                    <div className="text-xs text-muted-foreground">
-                                                                        by {typeof task.assignedBy === 'string'
-                                                                            ? task.assignedBy
-                                                                            : task.assignedBy?.name || 'System'}
-                                                                    </div>
-                                                                </div>
-                                                            </div>
+                                                            {client.clientType === "organization" ? "Organization" : "Individual"}
                                                         </TableCell>
-                                                        <TableCell>{getPriorityBadge(task.priority)}</TableCell>
-                                                        <TableCell>
-                                                            <div className="flex items-center gap-1">
-                                                                <Calendar className="h-4 w-4 text-muted-foreground" />
-                                                                <span>
-                                                                    {new Date(task.dueDate).toLocaleDateString("en-US", {
-                                                                        month: "short",
-                                                                        day: "numeric",
-                                                                        year: "numeric",
-                                                                    })}
-                                                                </span>
-                                                            </div>
-                                                        </TableCell>
-                                                        <TableCell>
-                                                            <div className="space-y-2">
-                                                                <div className="flex items-center justify-between">
-                                                                    <span className="text-sm font-medium">{task.status.replace("_", " ")}</span>
-                                                                </div>
-                                                            </div>
-                                                        </TableCell>
-                                                        <TableCell className="text-right">
-                                                            <DropdownMenu>
-                                                                <DropdownMenuTrigger asChild>
-                                                                    <Button variant="ghost" className="h-8 w-8 p-0">
-                                                                        <span className="sr-only">Open menu</span>
-                                                                        <MoreHorizontal className="h-4 w-4" />
-                                                                    </Button>
-                                                                </DropdownMenuTrigger>
-                                                                <DropdownMenuContent align="end">
-                                                                    <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                                                    <DropdownMenuItem asChild>
-                                                                        <Link href={`/task/${task.id}`}>
-                                                                            <Eye className="mr-2 h-4 w-4" />
-                                                                            View Details
-                                                                        </Link>
-                                                                    </DropdownMenuItem>
-                                                                    <DropdownMenuItem asChild>
-                                                                        <Link href={`/task/${task.id}/edit`}>
-                                                                            <Edit className="mr-2 h-4 w-4" />
-                                                                            Edit Task
-                                                                        </Link>
-                                                                    </DropdownMenuItem>
-                                                                    <DropdownMenuSeparator />
-                                                                    <DropdownMenuItem className="text-destructive" onClick={() => setTaskToDelete(task)}>
-                                                                        <Trash2 className="mr-2 h-4 w-4" />
-                                                                        Delete Task
-                                                                    </DropdownMenuItem>
-                                                                </DropdownMenuContent>
-                                                            </DropdownMenu>
-                                                        </TableCell>
+                                                        <TableCell className="text-muted-foreground">{client.email || "N/A"}</TableCell>
+                                                        <TableCell className="text-right">{taskCount}</TableCell>
                                                     </TableRow>
                                                 ))
                                             )}
                                         </TableBody>
                                     </Table>
                                 </div>
-                                {totalPages > 1 && (
-                                    <div className="flex items-center justify-between space-x-2 py-4">
-                                        <div className="text-sm text-muted-foreground">
-                                            Page {currentPage} of {totalPages}
-                                        </div>
-                                        <div className="flex items-center space-x-2">
-                                            <Select value={itemsPerPage.toString()} onValueChange={handleItemsPerPageChange}>
-                                                <SelectTrigger className="w-24">
-                                                    <SelectValue />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    {[5, 10, 20, 50].map((value) => (
-                                                        <SelectItem key={value} value={value.toString()}>
-                                                            {value} / page
-                                                        </SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
-                                            <Button
-                                                variant="outline"
-                                                size="sm"
-                                                onClick={() => handlePageChange(1)}
-                                                disabled={currentPage === 1}
-                                            >
-                                                <ChevronsLeft className="h-4 w-4" />
-                                            </Button>
-                                            <Button
-                                                variant="outline"
-                                                size="sm"
-                                                onClick={() => handlePageChange(currentPage - 1)}
-                                                disabled={currentPage === 1}
-                                            >
-                                                <ChevronLeft className="h-4 w-4" />
-                                            </Button>
-                                            {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                                                const pageNumber = Math.max(1, Math.min(totalPages - 4, currentPage - 2)) + i
-                                                if (pageNumber <= totalPages) {
-                                                    return (
-                                                        <Button
-                                                            key={pageNumber}
-                                                            variant={currentPage === pageNumber ? "default" : "outline"}
-                                                            size="sm"
-                                                            onClick={() => handlePageChange(pageNumber)}
-                                                        >
-                                                            {pageNumber}
-                                                        </Button>
-                                                    )
-                                                }
-                                                return null
-                                            })}
-                                            <Button
-                                                variant="outline"
-                                                size="sm"
-                                                onClick={() => handlePageChange(currentPage + 1)}
-                                                disabled={currentPage === totalPages}
-                                            >
-                                                <ChevronRight className="h-4 w-4" />
-                                            </Button>
-                                            <Button
-                                                variant="outline"
-                                                size="sm"
-                                                onClick={() => handlePageChange(totalPages)}
-                                                disabled={currentPage === totalPages}
-                                            >
-                                                <ChevronsRight className="h-4 w-4" />
-                                            </Button>
-                                        </div>
-                                    </div>
-                                )}
                             </CardContent>
-                        </>
-                    )}
-                </Card>
-
-                <AlertDialog open={!!taskToDelete} onOpenChange={() => setTaskToDelete(null)}>
-                    <AlertDialogContent>
-                        <AlertDialogHeader>
-                            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                                This action cannot be undone. This will permanently delete the task and remove its data from our servers.
-                            </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction onClick={handleDelete}>Delete</AlertDialogAction>
-                        </AlertDialogFooter>
-                    </AlertDialogContent>
-                </AlertDialog>
+                        </Card>
+                    </TabsContent>
+                </Tabs>
             </div>
         </div>
     )

@@ -641,12 +641,20 @@ export default function ClientTasksPage() {
               Comprehensive view of tasks assigned to this client
             </p>
           </div>
-          <Button asChild variant="outline" className="w-fit">
-            <Link href="/client">
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              Back to Clients
-            </Link>
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button asChild variant="outline" className="w-fit">
+              <Link href={`/client/${id}/diary`} target="_blank">
+                <FileText className="mr-2 h-4 w-4" />
+                Client Diary
+              </Link>
+            </Button>
+            <Button asChild variant="outline" className="w-fit">
+              <Link href="/client">
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Back to Clients
+              </Link>
+            </Button>
+          </div>
         </div>
 
         {/* Client Summary Card */}
@@ -691,6 +699,24 @@ export default function ClientTasksPage() {
                       <span>{client?.phoneNumber || "N/A"}</span>
                     </div>
                   </div>
+                  {client?.clientType === "organization" && (
+                    <div className="mt-3 pt-3 border-t text-sm text-muted-foreground space-y-1">
+                      <div className="font-medium text-foreground">Authorized Person</div>
+                      <div className="flex items-center gap-2">
+                        <User className="h-4 w-4" />
+                        <span>
+                          {client.authorizedPersonName || "N/A"}
+                          {client.designation ? ` (${client.designation})` : ""}
+                        </span>
+                      </div>
+                      {client.contactEmail && (
+                        <div className="flex items-center gap-2">
+                          <Mail className="h-4 w-4" />
+                          <span>{client.contactEmail}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="text-right">

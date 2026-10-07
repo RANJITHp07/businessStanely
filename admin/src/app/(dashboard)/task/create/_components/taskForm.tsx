@@ -64,6 +64,7 @@ import { useParams, useRouter } from "next/navigation";
 import { toast } from "react-toastify";
 import { Checkbox } from "@/components/ui/checkbox";
 import SimilarClients, { type SimilarClient } from "@/components/SimilarClients";
+import SimilarServices, { type SimilarService } from "@/components/SimilarServices";
 import { clientDisplayName } from "@/lib/entityNames";
 
 /** ISO weekday numbers: 1 = Monday ... 7 = Sunday, matching the stored value. */
@@ -389,6 +390,24 @@ export default function TaskForm() {
       email: "",
       phoneNumber: "",
     });
+  };
+
+  // Picking an existing service from the Add Service dialog uses it for this
+  // task and drops the new-service entry, so no duplicate is created.
+  const handleExistingServiceSelect = (existing: SimilarService) => {
+    const service: Category = categories.find((c) => c.id === existing.id) ?? {
+      id: existing.id,
+      name: existing.name,
+      description: existing.description ?? undefined,
+      status: existing.status,
+      timePeriod: existing.timePeriod ?? undefined,
+    };
+    if (!categories.some((c) => c.id === service.id)) {
+      setCategories((prev) => [service, ...prev]);
+    }
+    handleCategorySelection(service);
+    setIsCategoryModalOpen(false);
+    toast.info(`${existing.name} already exists and has been selected.`);
   };
 
   // Picking an already-registered client from the Add Client dialog uses it
@@ -879,6 +898,10 @@ export default function TaskForm() {
                                 required
                               />
                             </div>
+                            <SimilarServices
+                              name={newCategoryData.name}
+                              onSelect={handleExistingServiceSelect}
+                            />
 
                             <div className="space-y-2">
                               <Label htmlFor="category-description">Description</Label>

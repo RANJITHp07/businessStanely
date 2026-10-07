@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { useRouter } from "next/navigation"
 import { toast } from "react-toastify"
+import SimilarServices, { type SimilarService } from "@/components/SimilarServices"
 
 interface CreateProps {
     admin?: {
@@ -36,6 +37,13 @@ function Create({ admin, initialData }: CreateProps) {
     })
     const [isSubmitting, setIsSubmitting] = useState(false)
     const router = useRouter()
+
+    // Picking an existing service abandons this create and opens that
+    // service, so the same service is never entered twice.
+    const handleExistingServiceSelect = (existing: SimilarService) => {
+        toast.info(`${existing.name} already exists. Opening the existing service.`)
+        router.push(`/task_category/${existing.id}`)
+    }
 
     // ...existing code...
     // Handle form submission
@@ -113,6 +121,15 @@ function Create({ admin, initialData }: CreateProps) {
                                     required
                                 />
                             </div>
+                            {!admin?.id && (
+                                <div className="mt-3">
+                                    <SimilarServices
+                                        name={formData.name}
+                                        onSelect={handleExistingServiceSelect}
+                                        selectLabel="Use this service"
+                                    />
+                                </div>
+                            )}
                             <div className="space-y-2 mt-3">
                                 <Label htmlFor="description">Description</Label>
                                 <Textarea

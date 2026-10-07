@@ -100,7 +100,7 @@ export default function ClientForm({ client }: ClientFormProps) {
     // that client, so the same party is never entered twice.
     const handleExistingClientSelect = (existing: SimilarClient) => {
         toast.info(`${clientDisplayName(existing)} is already registered. Opening the existing client.`)
-        router.push(`/client/${existing.id}`)
+        router.push(`/client/${existing.id}/tasks`)
     }
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();

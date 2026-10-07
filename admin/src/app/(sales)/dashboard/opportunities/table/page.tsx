@@ -8,6 +8,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
+import { Checkbox } from "@/components/ui/checkbox"
+import BulkTransferDialog from "@/components/BulkTransferDialog"
 import {
     Loader2,
     Plus,
@@ -24,6 +26,7 @@ import {
     Filter,
     X,
     CalendarIcon,
+    ArrowLeftRight,
 } from "lucide-react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -51,6 +54,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "react-toastify"
 import { cn } from "@/lib/utils"
 import { useTablePage } from "@/hooks/useTablePage"
+import { useRowSelection } from "@/hooks/useRowSelection"
 
 type OpportunityRow = {
     id: string
@@ -87,6 +91,10 @@ export default function ProspectsTable() {
     const [dateType, setDateType] = useState<string>("")
     const [startDate, setStartDate] = useState("")
     const [endDate, setEndDate] = useState("")
+    const [assigneeFilter, setAssigneeFilter] = useState<string>("all")
+    const [transferOpen, setTransferOpen] = useState(false)
+    const [refreshKey, setRefreshKey] = useState(0)
+    const { selected, toggle, toggleMany, selectAll, clear: clearSelection } = useRowSelection()
 
     // Delete handler
     const handleDelete = async (id: string) => {
@@ -132,7 +140,15 @@ export default function ProspectsTable() {
                 setProspects([]);
                 setLoading(false);
             });
-    }, [searchParams])
+    }, [searchParams, refreshKey])
+
+    const assigneeOptions = Array.from(
+        new Map(
+            prospects
+                .filter((p) => p.prospect?.assignedAgentId)
+                .map((p) => [p.prospect!.assignedAgentId!, p.prospect?.assignedAgent?.name || "Unknown"])
+        )
+    ).sort((a, b) => a[1].localeCompare(b[1]))
 
 
 
@@ -166,8 +182,22 @@ export default function ProspectsTable() {
             selectedEngagementStatus.length === 0 ||
             selectedEngagementStatus.includes(engagementStatus);
 
-        return matchesSearch && matchesStatus && matchesEngagement;
+        const assignedAgentId = prospect.prospect?.assignedAgentId
+        const matchesAssignee =
+            assigneeFilter === "all" ||
+            (assigneeFilter === "unassigned" ? !assignedAgentId : assignedAgentId === assigneeFilter);
+
+        return matchesSearch && matchesStatus && matchesEngagement && matchesAssignee;
     });
+
+    // A selection hidden by a new filter would still be transferred, so any
+    // filter change starts the selection over.
+    useEffect(() => {
+        clearSelection()
+    }, [searchTerm, selectedStatuses, selectedEngagementStatus, assigneeFilter, clearSelection])
+
+    const filteredIds = filteredProspects.map((p) => p.id)
+    const selectedOpportunities = filteredProspects.filter((p) => selected.has(p.id))
 
     const totalPages = Math.ceil(filteredProspects.length / itemsPerPage)
 
@@ -177,6 +207,8 @@ export default function ProspectsTable() {
     const startIndex = (currentPage - 1) * itemsPerPage
     const endIndex = startIndex + itemsPerPage
     const currentProspects = filteredProspects.slice(startIndex, endIndex)
+    const pageIds = currentProspects.map((p) => p.id)
+    const pageSelectedCount = pageIds.filter((id) => selected.has(id)).length
 
     const formatDate = (dateString: string | undefined) => {
         if (!dateString) return "N/A"
@@ -368,6 +400,22 @@ export default function ProspectsTable() {
                                         )}
                                     </div>
 
+                                    <div className="space-y-2">
+                                        <Label>Assigned To</Label>
+                                        <Select value={assigneeFilter} onValueChange={setAssigneeFilter}>
+                                            <SelectTrigger className="w-full bg-transparent">
+                                                <SelectValue placeholder="All Advisors" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="all">All Advisors</SelectItem>
+                                                <SelectItem value="unassigned">Unassigned</SelectItem>
+                                                {assigneeOptions.map(([id, name]) => (
+                                                    <SelectItem key={id} value={id}>{name}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+
                                     {/* <div className="space-y-2">
                                         <Label >Date Type</Label>
                                         <Select value={dateType} onValueChange={(value: any) => setDateType(value)}>
@@ -484,8 +532,25 @@ export default function ProspectsTable() {
             </div>
 
             <Card>
-                <CardHeader>
+                <CardHeader className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                     <CardTitle>Opportunities ({filteredProspects.length})</CardTitle>
+                    {selectedOpportunities.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-2 text-sm">
+                            <span className="font-medium">{selectedOpportunities.length} selected</span>
+                            {selectedOpportunities.length < filteredIds.length && (
+                                <Button variant="link" size="sm" className="px-1" onClick={() => selectAll(filteredIds)}>
+                                    Select all {filteredIds.length}
+                                </Button>
+                            )}
+                            <Button variant="ghost" size="sm" onClick={clearSelection}>
+                                Clear
+                            </Button>
+                            <Button size="sm" onClick={() => setTransferOpen(true)}>
+                                <ArrowLeftRight className="h-4 w-4" />
+                                Transfer
+                            </Button>
+                        </div>
+                    )}
                 </CardHeader>
                 <CardContent>
                     {loading ? (
@@ -498,6 +563,19 @@ export default function ProspectsTable() {
                                 <Table>
                                     <TableHeader>
                                         <TableRow>
+                                            <TableHead className="w-10">
+                                                <Checkbox
+                                                    aria-label="Select all opportunities on this page"
+                                                    checked={
+                                                        pageSelectedCount === 0
+                                                            ? false
+                                                            : pageSelectedCount === pageIds.length
+                                                                ? true
+                                                                : "indeterminate"
+                                                    }
+                                                    onCheckedChange={() => toggleMany(pageIds)}
+                                                />
+                                            </TableHead>
                                             <TableHead>Name</TableHead>
                                             <TableHead>Phone Number</TableHead>
                                             {/* <TableHead>Description</TableHead> */}
@@ -517,7 +595,14 @@ export default function ProspectsTable() {
                                             </TableRow>
                                         ) : (
                                             currentProspects.map((prospect) => (
-                                                <TableRow key={prospect.id} className="cursor-pointer" >
+                                                <TableRow key={prospect.id} className="cursor-pointer" data-state={selected.has(prospect.id) ? "selected" : undefined}>
+                                                    <TableCell>
+                                                        <Checkbox
+                                                            aria-label={`Select ${prospect.prospect?.name || prospect.name}`}
+                                                            checked={selected.has(prospect.id)}
+                                                            onCheckedChange={() => toggle(prospect.id)}
+                                                        />
+                                                    </TableCell>
                                                     <TableCell className="font-medium max-w-[150px] truncate" onClick={() => router.push(`/dashboard/opportunities/${prospect.id}`)}>{prospect.prospect?.name || "N/A"}</TableCell>
                                                     <TableCell> {prospect.phoneNumber}</TableCell>
                                                     {/* <TableCell className="max-w-[300px] truncate" onClick={() => router.push(`/dashboard/opportunities/${prospect.id}`)}>{prospect.description || "N/A"}</TableCell> */}
@@ -632,6 +717,17 @@ export default function ProspectsTable() {
                     )}
                 </CardContent>
             </Card >
+            <BulkTransferDialog
+                open={transferOpen}
+                onOpenChange={setTransferOpen}
+                kind="opportunity"
+                ids={selectedOpportunities.map((p) => p.id)}
+                currentAssignees={selectedOpportunities.map((p) => p.prospect?.assignedAgent?.name)}
+                onTransferred={() => {
+                    clearSelection()
+                    setRefreshKey((k) => k + 1)
+                }}
+            />
             <AlertDialog open={!!sourceToDelete} onOpenChange={() => setSourceToDelete(null)}>
                 <AlertDialogContent>
                     <AlertDialogHeader>

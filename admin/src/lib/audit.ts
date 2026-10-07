@@ -185,6 +185,7 @@ export async function recordUpdateAudit(params: {
   entityId: string;
   entityName: string;
   changedFields: string[];
+  reason?: string | null;
   actor: AuditActor;
   req?: NextRequest;
 }) {

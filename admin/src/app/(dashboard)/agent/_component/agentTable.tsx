@@ -53,16 +53,6 @@ import {
   ChevronsRight,
 } from "lucide-react";
 import Link from "next/link";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 
 const agentTypes = [
   "All Types",
@@ -81,7 +71,8 @@ const jurisdictions = ["All Jurisdictions", "India", "USA", "UAE", "Others"];
 
 import { Agent } from "@/types";
 import { toast } from "react-toastify";
-import { hasExecutionRole, hasAdvisorRole } from "@/lib/agentRole";
+import { hasExecutionRole } from "@/lib/agentRole";
+import DeleteAgentDialog from "./deleteAgentDialog";
 import { useTablePage } from "@/hooks/useTablePage";
 
 const isVisibleExecutionAgent = (agent: Agent) =>
@@ -98,14 +89,10 @@ export default function AgentsTable() {
       useTablePage("admin-dashboard-agent-_component-agentTable");
   const [agentToDelete, setAgentToDelete] = useState<Agent | null>(null);
   const [loading, setLoading] = useState(true)
-  const [transferAgentId, setTransferAgentId] = useState<string | null>(null);
-  const [agentSearchQuery, setAgentSearchQuery] = useState("");
-  const [showAgentSuggestions, setShowAgentSuggestions] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [transferLeadsAgentId, setTransferLeadsAgentId] = useState<string | null>(null);
-  const [leadsAgentSearchQuery, setLeadsAgentSearchQuery] = useState("");
-  const [showLeadsAgentSuggestions, setShowLeadsAgentSuggestions] = useState(false);
-  const [advisorAgents, setAdvisorAgents] = useState<Agent[]>([]);
+  // Bumped after a delete or role removal so the list is fetched again: a
+  // dual-role agent who loses the Execution role leaves this list, one who
+  // loses the Advisor role stays with a new role.
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     const fetchAgents = async () => {
@@ -126,26 +113,7 @@ export default function AgentsTable() {
     };
 
     fetchAgents();
-  }, []);
-
-  const isDualAgent = agentToDelete ? hasAdvisorRole(agentToDelete.agentRole) : false;
-
-  useEffect(() => {
-    if (!agentToDelete || !isDualAgent) return;
-    fetchWithAuth("/api/agents")
-      .then((r) => (r.ok ? r.json() : []))
-      .then((data: Agent[]) =>
-        setAdvisorAgents(
-          data.filter(
-            (a: Agent) =>
-              hasAdvisorRole(a.agentRole) &&
-              a.status !== "inactive" &&
-              a.id !== agentToDelete.id,
-          ),
-        ),
-      )
-      .catch(() => setAdvisorAgents([]));
-  }, [agentToDelete, isDualAgent]);
+  }, [reloadKey]);
 
   // Filter agents based on search and filters
   const filteredAgents = agents.filter((agent) => {
@@ -166,30 +134,6 @@ export default function AgentsTable() {
     return matchesSearch && matchesType && matchesJurisdiction;
   });
 
-
-  const deleteFilteredAgents = agents.filter((agent) => {
-    if (!agentToDelete) return false;
-    if (!isVisibleExecutionAgent(agent)) return false;
-
-    const matchesSearch = agent.name
-      .toLowerCase()
-      .includes(agentSearchQuery.toLowerCase());
-
-    const notDeletedAgent = agent.id !== agentToDelete.id;
-
-    // Compare ranks using the agentTypes array
-    const deleteAgentRank = agentTypes.indexOf(agentToDelete.agentType);
-    const currentAgentRank = agentTypes.indexOf(agent.agentType);
-
-    // Include only agents of same rank or higher (lower index = higher rank)
-    const allowedByRank = currentAgentRank <= deleteAgentRank;
-
-    return matchesSearch && notDeletedAgent && allowedByRank;
-  });
-
-  const leadsTransferCandidates = advisorAgents.filter((agent) =>
-    agent.name.toLowerCase().includes(leadsAgentSearchQuery.toLowerCase()),
-  );
 
   // Apply sorting to filtered agents
   const sortedAgents = filteredAgents;
@@ -217,52 +161,6 @@ export default function AgentsTable() {
   const handleItemsPerPageChange = (value: string) => {
     setItemsPerPage(Number.parseInt(value));
     setCurrentPage(1);
-  };
-
-  const handleDelete = async () => {
-    if (!agentToDelete) return;
-
-    try {
-      setIsSubmitting(true);
-
-      const endpoint = isDualAgent
-        ? `/api/agents/${agentToDelete.id}/dual-transfer`
-        : `/api/agents/${agentToDelete.id}/transfer`;
-
-      const body = isDualAgent
-        ? { transferAgentId, transferLeadsAgentId }
-        : { transferAgentId };
-
-      const response = await fetch(endpoint, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to delete agent");
-      }
-
-      setAgents((currentAgents) =>
-        currentAgents.filter((agent) => agent.id !== agentToDelete.id),
-      );
-
-      const successMsg = isDualAgent
-        ? `Agent deleted. Tasks transferred to ${agentSearchQuery}, leads transferred to ${leadsAgentSearchQuery}`
-        : `Agent deleted successfully and all tasks transferred to ${agentSearchQuery}`;
-      toast.success(successMsg);
-    } catch (error) {
-      console.error("Error deleting agent:", error);
-      toast.error("Failed to delete agent");
-    } finally {
-      setIsSubmitting(false);
-      setAgentToDelete(null);
-      setAgentSearchQuery("");
-      setTransferAgentId(null);
-      setTransferLeadsAgentId(null);
-      setLeadsAgentSearchQuery("");
-      setShowLeadsAgentSuggestions(false);
-    }
   };
 
   const getAgentTypeBadge = (type: string) => {
@@ -737,184 +635,14 @@ export default function AgentsTable() {
 
 
       </Card>
-      <AlertDialog
+      <DeleteAgentDialog
+        agent={agentToDelete}
         open={!!agentToDelete}
-        onOpenChange={() => {
-          setTransferAgentId(null);
-          setAgentSearchQuery("");
-          setTransferLeadsAgentId(null);
-          setLeadsAgentSearchQuery("");
-          setShowLeadsAgentSuggestions(false);
+        onOpenChange={(open) => {
+          if (!open) setAgentToDelete(null);
         }}
-      >
-        <AlertDialogContent className="max-w-lg">
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone.
-              <br />
-              <br />
-              {isDualAgent ? (
-                <strong>
-                  This is a dual-role agent. Tasks will be transferred to the
-                  selected execution agent and leads will be transferred to the
-                  selected advisor agent below.
-                </strong>
-              ) : (
-                <strong>
-                  All Todo, In-Progress, On-Hold, and Abandoned tasks will be
-                  transferred to the selected agent below.
-                </strong>
-              )}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-
-          {/* Transfer Tasks Input */}
-          <div className="space-y-2 mt-4">
-            <Label htmlFor="assigned-agent">Transfer Tasks To *</Label>
-
-            <div className="relative">
-              <Input
-                id="assigned-agent"
-                type="text"
-                placeholder="Type to search agents..."
-                value={agentSearchQuery}
-                onChange={(e) => {
-                  if (e.target.value === "") {
-                    setTransferAgentId(null);
-                  }
-                  setAgentSearchQuery(e.target.value);
-                  setShowAgentSuggestions(!!e.target.value.trim());
-                }}
-                onFocus={() => {
-                  if (agentSearchQuery.trim()) setShowAgentSuggestions(true);
-                }}
-              />
-
-              {showAgentSuggestions &&
-                agentSearchQuery.trim() &&
-                agents.length > 0 && (
-                  <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto">
-                    {deleteFilteredAgents.map((agent) => (
-                      <div
-                        key={agent.id}
-                        className="flex items-center gap-2 p-3 hover:bg-gray-50 cursor-pointer border-b last:border-b-0"
-                        onClick={() => {
-                          setAgentSearchQuery(agent.name);
-                          setTransferAgentId(agent.id);
-                          setShowAgentSuggestions(false);
-                        }}
-                      >
-                        <Avatar className="h-6 w-6">
-                          <AvatarFallback className="text-xs">
-                            {agent.name
-                              .split(" ")
-                              .map((n) => n[0])
-                              .join("")}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <span className="font-medium">{agent.name}</span>
-                          <span className="text-sm text-muted-foreground ml-2">
-                            ({agent.agentType})
-                          </span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-              {showAgentSuggestions &&
-                agentSearchQuery.trim() &&
-                deleteFilteredAgents.length === 0 && (
-                  <div className="absolute z-10 w-full mt-1 bg-white border rounded-md p-3">
-                    <span className="text-gray-500">No agents found</span>
-                  </div>
-                )}
-            </div>
-          </div>
-
-          {/* Transfer Leads Input — only for dual-role agents */}
-          {isDualAgent && (
-            <div className="space-y-2 mt-4">
-              <Label htmlFor="transfer-leads-agent">Transfer Leads To *</Label>
-
-              <div className="relative">
-                <Input
-                  id="transfer-leads-agent"
-                  type="text"
-                  placeholder="Type to search advisor agents..."
-                  value={leadsAgentSearchQuery}
-                  onChange={(e) => {
-                    if (e.target.value === "") {
-                      setTransferLeadsAgentId(null);
-                    }
-                    setLeadsAgentSearchQuery(e.target.value);
-                    setShowLeadsAgentSuggestions(!!e.target.value.trim());
-                  }}
-                  onFocus={() => {
-                    if (leadsAgentSearchQuery.trim())
-                      setShowLeadsAgentSuggestions(true);
-                  }}
-                />
-
-                {showLeadsAgentSuggestions &&
-                  leadsAgentSearchQuery.trim() &&
-                  leadsTransferCandidates.length > 0 && (
-                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto">
-                      {leadsTransferCandidates.map((agent) => (
-                        <div
-                          key={agent.id}
-                          className="flex items-center gap-2 p-3 hover:bg-gray-50 cursor-pointer border-b last:border-b-0"
-                          onClick={() => {
-                            setLeadsAgentSearchQuery(agent.name);
-                            setTransferLeadsAgentId(agent.id);
-                            setShowLeadsAgentSuggestions(false);
-                          }}
-                        >
-                          <Avatar className="h-6 w-6">
-                            <AvatarFallback className="text-xs">
-                              {agent.name
-                                .split(" ")
-                                .map((n) => n[0])
-                                .join("")}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <span className="font-medium">{agent.name}</span>
-                            <span className="text-sm text-muted-foreground ml-2">
-                              ({agent.agentType})
-                            </span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                {showLeadsAgentSuggestions &&
-                  leadsAgentSearchQuery.trim() &&
-                  leadsTransferCandidates.length === 0 && (
-                    <div className="absolute z-10 w-full mt-1 bg-white border rounded-md p-3">
-                      <span className="text-gray-500">No advisor agents found</span>
-                    </div>
-                  )}
-              </div>
-            </div>
-          )}
-
-          <AlertDialogFooter className="mt-6">
-            <AlertDialogCancel onClick={() => setAgentToDelete(null)}>Cancel</AlertDialogCancel>
-
-            <AlertDialogAction
-              onClick={handleDelete}
-              disabled={!transferAgentId || (isDualAgent && !transferLeadsAgentId) || isSubmitting}
-              className="bg-red-600 hover:bg-red-700 disabled:opacity-50"
-            >
-              {isSubmitting ? "Transferring..." : isDualAgent ? "Delete & Transfer" : "Delete & Transfer Tasks"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        onCompleted={() => setReloadKey((key) => key + 1)}
+      />
 
     </div>
   );

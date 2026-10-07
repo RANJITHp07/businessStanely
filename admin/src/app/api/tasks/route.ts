@@ -240,6 +240,12 @@ export async function GET(req: NextRequest) {
       whereClause.legislationId =
         trigger === "standard" ? null : { not: null };
       whereClause.triggerDate = { not: null };
+      // Only rows the recurring cron will actually fire again. It selects on
+      // this same pair (see updateAllRecurringTasks); a completed one-off keeps
+      // its old triggerDate but never comes back, and listing it here made the
+      // Upcoming view look like a plain completed-task list.
+      whereClause.recurring = { not: null };
+      whereClause.recurringType = { not: null };
       triggerStateFilter = {
         OR: [
           { active: false },

@@ -70,12 +70,14 @@ import {
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
+  RotateCcw,
 } from "lucide-react";
 import { Agent, Client, Task } from "@/types";
 import Link from "next/link";
 import { fetchWithAuth } from "@/lib/fetchWithAuth";
 import { hasAdvisorRole, hasExecutionRole } from "@/lib/agentRole";
 import { cn } from "@/lib/utils";
+import RestoreAgentDialog from "@/app/(dashboard)/agent/_component/restoreAgentDialog";
 import { ProspectTable } from "@/app/(sales)/dashboard/prospects/tables/page";
 import { ProspectsTable } from "@/app/(sales)/dashboard/opportunities/tables/page";
 
@@ -259,6 +261,14 @@ export default function AgentDetails() {
   const searchParams = useSearchParams();
   const id = params.id as string;
   const [agent, setAgent] = useState<Agent | null>(null);
+  // The agent's latest delete or role removal that can still be undone.
+  const [restorable, setRestorable] = useState<{
+    kind: "delete" | "remove-role";
+    removedRole: "execution" | "advisor" | null;
+    mode: "transfer" | "soft-delete" | null;
+    at: string;
+  } | null>(null);
+  const [restoreDialogOpen, setRestoreDialogOpen] = useState(false);
   const [agentTasks, setAgentTasks] = useState<Task[]>([]);
   const [agentRetainershipTasks, setAgentRetainershipTasks] = useState<Task[]>([]);
   const [agentTriggerTasks, setAgentTriggerTasks] = useState<Task[]>([]);
@@ -355,6 +365,14 @@ export default function AgentDetails() {
       setLegislationTotal(0);
     }
   };
+
+  useEffect(() => {
+    if (!id) return;
+    fetchWithAuth(`/api/agents/${id}/restore`)
+      .then((response) => (response.ok ? response.json() : null))
+      .then((data) => setRestorable(data?.restorable ?? null))
+      .catch(() => setRestorable(null));
+  }, [id]);
 
   useEffect(() => {
     if (!id) return;
@@ -1023,6 +1041,43 @@ export default function AgentDetails() {
             </div>
           }
         </div>
+
+        {restorable && (
+          <div className="mb-4 flex flex-col md:flex-row md:items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+            <span>
+              {restorable.kind === "delete"
+                ? "This agent was deleted"
+                : `The ${restorable.removedRole === "execution" ? "Execution" : "Advisor"} role was removed`}{" "}
+              on {new Date(restorable.at).toLocaleDateString("en-GB")}
+              {restorable.mode === "soft-delete"
+                ? ", and its open work was hidden."
+                : restorable.mode === "transfer"
+                  ? ", and its work was transferred."
+                  : "."}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-fit cursor-pointer"
+              onClick={() => setRestoreDialogOpen(true)}
+            >
+              <RotateCcw className="h-4 w-4 mr-2" />
+              {restorable.kind === "delete"
+                ? "Restore agent"
+                : `Restore ${restorable.removedRole === "execution" ? "Execution" : "Advisor"} role`}
+            </Button>
+          </div>
+        )}
+
+        <RestoreAgentDialog
+          agent={agent}
+          kind={restorable?.kind === "remove-role" ? "role" : "agent"}
+          roleLabel={restorable?.removedRole === "execution" ? "Execution" : "Advisor"}
+          open={restoreDialogOpen}
+          onOpenChange={setRestoreDialogOpen}
+          // Role, tasks, leads and stats all change, so start the page over.
+          onRestored={() => window.location.reload()}
+        />
 
         {/* Agent Summary Card */}
         <Card>

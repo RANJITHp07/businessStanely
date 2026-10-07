@@ -141,13 +141,11 @@ export default function RetainershipTable() {
                 const [
                     retainershipRes,
                     triggerRes,
-                    completedTriggerRes,
                     clientsRes,
                     legislationsRes,
                 ] = await Promise.all([
                     fetchWithAuth(`/api/tasks?retainershipTasks=true`, { silent401: true }),
                     fetchWithAuth(`/api/tasks?trigger=true`, { silent401: true }),
-                    fetchWithAuth(`/api/tasks?retainershipTasks=true&status=Completed`, { silent401: true }),
                     fetchWithAuth(`/api/clients?assignedToId=me`, { silent401: true }),
                     fetchWithAuth(`/api/legislation?assignedAgent=me`, { silent401: true }),
                 ]);
@@ -159,25 +157,22 @@ export default function RetainershipTable() {
                 const [
                     retainershipData,
                     triggerData,
-                    completedTriggerData,
                     clientsData,
                     legislationsData,
                 ] = await Promise.all([
                     retainershipRes.json(),
                     triggerRes.json(),
-                    completedTriggerRes.ok ? completedTriggerRes.json() : Promise.resolve({ tasks: [] }),
                     clientsRes.json(),
                     legislationsRes.json(),
                 ]);
 
-                const pendingTriggers = triggerData.tasks || [];
-                const completedWithTrigger = (completedTriggerData.tasks || []).filter((t: any) => !!t.triggerDate);
-                const mergedTriggers = Array.from(
-                    new Map([...pendingTriggers, ...completedWithTrigger].map((t: any) => [t.id, t])).values()
-                );
+                // The same query the Upcoming section's "View more" opens, so
+                // the preview and the full list cannot disagree. Completed
+                // recurring tasks are already part of it.
+                const triggers = triggerData.tasks || [];
 
                 setMyRetainerships(retainershipData.tasks || []);
-                setTriggerTask(mergedTriggers)
+                setTriggerTask(triggers)
                 setMyClients(clientsData || []);
                 setMyLegislations(legislationsData || []);
 

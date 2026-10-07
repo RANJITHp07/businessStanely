@@ -136,6 +136,14 @@ export async function GET(req: NextRequest) {
         ...(scope === "standard"
           ? { legislationId: null }
           : { legislationId: { not: null } }),
+        // Only rows the recurring cron will actually fire again: it selects on
+        // triggerDate + recurring + recurringType (admin's
+        // updateAllRecurringTasks in src/lib/singleTaskRecurring.ts).
+        // Without these, completed one-off tasks -- which never come back --
+        // filled the Upcoming / Future Tasks lists and their "View more" pages.
+        triggerDate: { not: null },
+        recurring: { not: null },
+        recurringType: { not: null },
         OR: [
           { active: false },
           { status: "Completed" },

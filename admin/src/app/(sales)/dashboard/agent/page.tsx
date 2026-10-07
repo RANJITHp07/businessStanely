@@ -65,16 +65,6 @@ import {
     UserPlus,
 } from "lucide-react";
 import Link from "next/link";
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 
 const agentTypes = [
     "All Types",
@@ -87,6 +77,7 @@ const jurisdictions = ["All Jurisdictions", "India", "USA", "UAE", "Others"];
 import { Agent } from "@/types";
 import { hasAdvisorRole } from "@/lib/agentRole";
 import { sanitizeInactiveAgentEmail } from "@/lib/agentEmail";
+import DeleteAgentDialog from "@/app/(dashboard)/agent/_component/deleteAgentDialog";
 import { useTablePage } from "@/hooks/useTablePage";
 
 const advisorTypesSet = new Set(["Lead Maker", "Client Advisor", "Client Manager"]);
@@ -448,10 +439,9 @@ export default function AgentsTable() {
         useTablePage("admin-sales-dashboard-agent-page");
     const [agentToDelete, setAgentToDelete] = useState<Agent | null>(null);
     const [loading, setLoading] = useState(true);
-    const [transferAgentId, setTransferAgentId] = useState<string | null>(null);
-    const [agentSearchQuery, setAgentSearchQuery] = useState("");
-    const [showAgentSuggestions, setShowAgentSuggestions] = useState(false);
-    const [isSubmitting, setIsSubmitting] = useState(false);
+    // Bumped after a delete or role removal so the list is fetched again: a
+    // dual-role agent who loses the Advisor role leaves this list.
+    const [reloadKey, setReloadKey] = useState(0);
 
     // Client Advisors Modal state
     const [clientAdvisorsAgent, setClientAdvisorsAgent] = useState<Agent | null>(null);
@@ -476,7 +466,7 @@ export default function AgentsTable() {
         };
 
         fetchAgents();
-    }, []);
+    }, [reloadKey]);
 
     // Filter agents based on search and filters
     const filteredAgents = agents.filter((agent) => {
@@ -501,21 +491,6 @@ export default function AgentsTable() {
     // Apply sorting to filtered agents
     const sortedAgents = filteredAgents;
 
-    const transferCandidates = agents.filter((agent) => {
-        if (!agentToDelete) return false;
-
-        const matchesSearch = agent.name
-            .toLowerCase()
-            .includes(agentSearchQuery.toLowerCase());
-
-        const deletingLeadMaker = getAdvisorType(agentToDelete) === "Lead Maker";
-        const isValidType = deletingLeadMaker
-            ? getAdvisorType(agent) === "Lead Maker"
-            : true;
-
-        return matchesSearch && agent.id !== agentToDelete.id && isValidType;
-    });
-
     const resetFilters = () => {
         setSearchTerm("");
         setSelectedType("All Types");
@@ -539,35 +514,6 @@ export default function AgentsTable() {
     const handleItemsPerPageChange = (value: string) => {
         setItemsPerPage(Number.parseInt(value));
         setCurrentPage(1);
-    };
-
-    const handleDelete = async () => {
-        if (!agentToDelete) return;
-
-        try {
-            setIsSubmitting(true);
-            const response = await fetchWithAuth(`/api/agents/${agentToDelete.id}/advisor-transfer`, {
-                method: "PUT",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({ transferAgentId }),
-            });
-
-            if (response.ok) {
-                setAgents(agents.filter((agent) => agent.id !== agentToDelete.id));
-                setAgentToDelete(null);
-            } else {
-                console.error("Failed to delete agent");
-            }
-        } catch (error) {
-            console.error("Error deleting agent:", error);
-        } finally {
-            setIsSubmitting(false);
-            setTransferAgentId(null);
-            setAgentSearchQuery("");
-            setShowAgentSuggestions(false);
-        }
     };
 
     const handleOpenClientAdvisors = (e: React.MouseEvent, agent: Agent) => {
@@ -1071,106 +1017,14 @@ export default function AgentsTable() {
                 )}
             </Card>
 
-            {/* Delete Confirmation Dialog */}
-            <AlertDialog
+            <DeleteAgentDialog
+                agent={agentToDelete}
                 open={!!agentToDelete}
-                onOpenChange={() => {
-                    setAgentToDelete(null);
-                    setTransferAgentId(null);
-                    setAgentSearchQuery("");
-                    setShowAgentSuggestions(false);
+                onOpenChange={(open) => {
+                    if (!open) setAgentToDelete(null);
                 }}
-            >
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            This action cannot be undone.
-                            <br />
-                            <br />
-                            <strong>
-                                All leads, related opportunities context, and team members will be
-                                transferred to the selected advisor below.
-                            </strong>
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-
-                    <div className="space-y-2 mt-4">
-                        <Label htmlFor="transfer-advisor">Transfer To *</Label>
-
-                        <div className="relative">
-                            <Input
-                                id="transfer-advisor"
-                                type="text"
-                                placeholder="Type to search advisors..."
-                                value={agentSearchQuery}
-                                onChange={(e) => {
-                                    if (e.target.value === "") {
-                                        setTransferAgentId(null);
-                                    }
-                                    setAgentSearchQuery(e.target.value);
-                                    setShowAgentSuggestions(!!e.target.value.trim());
-                                }}
-                                onFocus={() => {
-                                    if (agentSearchQuery.trim()) setShowAgentSuggestions(true);
-                                }}
-                            />
-
-                            {showAgentSuggestions &&
-                                agentSearchQuery.trim() &&
-                                transferCandidates.length > 0 && (
-                                    <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto">
-                                        {transferCandidates.map((agent) => (
-                                            <div
-                                                key={agent.id}
-                                                className="flex items-center gap-2 p-3 hover:bg-gray-50 cursor-pointer border-b last:border-b-0"
-                                                onClick={() => {
-                                                    setAgentSearchQuery(agent.name);
-                                                    setTransferAgentId(agent.id);
-                                                    setShowAgentSuggestions(false);
-                                                }}
-                                            >
-                                                <Avatar className="h-6 w-6">
-                                                    <AvatarFallback className="text-xs">
-                                                        {agent.name
-                                                            .split(" ")
-                                                            .map((n) => n[0])
-                                                            .join("")}
-                                                    </AvatarFallback>
-                                                </Avatar>
-
-                                                <div>
-                                                    <span className="font-medium">{agent.name}</span>
-                                                    <span className="text-sm text-muted-foreground ml-2">
-                                                        ({getAdvisorType(agent) || agent.agentType})
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-
-                            {showAgentSuggestions &&
-                                agentSearchQuery.trim() &&
-                                transferCandidates.length === 0 && (
-                                    <div className="absolute z-10 w-full mt-1 bg-white border rounded-md p-3">
-                                        <span className="text-gray-500">No advisors found</span>
-                                    </div>
-                                )}
-                        </div>
-                    </div>
-
-                    <AlertDialogFooter>
-                        <AlertDialogCancel onClick={() => setAgentToDelete(null)}>Cancel</AlertDialogCancel>
-                        <AlertDialogAction
-                            onClick={handleDelete}
-                            disabled={!transferAgentId || isSubmitting}
-                        >
-                            {isSubmitting ? "Transferring..." : "Delete & Transfer"}
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
+                onCompleted={() => setReloadKey((key) => key + 1)}
+            />
 
             {/* Client Advisors Modal */}
             <ClientAdvisorsModal

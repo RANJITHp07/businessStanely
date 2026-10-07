@@ -269,10 +269,14 @@ export default function TasksTable() {
     const retainershipTasks = searchParams?.get("retainershipTasks")
     const retainershipId = searchParams?.get("retainershipId")
     const trigger = searchParams?.get("trigger")
+    // Dropping `scope` on a filter change turned the standard Future Tasks
+    // list into the legislation one.
+    const scope = searchParams?.get("scope")
     if (assignedToId) params.set("assignedToId", assignedToId);
     if (retainershipTasks) params.set("retainershipTasks", retainershipTasks);
     if (retainershipId) params.set("retainershipId", retainershipId);
     if (trigger) params.set("trigger", trigger);
+    if (trigger && scope) params.set("scope", scope);
     if (search) params.set("search", search);
     if (priorities.length > 0) params.set("priorities", priorities.join(","));
     if (statuses.length > 0) params.set("statuses", statuses.join(","));
@@ -368,9 +372,17 @@ export default function TasksTable() {
         <div className="mb-8">
           <div className="flex  flex-col md:flex-row  justify-between md:items-center  mb-6 md:mb-4">
             <div>
-              <h1 className="text-3xl font-bold">Task Management</h1>
+              <h1 className="text-3xl font-bold">
+                {searchParams.get("trigger") === "true"
+                  ? searchParams.get("scope") === "standard"
+                    ? "Future Tasks"
+                    : "Upcoming Tasks"
+                  : "Task Management"}
+              </h1>
               <p className="text-muted-foreground mt-2">
-                Manage and track all legal tasks and assignments
+                {searchParams.get("trigger") === "true"
+                  ? "Recurring tasks waiting for their next trigger date"
+                  : "Manage and track all legal tasks and assignments"}
               </p>
             </div>
             {(canCreateTask || searchParams.get("retainershipTasks")) && (

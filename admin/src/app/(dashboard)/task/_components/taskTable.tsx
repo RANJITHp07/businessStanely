@@ -328,8 +328,18 @@ export default function TasksTable() {
       <div className="mb-8">
         <div className="flex  flex-col md:flex-row  justify-between md:items-center  mb-6 md:mb-4">
           <div>
-            <h1 className="text-3xl font-bold">Task Management</h1>
-            <p className="text-muted-foreground mt-2">Manage and track all legal tasks and assignments</p>
+            <h1 className="text-3xl font-bold">
+              {searchParams.get("trigger") === "true"
+                ? "Upcoming Tasks"
+                : searchParams.get("trigger") === "standard"
+                  ? "Future Tasks"
+                  : "Task Management"}
+            </h1>
+            <p className="text-muted-foreground mt-2">
+              {searchParams.get("trigger")
+                ? "Recurring tasks waiting for their next trigger date"
+                : "Manage and track all legal tasks and assignments"}
+            </p>
           </div>
           <Link href="/task/create" className="flex justify-end">
             <Button className=" mt-[20px] md:mt-none   bg-[#003459] hover:bg-[#003459] text-white rounded-lg px-4 py-2 flex items-center gap-2 cursor-pointer shadow-none hover:shadow-md transition-shadow duration-300">

@@ -604,30 +604,17 @@ export default function AgentDetails() {
             requests.push(
               (async () => {
                 try {
-                  const [triggerResponse, completedResponse] = await Promise.all([
-                    fetch(`/api/tasks?assignedToId=${id}&trigger=true`),
-                    fetch(
-                      `/api/tasks?assignedToId=${id}&retainershipTasks=true&status=Completed`,
-                    ),
-                  ]);
-
-                  const pendingTriggerTasks = triggerResponse.ok
-                    ? parseTaskResponse(await triggerResponse.json())
-                    : [];
-                  const completedTriggerTasks = completedResponse.ok
-                    ? parseTaskResponse(await completedResponse.json()).filter(
-                      (task) => Boolean(task.triggerDate),
-                    )
-                    : [];
-
-                  const mergedTriggerTasks = [
-                    ...pendingTriggerTasks,
-                    ...completedTriggerTasks,
-                  ];
-                  const uniqueTriggerTasks = Array.from(
-                    new Map(mergedTriggerTasks.map((task) => [task.id, task])).values(),
+                  // The same query the section's "View more" opens on /task,
+                  // so the preview and the full list cannot disagree. Completed
+                  // recurring tasks are already part of it.
+                  const triggerResponse = await fetch(
+                    `/api/tasks?assignedToId=${id}&trigger=true`,
                   );
-                  setAgentTriggerTasks(uniqueTriggerTasks);
+                  setAgentTriggerTasks(
+                    triggerResponse.ok
+                      ? parseTaskResponse(await triggerResponse.json())
+                      : [],
+                  );
                 } catch (error) {
                   console.error("Error fetching team member trigger tasks:", error);
                   setAgentTriggerTasks([]);

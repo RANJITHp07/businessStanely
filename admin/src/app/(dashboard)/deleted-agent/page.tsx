@@ -51,6 +51,7 @@ import {
     ChevronRight,
     ChevronsLeft,
     ChevronsRight,
+    RotateCcw,
 } from "lucide-react";
 import Link from "next/link";
 import {
@@ -83,10 +84,12 @@ import { Agent } from "@/types";
 import { hasExecutionRole } from "@/lib/agentRole";
 import { sanitizeInactiveAgentEmail } from "@/lib/agentEmail";
 import { useTablePage } from "@/hooks/useTablePage";
+import RestoreAgentDialog from "@/app/(dashboard)/agent/_component/restoreAgentDialog";
 
 export default function AgentsTable() {
     const router = useRouter();
     const [agents, setAgents] = useState<Agent[]>([]);
+    const [agentToRestore, setAgentToRestore] = useState<Agent | null>(null);
     const [searchTerm, setSearchTerm] = useState("");
     const [selectedType, setSelectedType] = useState("All Types");
     const [selectedJurisdiction, setSelectedJurisdiction] = useState("All Jurisdictions");
@@ -398,6 +401,10 @@ export default function AgentsTable() {
                                                                         View Details
                                                                     </Link>
                                                                 </DropdownMenuItem>
+                                                                <DropdownMenuItem onClick={() => setAgentToRestore(agent)}>
+                                                                    <RotateCcw className="mr-2 h-4 w-4" />
+                                                                    Restore
+                                                                </DropdownMenuItem>
                                                             </DropdownMenuContent>
                                                         </DropdownMenu>
                                                     </TableCell>
@@ -494,6 +501,10 @@ export default function AgentsTable() {
                                                                         <Eye className="mr-2 h-3 w-3" />
                                                                         <span className="text-xs">View Details</span>
                                                                     </Link>
+                                                                </DropdownMenuItem>
+                                                                <DropdownMenuItem onClick={() => setAgentToRestore(agent)}>
+                                                                    <RotateCcw className="mr-2 h-3 w-3" />
+                                                                    <span className="text-xs">Restore</span>
                                                                 </DropdownMenuItem>
                                                             </DropdownMenuContent>
                                                         </DropdownMenu>
@@ -597,6 +608,19 @@ export default function AgentsTable() {
                 </>)}
 
             </Card>
+
+            <RestoreAgentDialog
+                agent={agentToRestore}
+                kind="agent"
+                open={!!agentToRestore}
+                onOpenChange={(open) => {
+                    if (!open) setAgentToRestore(null);
+                }}
+                onRestored={() => {
+                    const restoredId = agentToRestore?.id;
+                    setAgents((current) => current.filter((a) => a.id !== restoredId));
+                }}
+            />
         </div>
     );
 }

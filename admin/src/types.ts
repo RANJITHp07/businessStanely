@@ -70,6 +70,7 @@ export interface Task {
   recurringType?: string;
   recurringWeekDays?: number[];
   legislationId?: string; // Added to link tasks to legislations
+  retainershipId?: string | null;
   currentPeriodStart?: string;
   legislation?: {
     id: string;

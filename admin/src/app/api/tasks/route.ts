@@ -180,6 +180,9 @@ export async function GET(req: NextRequest) {
     const retainershipId = searchParams.get("retainershipId");
     const status = searchParams.get("status");
     const trigger = searchParams.get("trigger");
+    // `trigger=true` is the legislation/retainership future-trigger view;
+    // `trigger=standard` is the same view over normal (non-legislation) tasks.
+    const isTriggerView = trigger === "true" || trigger === "standard";
     const retainershipTasks = searchParams.get("retainershipTasks");
     const clientUpdateFilter = searchParams.get("clientUpdate");
     const statusCheckDurationParam = searchParams.get("statusCheckDuration");
@@ -228,12 +231,14 @@ export async function GET(req: NextRequest) {
     if (assignedToId) {
       whereClause.assignedToId = assignedToId;
     }
-    if (trigger === "true") {
-      // A future-trigger row is a legislation task that has been scheduled
-      // (triggerDate set) and is no longer the live occurrence: either it was
-      // deactivated or its current period is completed. Completed rows can
-      // still be active, so `active` is not constrained here -- see finalWhere.
-      whereClause.legislationId = { not: null };
+    if (isTriggerView) {
+      // A future-trigger row is a task that has been scheduled (triggerDate
+      // set) and is no longer the live occurrence: either it was deactivated
+      // (e.g. created to start only on its trigger date) or its current period
+      // is completed. Completed rows can still be active, so `active` is not
+      // constrained here -- see finalWhere.
+      whereClause.legislationId =
+        trigger === "standard" ? null : { not: null };
       whereClause.triggerDate = { not: null };
       triggerStateFilter = {
         OR: [
@@ -424,7 +429,7 @@ export async function GET(req: NextRequest) {
     }
 
     let finalWhere: Prisma.TaskWhereInput;
-    if (trigger === "true") {
+    if (isTriggerView) {
       const { AND: existingAnd, ...restOfWhere } = whereClause;
       const andClauses: Prisma.TaskWhereInput[] = Array.isArray(existingAnd)
         ? [...existingAnd]

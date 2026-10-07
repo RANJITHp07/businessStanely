@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Input } from "@/components/ui/input";
 import {
   Dialog,
@@ -309,7 +308,7 @@ export default function TransferTasksDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="min-w-0 space-y-4">
           {loadingSummary ? (
             <div className="space-y-2">
               <Skeleton className="h-4 w-56" />
@@ -444,7 +443,10 @@ export default function TransferTasksDialog({
                     />
                   </div>
 
-                  <ScrollArea className="h-56 rounded-lg border">
+                  {/* Plain overflow box, not ScrollArea: its viewport wraps
+                      children in display:table, which grows to fit the
+                      nowrap titles and pushes the list past the dialog. */}
+                  <div className="h-56 overflow-y-auto rounded-lg border">
                     {visibleTasks.length === 0 ? (
                       <p className="p-4 text-center text-sm text-muted-foreground">
                         {tasks.length === 0
@@ -477,7 +479,7 @@ export default function TransferTasksDialog({
                         ))}
                       </div>
                     )}
-                  </ScrollArea>
+                  </div>
 
                   <p className="flex items-start gap-2 text-xs text-muted-foreground">
                     <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />

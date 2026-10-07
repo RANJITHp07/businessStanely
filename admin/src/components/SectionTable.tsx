@@ -54,13 +54,16 @@ export function SectionTable({
   tasks: Task[];
   agentId?: string;
   retainershipTasks?: boolean;
-  trigger?: boolean;
+  // `true` links to the legislation future-trigger view, "standard" to the
+  // normal-task one.
+  trigger?: boolean | "standard";
 }) {
   const labelColor = (() => {
     const l = label.toLowerCase();
     if (l.includes("progress")) return "text-sky-600";
     if (l.includes("completed")) return "text-green-600";
     if (l.includes("hold")) return "text-gray-600";
+    if (l.includes("future")) return "text-violet-600";
     return "text-blue-600";
   })();
 
@@ -252,7 +255,7 @@ export function SectionTable({
             const params = new URLSearchParams();
             if (agentId) params.set("assignedToId", agentId);
             if (trigger) {
-              params.set("trigger", "true");
+              params.set("trigger", trigger === "standard" ? "standard" : "true");
             } else {
               params.set("status", sectionLabelToStatus(label));
               if (retainershipTasks) params.set("retainershipTasks", "true");

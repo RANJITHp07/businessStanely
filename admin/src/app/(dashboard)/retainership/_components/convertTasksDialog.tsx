@@ -219,7 +219,7 @@ export default function ConvertTasksDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl">
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-4xl">
         <DialogHeader>
           <DialogTitle>Convert Tasks to Legislation Tasks</DialogTitle>
           <DialogDescription>
@@ -229,7 +229,7 @@ export default function ConvertTasksDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
+        <div className="min-w-0 space-y-4">
           <div className="space-y-2">
             <Label htmlFor="convert-legislation">Target legislation *</Label>
             {loading && legislations.length === 0 ? (
@@ -289,7 +289,7 @@ export default function ConvertTasksDialog({
           </div>
 
           <div className="max-h-[45vh] overflow-y-auto rounded-md border">
-            <Table className="table-fixed">
+            <Table className="min-w-[640px] table-fixed">
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-10">

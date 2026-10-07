@@ -49,6 +49,7 @@ import {
   AlertCircle,
   Calendar,
   X,
+  ArrowLeftRight,
 } from "lucide-react"
 import Link from "next/link"
 
@@ -56,6 +57,7 @@ import { Task } from "@/types"
 import { useSearchParams } from "next/navigation"
 import { useTablePage } from "@/hooks/useTablePage"
 import ServiceFilter from "./serviceFilter"
+import ConvertTaskDialog from "./convertTaskDialog"
 
 const priorities = ["All Priorities", "Low", "Medium", "High"]
 const statuses = ["All Status", "To Do", "In Progress", "Hold", "Completed", "Abandoned"]
@@ -78,6 +80,10 @@ export default function TasksTable() {
   const { currentPage, setCurrentPage, itemsPerPage, setItemsPerPage, clampToTotalPages } =
       useTablePage("admin-dashboard-task-_components-taskTable")
   const [taskToDelete, setTaskToDelete] = useState<Task | null>(null)
+  const [taskToConvert, setTaskToConvert] = useState<Task | null>(null)
+  // Bumped after a conversion: the converted task usually leaves this view
+  // (normal and legislation tasks are listed separately), so the page reloads.
+  const [reloadKey, setReloadKey] = useState(0)
   // Row count for the *whole* filtered set, not just the page in `tasks`.
   const [totalTasks, setTotalTasks] = useState(0)
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -208,7 +214,7 @@ export default function TasksTable() {
       }
     };
     fetchTasks();
-  }, [searchParams, currentPage, itemsPerPage]);
+  }, [searchParams, currentPage, itemsPerPage, reloadKey]);
 
   const handleDelete = async () => {
     if (!taskToDelete) return
@@ -935,6 +941,12 @@ export default function TasksTable() {
                                           Edit Task
                                         </Link>
                                       </DropdownMenuItem>
+                                      <DropdownMenuItem onClick={() => setTaskToConvert(task)}>
+                                        <ArrowLeftRight className="mr-2 h-4 w-4" />
+                                        {task.legislationId || task.retainershipId
+                                          ? "Convert to Normal Task"
+                                          : "Convert to Legislation Task"}
+                                      </DropdownMenuItem>
                                       <DropdownMenuSeparator />
                                       <DropdownMenuItem
                                         className="text-destructive"
@@ -1049,6 +1061,19 @@ export default function TasksTable() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      {taskToConvert && (
+        <ConvertTaskDialog
+          open={!!taskToConvert}
+          onOpenChange={(open) => {
+            if (!open) setTaskToConvert(null)
+          }}
+          taskId={taskToConvert.id}
+          taskTitle={taskToConvert.title}
+          isLegislationTask={Boolean(taskToConvert.legislationId || taskToConvert.retainershipId)}
+          legislationTitle={taskToConvert.legislation?.title}
+          onConverted={() => setReloadKey((key) => key + 1)}
+        />
+      )}
     </div >
   )
 }

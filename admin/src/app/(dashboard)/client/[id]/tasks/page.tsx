@@ -214,6 +214,7 @@ function SectionTable({
     if (l.includes("progress")) return "text-sky-600";
     if (l.includes("completed")) return "text-green-600";
     if (l.includes("hold")) return "text-gray-600";
+    if (l.includes("future")) return "text-violet-600";
     return "text-blue-600";
   })();
 
@@ -469,9 +470,12 @@ function SectionTable({
 function TaskSections({
   tasks,
   taskListHref,
+  future,
 }: {
   tasks: Task[];
   taskListHref: (status: string) => string;
+  // Optional "Future Tasks" section, shown under Completed.
+  future?: { tasks: Task[]; viewMoreHref: string };
 }) {
   const tasksNew = tasks.filter((t) => statusKey(t.status) === "todo");
   const tasksInProgress = tasks.filter((t) => statusKey(t.status) === "inprogress");
@@ -491,6 +495,13 @@ function TaskSections({
         tasks={tasksCompleted.slice(0, 3)}
         viewMoreHref={taskListHref("Completed")}
       />
+      {future && (
+        <SectionTable
+          label="Future Tasks"
+          tasks={future.tasks.slice(0, 3)}
+          viewMoreHref={future.viewMoreHref}
+        />
+      )}
       <SectionTable label="Hold" tasks={tasksHold.slice(0, 3)} viewMoreHref={taskListHref("Hold")} />
     </div>
   );
@@ -504,6 +515,7 @@ export default function ClientTasksPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [retainershipTasks, setRetainershipTasks] = useState<Task[]>([]);
   const [triggerTasks, setTriggerTasks] = useState<Task[]>([]);
+  const [standardFutureTasks, setStandardFutureTasks] = useState<Task[]>([]);
   const [legislations, setLegislations] = useState<ClientLegislation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -522,8 +534,10 @@ export default function ClientTasksPage() {
         fetchWithAuth(`/api/tasks?clientId=${id}&retainershipTasks=true`),
         fetchWithAuth(`/api/tasks?clientId=${id}&trigger=true`),
         fetchWithAuth(`/api/legislation?retainershipClientId=${id}&pageSize=100`),
+        fetchWithAuth(`/api/tasks?clientId=${id}&trigger=standard&page=1&limit=3`),
       ]);
-      const [clientResult, tasksResult, retainershipResult, triggerResult, legislationResult] = results;
+      const [clientResult, tasksResult, retainershipResult, triggerResult, legislationResult, standardFutureResult] =
+        results;
 
       if (clientResult.status === "fulfilled" && clientResult.value.ok) {
         setClient(await clientResult.value.json());
@@ -548,6 +562,12 @@ export default function ClientTasksPage() {
         setTriggerTasks(parseTaskResponse(await triggerResult.value.json()));
       } else if (triggerResult.status === "rejected") {
         console.error("Error fetching future-trigger tasks:", triggerResult.reason);
+      }
+
+      if (standardFutureResult.status === "fulfilled" && standardFutureResult.value.ok) {
+        setStandardFutureTasks(parseTaskResponse(await standardFutureResult.value.json()));
+      } else if (standardFutureResult.status === "rejected") {
+        console.error("Error fetching future tasks:", standardFutureResult.reason);
       }
 
       if (legislationResult.status === "fulfilled" && legislationResult.value.ok) {
@@ -730,7 +750,7 @@ export default function ClientTasksPage() {
         </div>
 
         <TabsContent value="standard" className="space-y-6">
-          {tasks.length === 0 ? (
+          {tasks.length === 0 && standardFutureTasks.length === 0 ? (
             <Card>
               <CardContent className="text-center py-8 text-muted-foreground">
                 No standard tasks found for this client.
@@ -742,6 +762,10 @@ export default function ClientTasksPage() {
               taskListHref={(label) =>
                 `/task?clientId=${id}&status=${encodeURIComponent(sectionLabelToStatus(label))}`
               }
+              future={{
+                tasks: standardFutureTasks,
+                viewMoreHref: `/task?clientId=${id}&trigger=standard`,
+              }}
             />
           )}
         </TabsContent>

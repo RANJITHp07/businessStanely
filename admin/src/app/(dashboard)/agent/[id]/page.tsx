@@ -262,6 +262,7 @@ export default function AgentDetails() {
   const [agentTasks, setAgentTasks] = useState<Task[]>([]);
   const [agentRetainershipTasks, setAgentRetainershipTasks] = useState<Task[]>([]);
   const [agentTriggerTasks, setAgentTriggerTasks] = useState<Task[]>([]);
+  const [agentStandardFutureTasks, setAgentStandardFutureTasks] = useState<Task[]>([]);
   const [agentLegislations, setAgentLegislations] = useState<AgentLegislation[]>([]);
   const [legislationPage, setLegislationPage] = useState(1);
   const [legislationPageSize] = useState(10);
@@ -383,6 +384,7 @@ export default function AgentDetails() {
               fetchAgentTasks(),
               fetchAgentRetainershipTasks(),
               fetchAgentTriggerTasks(),
+              fetchAgentStandardFutureTasks(),
               fetchAgentLegislations(),
               fetchAgentClients(),
             );
@@ -496,6 +498,23 @@ export default function AgentDetails() {
       } catch (error) {
         console.error("Error fetching agent trigger tasks:", error);
         setAgentTriggerTasks([]);
+      }
+    };
+
+    // Normal tasks waiting on their trigger date (scheduled to start later, or
+    // completed and due to recur). Only the section's first rows are shown.
+    const fetchAgentStandardFutureTasks = async () => {
+      try {
+        const response = await fetchWithAuth(
+          `/api/tasks?assignedToId=${id}&trigger=standard&page=1&limit=3`,
+        );
+
+        setAgentStandardFutureTasks(
+          response.ok ? parseTaskResponse(await response.json()) : [],
+        );
+      } catch (error) {
+        console.error("Error fetching agent future tasks:", error);
+        setAgentStandardFutureTasks([]);
       }
     };
 
@@ -1570,7 +1589,7 @@ export default function AgentDetails() {
                 </div>
 
                 <TabsContent value="standard-tasks" className="space-y-6">
-                  {standardAgentTasks.length === 0 ? (
+                  {standardAgentTasks.length === 0 && agentStandardFutureTasks.length === 0 ? (
                     <Card>
                       <CardContent className="text-center py-8 text-muted-foreground">
                         No standard tasks assigned to this agent.
@@ -1592,6 +1611,12 @@ export default function AgentDetails() {
                         label="Completed"
                         tasks={standardAgentTasks.filter((task) => statusKey(task.status) === "completed").slice(0, 3)}
                         agentId={id}
+                      />
+                      <SectionTable
+                        label="Future Tasks"
+                        tasks={agentStandardFutureTasks}
+                        agentId={id}
+                        trigger="standard"
                       />
                       <SectionTable
                         label="Hold"

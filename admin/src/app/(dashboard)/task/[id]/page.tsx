@@ -38,6 +38,7 @@ import {
   Send,
   Paperclip,
   Trash2,
+  ArrowLeftRight,
 } from "lucide-react";
 import { format } from "date-fns";
 import { Task, Agent, Comment, TimeLog } from "@/types";
@@ -46,6 +47,7 @@ import Image from "next/image";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { uploadFileToS3Direct } from "@/lib/directUpload";
+import ConvertTaskDialog from "../_components/convertTaskDialog";
 
 export default function TaskDetails() {
   const MANAGEMENT_BASE_URL = "https://management.legalstanley.com";
@@ -88,6 +90,9 @@ export default function TaskDetails() {
   const [selectedOwnershipAgentId, setSelectedOwnershipAgentId] = useState<string | null>(null);
   const [duration, setDuration] = useState(2);
   const [progressInput, setProgressInput] = useState<string>("");
+  const [isConvertOpen, setIsConvertOpen] = useState(false);
+  // Bumped after a conversion so the task is re-read with its new legislation.
+  const [reloadKey, setReloadKey] = useState(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // const [isFromRetainership, setIsFromRetainership] = useState(false);
@@ -204,7 +209,7 @@ export default function TaskDetails() {
 
     fetchTask();
     fetchTimeLogs();
-  }, [id]);
+  }, [id, reloadKey]);
 
   // Fetch agents
   useEffect(() => {
@@ -864,6 +869,10 @@ export default function TaskDetails() {
     );
   }
 
+  // A task is a legislation task while it points at a legislation (or, for
+  // older bulk conversions, only at a retainership).
+  const isLegislationTask = Boolean(taskData.legislationId || taskData.retainershipId);
+
   const displayOwnershipAgent =
     taskData.ownerShipBy?.status?.toLowerCase() === "inactive"
       ? taskData.assignedTo
@@ -880,7 +889,15 @@ export default function TaskDetails() {
               Comprehensive view of task progress and activity
             </p>
           </div>
-          {taskData.active && !isDeleted && < div className="flex justify-end">
+          {taskData.active && !isDeleted && < div className="flex flex-wrap justify-end gap-2">
+            <Button
+              variant="outline"
+              className="mt-[20px] md:mt-0 w-fit rounded-lg px-4 py-2 flex items-center gap-2"
+              onClick={() => setIsConvertOpen(true)}
+            >
+              <ArrowLeftRight className="h-4 w-4" />
+              {isLegislationTask ? "Convert to Normal Task" : "Convert to Legislation Task"}
+            </Button>
             <Button className="mt-[20px] md:mt-0 w-fit f bg-[#003459] hover:bg-[#003459] text-white rounded-lg px-4 py-2 flex items-center gap-2 cursor-pointer shadow-none hover:shadow-md transition-shadow duration-300">
               <a href={`/task/${id}/edit`} className="flex items-center gap-1">
                 <Edit className="h-4 w-4" />
@@ -2138,6 +2155,16 @@ export default function TaskDetails() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <ConvertTaskDialog
+        open={isConvertOpen}
+        onOpenChange={setIsConvertOpen}
+        taskId={taskData.id}
+        taskTitle={taskData.title}
+        isLegislationTask={isLegislationTask}
+        legislationTitle={taskData.legislation?.title}
+        onConverted={() => setReloadKey((key) => key + 1)}
+      />
     </div >
   );
 }

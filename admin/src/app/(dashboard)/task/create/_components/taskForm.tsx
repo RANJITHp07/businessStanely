@@ -63,6 +63,8 @@ interface Category {
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "react-toastify";
 import { Checkbox } from "@/components/ui/checkbox";
+import SimilarClients, { type SimilarClient } from "@/components/SimilarClients";
+import { clientDisplayName } from "@/lib/entityNames";
 
 /** ISO weekday numbers: 1 = Monday ... 7 = Sunday, matching the stored value. */
 const WEEKDAY_OPTIONS = [
@@ -387,6 +389,16 @@ export default function TaskForm() {
       email: "",
       phoneNumber: "",
     });
+  };
+
+  // Picking an already-registered client from the Add Client dialog uses it
+  // for this task and drops the new-client entry, so no duplicate is created.
+  const handleExistingClientSelect = (existing: SimilarClient) => {
+    setSearchQuery(clientDisplayName(existing));
+    handleInputChange("clientId", existing.id);
+    setShowSuggestions(false);
+    setIsModalOpen(false);
+    toast.info(`${clientDisplayName(existing)} is already registered and has been selected.`);
   };
 
   const handleCreateClient = async () => {
@@ -1077,6 +1089,10 @@ export default function TaskForm() {
                             />
                           </div>
                         </div>
+                        <SimilarClients
+                          name={`${newClientData.firstName} ${newClientData.lastName}`}
+                          onSelect={handleExistingClientSelect}
+                        />
                         <div className="space-y-2">
                           <Label htmlFor="email">Email *</Label>
                           <div className="relative">
@@ -1136,6 +1152,10 @@ export default function TaskForm() {
                             }
                           />
                         </div>
+                        <SimilarClients
+                          name={newClientData.organizationName}
+                          onSelect={handleExistingClientSelect}
+                        />
                         <div className="space-y-2">
                           <Label htmlFor="authorizedPersonName">
                             Authorized Person *

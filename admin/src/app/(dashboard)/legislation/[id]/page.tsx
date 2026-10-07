@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { use, useCallback, useEffect, useState } from "react";
 import { toast } from "react-toastify";
 import { useRouter } from "next/navigation";
 import { fetchWithAuth } from "@/lib/fetchWithAuth";
@@ -31,6 +31,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import TransferTasksDialog from "../../retainership/_components/transferTasksDialog";
 
 export default function LegislationDetail({ params }: { params: Promise<{ id: string }> | { id: string } }) {
   const resolvedParams = params instanceof Promise ? use(params) : params;
@@ -40,33 +41,36 @@ export default function LegislationDetail({ params }: { params: Promise<{ id: st
   const [loading, setLoading] = useState(true);
   const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isTransferTasksOpen, setIsTransferTasksOpen] = useState(false);
   const router = useRouter();
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const legislationId = resolvedParams.id; // Extract id safely
-        const response = await fetchWithAuth(`/api/legislation/${legislationId}`);
+  // Pulled out of the effect so a task transfer can re-run it once the server
+  // confirms, rather than leaving the moved tasks listed here.
+  const fetchData = useCallback(async () => {
+    try {
+      const legislationId = resolvedParams.id; // Extract id safely
+      const response = await fetchWithAuth(`/api/legislation/${legislationId}`);
 
-        if (!response.ok) {
-          throw new Error("Failed to fetch legislation");
-        }
-
-        const data = await response.json();
-        setLegislation(data);
-        setTasks(data.tasks || []); // Ensure tasks are fetched directly from the legislation details API
-      } catch (error) {
-        console.error("Error fetching data:", error);
-        toast.error("Failed to load legislation details");
-        setLegislation(null);
-        setTasks([]);
-      } finally {
-        setLoading(false);
+      if (!response.ok) {
+        throw new Error("Failed to fetch legislation");
       }
-    };
 
-    fetchData();
+      const data = await response.json();
+      setLegislation(data);
+      setTasks(data.tasks || []); // Ensure tasks are fetched directly from the legislation details API
+    } catch (error) {
+      console.error("Error fetching data:", error);
+      toast.error("Failed to load legislation details");
+      setLegislation(null);
+      setTasks([]);
+    } finally {
+      setLoading(false);
+    }
   }, [resolvedParams.id]);
+
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
 
   const formatDate = (dateString?: string) => {
     if (!dateString) return "N/A";
@@ -172,7 +176,18 @@ export default function LegislationDetail({ params }: { params: Promise<{ id: st
               <FileText className="h-5 w-5" />
               Legislation Tasks
             </CardTitle>
-            <Button onClick={() => router.push(`/task/create?legislationId=${resolvedParams.id}&assignedAgent=${legislation.assignedAgent?.id || ""}&client=${legislation.retainership?.client?.id || ""}`)}>Add Task</Button>
+            <div className="flex items-center gap-2">
+              {legislation.retainershipId && (
+                <Button
+                  variant="outline"
+                  onClick={() => setIsTransferTasksOpen(true)}
+                  title="Move tasks to another legislation or retainership"
+                >
+                  Transfer Tasks
+                </Button>
+              )}
+              <Button onClick={() => router.push(`/task/create?legislationId=${resolvedParams.id}&assignedAgent=${legislation.assignedAgent?.id || ""}&client=${legislation.retainership?.client?.id || ""}`)}>Add Task</Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -282,6 +297,16 @@ export default function LegislationDetail({ params }: { params: Promise<{ id: st
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {legislation.retainershipId && (
+        <TransferTasksDialog
+          open={isTransferTasksOpen}
+          onOpenChange={setIsTransferTasksOpen}
+          retainershipId={legislation.retainershipId}
+          legislationId={resolvedParams.id}
+          onTransferred={() => fetchData()}
+        />
+      )}
     </div>
   );
 }

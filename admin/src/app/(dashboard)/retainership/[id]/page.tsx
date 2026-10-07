@@ -60,6 +60,7 @@ import { fetchWithAuth } from "@/lib/fetchWithAuth"
 import { cn } from "@/lib/utils"
 import { useRouter } from "next/navigation"
 import ConvertTasksDialog from "../_components/convertTasksDialog"
+import TransferTasksDialog from "../_components/transferTasksDialog"
 
 type ClientDiaryEntry = {
     id: string
@@ -162,6 +163,7 @@ export default function RetainershipDetail({ params }: { params: Promise<{ id: s
     });
     const [loading, setLoading] = useState(true);
     const [isConvertTasksOpen, setIsConvertTasksOpen] = useState(false);
+    const [isTransferTasksOpen, setIsTransferTasksOpen] = useState(false);
 
     // Pulled out of the effect so the bulk task conversion can re-run it once
     // the server confirms, rather than leaving the page on stale data.
@@ -736,6 +738,18 @@ export default function RetainershipDetail({ params }: { params: Promise<{ id: s
                                     }
                                 >
                                     Convert Tasks
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    onClick={() => setIsTransferTasksOpen(true)}
+                                    disabled={!retainership?.legislation?.length}
+                                    title={
+                                        retainership?.legislation?.length
+                                            ? "Move tasks between legislations or to another retainership"
+                                            : "Add a legislation before transferring tasks"
+                                    }
+                                >
+                                    Transfer Tasks
                                 </Button>
                                 <Button onClick={() => setIsModalOpen(true)}>Add Legislation</Button>
                             </div>
@@ -1340,6 +1354,13 @@ export default function RetainershipDetail({ params }: { params: Promise<{ id: s
                 onOpenChange={setIsConvertTasksOpen}
                 retainershipId={resolvedParams.id}
                 onConverted={() => fetchRetainership()}
+            />
+
+            <TransferTasksDialog
+                open={isTransferTasksOpen}
+                onOpenChange={setIsTransferTasksOpen}
+                retainershipId={resolvedParams.id}
+                onTransferred={() => fetchRetainership()}
             />
         </div >
     );

@@ -147,11 +147,24 @@ function StatCard({
   );
 }
 
-export function SectionTable({ label, tasks }: { label: string; tasks: Task[] }) {
+export function SectionTable({
+  label,
+  tasks,
+  viewMoreHref,
+}: {
+  label: string;
+  tasks: Task[];
+  // Defaults to the task list filtered by this section's status.
+  viewMoreHref?: string;
+}) {
+  const listHref =
+    viewMoreHref ??
+    `/task?status=${encodeURIComponent(sectionLabelToStatus(label))}`;
   const labelColor = (() => {
     const l = label.toLowerCase();
     if (l.includes("progress")) return "text-sky-600";
     if (l.includes("completed")) return "text-green-600";
+    if (l.includes("future")) return "text-violet-600";
     return "text-blue-600"; // New Task
   })();
 
@@ -376,9 +389,7 @@ export function SectionTable({ label, tasks }: { label: string; tasks: Task[] })
                               <Tooltip>
                                 <TooltipTrigger asChild>
                                   <Link
-                                    href={`/task?status=${encodeURIComponent(
-                                      sectionLabelToStatus(label)
-                                    )}`}
+                                    href={listHref}
                                     className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-muted"
                                     aria-label="View tasks with this status"
                                   >
@@ -434,9 +445,7 @@ export function SectionTable({ label, tasks }: { label: string; tasks: Task[] })
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Link
-                                href={`/task?status=${encodeURIComponent(
-                                  sectionLabelToStatus(label)
-                                )}`}
+                                href={listHref}
                                 className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-muted"
                                 aria-label="View tasks with this status"
                               >
@@ -520,9 +529,7 @@ export function SectionTable({ label, tasks }: { label: string; tasks: Task[] })
 
       <div className="flex justify-end">
         <Link
-          href={`/task?status=${encodeURIComponent(
-            sectionLabelToStatus(label)
-          )}`}
+          href={listHref}
           className="bg-[#003459] cursor-pointer text-white text-[14px] py-[10px] mt-[10px] px-[10px] rounded-[5px] inline-block"
         >
           View more
@@ -542,9 +549,26 @@ export default function MyTasksPage() {
     inprogress: 0,
     todo: 0,
   });
+  const [futureTasks, setFutureTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Normal tasks waiting on their trigger date. Kept out of the summary call
+    // so a failure here never blanks the status sections.
+    const loadFuture = async () => {
+      try {
+        const res = await fetchWithAuth(
+          `/api/tasks?trigger=standard&page=1&limit=${SECTION_LIMIT}`
+        );
+        if (!res.ok) throw new Error("Failed to fetch future tasks");
+        const data = await res.json();
+        setFutureTasks(data.tasks ?? []);
+      } catch (e) {
+        console.error(e);
+        setFutureTasks([]);
+      }
+    };
+
     const load = async () => {
       try {
         const res = await fetchWithAuth(
@@ -569,6 +593,7 @@ export default function MyTasksPage() {
       }
     };
     load();
+    loadFuture();
   }, []);
 
   const { total, completed, inprogress, todo } = counts;
@@ -643,6 +668,11 @@ export default function MyTasksPage() {
           <SectionTable label="New Task" tasks={tasksNew} />
           <SectionTable label="In Progress" tasks={tasksInProgress} />
           <SectionTable label="Completed" tasks={tasksCompleted} />
+          <SectionTable
+            label="Future Tasks"
+            tasks={futureTasks}
+            viewMoreHref="/task?trigger=standard"
+          />
           <SectionTable label="Hold" tasks={tasksHold} />
         </div>
       )}

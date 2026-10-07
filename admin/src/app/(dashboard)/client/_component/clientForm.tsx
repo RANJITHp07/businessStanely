@@ -55,6 +55,8 @@ const communicationPreferences = [
 import { Client } from "@/types";
 import { toast } from "react-toastify"
 import { useRouter } from "next/navigation"
+import SimilarClients, { type SimilarClient } from "@/components/SimilarClients"
+import { clientDisplayName } from "@/lib/entityNames"
 
 interface ClientFormProps {
     client?: Client;
@@ -92,6 +94,13 @@ export default function ClientForm({ client }: ClientFormProps) {
 
     const handleInputChange = (field: string, value: string) => {
         setFormData((prev) => ({ ...prev, [field]: value }))
+    }
+
+    // Picking an already-registered client abandons this create and opens
+    // that client, so the same party is never entered twice.
+    const handleExistingClientSelect = (existing: SimilarClient) => {
+        toast.info(`${clientDisplayName(existing)} is already registered. Opening the existing client.`)
+        router.push(`/client/${existing.id}`)
     }
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -242,6 +251,14 @@ export default function ClientForm({ client }: ClientFormProps) {
                                 </div>
                             </div>
 
+                            {!client && (
+                                <SimilarClients
+                                    name={`${formData.firstName} ${formData.lastName}`}
+                                    onSelect={handleExistingClientSelect}
+                                    selectLabel="Use this client"
+                                />
+                            )}
+
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="space-y-2">
                                     <Label htmlFor="gender">Gender</Label>
@@ -350,6 +367,14 @@ export default function ClientForm({ client }: ClientFormProps) {
                                     />
                                 </div>
                             </div>
+
+                            {!client && (
+                                <SimilarClients
+                                    name={formData.organizationName}
+                                    onSelect={handleExistingClientSelect}
+                                    selectLabel="Use this client"
+                                />
+                            )}
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="space-y-2">

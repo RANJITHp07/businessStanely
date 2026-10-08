@@ -36,7 +36,7 @@ interface oppurtunities {
     description: string
     amount?: number
     nextFollowUp?: string
-    status: "Proposal Issued" | "Closed as Won" | "Closed as Loss"
+    status: "New Opportunity" | "Proposal Issued" | "Closed as Won" | "Closed as Loss"
     createdAt: string
     updatedAt: string
     prospect?: {
@@ -107,33 +107,40 @@ export default function OppurtunitiesDetailPage() {
     }, [opportunityId]);
 
     const handleNextFollowUpChange = async (date: Date | undefined) => {
+        if (!oppurtunities || !date) return
+        const previous = { opportunity: oppurtunities, date: nextFollowUpDate }
         setNextFollowUpDate(date)
-        if (oppurtunities && date) {
-            setoppurtunities({ ...oppurtunities, nextFollowUp: date.toISOString().split("T")[0] })
+        setoppurtunities({ ...oppurtunities, nextFollowUp: date.toISOString() })
+        try {
             const res = await fetch(`/api/opportunities/${oppurtunities.id}`, {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ ...oppurtunities, nextFollowUp: date }),
             });
-            if (!res.ok) {
-                console.error("Failed to update status");
-                return;
-            }
+            if (!res.ok) throw new Error("Failed to update next follow up");
+        } catch (err) {
+            console.error("Error updating next follow up:", err);
+            setNextFollowUpDate(previous.date)
+            setoppurtunities(previous.opportunity)
+            alert("Could not update next follow up. Please try again.")
         }
     }
 
-    const handleStatusChange = async (newStatus: "Proposal Issued" | "Closed as Won" | "Closed as Loss") => {
-        if (oppurtunities) {
-            setoppurtunities({ ...oppurtunities, status: newStatus })
+    const handleStatusChange = async (newStatus: oppurtunities["status"]) => {
+        if (!oppurtunities) return
+        const previous = oppurtunities
+        setoppurtunities({ ...oppurtunities, status: newStatus })
+        try {
             const res = await fetch(`/api/opportunities/${oppurtunities.id}`, {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ ...oppurtunities, status: newStatus }),
             });
-            if (!res.ok) {
-                console.error("Failed to update status");
-                return;
-            }
+            if (!res.ok) throw new Error("Failed to update status");
+        } catch (err) {
+            console.error("Error updating status:", err);
+            setoppurtunities(previous)
+            alert("Could not update status. Please try again.")
         }
     }
 
@@ -230,7 +237,6 @@ export default function OppurtunitiesDetailPage() {
                                                     "w-full justify-start text-left font-normal",
                                                     !nextFollowUpDate && "text-muted-foreground",
                                                 )}
-                                                disabled={true}
                                             >
                                                 <CalendarIcon className="mr-2 h-4 w-4" />
                                                 {nextFollowUpDate ? (
@@ -250,7 +256,11 @@ export default function OppurtunitiesDetailPage() {
                                                 selected={nextFollowUpDate}
                                                 onSelect={handleNextFollowUpChange}
                                                 initialFocus
-                                                disabled={true}
+                                                disabled={(date: Date) => {
+                                                    const today = new Date();
+                                                    today.setHours(0, 0, 0, 0);
+                                                    return date < today; // disable all dates before today
+                                                }}
                                             />
                                         </PopoverContent>
                                     </Popover>
@@ -259,7 +269,6 @@ export default function OppurtunitiesDetailPage() {
                                     <div className="flex flex-col gap-1">
                                         <p className="text-sm text-muted-foreground mb-1">Status</p>
                                         <Select
-                                            disabled={true}
                                             value={oppurtunities.status} onValueChange={handleStatusChange}>
                                             <SelectTrigger className="w-[180px]">
                                                 <SelectValue />

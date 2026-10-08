@@ -115,17 +115,21 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
     }, [resolvedParams.id])
 
     const handleNextFollowUpChange = async (date: Date | undefined) => {
+        if (!prospect || !date) return;
+        const previous = nextFollowUpDate
         setNextFollowUpDate(date)
-        if (prospect && date) {
+        try {
             const res = await fetch(`/api/prospects/${prospect.id}`, {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ ...prospect, nextFollowUp: date }),
             });
-            if (!res.ok) {
-                return;
-            }
-            setProspect({ ...prospect, nextFollowUp: date.toISOString().split("T")[0] })
+            if (!res.ok) throw new Error("Failed to update next follow up");
+            setProspect({ ...prospect, nextFollowUp: date.toISOString() })
+        } catch (err) {
+            console.error("Error updating next follow up:", err);
+            setNextFollowUpDate(previous)
+            alert("Could not update next follow up. Please try again.")
         }
     }
 
@@ -133,29 +137,29 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
         if (!prospect) return;
         // If status is Opportunity, create and redirect immediately
         if (newStatus === "Opportunity") {
+            if (!confirm("Convert this lead to an opportunity? The lead will be archived.")) return;
             try {
                 const res = await fetch(`/api/prospects/${prospect.id}`, {
                     method: "PUT",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ ...prospect, status: newStatus }),
                 });
-                if (!res.ok) {
-                    console.error("Failed to update status");
-                    return;
-                }
+                if (!res.ok) throw new Error("Failed to convert lead");
                 const data = await res.json();
                 if (data.opportunity && data.opportunity.id) {
-                    // Redirect to new opportunity and prevent rendering deleted prospect
-                    router.replace(`/sales/opportunites/${data.opportunity.id}`);
+                    // Redirect to new opportunity and prevent rendering archived prospect
+                    router.replace(`/dashboard/opportunities/${data.opportunity.id}`);
                 } else {
-                    router.replace(`/sales/opportunites/table`);
+                    router.replace(`/dashboard/opportunities/table`);
                 }
             } catch (err) {
                 console.error("Error updating status:", err);
+                alert("Could not convert lead to opportunity. Please try again.")
             }
             return;
         }
         // Otherwise, update prospect as usual
+        const previous = prospect;
         setProspect({ ...prospect, status: newStatus });
         try {
             const res = await fetch(`/api/prospects/${prospect.id}`, {
@@ -163,11 +167,11 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ ...prospect, status: newStatus }),
             });
-            if (!res.ok) {
-                console.error("Failed to update status");
-            }
+            if (!res.ok) throw new Error("Failed to update status");
         } catch (err) {
             console.error("Error updating status:", err);
+            setProspect(previous);
+            alert("Could not update status. Please try again.")
         }
     }
 
@@ -308,7 +312,7 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
                                                     "w-full justify-start text-left font-normal",
                                                     !nextFollowUpDate && "text-muted-foreground",
                                                 )}
-                                                disabled={true}
+                                                disabled={isCommentDisabled}
                                             >
                                                 <CalendarIcon className="mr-2 h-4 w-4" />
                                                 {nextFollowUpDate ? (
@@ -341,7 +345,7 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
                                     <div className="flex flex-col gap-1">
                                         <p className="text-sm text-muted-foreground mb-1">Status</p>
                                         <Select
-                                            disabled={true}
+                                            disabled={isCommentDisabled}
                                             value={prospect.status} onValueChange={handleStatusChange}>
                                             <SelectTrigger className="w-[180px]">
                                                 <SelectValue />

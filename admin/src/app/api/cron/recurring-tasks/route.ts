@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import {
+  businessDayKey,
   updateAllRecurringTasks,
   sendActivityEmailsToAgents,
 } from "@/lib/singleTaskRecurring";
@@ -30,7 +31,9 @@ async function runDailyJob(request: NextRequest) {
   // once-a-day claim on cron_logs still limits an unauthenticated caller to
   // the run that was due anyway.
 
-  const runDate = new Date().toISOString().slice(0, 10);
+  // The same business day the roll-forward treats as "today", so the
+  // once-a-day claim and the trigger cut-off agree on which day this run is.
+  const runDate = businessDayKey();
 
   /**
    * A claim only releases itself on a thrown error. A run killed mid-flight --

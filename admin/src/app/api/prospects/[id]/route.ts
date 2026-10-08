@@ -78,7 +78,6 @@ export async function PUT(
       nextFollowUp,
       assignedAgentId,
       amount,
-      service,
     } = body;
 
     // If status is being set to 'Opportunity', create Opportunity and archive prospect
@@ -92,17 +91,17 @@ export async function PUT(
             { status: 404 },
           );
         }
-        // Create Opportunity
+        // Create Opportunity. Same defaults as the agent app's conversion: no
+        // quote is attached here, so it starts as "New Opportunity".
         const opportunity = await prisma.opportunity.create({
           data: {
             name: name || prospect.name,
             phoneNumber: phoneNumber || prospect.phoneNumber,
             description: description || prospect.description,
-            amount: typeof amount === "number" ? amount : 0,
+            amount: typeof amount === "number" ? amount : (prospect.amount ?? 0),
             nextFollowUp: nextFollowUp ? new Date(nextFollowUp) : undefined,
-            status: "Proposal Issued",
+            status: "New Opportunity",
             prospectId: prospect.id,
-            service,
           },
         });
         // Archive the prospect instead of deleting
@@ -149,7 +148,12 @@ export async function PUT(
       notes,
       nextFollowUp: nextFollowUp ? new Date(nextFollowUp) : undefined,
       assignedAgentId,
-      amount: parseFloat(amount),
+      // Detail page saves send the whole lead back, often with amount null;
+      // parseFloat(null) is NaN, which would overwrite the stored amount.
+      amount:
+        amount === undefined || amount === null || amount === ""
+          ? undefined
+          : parseFloat(amount),
     };
 
     // Otherwise, just update the prospect

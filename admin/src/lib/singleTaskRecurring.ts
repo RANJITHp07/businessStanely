@@ -10,6 +10,32 @@ function isRecurringType(value: string): value is RecurringType {
 }
 
 /**
+ * The business runs on India time, but a trigger date is stored as UTC
+ * midnight of the calendar day picked in the form ("2026-10-07" becomes
+ * 2026-10-07T00:00:00Z). "Today" has to be India's calendar day expressed the
+ * same way. Using the server's UTC day meant the scheduler's 19:11 UTC call
+ * (00:41 IST) still saw yesterday, so every trigger fired a day late.
+ */
+const BUSINESS_TIME_ZONE = process.env.BUSINESS_TIME_ZONE || "Asia/Kolkata";
+
+/** Today's calendar day in the business time zone, as "YYYY-MM-DD". */
+export function businessDayKey(now: Date = new Date()): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: BUSINESS_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(now);
+}
+
+/** Midnight UTC of the business day after today, i.e. the first trigger date not yet due. */
+function startOfNextBusinessDay(now: Date = new Date()): Date {
+  const next = new Date(`${businessDayKey(now)}T00:00:00.000Z`);
+  next.setUTCDate(next.getUTCDate() + 1);
+  return next;
+}
+
+/**
  * Normalise a stored weekday set to sorted, unique ISO weekdays (1 = Monday ...
  * 7 = Sunday). Anything out of range is dropped rather than clamped: a bad
  * value is a data problem, and clamping would silently fire the task on a day
@@ -23,9 +49,13 @@ function normalizeWeekDays(value: unknown): number[] {
   return [...new Set(days)].sort((a, b) => a - b);
 }
 
-/** ISO weekday of a date: 1 = Monday ... 7 = Sunday (JS Sunday 0 becomes 7). */
+/**
+ * ISO weekday of a date: 1 = Monday ... 7 = Sunday (JS Sunday 0 becomes 7).
+ * Read in UTC because trigger dates are stored as UTC midnight of the picked
+ * day; a local-time read on a non-UTC server lands on the day before.
+ */
 function isoWeekDay(date: Date): number {
-  return date.getDay() === 0 ? 7 : date.getDay();
+  return date.getUTCDay() === 0 ? 7 : date.getUTCDay();
 }
 
 /**
@@ -45,8 +75,8 @@ function nextWeekDayOccurrence(
 ): Date {
   const mondayOf = (date: Date) => {
     const monday = new Date(date);
-    monday.setHours(0, 0, 0, 0);
-    monday.setDate(monday.getDate() - (isoWeekDay(monday) - 1));
+    monday.setUTCHours(0, 0, 0, 0);
+    monday.setUTCDate(monday.getUTCDate() - (isoWeekDay(monday) - 1));
     return monday;
   };
 
@@ -55,12 +85,12 @@ function nextWeekDayOccurrence(
   const msPerWeek = 7 * 24 * 60 * 60 * 1000;
 
   const candidate = new Date(from);
-  candidate.setHours(0, 0, 0, 0);
+  candidate.setUTCHours(0, 0, 0, 0);
 
   // Walk day by day. Bounded by interval * 7 + 7 days, so this terminates even
   // if `from` sits far from the anchor.
   for (let step = 1; step <= interval * 7 + 7; step++) {
-    candidate.setDate(candidate.getDate() + 1);
+    candidate.setUTCDate(candidate.getUTCDate() + 1);
 
     if (!weekDays.includes(isoWeekDay(candidate))) continue;
 
@@ -75,7 +105,7 @@ function nextWeekDayOccurrence(
 
   // Unreachable for a non-empty weekDays set; falls back to the plain interval.
   const fallback = new Date(from);
-  fallback.setDate(fallback.getDate() + interval * 7);
+  fallback.setUTCDate(fallback.getUTCDate() + interval * 7);
   return fallback;
 }
 
@@ -121,7 +151,7 @@ export function occurrenceDeadline(
 ): Date {
   const deadline = new Date(start);
   if (timePeriodDays) {
-    deadline.setDate(deadline.getDate() + Number(timePeriodDays));
+    deadline.setUTCDate(deadline.getUTCDate() + Number(timePeriodDays));
   }
 
   if (spanDays !== null && spanDays >= 1) {
@@ -129,7 +159,7 @@ export function occurrenceDeadline(
     // At a 1-day interval this collapses onto the start date itself: a daily
     // task is due the day it is raised.
     const bounded = new Date(start);
-    bounded.setDate(bounded.getDate() + spanDays - 1);
+    bounded.setUTCDate(bounded.getUTCDate() + spanDays - 1);
     if (bounded < deadline) return bounded;
   }
 
@@ -185,17 +215,13 @@ export async function updateRecurringTaskSchedule(taskId: string) {
     return null;
   }
 
-  const startOfToday = new Date();
-  startOfToday.setHours(0, 0, 0, 0);
-
-  const endOfToday = new Date();
-  endOfToday.setHours(23, 59, 59, 999);
+  const startOfTomorrow = startOfNextBusinessDay();
 
   const triggerDate = new Date(task.triggerDate || task.dueDate);
   if (isNaN(triggerDate.getTime())) return null;
   // Process anything due today or earlier (not just an exact match on "today"),
   // so a missed cron run doesn't permanently skip the task.
-  if (triggerDate > endOfToday) return null;
+  if (triggerDate >= startOfTomorrow) return null;
 
   // A weekday set has no single span, so its bound comes from the real next
   // occurrence (computed below) rather than an interval approximation.
@@ -212,7 +238,7 @@ export async function updateRecurringTaskSchedule(taskId: string) {
     // occurrence; for everything else it is the interval span.
     if (nextStart) {
       const dayBefore = new Date(nextStart);
-      dayBefore.setDate(dayBefore.getDate() - 1);
+      dayBefore.setUTCDate(dayBefore.getUTCDate() - 1);
       const serviceDeadline = occurrenceDeadline(
         start,
         task.category?.timePeriod,
@@ -274,49 +300,60 @@ export async function updateRecurringTaskSchedule(taskId: string) {
 
     const next = new Date(from);
     if (recurringType === "day") {
-      next.setDate(next.getDate() + recurringValue);
+      next.setUTCDate(next.getUTCDate() + recurringValue);
     } else if (recurringType === "week") {
-      next.setDate(next.getDate() + recurringValue * 7);
+      next.setUTCDate(next.getUTCDate() + recurringValue * 7);
     } else if (recurringType === "year") {
       // setFullYear keeps the month/day, except 29 Feb in a non-leap year,
       // which JS rolls into 1 March. Clamping back to 28 Feb keeps a task
       // seeded on a leap day inside February for every other year.
-      const day = next.getDate();
-      const month = next.getMonth();
-      next.setFullYear(next.getFullYear() + recurringValue);
-      if (next.getMonth() !== month || next.getDate() !== day) {
-        next.setDate(0);
+      const day = next.getUTCDate();
+      const month = next.getUTCMonth();
+      next.setUTCFullYear(next.getUTCFullYear() + recurringValue);
+      if (next.getUTCMonth() !== month || next.getUTCDate() !== day) {
+        next.setUTCDate(0);
       }
     } else {
-      next.setMonth(next.getMonth() + recurringValue);
+      // setMonth overflows a day the target month lacks: 31 Oct + 1 month is
+      // "31 Nov", which JS rolls into 1 Dec, so November's occurrence never
+      // fired. Clamp to the target month's last day instead.
+      const day = next.getUTCDate();
+      next.setUTCDate(1);
+      next.setUTCMonth(next.getUTCMonth() + recurringValue);
+      const lastDay = new Date(
+        Date.UTC(next.getUTCFullYear(), next.getUTCMonth() + 1, 0),
+      ).getUTCDate();
+      next.setUTCDate(Math.min(day, lastDay));
     }
     return next;
   };
 
-  // Advance repeatedly (not just once) so a task that's been dormant for
-  // several missed periods lands on the next occurrence that is actually
-  // upcoming, instead of one interval past a still-overdue triggerDate.
-  let nextTriggerDate = new Date(triggerDate);
-  do {
-    nextTriggerDate = advanceOnce(nextTriggerDate);
-  } while (nextTriggerDate <= endOfToday);
+  // The row becomes the latest occurrence that has already started. Walking
+  // forward (not just one hop) means a task dormant for several missed
+  // periods resumes on the current one rather than a long-overdue one.
+  let currentStart = new Date(triggerDate);
+  let nextTriggerDate = advanceOnce(currentStart);
+  while (nextTriggerDate < startOfTomorrow) {
+    currentStart = nextTriggerDate;
+    nextTriggerDate = advanceOnce(currentStart);
+  }
 
-  // The occurrence after this one bounds the deadline: a period must close
-  // before its successor opens.
-  const followingTriggerDate = advanceOnce(nextTriggerDate);
-  const nextDueDate = deadlineFor(nextTriggerDate, followingTriggerDate);
+  // Each occurrence must close before its successor opens, so the following
+  // trigger bounds each deadline.
+  const dueDate = deadlineFor(currentStart, nextTriggerDate);
+  const nextDueDate = deadlineFor(nextTriggerDate, advanceOnce(nextTriggerDate));
 
   const updatedTask = await prisma.task.update({
     where: { id: taskId },
     data: {
       triggerDate: nextTriggerDate,
-      // The row now represents the occurrence starting on nextTriggerDate, so
-      // its due date is that occurrence's deadline. Writing the *previous*
-      // occurrence's deadline here (the old behaviour) left rows like
-      // trigger=2026-07-09 alongside due=2026-01-29.
-      dueDate: nextDueDate,
+      // The row is the occurrence that started on currentStart, so its due
+      // date is that occurrence's deadline. Writing the *next* occurrence's
+      // deadline here (as this used to) made a monthly task raised on 1 Oct
+      // read due 11 Nov, hiding it from overdue checks for a whole period.
+      dueDate,
       nextDueDate,
-      currentPeriodStart: nextTriggerDate,
+      currentPeriodStart: currentStart,
       completed: false,
       progress: 0,
       status: "To Do",
@@ -413,11 +450,7 @@ export async function updateHoldTasks() {
 
 // Extend updateAllRecurringTasks to include "Hold" tasks
 export async function updateAllRecurringTasks() {
-  const startOfToday = new Date();
-  startOfToday.setHours(0, 0, 0, 0);
-
-  const startOfTomorrow = new Date(startOfToday);
-  startOfTomorrow.setDate(startOfTomorrow.getDate() + 1);
+  const startOfTomorrow = startOfNextBusinessDay();
 
   // Find all active recurring tasks due today or earlier (catches tasks
   // whose triggerDate was missed on a day the cron didn't run).

@@ -82,9 +82,12 @@ import { ProspectTable } from "@/app/(sales)/dashboard/prospects/tables/page";
 import { ProspectsTable } from "@/app/(sales)/dashboard/opportunities/tables/page";
 
 
+type ActivityEntityType = "task" | "prospect" | "opportunity" | "enquiry";
+
 interface AgentActivity {
-  taskId: string;
-  taskTitle: string;
+  entityType: ActivityEntityType | null;
+  entityId: string | null;
+  entityTitle: string | null;
   content: string;
   createdAt: string;
 }
@@ -206,6 +209,31 @@ function statusKey(s?: string) {
 function normalizeStatus(value?: string) {
   return (value || "").toLowerCase().replace(/\s+/g, " ").trim();
 }
+
+// Comments can sit on a task, a lead, an opportunity or an enquiry, and each
+// has its own detail route.
+function activityHref(activity: AgentActivity, agentId: string) {
+  if (!activity.entityId) return null;
+  switch (activity.entityType) {
+    case "task":
+      return `/task/${activity.entityId}?agentId=${agentId}`;
+    case "prospect":
+      return `/dashboard/prospects/${activity.entityId}`;
+    case "opportunity":
+      return `/dashboard/opportunities/${activity.entityId}`;
+    case "enquiry":
+      return `/dashboard/enquiries/${activity.entityId}`;
+    default:
+      return null;
+  }
+}
+
+const ACTIVITY_TYPE_LABELS: Record<ActivityEntityType, string> = {
+  task: "Task",
+  prospect: "Lead",
+  opportunity: "Opportunity",
+  enquiry: "Enquiry",
+};
 
 function groupActivitiesByDate(activities: AgentActivity[]) {
   return activities.reduce((acc, activity) => {
@@ -2249,25 +2277,32 @@ export default function AgentDetails() {
                           <Table>
                             <TableHeader>
                               <TableRow>
-                                <TableHead>Task</TableHead>
+                                <TableHead>Related To</TableHead>
                                 <TableHead>Interaction</TableHead>
                                 <TableHead>Date & Time</TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
-                              {acts.map((activity, idx) => (
+                              {acts.map((activity, idx) => {
+                                const href = activityHref(activity, id);
+                                return (
                                 <TableRow key={idx}>
                                   <TableCell className="break-words whitespace-pre-line align-top" style={{ wordBreak: 'break-word', whiteSpace: 'pre-line', width: '33%', minWidth: 120, maxWidth: 240 }}>
-                                    {activity.taskTitle ? (
+                                    {activity.entityType && (
+                                      <Badge variant="outline" className="mb-1 text-[10px]">
+                                        {ACTIVITY_TYPE_LABELS[activity.entityType]}
+                                      </Badge>
+                                    )}
+                                    {href ? (
                                       <Link
-                                        href={`/task/${activity.taskId}?agentId=${id}`}
+                                        href={href}
                                         className="text-blue-600 hover:underline break-words whitespace-pre-line block"
                                         style={{ wordBreak: 'break-word', whiteSpace: 'pre-line' }}
                                       >
-                                        {activity.taskTitle}
+                                        {activity.entityTitle || "Untitled"}
                                       </Link>
                                     ) : (
-                                      <span className="text-muted-foreground">Unknown Task</span>
+                                      <span className="text-muted-foreground">Unknown</span>
                                     )}
                                   </TableCell>
                                   <TableCell style={{ wordBreak: 'break-word', whiteSpace: 'pre-line', maxWidth: 200 }}>
@@ -2275,7 +2310,8 @@ export default function AgentDetails() {
                                   </TableCell>
                                   <TableCell>{new Date(activity.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</TableCell>
                                 </TableRow>
-                              ))}
+                                );
+                              })}
                             </TableBody>
                           </Table>
                         </div>

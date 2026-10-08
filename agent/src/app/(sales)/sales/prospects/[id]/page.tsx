@@ -31,6 +31,7 @@ import Link from "next/link"
 import { Separator } from "@/components/ui/separator"
 import { Progress } from "@/components/ui/progress"
 import { cn } from "@/lib/utils"
+import { isAudioAttachment } from "@/lib/audioAttachment"
 import { useAgentContext } from "@/lib/agent-context"
 import { normalizePhoneNumber } from "@/lib/normalizePhoneNumber"
 import { uploadFileToS3Direct } from "@/lib/directUpload"
@@ -470,9 +471,7 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
                                             {comment.attachments && comment.attachments.length > 0 && (
                                                 <div className="mt-2 flex flex-wrap gap-2">
                                                     {comment.attachments.map((att, idx) => {
-                                                        const isAudio =
-                                                            att.type?.startsWith("audio/") ||
-                                                            /\.(mp3|wav|ogg|m4a|aac|webm)$/i.test(att.name || att.url);
+                                                        const isAudio = isAudioAttachment(att);
                                                         if (isAudio) {
                                                             return (
                                                                 <div
@@ -526,6 +525,17 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
                                                                 <span>({(comment.attachmentSize! / 1024).toFixed(1)} KB)</span>
                                                                 <a href={getAttachmentUrl(comment.attachmentUrl)} className="text-blue-600 hover:text-blue-800 underline ml-auto" target="_blank" rel="noopener noreferrer">View</a>
                                                             </div>
+                                                        </div>
+                                                    ) : comment.attachmentUrl &&
+                                                        isAudioAttachment({ type: comment.attachmentType, name: comment.attachmentName, url: comment.attachmentUrl }) ? (
+                                                        <div className="flex w-full flex-col gap-1 bg-muted px-2 py-1.5 rounded border">
+                                                            <span className="text-xs text-muted-foreground font-medium truncate">
+                                                                {comment.attachmentName}
+                                                            </span>
+                                                            <audio controls className="w-full">
+                                                                <source src={getAttachmentUrl(comment.attachmentUrl)} />
+                                                                Your browser does not support the audio element.
+                                                            </audio>
                                                         </div>
                                                     ) : (
                                                         <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted p-2 rounded border">

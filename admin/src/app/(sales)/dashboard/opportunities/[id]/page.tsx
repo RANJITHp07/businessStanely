@@ -28,6 +28,7 @@ import {
 import Link from "next/link"
 import { Separator } from "@/components/ui/separator"
 import { cn } from "@/lib/utils"
+import { isAudioAttachment } from "@/lib/audioAttachment"
 
 interface oppurtunities {
     id: string
@@ -380,9 +381,7 @@ export default function OppurtunitiesDetailPage() {
                                             {comment.attachments && comment.attachments.length > 0 && (
                                                 <div className="flex flex-wrap gap-2 pt-2">
                                                     {comment.attachments.map((att, idx) => {
-                                                        const isAudio =
-                                                            att.type?.startsWith("audio/") ||
-                                                            /\.(mp3|wav|ogg|m4a|aac|webm)$/i.test(att.name || att.url);
+                                                        const isAudio = isAudioAttachment(att);
                                                         if (isAudio) {
                                                             return (
                                                                 <div
@@ -417,8 +416,7 @@ export default function OppurtunitiesDetailPage() {
                                             )}
                                             {!comment.attachments && comment.attachmentUrl && (
                                                 <div className="flex flex-wrap gap-2 pt-2">
-                                                    {comment.attachmentType?.startsWith("audio/") ||
-                                                        /\.(mp3|wav|ogg|m4a|aac|webm)$/i.test(comment.attachmentName || comment.attachmentUrl) ? (
+                                                    {isAudioAttachment({ type: comment.attachmentType, name: comment.attachmentName, url: comment.attachmentUrl }) ? (
                                                         <div className="flex w-full flex-col gap-1 bg-muted px-2 py-1.5 rounded border">
                                                             <span className="text-xs text-muted-foreground font-medium truncate">
                                                                 {comment.attachmentName}

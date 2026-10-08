@@ -60,6 +60,7 @@ import {
 import { format } from "date-fns";
 import { Checkbox } from "@/components/ui/checkbox";
 import { uploadFileToS3Direct } from "@/lib/directUpload";
+import { isAudioAttachment } from "@/lib/audioAttachment";
 
 // Task interface based on the API response
 interface Task {
@@ -1809,8 +1810,7 @@ export default function TaskDetails() {
                                       </div>
                                     ) : null}
 
-                                    {attachment.type?.startsWith("audio/") ||
-                                    /\.(mp3|wav|ogg|m4a|aac|webm)$/i.test(attachment.name || attachment.url) ? (
+                                    {isAudioAttachment(attachment) ? (
                                       <div className="flex flex-col gap-1 text-xs text-muted-foreground bg-muted p-2 rounded border">
                                         <div className="flex items-center gap-2">
                                           <Paperclip className="h-3 w-3" />

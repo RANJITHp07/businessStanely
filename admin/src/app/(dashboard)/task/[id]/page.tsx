@@ -47,6 +47,7 @@ import Image from "next/image";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { uploadFileToS3Direct } from "@/lib/directUpload";
+import { isAudioAttachment } from "@/lib/audioAttachment";
 import ConvertTaskDialog from "../_components/convertTaskDialog";
 
 export default function TaskDetails() {
@@ -758,13 +759,6 @@ export default function TaskDetails() {
     return content.replace(/^\[(CLIENT_UPDATE|NORMAL)\]\s*/, "");
   };
 
-  const isAudioAttachment = (attachment: { name?: string; url?: string; type?: string }) =>
-    Boolean(
-      attachment.type?.startsWith("audio/") ||
-        /\.(mp3|wav|ogg|m4a|aac|webm)$/i.test(
-          attachment.name || attachment.url || "",
-        ),
-    );
 
   useEffect(() => {
     if (startTime && duration > 0) {

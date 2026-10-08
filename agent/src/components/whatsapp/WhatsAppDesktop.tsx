@@ -40,6 +40,7 @@ function readStoredTheme(): "dark" | "light" {
 
 import { useWhatsAppDesktop } from "@/hooks/use-whatsapp-desktop";
 import type { WhatsAppChatSummary, WhatsAppMessage } from "@/lib/whatsapp/types";
+import { isAudioFile } from "@/lib/audioAttachment";
 import { getCachedAvatar, resolveAvatar } from "@/lib/whatsapp/avatar-cache";
 import {
     Dialog,
@@ -223,6 +224,25 @@ function MessageMedia({ message }: { message: WhatsAppMessage }) {
                 className="h-12 w-full min-w-70 sm:min-w-90"
                 preload="metadata"
             />
+        );
+    }
+
+    // Audio sent as a file (a forwarded .mp3, say) arrives as a document. Play it
+    // here like a voice note instead of sending the user to a new tab.
+    if (isAudioFile({ type: message.mimetype, name: message.filename })) {
+        return (
+            <div>
+                <p className="mb-1 truncate text-xs opacity-80">{message.filename || "Audio"}</p>
+                <audio
+                    src={src}
+                    controls
+                    className="h-12 w-full min-w-70 sm:min-w-90"
+                    preload="metadata"
+                />
+                {message.body ? (
+                    <p className="mt-1 wrap-break-word whitespace-pre-wrap text-[14px] leading-6">{message.body}</p>
+                ) : null}
+            </div>
         );
     }
 

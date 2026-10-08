@@ -27,6 +27,7 @@ import {
 import Link from "next/link"
 import { Separator } from "@/components/ui/separator"
 import { cn } from "@/lib/utils"
+import { isAudioAttachment } from "@/lib/audioAttachment"
 import { useAgentContext } from "@/lib/agent-context"
 import { normalizePhoneNumber } from "@/lib/normalizePhoneNumber"
 import { Input } from "@/components/ui/input"
@@ -532,9 +533,7 @@ export default function OppurtunitiesDetailPage() {
                                             {comment.attachments && comment.attachments.length > 0 && (
                                                 <div className="flex flex-wrap gap-2 pt-2">
                                                     {comment.attachments.map((att, idx) => {
-                                                        const isAudio =
-                                                            att.type?.startsWith("audio/") ||
-                                                            /\.(mp3|wav|ogg|m4a|aac|webm)$/i.test(att.name || att.url);
+                                                        const isAudio = isAudioAttachment(att);
                                                         if (isAudio) {
                                                             return (
                                                                 <div
@@ -577,7 +576,7 @@ export default function OppurtunitiesDetailPage() {
                                                             <Paperclip className="h-3 w-3" />
                                                             {comment.attachmentName}
                                                         </a>
-                                                    ) : comment.attachmentUrl.match(/\.(mp3|wav|ogg)$/i) ? (
+                                                    ) : isAudioAttachment({ type: comment.attachmentType, name: comment.attachmentName, url: comment.attachmentUrl }) ? (
                                                         <div className="flex flex-col gap-1 px-2 py-1 bg-muted rounded-md text-sm w-full">
                                                             <audio controls className="w-full">
                                                                 <source src={getAttachmentUrl(comment.attachmentUrl)} />

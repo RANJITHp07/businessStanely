@@ -54,6 +54,7 @@ import { fetchWithAuth } from "@/lib/fetchWithAuth"
    round-robin instead of the admin picking one. */
 const AUTO_ASSIGN = "__auto__"
 import { uploadFileToS3Direct } from "@/lib/directUpload"
+import { isAudioAttachment } from "@/lib/audioAttachment"
 
 /* Detail view for a single website enquiry, built to match the lead detail
    screen: contact block, the submission itself, and an interaction feed an
@@ -112,11 +113,6 @@ function getAttachmentUrl(url?: string | null) {
     return `${MANAGEMENT_BASE_URL}${url.startsWith("/") ? url : `/${url}`}`
 }
 
-function isAudioAttachment(type?: string | null, name?: string | null) {
-    return Boolean(
-        type?.startsWith("audio/") || /\.(mp3|wav|ogg|m4a|aac|webm)$/i.test(name || ""),
-    )
-}
 
 function statusBadge(status: string) {
     const s = status.toLowerCase()
@@ -549,7 +545,7 @@ export default function EnquiryDetailPage({ params }: { params: Promise<{ id: st
                                             {comment.attachments && comment.attachments.length > 0 && (
                                                 <div className="flex flex-wrap gap-2 pt-2">
                                                     {comment.attachments.map((att, idx) =>
-                                                        isAudioAttachment(att.type, att.name || att.url) ? (
+                                                        isAudioAttachment(att) ? (
                                                             <div
                                                                 key={idx}
                                                                 className="flex w-full flex-col gap-1 bg-muted px-2 py-1.5 rounded border"
@@ -583,7 +579,7 @@ export default function EnquiryDetailPage({ params }: { params: Promise<{ id: st
 
                                             {!comment.attachments && comment.attachmentUrl && (
                                                 <div className="flex flex-wrap gap-2 pt-2">
-                                                    {isAudioAttachment(comment.attachmentType, comment.attachmentName || comment.attachmentUrl) ? (
+                                                    {isAudioAttachment({ type: comment.attachmentType, name: comment.attachmentName, url: comment.attachmentUrl }) ? (
                                                         <div className="flex w-full flex-col gap-1 bg-muted px-2 py-1.5 rounded border">
                                                             <span className="text-xs text-muted-foreground font-medium truncate">
                                                                 {comment.attachmentName}

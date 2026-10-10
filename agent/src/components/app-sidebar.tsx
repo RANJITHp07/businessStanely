@@ -12,6 +12,7 @@ import {
   FileText,
   Calendar,
   MessageSquare,
+  UserCheck,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import Link from "next/link";
@@ -106,6 +107,11 @@ const dashboardItems: MenuItem[] = [
     title: "Task",
     url: "/my-task",
     icon: ClipboardCheck,
+  },
+  {
+    title: "Assigned Tasks",
+    url: "/assigned-tasks",
+    icon: UserCheck,
   },
   {
     title: "Client",

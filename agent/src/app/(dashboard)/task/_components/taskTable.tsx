@@ -153,9 +153,12 @@ export default function TasksTable() {
         const priorities = searchParams?.get("priorities");
         const followUpDurations = searchParams?.get("followUpDurations");
         const serviceIds = searchParams?.get("serviceIds");
+        const assignedBy = searchParams?.get("assignedBy");
         let url = '/api/tasks';
         const params = [];
         if (assignedToId) params.push(`assignedToId=${assignedToId}`);
+        // Assigned Tasks "View more": work this agent handed to a junior.
+        if (assignedBy) params.push(`assignedBy=${encodeURIComponent(assignedBy)}`);
         if (retainershipTasks) params.push(`retainershipTasks=${retainershipTasks}`);
         if (retainershipId) params.push(`retainershipId=${encodeURIComponent(retainershipId)}`);
         if (trigger) params.push(`trigger=${trigger}`);
@@ -272,7 +275,9 @@ export default function TasksTable() {
     // Dropping `scope` on a filter change turned the standard Future Tasks
     // list into the legislation one.
     const scope = searchParams?.get("scope")
+    const assignedBy = searchParams?.get("assignedBy")
     if (assignedToId) params.set("assignedToId", assignedToId);
+    if (assignedBy) params.set("assignedBy", assignedBy);
     if (retainershipTasks) params.set("retainershipTasks", retainershipTasks);
     if (retainershipId) params.set("retainershipId", retainershipId);
     if (trigger) params.set("trigger", trigger);
@@ -377,12 +382,16 @@ export default function TasksTable() {
                   ? searchParams.get("scope") === "standard"
                     ? "Future Tasks"
                     : "Upcoming Tasks"
-                  : "Task Management"}
+                  : searchParams.get("assignedBy") === "me"
+                    ? "Assigned Tasks"
+                    : "Task Management"}
               </h1>
               <p className="text-muted-foreground mt-2">
                 {searchParams.get("trigger") === "true"
                   ? "Recurring tasks waiting for their next trigger date"
-                  : "Manage and track all legal tasks and assignments"}
+                  : searchParams.get("assignedBy") === "me"
+                    ? "Tasks you have assigned to your team"
+                    : "Manage and track all legal tasks and assignments"}
               </p>
             </div>
             {(canCreateTask || searchParams.get("retainershipTasks")) && (

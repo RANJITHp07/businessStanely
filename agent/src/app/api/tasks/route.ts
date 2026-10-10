@@ -97,6 +97,10 @@ export async function GET(req: NextRequest) {
     const prioritiesParam = searchParams.get("priorities");
     const followUpDurationsParam = searchParams.get("followUpDurations");
     const serviceIdsParam = searchParams.get("serviceIds");
+    // Tasks the current agent owns (ownerShipId) but handed to someone else,
+    // i.e. work it assigned to a junior. Only "me" is honoured so one agent
+    // cannot list another agent's delegated work through this param.
+    const assignedByMe = searchParams.get("assignedBy") === "me";
 
     const statusCheckDurations = statusCheckDurationParam
       ? statusCheckDurationParam
@@ -182,6 +186,27 @@ export async function GET(req: NextRequest) {
         //     ],
         //   },
         // ],
+      };
+    }
+
+    // ASSIGNED TASKS
+    //
+    // Mirrors admin's `assignedById`: standard and legislation tasks alike.
+    // Legislation tasks stay visible while their service awaits approval, as
+    // they do on the admin side.
+    else if (assignedByMe) {
+      where = {
+        ownerShipId: agent.id,
+        assignedToId: { not: agent.id },
+        AND: [
+          {
+            OR: [
+              { category: null },
+              { category: { status: "approved" } },
+              { legislationId: { not: null } },
+            ],
+          },
+        ],
       };
     }
 

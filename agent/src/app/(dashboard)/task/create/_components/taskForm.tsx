@@ -50,6 +50,7 @@ import {
 } from "lucide-react";
 import { format, isBefore, startOfDay } from "date-fns";
 import { cn } from "@/lib/utils";
+import { scheduleDeadline } from "@/lib/recurrenceWindow";
 
 import { Client, Agent, Task, Legislation } from "@/types";
 
@@ -85,6 +86,39 @@ function describeWeekDays(days: number[]): string {
   if (names.length === 0) return "";
   if (names.length === 1) return names[0];
   return names.slice(0, -1).join(", ") + " and " + names[names.length - 1];
+}
+
+type ScheduleFields = {
+  recurring: string;
+  recurringType: string;
+  recurringWeekDays: number[];
+};
+
+/**
+ * Default completion date for an occurrence raised today: the service's days,
+ * cut short by the repeat interval -- the rule the cron applies when it rolls
+ * the task forward. A daily task on a 5-day service is due today, so its next
+ * trigger can be tomorrow rather than six days out.
+ */
+function scheduleDueDate(
+  timePeriod: number | undefined,
+  schedule: ScheduleFields,
+): Date {
+  const now = new Date();
+  const today = new Date(
+    Date.UTC(now.getFullYear(), now.getMonth(), now.getDate()),
+  );
+  const deadline = scheduleDeadline(
+    today,
+    timePeriod,
+    schedule.recurringType,
+    schedule.recurring,
+    schedule.recurringWeekDays,
+  );
+  const days = Math.round((deadline.getTime() - today.getTime()) / 86400000);
+  const due = new Date();
+  due.setDate(due.getDate() + days);
+  return due;
 }
 
 const taskPriorities = [
@@ -735,9 +769,7 @@ export default function TaskForm({ id }: TaskFormProps) {
     setSelectedCategory(category);
     // Automatically set due date based on category's time period
     if (category.timePeriod) {
-      const calculatedDueDate = new Date();
-      calculatedDueDate.setDate(calculatedDueDate.getDate() + category.timePeriod);
-      setDueDate(calculatedDueDate);
+      setDueDate(scheduleDueDate(category.timePeriod, formData));
       handleInputChange("triggerDate", "");
     }
   };
@@ -754,16 +786,36 @@ export default function TaskForm({ id }: TaskFormProps) {
 
 
   // Add handler for recurring selection to show information
+  /**
+   * Re-derive the default completion date when the repeat schedule changes on
+   * a new task, so the service window never outlasts the interval. A trigger
+   * that no longer falls after the new date is cleared, since it would open
+   * the next occurrence while this one is still running.
+   */
+  const refreshDueDateForSchedule = (schedule: ScheduleFields) => {
+    if (isEditMode) return;
+    const category = categories.find((cat) => cat.id === formData.categoryId);
+    if (!category?.timePeriod) return;
+
+    const nextDueDate = scheduleDueDate(category.timePeriod, schedule);
+    setDueDate(nextDueDate);
+    if (
+      formData.triggerDate &&
+      !isBefore(startOfDay(nextDueDate), startOfDay(new Date(formData.triggerDate)))
+    ) {
+      handleInputChange("triggerDate", "");
+    }
+  };
+
   const toggleWeekDay = (day: number) => {
-    setFormData((prev: any) => {
-      const current: number[] = Array.isArray(prev.recurringWeekDays)
-        ? prev.recurringWeekDays
-        : [];
-      const next = current.includes(day)
-        ? current.filter((d) => d !== day)
-        : [...current, day].sort((a, b) => a - b);
-      return { ...prev, recurringWeekDays: next };
-    });
+    const current: number[] = Array.isArray(formData.recurringWeekDays)
+      ? formData.recurringWeekDays
+      : [];
+    const next = current.includes(day)
+      ? current.filter((d) => d !== day)
+      : [...current, day].sort((a, b) => a - b);
+    setFormData((prev: any) => ({ ...prev, recurringWeekDays: next }));
+    refreshDueDateForSchedule({ ...formData, recurringWeekDays: next });
   };
 
   const handleRecurringChange = (value: string) => {
@@ -771,6 +823,11 @@ export default function TaskForm({ id }: TaskFormProps) {
       handleInputChange("recurring", "0");
       handleInputChange("recurringType", "");
       handleInputChange("recurringWeekDays", []);
+      refreshDueDateForSchedule({
+        recurring: "0",
+        recurringType: "",
+        recurringWeekDays: [],
+      });
       return;
     }
 
@@ -784,23 +841,11 @@ export default function TaskForm({ id }: TaskFormProps) {
       handleInputChange("recurringWeekDays", []);
     }
 
-    // Show information about next task creation if recurring is selected
-    if (dueDate && interval) {
-      const nextDueDate = new Date(dueDate);
-      const parsedInterval = parseInt(interval, 10);
-
-      if (type === "day") {
-        nextDueDate.setDate(nextDueDate.getDate() + parsedInterval);
-      } else if (type === "week") {
-        nextDueDate.setDate(nextDueDate.getDate() + parsedInterval * 7);
-      } else {
-        nextDueDate.setMonth(nextDueDate.getMonth() + parsedInterval);
-      }
-
-      console.log(
-        `Next recurring task will be due on: ${nextDueDate.toLocaleDateString()}`,
-      );
-    }
+    refreshDueDateForSchedule({
+      recurring: interval || "1",
+      recurringType: type.toLocaleUpperCase(),
+      recurringWeekDays: type === "week" ? formData.recurringWeekDays : [],
+    });
   };
 
 
@@ -1907,10 +1952,16 @@ export default function TaskForm({ id }: TaskFormProps) {
                               (cat) => cat.id === formData.categoryId,
                             );
 
-                            const timePeriod = selectedCategory?.timePeriod || 7;
-
-                            const endDate = new Date(startDate);
-                            endDate.setDate(endDate.getDate() + timePeriod);
+                            // Same deadline the cron writes: the service days cut
+                            // short by the repeat interval, and the trigger date
+                            // itself when the service grants no days.
+                            const endDate = scheduleDeadline(
+                              startDate,
+                              selectedCategory?.timePeriod || 0,
+                              formData.recurringType,
+                              formData.recurring,
+                              formData.recurringWeekDays,
+                            );
 
                             return `Next task period: ${startDate.toLocaleDateString("en-GB")} to ${endDate.toLocaleDateString("en-GB")}`;
                           })()}

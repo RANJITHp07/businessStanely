@@ -107,7 +107,7 @@ const STAT_STYLES: Record<
   },
 };
 
-function StatCard({
+export function StatCard({
   title,
   value,
   percent,
@@ -149,7 +149,7 @@ function StatCard({
   );
 }
 
-export function SectionTable({ label, tasks, retainershipTasks, trigger, triggerScope }: { label: string; tasks: Task[], retainershipTasks?: boolean, trigger?: boolean, triggerScope?: string }) {
+export function SectionTable({ label, tasks, retainershipTasks, trigger, triggerScope, assignedByMe }: { label: string; tasks: Task[], retainershipTasks?: boolean, trigger?: boolean, triggerScope?: string, assignedByMe?: boolean }) {
   const labelColor = (() => {
     const l = label.toLowerCase();
     if (l.includes("progress")) return "text-sky-600";
@@ -220,8 +220,11 @@ export function SectionTable({ label, tasks, retainershipTasks, trigger, trigger
                     ) : (
                       tasks.map((t) => {
                         const clientName = t.client?.name || ""
-                        const owner =
-                          t.ownerShipBy?.status?.toLowerCase() === "inactive"
+                        // On Assigned Tasks the owner is the viewing agent, so
+                        // show the junior the task was handed to instead.
+                        const owner = assignedByMe
+                          ? t.assignedTo
+                          : t.ownerShipBy?.status?.toLowerCase() === "inactive"
                             ? t.assignedTo
                             : t.ownerShipBy ?? t.assignedTo;
                         const ownerName = owner?.name ?? "-";
@@ -432,8 +435,9 @@ export function SectionTable({ label, tasks, retainershipTasks, trigger, trigger
                           }`.trim()
                         : t.client.organizationName ?? ""
                       : "-";
-                    const owner =
-                      t.ownerShipBy?.status?.toLowerCase() === "inactive"
+                    const owner = assignedByMe
+                      ? t.assignedTo
+                      : t.ownerShipBy?.status?.toLowerCase() === "inactive"
                         ? t.assignedTo
                         : t.ownerShipBy ?? t.assignedTo;
                     const ownerName = owner?.name ?? "-";
@@ -573,6 +577,7 @@ export function SectionTable({ label, tasks, retainershipTasks, trigger, trigger
               params.set("status", sectionLabelToStatus(label));
             }
             if (retainershipTasks) params.set("retainershipTasks", "true");
+            if (assignedByMe) params.set("assignedBy", "me");
             return `/task?${params.toString()}`;
           })()}
           className="bg-[#003459] cursor-pointer text-white text-[14px] py-[10px] mt-[10px] px-[10px] rounded-[5px] inline-block"

@@ -1,13 +1,14 @@
 import prisma from "@/lib/prisma";
 import { createTransporter } from "./email";
 import { format } from "date-fns";
-
-const RECURRING_TYPES = ["once", "day", "week", "month", "year"] as const;
-type RecurringType = (typeof RECURRING_TYPES)[number];
-
-function isRecurringType(value: string): value is RecurringType {
-  return (RECURRING_TYPES as readonly string[]).includes(value);
-}
+import {
+  type RecurringType,
+  intervalSpanDays,
+  isRecurringType,
+  nextWeekDayOccurrence,
+  normalizeWeekDays,
+  occurrenceDeadline,
+} from "./recurrenceWindow";
 
 /**
  * The business runs on India time, but a trigger date is stored as UTC
@@ -33,137 +34,6 @@ function startOfNextBusinessDay(now: Date = new Date()): Date {
   const next = new Date(`${businessDayKey(now)}T00:00:00.000Z`);
   next.setUTCDate(next.getUTCDate() + 1);
   return next;
-}
-
-/**
- * Normalise a stored weekday set to sorted, unique ISO weekdays (1 = Monday ...
- * 7 = Sunday). Anything out of range is dropped rather than clamped: a bad
- * value is a data problem, and clamping would silently fire the task on a day
- * nobody picked.
- */
-function normalizeWeekDays(value: unknown): number[] {
-  if (!Array.isArray(value)) return [];
-  const days = value
-    .map((day) => Number(day))
-    .filter((day) => Number.isInteger(day) && day >= 1 && day <= 7);
-  return [...new Set(days)].sort((a, b) => a - b);
-}
-
-/**
- * ISO weekday of a date: 1 = Monday ... 7 = Sunday (JS Sunday 0 becomes 7).
- * Read in UTC because trigger dates are stored as UTC midnight of the picked
- * day; a local-time read on a non-UTC server lands on the day before.
- */
-function isoWeekDay(date: Date): number {
-  return date.getUTCDay() === 0 ? 7 : date.getUTCDay();
-}
-
-/**
- * The next occurrence strictly after `from` for a task that fires on specific
- * weekdays, e.g. every Monday and Wednesday.
- *
- * `weekInterval` spaces out the *weeks* the task runs in: 1 is every week, 2
- * fires on the chosen weekdays every other week. Weeks are counted from the
- * Monday of the anchor's week, so the rhythm stays fixed to the schedule's
- * origin instead of drifting each time the job rolls forward.
- */
-function nextWeekDayOccurrence(
-  from: Date,
-  weekDays: number[],
-  weekInterval: number,
-  anchor: Date,
-): Date {
-  const mondayOf = (date: Date) => {
-    const monday = new Date(date);
-    monday.setUTCHours(0, 0, 0, 0);
-    monday.setUTCDate(monday.getUTCDate() - (isoWeekDay(monday) - 1));
-    return monday;
-  };
-
-  const anchorMonday = mondayOf(anchor);
-  const interval = weekInterval >= 1 ? weekInterval : 1;
-  const msPerWeek = 7 * 24 * 60 * 60 * 1000;
-
-  const candidate = new Date(from);
-  candidate.setUTCHours(0, 0, 0, 0);
-
-  // Walk day by day. Bounded by interval * 7 + 7 days, so this terminates even
-  // if `from` sits far from the anchor.
-  for (let step = 1; step <= interval * 7 + 7; step++) {
-    candidate.setUTCDate(candidate.getUTCDate() + 1);
-
-    if (!weekDays.includes(isoWeekDay(candidate))) continue;
-
-    // Only accept weekdays that land in an "on" week for this interval.
-    const weeksFromAnchor = Math.round(
-      (mondayOf(candidate).getTime() - anchorMonday.getTime()) / msPerWeek,
-    );
-    if (((weeksFromAnchor % interval) + interval) % interval !== 0) continue;
-
-    return candidate;
-  }
-
-  // Unreachable for a non-empty weekDays set; falls back to the plain interval.
-  const fallback = new Date(from);
-  fallback.setUTCDate(fallback.getUTCDate() + interval * 7);
-  return fallback;
-}
-
-/**
- * Days spanned by one interval of a recurrence, or null when it has no fixed
- * span. Used to bound a service window that would otherwise outlast the
- * interval and let occurrences overlap.
- *
- * A weekday set has no single span (Mon+Wed is 2 days then 5), so the caller
- * computes its real next occurrence instead of using an approximation. Month
- * and year are approximated only for comparison, never for a stored date.
- */
-function intervalSpanDays(
-  recurringType: RecurringType,
-  recurringValue: number,
-  weekDays: number[],
-): number | null {
-  if (weekDays.length > 0) return null;
-  if (recurringType === "day") return recurringValue;
-  if (recurringType === "week") return recurringValue * 7;
-  if (recurringType === "month") return recurringValue * 28;
-  if (recurringType === "year") return recurringValue * 365;
-  return null;
-}
-
-/**
- * The deadline for an occurrence starting on `start`.
- *
- * The service (task category) grants `timePeriod` days, but a repeating task
- * must also close before its next occurrence opens. When the service window is
- * the longer of the two the periods overlap -- a task repeating every 1 day
- * with a 5-day service was given a deadline 5 days out, so four later
- * occurrences opened while the first was still pending, each resetting status
- * and progress on the same row. The shorter bound wins.
- *
- * `spanDays` is null for a one-off (no successor) or a weekday set (no single
- * span), and the full service window then applies.
- */
-export function occurrenceDeadline(
-  start: Date,
-  timePeriodDays: number | null | undefined,
-  spanDays: number | null,
-): Date {
-  const deadline = new Date(start);
-  if (timePeriodDays) {
-    deadline.setUTCDate(deadline.getUTCDate() + Number(timePeriodDays));
-  }
-
-  if (spanDays !== null && spanDays >= 1) {
-    // One day before the next occurrence opens, so the two never share a day.
-    // At a 1-day interval this collapses onto the start date itself: a daily
-    // task is due the day it is raised.
-    const bounded = new Date(start);
-    bounded.setUTCDate(bounded.getUTCDate() + spanDays - 1);
-    if (bounded < deadline) return bounded;
-  }
-
-  return deadline;
 }
 
 // Auto-update recurring tasks based on calendar schedule (not completion)

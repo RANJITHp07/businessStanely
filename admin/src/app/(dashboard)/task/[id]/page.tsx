@@ -1599,24 +1599,30 @@ export default function TaskDetails() {
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Calendar className="h-4 w-4 text-muted-foreground" />
-                    <div>
-                      <div className="text-sm font-medium">Next Trigger Date</div>
-                      <div className="text-sm text-muted-foreground">
-                        {formatDateTime(taskData.triggerDate, true)}
+                  {/* A non-recurring task has no next occurrence, so no next
+                      trigger or deadline to show. */}
+                  {taskData.recurring && Number(taskData.recurring) !== 0 ? (
+                    <>
+                      <div className="flex items-center gap-2">
+                        <Calendar className="h-4 w-4 text-muted-foreground" />
+                        <div>
+                          <div className="text-sm font-medium">Next Trigger Date</div>
+                          <div className="text-sm text-muted-foreground">
+                            {formatDateTime(taskData.triggerDate, true)}
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Calendar className="h-4 w-4 text-muted-foreground" />
-                    <div>
-                      <div className="text-sm font-medium">Next Due Date</div>
-                      <div className="text-sm text-muted-foreground">
-                        {formatDateTime(taskData.nextDueDate, true)}
+                      <div className="flex items-center gap-2">
+                        <Calendar className="h-4 w-4 text-muted-foreground" />
+                        <div>
+                          <div className="text-sm font-medium">Next Due Date</div>
+                          <div className="text-sm text-muted-foreground">
+                            {formatDateTime(taskData.nextDueDate, true)}
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  </div>
+                    </>
+                  ) : null}
                 </CardContent>
               </Card>
 

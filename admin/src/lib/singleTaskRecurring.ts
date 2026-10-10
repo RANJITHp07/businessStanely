@@ -369,9 +369,12 @@ export async function updateAllRecurringTasks() {
  * the submitted dueDate is not the trigger-based deadline for retainership
  * tasks that are scheduled to start later.
  *
- * Falls back to the task's own dueDate when there is no trigger date (a one-off
- * task that starts immediately), and leaves the deadline at the trigger date
- * when the category carries no timePeriod.
+ * A normal task (no trigger date: a one-off that starts immediately) has no
+ * next occurrence, so it gets no `nextDueDate` -- its own dueDate is the
+ * deadline. Falling back to dueDate as the period start used to add the
+ * service's timePeriod on top of a dueDate that already included it, so a
+ * 5-day service showed a Next Due Date 5 days past the real one. Leaves the
+ * deadline at the trigger date when the category carries no timePeriod.
  */
 export async function initializeRecurringTask(taskId: string) {
   const task = await prisma.task.findUnique({
@@ -381,8 +384,16 @@ export async function initializeRecurringTask(taskId: string) {
 
   if (!task) return null;
 
-  const periodStart = task.triggerDate ?? task.dueDate;
-  if (!periodStart) return null;
+  // Also clears values left by the old dueDate fallback, and a schedule whose
+  // trigger date was removed on edit.
+  if (!task.triggerDate) {
+    return prisma.task.update({
+      where: { id: taskId },
+      data: { currentPeriodStart: null, nextDueDate: null },
+    });
+  }
+
+  const periodStart = task.triggerDate;
 
   // The same bound the cron applies when it rolls the task forward: a
   // repeating occurrence cannot outlast its own interval, so a daily task with

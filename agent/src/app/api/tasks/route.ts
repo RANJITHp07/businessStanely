@@ -643,9 +643,9 @@ export async function POST(req: NextRequest) {
       })),
     });
 
-    // Seed the schedule fields for every task, not only recurring ones: a
-    // one-off task still shows a Next Due Date, and leaving it null there was
-    // why retainership tasks displayed a blank deadline until the first cron run.
+    // Seed the schedule fields for every scheduled task, recurring or not:
+    // leaving them null was why retainership tasks displayed a blank deadline
+    // until the first cron run. A normal task (no trigger date) gets none.
     try {
       const { initializeRecurringTask } =
         await import("@/lib/singleTaskRecurring");

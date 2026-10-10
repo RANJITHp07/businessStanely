@@ -71,6 +71,7 @@ import {
   ChevronsLeft,
   ChevronsRight,
   RotateCcw,
+  UserCheck,
 } from "lucide-react";
 import { Agent, Client, Task } from "@/types";
 import Link from "next/link";
@@ -206,6 +207,24 @@ function statusKey(s?: string) {
   return k || "todo";
 }
 
+type SectionCounts = { todo: number; inprogress: number; completed: number; hold: number };
+
+// How many tasks fall in each status section. A tab's total is the sum of
+// these, so it matches the sections on screen; a status no section lists
+// (e.g. Abandoned) is left out of both.
+function countSections(tasks: Task[]): SectionCounts {
+  const counts: SectionCounts = { todo: 0, inprogress: 0, completed: 0, hold: 0 };
+  for (const task of tasks) {
+    const key = statusKey(task.status);
+    if (key in counts) counts[key as keyof SectionCounts] += 1;
+  }
+  return counts;
+}
+
+function sumSections(counts: SectionCounts) {
+  return counts.todo + counts.inprogress + counts.completed + counts.hold;
+}
+
 function normalizeStatus(value?: string) {
   return (value || "").toLowerCase().replace(/\s+/g, " ").trim();
 }
@@ -301,6 +320,17 @@ export default function AgentDetails() {
   const [agentRetainershipTasks, setAgentRetainershipTasks] = useState<Task[]>([]);
   const [agentTriggerTasks, setAgentTriggerTasks] = useState<Task[]>([]);
   const [agentStandardFutureTasks, setAgentStandardFutureTasks] = useState<Task[]>([]);
+  // Only the first rows of future tasks are fetched; this is the full count.
+  const [agentStandardFutureTotal, setAgentStandardFutureTotal] = useState(0);
+  // Tasks this agent assigned to a junior: the newest few per status, keyed
+  // "todo" | "inprogress" | "completed" | "hold", plus each section's size.
+  const [assignedTaskSections, setAssignedTaskSections] = useState<Record<string, Task[]>>({});
+  const [assignedSectionCounts, setAssignedSectionCounts] = useState<SectionCounts>({
+    todo: 0,
+    inprogress: 0,
+    completed: 0,
+    hold: 0,
+  });
   const [agentLegislations, setAgentLegislations] = useState<AgentLegislation[]>([]);
   const [legislationPage, setLegislationPage] = useState(1);
   const [legislationPageSize] = useState(10);
@@ -428,6 +458,7 @@ export default function AgentDetails() {
             dataRequests.push(
               fetchDashboardStatus(today),
               fetchAgentTasks(),
+              fetchAgentAssignedTasks(),
               fetchAgentRetainershipTasks(),
               fetchAgentTriggerTasks(),
               fetchAgentStandardFutureTasks(),
@@ -514,10 +545,10 @@ export default function AgentDetails() {
         );
         if (response.ok) {
           const data = await response.json();
-          const retainershipTasks = parseTaskResponse(data).filter(
-            (task) => statusKey(task.status) !== "completed",
-          );
-          setAgentRetainershipTasks(retainershipTasks);
+          // The API already holds back completed recurring rows (those belong
+          // to Future Triggers); completed one-offs belong in Completed, so
+          // dropping every completed row here left that section always empty.
+          setAgentRetainershipTasks(parseTaskResponse(data));
         } else {
           setAgentRetainershipTasks([]);
         }
@@ -555,12 +586,40 @@ export default function AgentDetails() {
           `/api/tasks?assignedToId=${id}&trigger=standard&page=1&limit=3`,
         );
 
-        setAgentStandardFutureTasks(
-          response.ok ? parseTaskResponse(await response.json()) : [],
+        const data = response.ok ? await response.json() : null;
+        const rows = data ? parseTaskResponse(data) : [];
+        setAgentStandardFutureTasks(rows);
+        setAgentStandardFutureTotal(
+          typeof data?.total === "number" ? data.total : rows.length,
         );
       } catch (error) {
         console.error("Error fetching agent future tasks:", error);
         setAgentStandardFutureTasks([]);
+        setAgentStandardFutureTotal(0);
+      }
+    };
+
+    // Work this agent owns (ownerShipId) but handed to someone else. Summary
+    // mode returns the first rows of each status section and each section's
+    // size, which is all the tab shows; "View more" opens the full list.
+    const fetchAgentAssignedTasks = async () => {
+      const emptyCounts = { todo: 0, inprogress: 0, completed: 0, hold: 0 };
+      try {
+        const response = await fetchWithAuth(
+          `/api/tasks?assignedById=${id}&summary=true&limit=3`,
+        );
+        if (response.ok) {
+          const data = await response.json();
+          setAssignedTaskSections(data.sections || {});
+          setAssignedSectionCounts({ ...emptyCounts, ...data.sectionCounts });
+        } else {
+          setAssignedTaskSections({});
+          setAssignedSectionCounts(emptyCounts);
+        }
+      } catch (error) {
+        console.error("Error fetching agent assigned tasks:", error);
+        setAssignedTaskSections({});
+        setAssignedSectionCounts(emptyCounts);
       }
     };
 
@@ -844,6 +903,13 @@ export default function AgentDetails() {
   const showAdvisorTabs = hasAdvisorRole(agent.agentRole);
   const tabCount = 4 + (showExecutionTabs ? 2 : 0) + (showAdvisorTabs ? 2 : 0);
   const standardAgentTasks = agentTasks.filter((task) => !task.legislationId);
+  // Each section lists only its newest three rows, so the section labels carry
+  // the real counts and each tab's total is the sum of its sections.
+  const standardSectionCounts = countSections(standardAgentTasks);
+  const standardTasksTotal = sumSections(standardSectionCounts);
+  const retainershipSectionCounts = countSections(agentRetainershipTasks);
+  const retainershipTasksTotal = sumSections(retainershipSectionCounts);
+  const assignedTasksTotal = sumSections(assignedSectionCounts);
 
   const transferAuditSummary =
     agent.status === "inactive" ? parseLatestTransferAudit(serviceRecords) : null;
@@ -1635,7 +1701,7 @@ export default function AgentDetails() {
               <div>
                 <h2 className="text-xl font-semibold">Task Management</h2>
                 <p className="text-muted-foreground text-sm">
-                  Manage and track tasks, legislation, retainership work, future triggers, and retainership clients assigned to {agent.name}
+                  Manage and track tasks, work assigned to juniors, retainership work, future triggers, legislation, and retainership clients for {agent.name}
                 </p>
               </div>
             </div>
@@ -1647,22 +1713,26 @@ export default function AgentDetails() {
             ) : (
               <Tabs value={taskOverviewTab} onValueChange={setTaskOverviewTab} className="space-y-6">
                 <div className="w-full overflow-x-auto">
-                  <TabsList className="grid h-auto min-w-max w-full grid-cols-5">
+                  <TabsList className="grid h-auto min-w-max w-full grid-cols-6">
                     <TabsTrigger value="standard-tasks" className="flex items-center gap-1 px-2 py-3 text-[10px] lg:text-sm whitespace-nowrap">
                       <FileText className="h-4 w-4 hidden lg:block flex-shrink-0" />
-                      Standard Tasks ({standardAgentTasks.length})
+                      Standard Tasks ({standardTasksTotal})
                     </TabsTrigger>
-                    <TabsTrigger value="legislation-tab" className="flex items-center gap-1 px-2 py-3 text-[10px] lg:text-sm whitespace-nowrap">
-                      <CheckCircle className="h-4 w-4 hidden lg:block flex-shrink-0" />
-                      Assigned Legislation ({legislationTotal})
+                    <TabsTrigger value="assigned-tasks" className="flex items-center gap-1 px-2 py-3 text-[10px] lg:text-sm whitespace-nowrap">
+                      <UserCheck className="h-4 w-4 hidden lg:block flex-shrink-0" />
+                      Assigned Tasks ({assignedTasksTotal})
                     </TabsTrigger>
                     <TabsTrigger value="retainership-tasks" className="flex items-center gap-1 px-2 py-3 text-[10px] lg:text-sm whitespace-nowrap">
                       <CheckCircle className="h-4 w-4 hidden lg:block flex-shrink-0" />
-                      Retainership Tasks ({agentRetainershipTasks.length})
+                      Retainership Tasks ({retainershipTasksTotal})
                     </TabsTrigger>
                     <TabsTrigger value="future-triggers" className="flex items-center gap-1 px-2 py-3 text-[10px] lg:text-sm whitespace-nowrap">
                       <Clock className="h-4 w-4 hidden lg:block flex-shrink-0" />
                       Future Triggers ({agentTriggerTasks.length})
+                    </TabsTrigger>
+                    <TabsTrigger value="legislation-tab" className="flex items-center gap-1 px-2 py-3 text-[10px] lg:text-sm whitespace-nowrap">
+                      <CheckCircle className="h-4 w-4 hidden lg:block flex-shrink-0" />
+                      Legislations ({legislationTotal})
                     </TabsTrigger>
                     <TabsTrigger value="clients" className="flex items-center gap-1 px-2 py-3 text-[10px] lg:text-sm whitespace-nowrap">
                       <Users className="h-4 w-4 hidden lg:block flex-shrink-0" />
@@ -1682,29 +1752,73 @@ export default function AgentDetails() {
                     <div className="space-y-[40px]">
                       <SectionTable
                         label="New Task"
+                        count={standardSectionCounts.todo}
                         tasks={standardAgentTasks.filter((task) => statusKey(task.status) === "todo").slice(0, 3)}
                         agentId={id}
                       />
                       <SectionTable
                         label="In Progress"
+                        count={standardSectionCounts.inprogress}
                         tasks={standardAgentTasks.filter((task) => statusKey(task.status) === "inprogress").slice(0, 3)}
                         agentId={id}
                       />
                       <SectionTable
                         label="Completed"
+                        count={standardSectionCounts.completed}
                         tasks={standardAgentTasks.filter((task) => statusKey(task.status) === "completed").slice(0, 3)}
                         agentId={id}
                       />
                       <SectionTable
                         label="Future Tasks"
+                        count={agentStandardFutureTotal}
                         tasks={agentStandardFutureTasks}
                         agentId={id}
                         trigger="standard"
                       />
                       <SectionTable
                         label="Hold"
+                        count={standardSectionCounts.hold}
                         tasks={standardAgentTasks.filter((task) => statusKey(task.status) === "hold").slice(0, 3)}
                         agentId={id}
+                      />
+                    </div>
+                  )}
+                </TabsContent>
+
+                {/* Tasks this agent handed to a junior. "Assigned To" in each
+                    section is that junior. */}
+                <TabsContent value="assigned-tasks" className="space-y-6">
+                  {assignedTasksTotal === 0 ? (
+                    <Card>
+                      <CardContent className="text-center py-8 text-muted-foreground">
+                        No tasks assigned to juniors by this agent.
+                      </CardContent>
+                    </Card>
+                  ) : (
+                    <div className="space-y-[40px]">
+                      <SectionTable
+                        label="New Task"
+                        count={assignedSectionCounts.todo}
+                        tasks={assignedTaskSections.todo || []}
+                        viewMoreHref={`/task?assignedById=${id}&status=${encodeURIComponent("To Do")}`}
+                      />
+                      <SectionTable
+                        label="In Progress"
+                        count={assignedSectionCounts.inprogress}
+                        tasks={assignedTaskSections.inprogress || []}
+                        viewMoreHref={`/task?assignedById=${id}&status=${encodeURIComponent("In Progress")}`}
+                      />
+                      <SectionTable
+                        label="Completed"
+                        count={assignedSectionCounts.completed}
+                        tasks={assignedTaskSections.completed || []}
+                        viewMoreHref={`/task?assignedById=${id}&status=Completed`}
+                      />
+                      <SectionTable
+                        label="Hold"
+                        count={assignedSectionCounts.hold}
+                        tasks={assignedTaskSections.hold || []}
+                        viewMoreHref={`/task?assignedById=${id}&status=Hold`}
                       />
                     </div>
                   )}
@@ -1895,24 +2009,28 @@ export default function AgentDetails() {
                     <div className="space-y-[40px]">
                       <SectionTable
                         label="New Task"
+                        count={retainershipSectionCounts.todo}
                         tasks={agentRetainershipTasks.filter((task) => statusKey(task.status) === "todo").slice(0, 3)}
                         agentId={id}
                         retainershipTasks={true}
                       />
                       <SectionTable
                         label="In Progress"
+                        count={retainershipSectionCounts.inprogress}
                         tasks={agentRetainershipTasks.filter((task) => statusKey(task.status) === "inprogress").slice(0, 3)}
                         agentId={id}
                         retainershipTasks={true}
                       />
                       <SectionTable
                         label="Completed"
+                        count={retainershipSectionCounts.completed}
                         tasks={agentRetainershipTasks.filter((task) => statusKey(task.status) === "completed").slice(0, 3)}
                         agentId={id}
                         retainershipTasks={true}
                       />
                       <SectionTable
                         label="Hold"
+                        count={retainershipSectionCounts.hold}
                         tasks={agentRetainershipTasks.filter((task) => statusKey(task.status) === "hold").slice(0, 3)}
                         agentId={id}
                         retainershipTasks={true}
@@ -1932,6 +2050,7 @@ export default function AgentDetails() {
                     <div className="space-y-[40px]">
                       <SectionTable
                         label="Upcoming Tasks"
+                        count={agentTriggerTasks.length}
                         tasks={agentTriggerTasks.slice(0, 3)}
                         agentId={id}
                         trigger={true}

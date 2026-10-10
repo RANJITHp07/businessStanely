@@ -50,9 +50,13 @@ export function SectionTable({
   retainershipTasks,
   trigger,
   viewMoreHref,
+  count,
 }: {
   label: string;
   tasks: Task[];
+  // Full number of tasks in this section. Only the first few rows are listed,
+  // so without it the rows on screen never add up to the tab's total.
+  count?: number;
   agentId?: string;
   retainershipTasks?: boolean;
   // `true` links to the legislation future-trigger view, "standard" to the
@@ -70,19 +74,21 @@ export function SectionTable({
     return "text-blue-600";
   })();
 
+  const heading = count === undefined ? label : `${label} (${count})`;
+
   return (
     <>
       <div className="flex items-center gap-4 min-w-0">
         <div className="w-[96px] h-auto hidden md:flex items-center justify-center self-stretch flex-shrink-0 bg-white rounded-lg py-6 px-2">
           <span className={`block rotate-[-90deg] origin-center whitespace-nowrap tracking-widest font-semibold select-none text-[24px] ${labelColor}`}>
-            {label}
+            {heading}
           </span>
         </div>
         <div className="flex-1 min-w-0">
           <Card className="min-h-[250px] py-0 gap-0 rounded-md shadow-sm">
             <CardContent className="p-0">
               <div className={`md:hidden flex items-center justify-center px-4 py-4 rounded-lg shadow-sm border border-gray-100 font-semibold ${labelColor} text-2xl tracking-widest`}>
-                {label}
+                {heading}
               </div>
               <div className="rounded-md overflow-hidden p-1 md:p-0 block bg-white shadow-sm">
                 <Table className="w-full table-fixed text-sm [&_th]:py-3 [&_th]:h-12 [&_td]:py-3">
@@ -102,7 +108,7 @@ export function SectionTable({
                       <TableHead className="text-white">Client</TableHead>
                       <TableHead className="text-white">Assigned To</TableHead>
                       <TableHead className="text-white">Priority</TableHead>
-                      <TableHead className="text-white">Due Date</TableHead>
+                      <TableHead className="text-white">{trigger ? "Next Trigger" : "Due Date"}</TableHead>
                       <TableHead className="text-white">Last Completed</TableHead>
                       <TableHead className="text-white">{trigger ? "Prev Progress" : "Progress"}</TableHead>
                       <TableHead className="text-right text-white">Actions</TableHead>
@@ -130,7 +136,9 @@ export function SectionTable({
                         const clientEmail = t.client?.email ?? "";
                         const assignedRole = t.assignedTo?.agentType ?? "";
                         const priority = (t.priority || "").toLowerCase();
-                        const isOverdue = t.dueDate
+                        // A task waiting for its trigger still carries the
+                        // finished period's due date, so it is never overdue.
+                        const isOverdue = !trigger && t.dueDate
                           ? new Date(t.dueDate) < new Date() && statusKey(t.status) !== "completed"
                           : false;
                         const statusLabel = (() => {
@@ -209,6 +217,17 @@ export function SectionTable({
                               </div>
                             </TableCell>
                             <TableCell className="whitespace-nowrap align-top">{priorityBadge(priority)}</TableCell>
+                            {trigger ? (
+                              <TableCell className="whitespace-nowrap align-top" title={t.triggerDate || ""}>
+                                <div className="flex items-center gap-2">
+                                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                                  <span className="font-medium">{formatDate(t.triggerDate)}</span>
+                                </div>
+                                {t.nextDueDate ? (
+                                  <div className="mt-1 text-xs text-muted-foreground">Due {formatDate(t.nextDueDate)}</div>
+                                ) : null}
+                              </TableCell>
+                            ) : (
                             <TableCell className="whitespace-nowrap align-top" title={t.dueDate || ""}>
                               <div className="flex flex-col">
                                 <div className="flex items-center gap-2">
@@ -222,6 +241,7 @@ export function SectionTable({
                                 ) : null}
                               </div>
                             </TableCell>
+                            )}
                             <TableCell className="whitespace-nowrap align-top">
                               <div className="flex items-center gap-2">
                                 <Calendar className="h-4 w-4 text-muted-foreground" />

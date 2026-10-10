@@ -175,6 +175,9 @@ export async function GET(req: NextRequest) {
 
     const { searchParams } = new URL(req.url);
     const assignedToId = searchParams.get("assignedToId");
+    // Tasks this agent owns (ownerShipId) but has handed to someone else, i.e.
+    // work it assigned to a junior. Standard and legislation tasks alike.
+    const assignedById = searchParams.get("assignedById");
     const clientId = searchParams.get("clientId");
     const categoryId = searchParams.get("categoryId");
     const retainershipId = searchParams.get("retainershipId");
@@ -231,6 +234,10 @@ export async function GET(req: NextRequest) {
     if (assignedToId) {
       whereClause.assignedToId = assignedToId;
     }
+    if (assignedById) {
+      whereClause.ownerShipId = assignedById;
+      if (!assignedToId) whereClause.assignedToId = { not: assignedById };
+    }
     if (isTriggerView) {
       // A future-trigger row is a task that has been scheduled (triggerDate
       // set) and is no longer the live occurrence: either it was deactivated
@@ -278,7 +285,7 @@ export async function GET(req: NextRequest) {
       } else {
         whereClause.active = true;
       }
-    } else if (!categoryId) {
+    } else if (!categoryId && !assignedById) {
       // Default assigned-task view: exclude legislation/retainership tasks
       whereClause.legislationId = null;
     }
@@ -483,15 +490,27 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({
         counts: buildStatusCounts(groups),
         sections: Object.fromEntries(sections.map((s) => [s.key, s.tasks])),
+        // Exact size of each section. `counts.todo` folds in Hold and unknown
+        // statuses (e.g. Abandoned), so it cannot label the New Task section.
+        sectionCounts: Object.fromEntries(
+          SUMMARY_STATUS_SECTIONS.map(({ key, statuses }) => [
+            key,
+            groups
+              .filter((g) => (statuses as readonly string[]).includes(g.status ?? ""))
+              .reduce((sum, g) => sum + g._count._all, 0),
+          ]),
+        ),
       });
     }
 
     const taskQuery = {
       where: finalWhere,
       include: TASK_LIST_INCLUDE,
-      orderBy: {
-        createdAt: "desc",
-      },
+      // A future-trigger view lists the next occurrence first. Newest-created
+      // first scattered the trigger dates (a 2027 row above a next-week one).
+      orderBy: isTriggerView
+        ? [{ triggerDate: "asc" }, { createdAt: "desc" }]
+        : { createdAt: "desc" },
     } satisfies Prisma.TaskFindManyArgs;
 
     // Paginated mode is opt-in: callers that pass `page` (or `limit`) get

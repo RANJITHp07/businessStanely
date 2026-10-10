@@ -77,8 +77,19 @@ export default function TasksTable() {
   const [selectedStatusCheckDurations, setSelectedStatusCheckDurations] = useState<string[]>([])
   const [clientUpdateFilter, setClientUpdateFilter] = useState<"all" | "updated" | "not-updated">("all")
   const [selectedServiceIds, setSelectedServiceIds] = useState<string[]>([])
+  const searchParams = useSearchParams();
+  // "true" (Upcoming Tasks) or "standard" (Future Tasks): recurring tasks
+  // waiting for their next trigger date rather than live work.
+  const triggerView = searchParams.get("trigger")
+  // The future-trigger lists keep their own saved page. Sharing the main
+  // list's slot opened "View more" on whatever page the full task list was
+  // last left on, partway through the upcoming rows.
   const { currentPage, setCurrentPage, itemsPerPage, setItemsPerPage, clampToTotalPages } =
-      useTablePage("admin-dashboard-task-_components-taskTable")
+      useTablePage(
+        triggerView
+          ? `admin-dashboard-task-_components-taskTable-trigger-${triggerView}`
+          : "admin-dashboard-task-_components-taskTable",
+      )
   const [taskToDelete, setTaskToDelete] = useState<Task | null>(null)
   const [taskToConvert, setTaskToConvert] = useState<Task | null>(null)
   // Bumped after a conversion: the converted task usually leaves this view
@@ -89,7 +100,6 @@ export default function TasksTable() {
   const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const router = useRouter();
-  const searchParams = useSearchParams();
 
   // Update URL when filters change
   const updateUrlFilters = (
@@ -103,12 +113,14 @@ export default function TasksTable() {
   ) => {
     const params = new URLSearchParams();
     const assignedToId = searchParams.get("assignedToId");
+    const assignedById = searchParams.get("assignedById");
     const clientId = searchParams.get("clientId");
     const retainershipTasks = searchParams.get("retainershipTasks");
     const retainershipId = searchParams.get("retainershipId");
     const trigger = searchParams.get("trigger");
     const categoryId = searchParams.get("categoryId");
     if (assignedToId) params.set("assignedToId", assignedToId);
+    if (assignedById) params.set("assignedById", assignedById);
     if (clientId) params.set("clientId", clientId);
     if (retainershipTasks) params.set("retainershipTasks", retainershipTasks);
     if (retainershipId) params.set("retainershipId", retainershipId);
@@ -157,10 +169,17 @@ export default function TasksTable() {
   }, [searchParams]);
 
   useEffect(() => {
+    // Filters and page can change while a request is in flight (the saved page
+    // is restored just after mount, for one). Only the latest request may
+    // write rows, or a slower earlier response lands on top of it.
+    let ignore = false;
     const fetchTasks = async () => {
       try {
         // Get assignedToId, status, or statuses from URL
         const assignedToId = searchParams.get("assignedToId");
+        // Set by an agent's Assigned Tasks "View more": tasks that agent
+        // handed to a junior.
+        const assignedById = searchParams.get("assignedById");
         const clientId = searchParams.get("clientId");
         const status = searchParams.get("status");
         const statuses = searchParams.get("statuses");
@@ -179,6 +198,7 @@ export default function TasksTable() {
         let url = "/api/tasks";
         const params = [];
         if (assignedToId) params.push(`assignedToId=${encodeURIComponent(assignedToId)}`);
+        if (assignedById) params.push(`assignedById=${encodeURIComponent(assignedById)}`);
         if (clientId) params.push(`clientId=${encodeURIComponent(clientId)}`);
         if (status) params.push(`status=${encodeURIComponent(status)}`);
         if (statuses) params.push(`statuses=${encodeURIComponent(statuses)}`);
@@ -199,8 +219,10 @@ export default function TasksTable() {
         params.push(`limit=${itemsPerPage}`);
         if (params.length > 0) url += `?${params.join("&")}`;
         const response = await fetchWithAuth(url);
+        if (ignore) return;
         if (response.ok) {
           const data = await response.json();
+          if (ignore) return;
           const rows = data.tasks || data;
           setTasks(rows);
           setTotalTasks(
@@ -212,14 +234,18 @@ export default function TasksTable() {
           setTotalTasks(0);
         }
       } catch (error) {
+        if (ignore) return;
         console.error("Error fetching tasks:", error);
         setTasks([]);
         setTotalTasks(0);
       } finally {
-        setLoading(false);
+        if (!ignore) setLoading(false);
       }
     };
     fetchTasks();
+    return () => {
+      ignore = true;
+    };
   }, [searchParams, currentPage, itemsPerPage, reloadKey]);
 
   const handleDelete = async () => {
@@ -307,6 +333,9 @@ export default function TasksTable() {
   // }
 
   const isOverdue = (dueDate: string | undefined, status: string) => {
+    // A task waiting for its trigger still carries the finished period's due
+    // date, so it is not overdue.
+    if (triggerView) return false;
     if (!dueDate) return false;
     return new Date(dueDate) < new Date() && status !== "Completed"
   }
@@ -333,12 +362,16 @@ export default function TasksTable() {
                 ? "Upcoming Tasks"
                 : searchParams.get("trigger") === "standard"
                   ? "Future Tasks"
-                  : "Task Management"}
+                  : searchParams.get("assignedById")
+                    ? "Assigned Tasks"
+                    : "Task Management"}
             </h1>
             <p className="text-muted-foreground mt-2">
               {searchParams.get("trigger")
                 ? "Recurring tasks waiting for their next trigger date"
-                : "Manage and track all legal tasks and assignments"}
+                : searchParams.get("assignedById")
+                  ? "Tasks this agent has assigned to juniors"
+                  : "Manage and track all legal tasks and assignments"}
             </p>
           </div>
           <Link href="/task/create" className="flex justify-end">
@@ -817,9 +850,9 @@ export default function TasksTable() {
                       <TableHead>Client</TableHead>
                       <TableHead>Ownership to</TableHead>
                       <TableHead>Priority</TableHead>
-                      <TableHead>Due Date</TableHead>
+                      <TableHead>{triggerView ? "Next Trigger" : "Due Date"}</TableHead>
                       <TableHead>Last Completion</TableHead>
-                      <TableHead>Progress</TableHead>
+                      <TableHead>{triggerView ? "Prev Progress" : "Progress"}</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -902,12 +935,28 @@ export default function TasksTable() {
                             </TableCell>
                             <TableCell>{getPriorityBadge(task.priority)}</TableCell>
                             <TableCell>
-                              <div className="flex items-center gap-1">
-                                <Calendar className="h-4 w-4 text-muted-foreground" />
-                                <span className={isOverdue(task.dueDate, task.status) ? "text-red-600 font-medium" : ""}>
-                                  {task.dueDate ? formatDate(task.dueDate) : "N/A"}
-                                </span>
-                              </div>
+                              {triggerView ? (
+                                <>
+                                  <div className="flex items-center gap-1">
+                                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                                    <span className="font-medium">
+                                      {task.triggerDate ? formatDate(task.triggerDate) : "N/A"}
+                                    </span>
+                                  </div>
+                                  {task.nextDueDate && (
+                                    <div className="text-xs text-muted-foreground mt-1">
+                                      Due {formatDate(task.nextDueDate)}
+                                    </div>
+                                  )}
+                                </>
+                              ) : (
+                                <div className="flex items-center gap-1">
+                                  <Calendar className="h-4 w-4 text-muted-foreground" />
+                                  <span className={isOverdue(task.dueDate, task.status) ? "text-red-600 font-medium" : ""}>
+                                    {task.dueDate ? formatDate(task.dueDate) : "N/A"}
+                                  </span>
+                                </div>
+                              )}
                               {task.dueDate && isOverdue(task.dueDate, task.status) && (
                                 <Badge variant="destructive" className="text-xs mt-1">
                                   Overdue

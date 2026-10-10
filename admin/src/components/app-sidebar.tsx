@@ -80,21 +80,20 @@ const allItems: MenuItem[] = [
   { title: "Request Quote", url: "/request-quote", icon: FileText },
   { title: "Lead Source", url: "/lead_source", icon: CircleFadingPlusIcon },
   { title: "WhatsApp", url: "/whatsapp", icon: MessageSquare, newTab: true },
-  { title: "Deleted Client Advisor", url: "/dashboard/deleted-advisor", icon: UserRoundPen },
   { title: "Admin", url: "/admin", icon: ShieldUser },
   { title: "My Diary", url: "/my-diary", icon: UserRoundPen },
   { title: "Settings", url: "/setting", icon: Settings },
-  { title: "Deleted Agent", url: "/deleted-agent", icon: UserRoundPen },
-  // Deleted clients are a tab on the clients page; /deleted-client still
-  // resolves for existing links but no longer needs its own entry here.
+  // Deleted clients, agents and client advisors are tabs on their list pages;
+  // /deleted-client, /deleted-agent and /dashboard/deleted-advisor still
+  // resolve for existing links but no longer need their own entries here.
 ];
 
 // Split items into two panels
 const agentPanelItems = allItems.filter(
-  (item) => !["Leads", "Advisor Agent", "Opportunities Dashboard", "Client Advisor", "Leads Dashboard", "Deleted Client Advisor", "Opportunities", "Lead Source", "BusinessPlus Enquiries", "My Diary", "Settings"].includes(item.title)
+  (item) => !["Leads", "Advisor Agent", "Opportunities Dashboard", "Client Advisor", "Leads Dashboard", "Opportunities", "Lead Source", "BusinessPlus Enquiries", "My Diary", "Settings"].includes(item.title)
 );
 const salesPanelItems = allItems.filter((item) =>
-  ["Advisor Agent", "Leads", "Opportunities", "Opportunities Dashboard", "Client Advisor", "Deleted Client Advisor", "Leads Dashboard", "Lead Source", "BusinessPlus Enquiries"].includes(item.title)
+  ["Advisor Agent", "Leads", "Opportunities", "Opportunities Dashboard", "Client Advisor", "Leads Dashboard", "Lead Source", "BusinessPlus Enquiries"].includes(item.title)
 );
 
 const settingsPanelItems = allItems.filter((item) => item.title === "Settings" || item.title === "My Diary");

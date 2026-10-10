@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState, useEffect } from "react"
+import { useMemo, useState, useEffect, useRef } from "react"
 import { addDays } from "date-fns"
 import { LogIn, LogOut } from "lucide-react"
 import { Popover, PopoverAnchor, PopoverContent } from "@/components/ui/popover"
@@ -23,6 +23,11 @@ const timeSlots = [
 ]
 
 const IST_TIME_ZONE = "Asia/Kolkata"
+
+// Each hour row is 60px tall. The grid still covers the whole day, but opens
+// scrolled to the start of the working day; earlier hours are a scroll up.
+const HOUR_HEIGHT = 60
+const DEFAULT_SCROLL_HOUR = 9
 
 const getISTDayKey = (date: Date | string) => {
   const parts = new Intl.DateTimeFormat("en-CA", {
@@ -131,6 +136,13 @@ export function TimesheetCalendar({
   onEntryClick,
 }: TimesheetCalendarProps) {
   const [currentTime, setCurrentTime] = useState(new Date())
+  const scrollRef = useRef<HTMLDivElement>(null)
+
+  // Open on 9 AM rather than midnight. Only on mount, so changing the agent or
+  // date range keeps wherever the user has scrolled to.
+  useEffect(() => {
+    if (scrollRef.current) scrollRef.current.scrollTop = DEFAULT_SCROLL_HOUR * HOUR_HEIGHT
+  }, [])
   const [hoveredEntry, setHoveredEntry] = useState<TimeEntry | null>(null)
 
   useEffect(() => {
@@ -160,7 +172,7 @@ export function TimesheetCalendar({
   const todayISTKey = useMemo(() => getISTDayKey(new Date()), [currentTime])
 
   return (
-    <div className="flex-1 overflow-auto">
+    <div ref={scrollRef} className="flex-1 overflow-auto">
       <div style={{ minWidth: 800 }}>
         {/* Header */}
         <div className="sticky top-0 z-10 bg-card border-b border-border">

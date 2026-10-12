@@ -344,7 +344,7 @@ export default function OppurtunitiesDetailPage() {
                             <CardTitle>Amount</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <p className="text-muted-foreground leading-relaxed">{oppurtunities.amount !== undefined ? `$${oppurtunities.amount}` : '—'}</p>
+                            <p className="text-muted-foreground leading-relaxed">{oppurtunities.amount !== undefined ? `₹${Number(oppurtunities.amount).toLocaleString("en-IN")}` : '—'}</p>
                         </CardContent>
                     </Card>
 

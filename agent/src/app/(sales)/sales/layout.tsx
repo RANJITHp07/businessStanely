@@ -14,11 +14,11 @@ export default function RootLayout({
     return (
         <AuthGuard>
             <AuthSessionTimeout />
-            <div className={`overflow-auto flex w-full`}>
+            <div className="overflow-x-clip flex w-full">
                 <SidebarProvider>
                     <AppSidebar />
                     <main className="flex flex-col flex-1 min-w-0">
-                        <div className="flex gap-[20px] items-center py-[20px] p-6 md:pl-[20px] md:py-[15px] border-b">
+                        <div className="sticky top-0 z-30 bg-white flex gap-[20px] items-center py-[20px] p-6 md:pl-[20px] md:py-[15px] border-b">
                             <Navigator />
                             <div className="flex justify-between items-center flex-1 pr-4">
                                 <h1 className="text-[25px] block md:hidden">

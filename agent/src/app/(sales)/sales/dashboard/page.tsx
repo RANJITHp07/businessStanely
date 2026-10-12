@@ -3,7 +3,7 @@ import { useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { TrendingUp, TrendingDown, Users, DollarSign, AlertTriangle, CalendarIcon, Target, Clock } from "lucide-react"
+import { TrendingUp, TrendingDown, Users, IndianRupee, AlertTriangle, CalendarIcon, Target, Clock } from "lucide-react"
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, BarChart, Bar } from "recharts"
 import { useAgentContext } from "@/lib/agent-context"
@@ -62,9 +62,9 @@ const recentActivities = [
     {
         id: 2,
         type: "Deal Closed",
-        description: "$12,500 - TechStart Solutions",
+        description: "₹12,500 - TechStart Solutions",
         time: "1 hour ago",
-        icon: DollarSign,
+        icon: IndianRupee,
         color: "text-green-600",
     },
     {
@@ -146,7 +146,7 @@ export default function SalesDashboard() {
                     <Card className="bg-emerald-600 text-white border-0 shadow-lg">
                         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                             <CardTitle className="text-xl font-medium text-white">Closed This Month</CardTitle>
-                            <DollarSign className="h-10 w-10 text-emerald-200" />
+                            <IndianRupee className="h-10 w-10 text-emerald-200" />
                         </CardHeader>
                         <CardContent>
                             <div className="text-4xl font-bold text-white">

@@ -122,10 +122,36 @@ export async function PUT(
             prospectId: prospect.id,
           },
         });
-        // Archive the prospect instead of deleting
+        // Archive the prospect instead of deleting, and persist the details
+        // edited on the conversion form. The opportunity page reads the
+        // contact details (email, address, lead source, assignee, ...) from
+        // the linked prospect, so skipping this left them stale.
+        const resolvedAssigneeId = assignedAgentId || assignedTo;
         await prisma.prospect.update({
           where: { id },
-          data: { archived: true, status: "Converted" },
+          data: {
+            archived: true,
+            status: "Converted",
+            ...(name !== undefined && { name }),
+            ...(email !== undefined && { email }),
+            ...(dialCode !== undefined && { dialCode }),
+            ...(phoneNumber !== undefined && { phoneNumber }),
+            ...(address !== undefined && { address }),
+            ...(description !== undefined && { description }),
+            ...(notes !== undefined && { notes }),
+            ...(service && { service }),
+            ...(leadSourceId && {
+              leadSource: { connect: { id: leadSourceId } },
+            }),
+            ...(resolvedAssigneeId && {
+              assignedAgent: { connect: { id: resolvedAssigneeId } },
+            }),
+            amount: resolvedAmount,
+            ...(nextFollowUp && {
+              nextFollowUp: new Date(nextFollowUp),
+              prevFollowup: prospect.nextFollowUp ?? undefined,
+            }),
+          },
         });
         return NextResponse.json({ opportunity, archivedProspectId: id });
       } catch (opportunityError) {

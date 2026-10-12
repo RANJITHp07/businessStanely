@@ -15,6 +15,7 @@ import { isLeadMaker } from '@/lib/agentType'
 import { AddEntryDialog } from '@/app/(dashboard)/timesheet/_component/add-entry-dialog'
 import { usePWA } from '@/lib/pwa-context'
 import { Download } from 'lucide-react'
+import { useHiddenSidebarItems } from '@/lib/sidebarVisibility'
 
 export default function Navigator() {
     const router = useRouter()
@@ -23,6 +24,9 @@ export default function Navigator() {
     const segments = pathname.split('/').filter(Boolean)
     const [addEntryDialogOpen, setAddEntryDialogOpen] = useState(false)
     const { canInstall, install } = usePWA()
+    // Shortcuts into a section the admin hid for this agent are hidden too.
+    const hiddenItems = useHiddenSidebarItems()
+    const isVisible = (url: string) => !hiddenItems.includes(url)
 
     return (
         <div className="hidden md:flex items-center justify-between container mx-auto">
@@ -77,25 +81,31 @@ export default function Navigator() {
                 )}
                 {hasExecutionRole(agent?.agentRole) && (
                     <>
-                        {agent?.canCreateTask !== false && (
+                        {agent?.canCreateTask !== false && isVisible('/my-task') && (
                             <Button size="sm" onClick={() => router.push("/task/create")}>
                                 Add Normal Task
                             </Button>
                         )}
-                        <Button size="sm" onClick={() => router.push("/task_category/create")}>
-                            Create Service
-                        </Button>
-                        <Button size="sm" onClick={() => setAddEntryDialogOpen(true)}>
-                            Add Time Entry
-                        </Button>
+                        {isVisible('/task_category') && (
+                            <Button size="sm" onClick={() => router.push("/task_category/create")}>
+                                Create Service
+                            </Button>
+                        )}
+                        {isVisible('/timesheet') && (
+                            <Button size="sm" onClick={() => setAddEntryDialogOpen(true)}>
+                                Add Time Entry
+                            </Button>
+                        )}
                     </>
                 )}
                 {hasAdvisorRole(agent?.agentRole) && (
                     <>
-                        <Button size="sm" onClick={() => router.push("/sales/prospects/add")}>
-                            Create Lead
-                        </Button>
-                        {agent?.agentRole !== EXECUTION_AND_ADVISOR_AGENT_ROLE && !isLeadMaker(agent) && (
+                        {isVisible('/sales/prospects') && (
+                            <Button size="sm" onClick={() => router.push("/sales/prospects/add")}>
+                                Create Lead
+                            </Button>
+                        )}
+                        {agent?.agentRole !== EXECUTION_AND_ADVISOR_AGENT_ROLE && !isLeadMaker(agent) && isVisible('/sales/calendar') && (
                             <Button size="sm" onClick={() => router.push("/sales/calendar")}>
                                 View Calendar
                             </Button>

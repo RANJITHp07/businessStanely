@@ -7,6 +7,7 @@ export interface AgentContext {
   agentType: string;
   agentRole: string;
   canCreateTask?: boolean;
+  hiddenSidebarItems?: string[];
 }
 
 export function useAgentContext(): AgentContext | null {

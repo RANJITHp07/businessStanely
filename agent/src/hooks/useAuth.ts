@@ -16,6 +16,7 @@ interface Agent {
   specializations: string[];
   photo?: string;
   canCreateTask?: boolean;
+  hiddenSidebarItems?: string[];
 }
 
 interface AuthState {

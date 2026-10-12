@@ -14,9 +14,9 @@ import {
   MessageSquare,
   UserCheck,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 import {
   Sidebar,
@@ -45,6 +45,7 @@ import Image from "next/image";
 import Logo from "./../../public/Logo.jpg";
 import { hasAdvisorRole, hasExecutionRole, EXECUTION_AND_ADVISOR_AGENT_ROLE } from "@/lib/agentRole";
 import { getAdvisorAgentType } from "@/lib/agentType";
+import { isRouteHidden, useHiddenSidebarItems } from "@/lib/sidebarVisibility";
 
 type MenuItem = {
   title: string;
@@ -161,7 +162,9 @@ const commonItems: MenuItem[] = [
 export function AppSidebar() {
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
   const pathname = usePathname();
+  const router = useRouter();
   const { setOpenMobile, isMobile } = useSidebar();
+  const hiddenItems = useHiddenSidebarItems();
   const { agentRole, agentType } = useMemo(() => {
     if (typeof window === "undefined") {
       return { agentRole: null as string | null, agentType: null as string | null };
@@ -259,6 +262,29 @@ export function AppSidebar() {
     visibleSalesItems,
   ]);
 
+  // Drop sections an admin has hidden for this agent.
+  const withoutHidden = (items: MenuItem[]) =>
+    items.filter((item) => !hiddenItems.includes(item.url));
+
+  const visibleSingleRoleItems = withoutHidden(singleRoleItems);
+  const visibleDashboardItems = withoutHidden(dashboardItems);
+  const visibleSalesPanelItems = withoutHidden(visibleSalesItems);
+  const visibleCommonItems = withoutHidden(commonItemsWithWhatsApp);
+
+  // A hidden section must not stay reachable by typing its URL: send the agent
+  // to the first section they can see (Settings is never hideable).
+  const isCurrentRouteHidden = isRouteHidden(pathname, hiddenItems);
+  const fallbackUrl =
+    [
+      ...(isDualRole
+        ? [...visibleDashboardItems, ...visibleSalesPanelItems, ...visibleCommonItems]
+        : visibleSingleRoleItems),
+    ].find((item) => !item.newTab)?.url ?? "/setting";
+
+  useEffect(() => {
+    if (isCurrentRouteHidden) router.replace(fallbackUrl);
+  }, [isCurrentRouteHidden, fallbackUrl, router]);
+
   const renderItems = (items: MenuItem[]) =>
     items.map((item) => {
       const isActive =
@@ -321,46 +347,46 @@ export function AppSidebar() {
             <SidebarGroup>
               <SidebarGroupContent>
                 <SidebarMenu className="mt-[30px]">
-                  {renderItems(singleRoleItems)}
+                  {renderItems(visibleSingleRoleItems)}
                 </SidebarMenu>
               </SidebarGroupContent>
             </SidebarGroup>
           )}
 
-          {isDualRole && showExecutionPanel && (
+          {isDualRole && showExecutionPanel && visibleDashboardItems.length > 0 && (
             <SidebarGroup>
               <SidebarGroupLabel className="text-[16px] mt-[30px] text-white py-5 px-3 -ml-4 rounded-none border-b border-t border-white font-medium">
                 Execution Panel
               </SidebarGroupLabel>
               <SidebarGroupContent>
                 <SidebarMenu className="mt-[8px]">
-                  {renderItems(dashboardItems)}
+                  {renderItems(visibleDashboardItems)}
                 </SidebarMenu>
               </SidebarGroupContent>
             </SidebarGroup>
           )}
 
-          {isDualRole && showSalesPanel && (
+          {isDualRole && showSalesPanel && visibleSalesPanelItems.length > 0 && (
             <SidebarGroup>
               <SidebarGroupLabel className="text-[16px] text-white py-5 px-3 -ml-4 rounded-none border-b border-t border-white font-medium">
                 Sales Panel
               </SidebarGroupLabel>
               <SidebarGroupContent>
                 <SidebarMenu className="mt-[8px]">
-                  {renderItems(visibleSalesItems)}
+                  {renderItems(visibleSalesPanelItems)}
                 </SidebarMenu>
               </SidebarGroupContent>
             </SidebarGroup>
           )}
 
-          {isDualRole && (
+          {isDualRole && visibleCommonItems.length > 0 && (
             <SidebarGroup>
               <SidebarGroupLabel className="text-[16px] text-white py-5 px-3 -ml-4 rounded-none border-b border-t border-white font-medium">
                 Common
               </SidebarGroupLabel>
               <SidebarGroupContent>
                 <SidebarMenu className="mt-[8px]">
-                  {renderItems(commonItemsWithWhatsApp)}
+                  {renderItems(visibleCommonItems)}
                 </SidebarMenu>
               </SidebarGroupContent>
             </SidebarGroup>

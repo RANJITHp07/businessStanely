@@ -40,6 +40,7 @@ export async function POST(req: NextRequest) {
       autoAssign,
       enquiryAutoAssign,
       canCreateTask,
+      hiddenSidebarItems,
       ...agentData
     } = body;
 
@@ -174,6 +175,9 @@ export async function POST(req: NextRequest) {
       // Default to allowed so agents created before this flag existed, and any
       // client that omits it, keep the previous behaviour.
       canCreateTask: canCreateTask ?? true,
+      hiddenSidebarItems: Array.isArray(hiddenSidebarItems)
+        ? hiddenSidebarItems.filter((key: unknown): key is string => typeof key === "string")
+        : [],
       ...(specializations?.length && {
         specializations: {
           set: specializations,

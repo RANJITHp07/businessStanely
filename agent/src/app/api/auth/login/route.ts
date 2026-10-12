@@ -234,6 +234,7 @@ export async function POST(req: NextRequest) {
         jurisdiction: agent.jurisdiction,
         specializations: agent.specializations,
         photo: agent.photo,
+        hiddenSidebarItems: agent.hiddenSidebarItems,
       },
       token,
     });

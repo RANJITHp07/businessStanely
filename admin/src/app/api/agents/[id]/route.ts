@@ -78,6 +78,7 @@ export async function PUT(
       subordinates,
       advisorSubordinates,
       photo,
+      hiddenSidebarItems,
       ...agentData
     } = body;
 
@@ -216,6 +217,11 @@ export async function PUT(
         email: emailToCheck,
         photo: photoS3Key,
         specializations,
+        ...(Array.isArray(hiddenSidebarItems) && {
+          hiddenSidebarItems: hiddenSidebarItems.filter(
+            (key: unknown): key is string => typeof key === "string",
+          ),
+        }),
       },
     });
 

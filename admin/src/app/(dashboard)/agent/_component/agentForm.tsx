@@ -34,6 +34,11 @@ import {
   hasAdvisorRole,
   hasExecutionRole,
 } from "@/lib/agentRole";
+import {
+  AGENT_SIDEBAR_GROUP_LABELS,
+  AGENT_SIDEBAR_ITEMS,
+  type AgentSidebarGroup,
+} from "@/lib/agentSidebarItems";
 
 const executionAgentTypes = [
   "Owner",
@@ -203,6 +208,7 @@ export default function AgentForm({ agent }: AgentFormProps) {
     autoAssign?: boolean
     enquiryAutoAssign?: boolean
     canCreateTask?: boolean
+    hiddenSidebarItems: string[]
   };
   const searchParams = useSearchParams();
   const agentRole = searchParams.get("agentRole");
@@ -229,8 +235,14 @@ export default function AgentForm({ agent }: AgentFormProps) {
     enquiryAutoAssign: agent?.enquiryAutoAssign ?? true,
     // `??` rather than `||` so an agent explicitly set to false stays false
     // when the edit form reloads.
-    canCreateTask: agent?.canCreateTask ?? true
+    canCreateTask: agent?.canCreateTask ?? true,
+    hiddenSidebarItems: agent?.hiddenSidebarItems ?? [],
   });
+  const sidebarGroups: AgentSidebarGroup[] = [
+    ...(hasExecutionRole(formData.agentRole) ? (["execution"] as const) : []),
+    ...(hasAdvisorRole(formData.agentRole) ? (["sales"] as const) : []),
+    "common",
+  ];
   const [agentSearch, setAgentSearch] = useState("");
   const [advisorAgentSearch, setAdvisorAgentSearch] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -868,6 +880,48 @@ export default function AgentForm({ agent }: AgentFormProps) {
                   </p>
                 </div>
               </div>
+            </div>
+
+            {/* Sidebar visibility */}
+            <div className="space-y-3">
+              <Label>Sidebar Visibility</Label>
+              <p className="text-xs text-muted-foreground">
+                Untick a section to hide it from this agent&apos;s sidebar.
+                Only sections available for the selected role are listed.
+              </p>
+              {sidebarGroups.map((group) => (
+                <div key={group} className="rounded-lg border p-4 space-y-3">
+                  <p className="text-sm font-medium">
+                    {AGENT_SIDEBAR_GROUP_LABELS[group]}
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {AGENT_SIDEBAR_ITEMS.filter((item) => item.group === group).map(
+                      (item) => {
+                        const checkboxId = `sidebar-${item.key}`;
+                        return (
+                          <div key={item.key} className="flex items-center gap-2">
+                            <Checkbox
+                              id={checkboxId}
+                              checked={!formData.hiddenSidebarItems.includes(item.key)}
+                              onCheckedChange={(checked) =>
+                                setFormData((prev) => ({
+                                  ...prev,
+                                  hiddenSidebarItems: checked
+                                    ? prev.hiddenSidebarItems.filter((key) => key !== item.key)
+                                    : [...prev.hiddenSidebarItems, item.key],
+                                }))
+                              }
+                            />
+                            <Label htmlFor={checkboxId} className="text-sm font-normal">
+                              {item.label}
+                            </Label>
+                          </div>
+                        );
+                      },
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
           </CardContent>
         </Card>

@@ -308,6 +308,9 @@ model Agent {
   // tasks from the agent app? Legislation/retainership and service-linked task
   // creation is unaffected.
   canCreateTask        Boolean   @default(true)
+  // Admin-controlled: agent portal sidebar sections (by route, e.g. "/timesheet")
+  // hidden from this agent. Empty means every section the role allows is shown.
+  hiddenSidebarItems   String[] @default([])
   lastLogin            DateTime?
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt

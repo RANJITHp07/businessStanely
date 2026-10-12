@@ -24,6 +24,7 @@ export async function GET(req: NextRequest) {
         specializations: agent.specializations,
         photo: agent.photo,
         canCreateTask: agent.canCreateTask,
+        hiddenSidebarItems: agent.hiddenSidebarItems,
         status: agent.status,
       },
     });

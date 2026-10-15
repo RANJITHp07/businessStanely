@@ -34,6 +34,8 @@ export const SOFT_DELETE_MODELS = [
   "Retainership",
   "Legislation",
   "Enquiry",
+  "PracticeArea",
+  "PracticeAreaParameter",
 ] as const;
 
 const SOFT_DELETE_MODEL_SET: ReadonlySet<string> = new Set(SOFT_DELETE_MODELS);

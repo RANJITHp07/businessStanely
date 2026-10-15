@@ -843,6 +843,17 @@ model Enquiry {
   /// rows the leads screen uses.
   comments Comment[]
 
+  /// Practice areas picked on the blue-theme site, by id. `services` above
+  /// still holds their titles, so older screens and emails keep working.
+  /// Empty on rows from a form that predates practice areas.
+  practiceAreaIds String[] @db.ObjectId
+
+  /// Answers to the picked practice areas' parameters, filled in by the client
+  /// on the request's page in the client portal. Each entry snapshots
+  /// the area and parameter titles at submit time, so it still reads
+  /// correctly after either is renamed or removed.
+  parameterValues EnquiryParameterValue[]
+
   /// The website portal login this enquiry belongs to, created by the
   /// businessPlus site when the form is submitted. The admin app only reads it;
   /// portal accounts are owned by the website (see businessPlus/prisma).
@@ -865,6 +876,106 @@ model Enquiry {
   /// Who last changed this row. Field-level history lives in DeletionAudit.
   updatedById   String?   @db.ObjectId
   updatedByType String? // "USER" | "AGENT"
+}
+
+/// A service the firm offers on the public website, shown in its "Practice
+/// areas" grid and request form. Managed from the admin app's Practice Areas
+/// page; the blue-theme site reads it straight from this collection.
+///
+/// Soft deleted rather than removed, so enquiries that picked an area keep a
+/// valid reference.
+model PracticeArea {
+  id          String  @id @default(auto()) @map("_id") @db.ObjectId
+  title       String
+  description String?
+  /// Key of the icon the website draws on the card. One of PRACTICE_AREA_ICONS
+  /// in lib/practiceAreaParameters.ts.
+  icon        String  @default("building")
+  /// Order on the website, lowest first.
+  sortOrder   Int     @default(0)
+  /// Hidden areas stay here with their parameters but are not offered on the
+  /// website.
+  active      Boolean @default(true)
+
+  parameters PracticeAreaParameter[]
+
+  createdById String?  @db.ObjectId
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  /// Soft delete: rows are never removed, only stamped. Every read filters on
+  /// deletedAt: null. See lib/audit.ts.
+  deletedAt     DateTime?
+  deletedById   String?   @db.ObjectId
+  deletedByType String? // "USER" | "AGENT"
+
+  /// Who last changed this row. Field-level history lives in DeletionAudit.
+  updatedById   String? @db.ObjectId
+  updatedByType String? // "USER" | "AGENT"
+
+  @@index([active, sortOrder])
+}
+
+/// A field the client fills in for its practice area, on their request in the
+/// client portal (the website's request form only picks the area).
+///
+/// Soft deleted rather than removed, so answers already stored on enquiries
+/// stay attributable. `type` cannot change once any enquiry holds an answer;
+/// the API refuses it so stored answers never become invalid under a new type.
+model PracticeAreaParameter {
+  id             String       @id @default(auto()) @map("_id") @db.ObjectId
+  practiceAreaId String       @db.ObjectId
+  practiceArea   PracticeArea @relation(fields: [practiceAreaId], references: [id])
+
+  title    String
+  type     String // TEXT | TEXTAREA | NUMBER | DATE | BOOLEAN | SELECT | EMAIL | PHONE | FILE
+  required Boolean  @default(false)
+  /// Choices for a SELECT parameter, in display order. Empty for other types.
+  options  String[]
+
+  attachmentMode String @default("DISABLED") // DISABLED | OPTIONAL | REQUIRED
+  /// Most files one enquiry may attach to this parameter. Null when
+  /// attachments are disabled.
+  maxAttachments Int?
+
+  sortOrder Int @default(0)
+
+  createdById String?  @db.ObjectId
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  /// Soft delete: rows are never removed, only stamped. Every read filters on
+  /// deletedAt: null. See lib/audit.ts.
+  deletedAt     DateTime?
+  deletedById   String?   @db.ObjectId
+  deletedByType String? // "USER" | "AGENT"
+
+  /// Who last changed this row. Field-level history lives in DeletionAudit.
+  updatedById   String? @db.ObjectId
+  updatedByType String? // "USER" | "AGENT"
+
+  @@index([practiceAreaId, sortOrder])
+}
+
+/// One answer on an enquiry. `value` is always a string so a row reads back
+/// the same whatever the parameter's type: numbers in canonical form, dates as
+/// YYYY-MM-DD, booleans as "true"/"false".
+type EnquiryParameterValue {
+  practiceAreaId    String                @db.ObjectId
+  practiceAreaTitle String
+  parameterId       String                @db.ObjectId
+  title             String
+  type              String
+  value             String?
+  attachments       ParameterAttachment[]
+}
+
+type ParameterAttachment {
+  name String
+  /// S3 key from the portal upload, e.g. "uploads/portal/<accountId>/1700000000000_file.pdf"
+  url  String
+  size Int
+  type String
 }
 
 /// Website portal login for someone who submitted a service request on the

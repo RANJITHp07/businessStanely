@@ -17,6 +17,7 @@ import {
   Calendar,
   FileText,
   MessageSquare,
+  Briefcase,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -67,7 +68,8 @@ const allItems: MenuItem[] = [
   { title: "Execution Dashboard", icon: Home, url: "/" },
   { title: "Leads Dashboard", url: "/dashboard/prospects", icon: UserSearch },
   { title: "Leads", url: "/dashboard/prospects/tables", icon: UserSearch },
-  { title: "BusinessPlus Enquiries", url: "/dashboard/enquiries", icon: Inbox },
+  { title: "Enquiries", url: "/dashboard/enquiries", icon: Inbox },
+  { title: "Parameter Areas", url: "/practice-areas", icon: Briefcase },
   { title: "Opportunities Dashboard", url: "/dashboard/opportunities", icon: ClipboardList },
   { title: "Opportunities", url: "/dashboard/opportunities/tables", icon: ClipboardList },
   { title: "Execution Agent", url: "/agent", icon: UserRoundPen },
@@ -88,13 +90,19 @@ const allItems: MenuItem[] = [
   // resolve for existing links but no longer need their own entries here.
 ];
 
-// Split items into two panels
+// Website requests and what the website asks for: enquiries from the client
+// portal and landing page, and the parameter areas (website practice areas)
+// offered along with their parameters.
+const WEBSITE_PANEL = ["Enquiries", "Parameter Areas"];
+
+// Split items into panels
 const agentPanelItems = allItems.filter(
-  (item) => !["Leads", "Advisor Agent", "Opportunities Dashboard", "Client Advisor", "Leads Dashboard", "Opportunities", "Lead Source", "BusinessPlus Enquiries", "My Diary", "Settings"].includes(item.title)
+  (item) => ![...WEBSITE_PANEL, "Leads", "Advisor Agent", "Opportunities Dashboard", "Client Advisor", "Leads Dashboard", "Opportunities", "Lead Source", "My Diary", "Settings"].includes(item.title)
 );
 const salesPanelItems = allItems.filter((item) =>
-  ["Advisor Agent", "Leads", "Opportunities", "Opportunities Dashboard", "Client Advisor", "Leads Dashboard", "Lead Source", "BusinessPlus Enquiries"].includes(item.title)
+  ["Advisor Agent", "Leads", "Opportunities", "Opportunities Dashboard", "Client Advisor", "Leads Dashboard", "Lead Source"].includes(item.title)
 );
+const websitePanelItems = allItems.filter((item) => WEBSITE_PANEL.includes(item.title));
 
 const settingsPanelItems = allItems.filter((item) => item.title === "Settings" || item.title === "My Diary");
 
@@ -225,6 +233,16 @@ export function AppSidebar() {
             <SidebarGroupContent>
               <SidebarMenu className="mt-2">
                 {renderItems(salesPanelItems)}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+          <SidebarGroup>
+            <SidebarGroupLabel className=" text-[16px] text-white py-5 px-3 -ml-4  rounded-none border-b border-t border-white font-medium ">
+              Website Panel
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu className="mt-2">
+                {renderItems(websitePanelItems)}
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>

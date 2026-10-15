@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { Progress } from "@/components/ui/progress"
+import { formatParameterValue, type EnquiryParameterValue } from "@/lib/practiceAreaParameters"
 import {
     ArrowLeft,
     ArrowRight,
@@ -81,6 +82,8 @@ type Enquiry = {
     phone?: string | null
     company?: string | null
     services: string[]
+    /** Answers to the picked practice areas' parameters (blue-theme site). */
+    parameterValues?: EnquiryParameterValue[]
     payment?: string | null
     notes?: string | null
     source: string
@@ -113,6 +116,20 @@ function getAttachmentUrl(url?: string | null) {
     return `${MANAGEMENT_BASE_URL}${url.startsWith("/") ? url : `/${url}`}`
 }
 
+
+/** Answers in submit order, grouped under the practice area they belong to. */
+function groupByPracticeArea(values: EnquiryParameterValue[]) {
+    const groups: { practiceAreaId: string; practiceAreaTitle: string; values: EnquiryParameterValue[] }[] = []
+    for (const entry of values) {
+        let group = groups.find((g) => g.practiceAreaId === entry.practiceAreaId)
+        if (!group) {
+            group = { practiceAreaId: entry.practiceAreaId, practiceAreaTitle: entry.practiceAreaTitle, values: [] }
+            groups.push(group)
+        }
+        group.values.push(entry)
+    }
+    return groups
+}
 
 function statusBadge(status: string) {
     const s = status.toLowerCase()
@@ -467,6 +484,63 @@ export default function EnquiryDetailPage({ params }: { params: Promise<{ id: st
                             )}
                         </CardContent>
                     </Card>
+
+                    {(enquiry.parameterValues?.length ?? 0) > 0 && (
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Request Details</CardTitle>
+                                <CardDescription>What the client filled in for each parameter area in their portal</CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-6">
+                                {groupByPracticeArea(enquiry.parameterValues ?? []).map((group) => (
+                                    <div key={group.practiceAreaId} className="space-y-3">
+                                        <p className="text-sm font-semibold">{group.practiceAreaTitle}</p>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            {group.values.map((entry) => (
+                                                <div
+                                                    key={entry.parameterId}
+                                                    className={entry.type === "TEXTAREA" || entry.type === "FILE" ? "md:col-span-2" : ""}
+                                                >
+                                                    <Label className="text-sm font-medium text-muted-foreground">
+                                                        {entry.title}
+                                                    </Label>
+                                                    {entry.type !== "FILE" && (
+                                                        <p className="mt-1 font-medium break-words whitespace-pre-wrap">
+                                                            {formatParameterValue(entry.type, entry.value)}
+                                                        </p>
+                                                    )}
+                                                    {entry.attachments.length > 0 && (
+                                                        <div className="mt-1 space-y-1">
+                                                            {entry.attachments.map((att, idx) => (
+                                                                <div
+                                                                    key={`${att.url}-${idx}`}
+                                                                    className="flex items-center gap-2 text-xs text-muted-foreground bg-muted p-2 rounded border"
+                                                                >
+                                                                    <Paperclip className="h-3 w-3 shrink-0" />
+                                                                    <span className="font-medium truncate">{att.name}</span>
+                                                                    {att.size > 0 && (
+                                                                        <span className="shrink-0">({(att.size / 1024).toFixed(1)} KB)</span>
+                                                                    )}
+                                                                    <a
+                                                                        href={getAttachmentUrl(att.url)}
+                                                                        className="ml-auto shrink-0 text-blue-600 hover:text-blue-800 underline"
+                                                                        target="_blank"
+                                                                        rel="noopener noreferrer"
+                                                                    >
+                                                                        View
+                                                                    </a>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                ))}
+                            </CardContent>
+                        </Card>
+                    )}
 
                     <Card>
                         <CardHeader>

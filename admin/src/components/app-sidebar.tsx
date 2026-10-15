@@ -238,7 +238,7 @@ export function AppSidebar() {
           </SidebarGroup>
           <SidebarGroup>
             <SidebarGroupLabel className=" text-[16px] text-white py-5 px-3 -ml-4  rounded-none border-b border-t border-white font-medium ">
-              Website Panel
+              BusinessPlus Panel
             </SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu className="mt-2">

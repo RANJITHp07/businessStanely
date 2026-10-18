@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentAdmin } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 
-// GET /api/website-analytics?days=30 - page views recorded by the public
+// GET /api/website-analytics?days=7 - page views recorded by the public
 // website (PageView, written by its /api/track) over the last N days: totals,
-// a per-day series in India time, top breakdowns and the latest visits.
+// a per-day series in India time, and one page of the visits themselves
+// (newest first, `page` / `pageSize` query params).
 //
 // "Visitors" counts distinct visitorId values. The id is a daily hash, so one
 // person on three different days counts as three visitors over a 30-day range,
@@ -12,19 +13,7 @@ import prisma from "@/lib/prisma";
 
 const ALLOWED_DAYS = [1, 7, 30, 90, 365];
 const TIMEZONE = "Asia/Kolkata";
-const TOP_LIMIT = 10;
-
-type Bucket = { name: string; views: number; visitors: number };
-
-/** Group by `field`, nulls bucketed under `fallback`, busiest first. */
-function topBy(field: string, fallback: string) {
-  return [
-    { $group: { _id: { $ifNull: [`$${field}`, fallback] }, views: { $sum: 1 }, v: { $addToSet: "$visitorId" } } },
-    { $project: { _id: 0, name: "$_id", views: 1, visitors: { $size: "$v" } } },
-    { $sort: { views: -1 } },
-    { $limit: TOP_LIMIT },
-  ];
-}
+const MAX_PAGE_SIZE = 100;
 
 /** India-time calendar date (YYYY-MM-DD) for a Date. */
 function indiaDay(date: Date): string {
@@ -39,8 +28,13 @@ export async function GET(req: NextRequest) {
     }
 
     const requested = Number(req.nextUrl.searchParams.get("days"));
-    const days = ALLOWED_DAYS.includes(requested) ? requested : 30;
+    const days = ALLOWED_DAYS.includes(requested) ? requested : 7;
     const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    const page = Math.max(1, Math.floor(Number(req.nextUrl.searchParams.get("page")) || 1));
+    const pageSize = Math.min(
+      MAX_PAGE_SIZE,
+      Math.max(1, Math.floor(Number(req.nextUrl.searchParams.get("pageSize")) || 25)),
+    );
 
     const raw = (await prisma.pageView.aggregateRaw({
       pipeline: [
@@ -61,23 +55,19 @@ export async function GET(req: NextRequest) {
               },
               { $project: { _id: 0, date: "$_id", views: 1, visitors: { $size: "$v" } } },
             ],
-            pages: topBy("path", "/"),
-            referrers: topBy("referrer", "Direct"),
-            campaigns: topBy("utmSource", "None"),
-            countries: topBy("country", "Unknown"),
-            cities: topBy("city", "Unknown"),
-            devices: topBy("device", "Unknown"),
-            browsers: topBy("browser", "Other"),
-            os: topBy("os", "Other"),
-            recent: [
+            visits: [
               { $sort: { createdAt: -1 } },
-              { $limit: 50 },
+              { $skip: (page - 1) * pageSize },
+              { $limit: pageSize },
               {
                 $project: {
                   _id: 0,
                   path: 1,
                   referrer: 1,
                   utmSource: 1,
+                  utmMedium: 1,
+                  utmCampaign: 1,
+                  region: 1,
                   maskedIp: 1,
                   country: 1,
                   city: 1,
@@ -106,21 +96,13 @@ export async function GET(req: NextRequest) {
       daily.push({ date, ...(byDate.get(date) ?? { views: 0, visitors: 0 }) });
     }
 
-    const pick = (key: string): Bucket[] => facet[key] ?? [];
-
     return NextResponse.json({
       days,
       totals: { views: totals.views, visitors: totals.visitors },
       daily,
-      pages: pick("pages"),
-      referrers: pick("referrers"),
-      campaigns: pick("campaigns"),
-      countries: pick("countries"),
-      cities: pick("cities"),
-      devices: pick("devices"),
-      browsers: pick("browsers"),
-      os: pick("os"),
-      recent: facet.recent ?? [],
+      visits: facet.visits ?? [],
+      page,
+      pageSize,
     });
   } catch (error) {
     console.error("Error fetching website analytics:", error);

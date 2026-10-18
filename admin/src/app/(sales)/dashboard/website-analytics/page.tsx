@@ -11,7 +11,7 @@ import {
     XAxis,
     YAxis,
 } from "recharts"
-import { ChartLine, Eye, Loader2, RefreshCcw, Repeat, Users, CalendarDays } from "lucide-react"
+import { ChartLine, ChevronLeft, ChevronRight, Eye, Loader2, RefreshCcw, Repeat, Users, CalendarDays } from "lucide-react"
 import { fetchWithAuth } from "@/lib/fetchWithAuth"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -23,14 +23,15 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
    and bots are never recorded. IPs are shown masked (last part hidden); the
    full address is never stored. */
 
-type Bucket = { name: string; views: number; visitors: number }
-
-type RecentVisit = {
+type Visit = {
     path: string
     referrer?: string | null
     utmSource?: string | null
+    utmMedium?: string | null
+    utmCampaign?: string | null
     maskedIp?: string | null
     country?: string | null
+    region?: string | null
     city?: string | null
     device: string
     browser?: string | null
@@ -42,15 +43,9 @@ type AnalyticsData = {
     days: number
     totals: { views: number; visitors: number }
     daily: Array<{ date: string; views: number; visitors: number }>
-    pages: Bucket[]
-    referrers: Bucket[]
-    campaigns: Bucket[]
-    countries: Bucket[]
-    cities: Bucket[]
-    devices: Bucket[]
-    browsers: Bucket[]
-    os: Bucket[]
-    recent: RecentVisit[]
+    visits: Visit[]
+    page: number
+    pageSize: number
 }
 
 const RANGES = [
@@ -63,6 +58,8 @@ const RANGES = [
 
 const formatDay = (date: string) =>
     new Date(`${date}T00:00:00`).toLocaleDateString("en-IN", { day: "numeric", month: "short" })
+
+const PAGE_SIZES = ["25", "50", "100"]
 
 const formatTime = (iso: string) =>
     new Date(iso).toLocaleString("en-IN", {
@@ -88,53 +85,17 @@ function StatCard({ title, value, icon: Icon, hint }: { title: string; value: st
     )
 }
 
-/** Busiest-first list with a bar proportional to views. */
-function BreakdownCard({ title, rows }: { title: string; rows: Bucket[] }) {
-    const max = rows.reduce((m, r) => Math.max(m, r.views), 0) || 1
-    return (
-        <Card>
-            <CardHeader className="pb-3">
-                <CardTitle className="text-base">{title}</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-                {rows.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">No data yet</p>
-                ) : (
-                    <>
-                        <div className="flex justify-between text-xs text-muted-foreground">
-                            <span />
-                            <span>Visitors · Views</span>
-                        </div>
-                        {rows.map((row) => (
-                            <div key={row.name} className="relative overflow-hidden rounded">
-                                <div
-                                    className="absolute inset-y-0 left-0 bg-blue-100 dark:bg-blue-950"
-                                    style={{ width: `${(row.views / max) * 100}%` }}
-                                />
-                                <div className="relative flex items-center justify-between gap-3 px-2 py-1.5 text-sm">
-                                    <span className="truncate" title={row.name}>{row.name}</span>
-                                    <span className="shrink-0 tabular-nums text-muted-foreground">
-                                        {row.visitors.toLocaleString("en-IN")} · {row.views.toLocaleString("en-IN")}
-                                    </span>
-                                </div>
-                            </div>
-                        ))}
-                    </>
-                )}
-            </CardContent>
-        </Card>
-    )
-}
-
 export default function WebsiteAnalyticsPage() {
-    const [days, setDays] = useState("30")
+    const [days, setDays] = useState("7")
+    const [page, setPage] = useState(1)
+    const [pageSize, setPageSize] = useState("25")
     const [data, setData] = useState<AnalyticsData | null>(null)
     const [loading, setLoading] = useState(true)
 
     const load = useCallback(async () => {
         setLoading(true)
         try {
-            const res = await fetchWithAuth(`/api/website-analytics?days=${days}`)
+            const res = await fetchWithAuth(`/api/website-analytics?days=${days}&page=${page}&pageSize=${pageSize}`)
             if (!res.ok) throw new Error((await res.json().catch(() => null))?.error ?? "Failed to load analytics")
             setData(await res.json())
         } catch (error: any) {
@@ -142,7 +103,7 @@ export default function WebsiteAnalyticsPage() {
         } finally {
             setLoading(false)
         }
-    }, [days])
+    }, [days, page, pageSize])
 
     useEffect(() => {
         load()
@@ -151,6 +112,9 @@ export default function WebsiteAnalyticsPage() {
     const totals = data?.totals ?? { views: 0, visitors: 0 }
     const today = data?.daily[data.daily.length - 1]
     const perVisitor = totals.visitors ? (totals.views / totals.visitors).toFixed(1) : "0"
+    const totalPages = Math.max(1, Math.ceil(totals.views / Number(pageSize)))
+    const firstRow = totals.views === 0 ? 0 : (page - 1) * Number(pageSize) + 1
+    const lastRow = Math.min(page * Number(pageSize), totals.views)
 
     return (
         <div className="space-y-6 p-6">
@@ -165,7 +129,13 @@ export default function WebsiteAnalyticsPage() {
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
-                    <Select value={days} onValueChange={setDays}>
+                    <Select
+                        value={days}
+                        onValueChange={(value) => {
+                            setDays(value)
+                            setPage(1)
+                        }}
+                    >
                         <SelectTrigger className="w-[170px]">
                             <SelectValue />
                         </SelectTrigger>
@@ -219,7 +189,9 @@ export default function WebsiteAnalyticsPage() {
                     <Card>
                         <CardHeader>
                             <CardTitle className="text-base">Visitors and page views</CardTitle>
-                            <CardDescription>Per day, India time</CardDescription>
+                            <CardDescription>
+                                Per day, India time · {RANGES.find((r) => r.value === days)?.label}
+                            </CardDescription>
                         </CardHeader>
                         <CardContent>
                             <ResponsiveContainer width="100%" height={280}>
@@ -235,21 +207,37 @@ export default function WebsiteAnalyticsPage() {
                         </CardContent>
                     </Card>
 
-                    <div className="grid gap-4 lg:grid-cols-2">
-                        <BreakdownCard title="Top pages" rows={data?.pages ?? []} />
-                        <BreakdownCard title="Referrers" rows={data?.referrers ?? []} />
-                        <BreakdownCard title="Campaigns (utm_source)" rows={data?.campaigns ?? []} />
-                        <BreakdownCard title="Countries" rows={data?.countries ?? []} />
-                        <BreakdownCard title="Cities" rows={data?.cities ?? []} />
-                        <BreakdownCard title="Devices" rows={data?.devices ?? []} />
-                        <BreakdownCard title="Browsers" rows={data?.browsers ?? []} />
-                        <BreakdownCard title="Operating systems" rows={data?.os ?? []} />
-                    </div>
 
                     <Card>
-                        <CardHeader>
-                            <CardTitle className="text-base">Recent visits</CardTitle>
-                            <CardDescription>Latest 50 page views. IPs are masked; the full address is never stored.</CardDescription>
+                        <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3 space-y-0">
+                            <div>
+                                <CardTitle className="text-base">Visits</CardTitle>
+                                <CardDescription>
+                                    Every page view in {RANGES.find((r) => r.value === days)?.label.toLowerCase()}, newest first.
+                                    IPs are masked; the full address is never stored.
+                                </CardDescription>
+                            </div>
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                <span>Rows</span>
+                                <Select
+                                    value={pageSize}
+                                    onValueChange={(value) => {
+                                        setPageSize(value)
+                                        setPage(1)
+                                    }}
+                                >
+                                    <SelectTrigger className="h-8 w-[80px]">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {PAGE_SIZES.map((size) => (
+                                            <SelectItem key={size} value={size}>
+                                                {size}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
                         </CardHeader>
                         <CardContent className="overflow-x-auto">
                             <Table>
@@ -258,30 +246,36 @@ export default function WebsiteAnalyticsPage() {
                                         <TableHead>Time</TableHead>
                                         <TableHead>Page</TableHead>
                                         <TableHead>Source</TableHead>
+                                        <TableHead>Campaign</TableHead>
                                         <TableHead>Location</TableHead>
                                         <TableHead>Device</TableHead>
+                                        <TableHead>Browser</TableHead>
+                                        <TableHead>OS</TableHead>
                                         <TableHead>IP</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {(data?.recent ?? []).length === 0 ? (
+                                    {(data?.visits ?? []).length === 0 ? (
                                         <TableRow>
-                                            <TableCell colSpan={6} className="py-8 text-center text-muted-foreground">
-                                                No visits recorded yet
+                                            <TableCell colSpan={9} className="py-8 text-center text-muted-foreground">
+                                                No visits in this period
                                             </TableCell>
                                         </TableRow>
                                     ) : (
-                                        data!.recent.map((visit, i) => (
+                                        data!.visits.map((visit, i) => (
                                             <TableRow key={`${visit.createdAt}-${i}`}>
                                                 <TableCell className="whitespace-nowrap">{formatTime(visit.createdAt)}</TableCell>
-                                                <TableCell className="max-w-[220px] truncate">{visit.path}</TableCell>
-                                                <TableCell>{visit.utmSource ?? visit.referrer ?? "Direct"}</TableCell>
+                                                <TableCell className="max-w-[220px] truncate" title={visit.path}>{visit.path}</TableCell>
+                                                <TableCell>{visit.referrer ?? "Direct"}</TableCell>
                                                 <TableCell className="whitespace-nowrap">
-                                                    {[visit.city, visit.country].filter(Boolean).join(", ") || "Unknown"}
+                                                    {[visit.utmSource, visit.utmMedium, visit.utmCampaign].filter(Boolean).join(" / ") || "—"}
                                                 </TableCell>
-                                                <TableCell className="whitespace-nowrap capitalize">
-                                                    {[visit.device, visit.browser, visit.os].filter(Boolean).join(" · ")}
+                                                <TableCell className="whitespace-nowrap">
+                                                    {[visit.city, visit.region, visit.country].filter(Boolean).join(", ") || "Unknown"}
                                                 </TableCell>
+                                                <TableCell className="capitalize">{visit.device}</TableCell>
+                                                <TableCell>{visit.browser ?? "—"}</TableCell>
+                                                <TableCell>{visit.os ?? "—"}</TableCell>
                                                 <TableCell className="whitespace-nowrap font-mono text-xs">
                                                     {visit.maskedIp ?? "—"}
                                                 </TableCell>
@@ -290,6 +284,33 @@ export default function WebsiteAnalyticsPage() {
                                     )}
                                 </TableBody>
                             </Table>
+                            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm text-muted-foreground">
+                                <span>
+                                    {firstRow.toLocaleString("en-IN")}–{lastRow.toLocaleString("en-IN")} of{" "}
+                                    {totals.views.toLocaleString("en-IN")}
+                                </span>
+                                <div className="flex items-center gap-2">
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setPage((p) => p - 1)}
+                                        disabled={loading || page <= 1}
+                                    >
+                                        <ChevronLeft className="h-4 w-4" /> Previous
+                                    </Button>
+                                    <span>
+                                        Page {page} of {totalPages}
+                                    </span>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => setPage((p) => p + 1)}
+                                        disabled={loading || page >= totalPages}
+                                    >
+                                        Next <ChevronRight className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                            </div>
                         </CardContent>
                     </Card>
                 </>

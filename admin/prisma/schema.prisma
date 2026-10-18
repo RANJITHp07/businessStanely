@@ -1002,3 +1002,35 @@ model PortalAccount {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
+
+/// One page load on the public website (business-plus). Written by the site's
+/// /api/track endpoint, read by the Website Analytics page here. The site keeps
+/// a copy of this model in its own schema; this file is the source of truth.
+///
+/// No raw IP is stored: `maskedIp` has the last IPv4 octet (or everything after
+/// the first three IPv6 groups) replaced, and `visitorId` is a keyed hash of IP,
+/// browser and day that cannot be reversed and changes every day.
+///
+/// Rows expire after 12 months through a TTL index on createdAt, created by
+/// scripts/create-pageview-indexes.ts. Prisma cannot declare TTL indexes, so
+/// there is deliberately no @@index([createdAt]) here; it would clash with it.
+model PageView {
+  id          String  @id @default(auto()) @map("_id") @db.ObjectId
+  path        String
+  referrer    String? // hostname only, null for direct visits
+  utmSource   String?
+  utmMedium   String?
+  utmCampaign String?
+  visitorId   String
+  maskedIp    String?
+  country     String? // ISO code, e.g. "IN"
+  region      String?
+  city        String?
+  device      String // mobile | tablet | desktop
+  browser     String?
+  os          String?
+
+  createdAt DateTime @default(now())
+
+  @@map("page_views")
+}

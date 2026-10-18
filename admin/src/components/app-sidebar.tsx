@@ -70,6 +70,7 @@ const allItems: MenuItem[] = [
   { title: "Leads", url: "/dashboard/prospects/tables", icon: UserSearch },
   { title: "Enquiries", url: "/dashboard/enquiries", icon: Inbox },
   { title: "Parameter Areas", url: "/practice-areas", icon: Briefcase },
+  { title: "Website Analytics", url: "/dashboard/website-analytics", icon: ChartLine },
   { title: "Opportunities Dashboard", url: "/dashboard/opportunities", icon: ClipboardList },
   { title: "Opportunities", url: "/dashboard/opportunities/tables", icon: ClipboardList },
   { title: "Execution Agent", url: "/agent", icon: UserRoundPen },
@@ -92,8 +93,8 @@ const allItems: MenuItem[] = [
 
 // Website requests and what the website asks for: enquiries from the client
 // portal and landing page, and the parameter areas (website practice areas)
-// offered along with their parameters.
-const WEBSITE_PANEL = ["Enquiries", "Parameter Areas"];
+// offered along with their parameters, and visits recorded by the website.
+const WEBSITE_PANEL = ["Enquiries", "Parameter Areas", "Website Analytics"];
 
 // Split items into panels
 const agentPanelItems = allItems.filter(

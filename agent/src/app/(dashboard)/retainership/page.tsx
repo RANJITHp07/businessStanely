@@ -661,11 +661,6 @@ export default function RetainershipTable() {
                                     retainershipTasks={true}
                                 />
                                 <SectionTable
-                                    label="Completed"
-                                    tasks={myRetainerships.filter((t) => ["completed"].includes(statusKey(t.status))).slice(0, 3)}
-                                    retainershipTasks={true}
-                                />
-                                <SectionTable
                                     label="Hold"
                                     tasks={myRetainerships.filter((t) => ["hold"].includes(statusKey(t.status))).slice(0, 3)}
                                     retainershipTasks={true}
@@ -679,6 +674,11 @@ export default function RetainershipTable() {
                                             return when ? new Date(when) > new Date() : false;
                                         })
                                         .slice(0, 3)}
+                                    retainershipTasks={true}
+                                />
+                                <SectionTable
+                                    label="Completed"
+                                    tasks={myRetainerships.filter((t) => ["completed"].includes(statusKey(t.status))).slice(0, 3)}
                                     retainershipTasks={true}
                                 />
                             </div>
@@ -707,13 +707,13 @@ export default function RetainershipTable() {
                                     retainershipTasks={true}
                                 />
                                 <SectionTable
-                                    label="Completed"
-                                    tasks={teamRetainerships.filter((t) => ["completed"].includes(statusKey(t.status))).slice(0, 3)}
+                                    label="Hold"
+                                    tasks={teamRetainerships.filter((t) => ["hold"].includes(statusKey(t.status))).slice(0, 3)}
                                     retainershipTasks={true}
                                 />
                                 <SectionTable
-                                    label="Hold"
-                                    tasks={teamRetainerships.filter((t) => ["hold"].includes(statusKey(t.status))).slice(0, 3)}
+                                    label="Completed"
+                                    tasks={teamRetainerships.filter((t) => ["completed"].includes(statusKey(t.status))).slice(0, 3)}
                                     retainershipTasks={true}
                                 />
                             </div>

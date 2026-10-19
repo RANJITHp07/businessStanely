@@ -66,8 +66,8 @@ function statusKey(s?: string) {
 const STATUS_SECTIONS = [
     { label: "New Task", key: "todo", status: "To Do" },
     { label: "In Progress", key: "inprogress", status: "In Progress" },
-    { label: "Completed", key: "completed", status: "Completed" },
     { label: "Hold", key: "hold", status: "Hold" },
+    { label: "Completed", key: "completed", status: "Completed" },
 ] as const
 
 export default function CategoryDetail({ params }: { params: Promise<{ id: string }> | { id: string } }) {

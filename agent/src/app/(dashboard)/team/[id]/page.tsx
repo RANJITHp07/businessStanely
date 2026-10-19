@@ -1156,13 +1156,13 @@ export default function AgentDetails() {
                         agentId={id}
                       />
                       <SectionTable
-                        label="Completed"
-                        tasks={agentTasks.filter((t) => ["completed"].includes(statusKey(t.status))).slice(0, 3)}
+                        label="Hold"
+                        tasks={agentTasks.filter((t) => ["hold"].includes(statusKey(t.status))).slice(0, 3)}
                         agentId={id}
                       />
                       <SectionTable
-                        label="Hold"
-                        tasks={agentTasks.filter((t) => ["hold"].includes(statusKey(t.status))).slice(0, 3)}
+                        label="Completed"
+                        tasks={agentTasks.filter((t) => ["completed"].includes(statusKey(t.status))).slice(0, 3)}
                         agentId={id}
                       />
                     </div>
@@ -1193,14 +1193,14 @@ export default function AgentDetails() {
                         retainershipTasks={true}
                       />
                       <SectionTable
-                        label="Completed"
-                        tasks={agentRetainershipTasks.filter((t) => ["completed"].includes(statusKey(t.status))).slice(0, 3)}
+                        label="Hold"
+                        tasks={agentRetainershipTasks.filter((t) => ["hold"].includes(statusKey(t.status))).slice(0, 3)}
                         agentId={id}
                         retainershipTasks={true}
                       />
                       <SectionTable
-                        label="Hold"
-                        tasks={agentRetainershipTasks.filter((t) => ["hold"].includes(statusKey(t.status))).slice(0, 3)}
+                        label="Completed"
+                        tasks={agentRetainershipTasks.filter((t) => ["completed"].includes(statusKey(t.status))).slice(0, 3)}
                         agentId={id}
                         retainershipTasks={true}
                       />

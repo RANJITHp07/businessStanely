@@ -667,13 +667,13 @@ export default function MyTasksPage() {
         <div className="space-y-[40px]">
           <SectionTable label="New Task" tasks={tasksNew} />
           <SectionTable label="In Progress" tasks={tasksInProgress} />
-          <SectionTable label="Completed" tasks={tasksCompleted} />
+          <SectionTable label="Hold" tasks={tasksHold} />
           <SectionTable
             label="Future Tasks"
             tasks={futureTasks}
             viewMoreHref="/task?trigger=standard"
           />
-          <SectionTable label="Hold" tasks={tasksHold} />
+          <SectionTable label="Completed" tasks={tasksCompleted} />
         </div>
       )}
     </section>

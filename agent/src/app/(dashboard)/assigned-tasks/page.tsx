@@ -108,8 +108,8 @@ export default function AssignedTasksPage() {
         <div className="space-y-[40px]">
           <SectionTable label="New Task" tasks={sections.todo ?? []} assignedByMe />
           <SectionTable label="In Progress" tasks={sections.inprogress ?? []} assignedByMe />
-          <SectionTable label="Completed" tasks={sections.completed ?? []} assignedByMe />
           <SectionTable label="Hold" tasks={sections.hold ?? []} assignedByMe />
+          <SectionTable label="Completed" tasks={sections.completed ?? []} assignedByMe />
         </div>
       )}
     </section>

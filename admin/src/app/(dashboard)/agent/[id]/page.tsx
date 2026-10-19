@@ -1763,9 +1763,9 @@ export default function AgentDetails() {
                         agentId={id}
                       />
                       <SectionTable
-                        label="Completed"
-                        count={standardSectionCounts.completed}
-                        tasks={standardAgentTasks.filter((task) => statusKey(task.status) === "completed").slice(0, 3)}
+                        label="Hold"
+                        count={standardSectionCounts.hold}
+                        tasks={standardAgentTasks.filter((task) => statusKey(task.status) === "hold").slice(0, 3)}
                         agentId={id}
                       />
                       <SectionTable
@@ -1776,9 +1776,9 @@ export default function AgentDetails() {
                         trigger="standard"
                       />
                       <SectionTable
-                        label="Hold"
-                        count={standardSectionCounts.hold}
-                        tasks={standardAgentTasks.filter((task) => statusKey(task.status) === "hold").slice(0, 3)}
+                        label="Completed"
+                        count={standardSectionCounts.completed}
+                        tasks={standardAgentTasks.filter((task) => statusKey(task.status) === "completed").slice(0, 3)}
                         agentId={id}
                       />
                     </div>
@@ -1809,16 +1809,16 @@ export default function AgentDetails() {
                         viewMoreHref={`/task?assignedById=${id}&status=${encodeURIComponent("In Progress")}`}
                       />
                       <SectionTable
-                        label="Completed"
-                        count={assignedSectionCounts.completed}
-                        tasks={assignedTaskSections.completed || []}
-                        viewMoreHref={`/task?assignedById=${id}&status=Completed`}
-                      />
-                      <SectionTable
                         label="Hold"
                         count={assignedSectionCounts.hold}
                         tasks={assignedTaskSections.hold || []}
                         viewMoreHref={`/task?assignedById=${id}&status=Hold`}
+                      />
+                      <SectionTable
+                        label="Completed"
+                        count={assignedSectionCounts.completed}
+                        tasks={assignedTaskSections.completed || []}
+                        viewMoreHref={`/task?assignedById=${id}&status=Completed`}
                       />
                     </div>
                   )}
@@ -2022,16 +2022,16 @@ export default function AgentDetails() {
                         retainershipTasks={true}
                       />
                       <SectionTable
-                        label="Completed"
-                        count={retainershipSectionCounts.completed}
-                        tasks={agentRetainershipTasks.filter((task) => statusKey(task.status) === "completed").slice(0, 3)}
+                        label="Hold"
+                        count={retainershipSectionCounts.hold}
+                        tasks={agentRetainershipTasks.filter((task) => statusKey(task.status) === "hold").slice(0, 3)}
                         agentId={id}
                         retainershipTasks={true}
                       />
                       <SectionTable
-                        label="Hold"
-                        count={retainershipSectionCounts.hold}
-                        tasks={agentRetainershipTasks.filter((task) => statusKey(task.status) === "hold").slice(0, 3)}
+                        label="Completed"
+                        count={retainershipSectionCounts.completed}
+                        tasks={agentRetainershipTasks.filter((task) => statusKey(task.status) === "completed").slice(0, 3)}
                         agentId={id}
                         retainershipTasks={true}
                       />

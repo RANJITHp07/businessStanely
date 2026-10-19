@@ -740,7 +740,6 @@ export default function MyTasksPage() {
         <div className="space-y-[40px]">
           <SectionTable label="New Task" tasks={tasksNew} />
           <SectionTable label="In Progress" tasks={tasksInProgress} />
-          <SectionTable label="Completed" tasks={tasksCompleted} />
           <SectionTable label="Hold" tasks={tasksHold} />
           {futureTasks.length > 0 && (
             <SectionTable
@@ -750,6 +749,7 @@ export default function MyTasksPage() {
               triggerScope="standard"
             />
           )}
+          <SectionTable label="Completed" tasks={tasksCompleted} />
         </div>
       )}
     </section>

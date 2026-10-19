@@ -490,11 +490,7 @@ function TaskSections({
         tasks={tasksInProgress.slice(0, 3)}
         viewMoreHref={taskListHref("In Progress")}
       />
-      <SectionTable
-        label="Completed"
-        tasks={tasksCompleted.slice(0, 3)}
-        viewMoreHref={taskListHref("Completed")}
-      />
+      <SectionTable label="Hold" tasks={tasksHold.slice(0, 3)} viewMoreHref={taskListHref("Hold")} />
       {future && (
         <SectionTable
           label="Future Tasks"
@@ -502,7 +498,11 @@ function TaskSections({
           viewMoreHref={future.viewMoreHref}
         />
       )}
-      <SectionTable label="Hold" tasks={tasksHold.slice(0, 3)} viewMoreHref={taskListHref("Hold")} />
+      <SectionTable
+        label="Completed"
+        tasks={tasksCompleted.slice(0, 3)}
+        viewMoreHref={taskListHref("Completed")}
+      />
     </div>
   );
 }

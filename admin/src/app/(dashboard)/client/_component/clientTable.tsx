@@ -632,7 +632,7 @@ export default function ClientsTable({
                                                 <TableCell>
                                                     <Badge className="bg-gray-200 text-black">{(client as Client & { retainershipCount?: number })?.retainershipCount ?? 0}</Badge>
                                                 </TableCell>
-                                                <TableCell className="text-right">
+                                                <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
                                                     <DropdownMenu>
                                                         <DropdownMenuTrigger asChild>
                                                             <Button variant="ghost" className="h-8 w-8 p-0">

@@ -7,17 +7,89 @@ export async function GET() {
     const lastMonth = new Date();
     lastMonth.setMonth(now.getMonth() - 1);
 
-    const totalAgents = await prisma.agent.count();
+    const [
+      totalAgents,
+      agentsLastMonth,
+      totalClients,
+      individualClients,
+      organizationClients,
+      clientsLastMonth,
+      totalTasks,
+      pendingTasks,
+      inProgressTasks,
+      completedTasks,
+      overdueTasks,
+      tasksLastMonth,
+    ] = await Promise.all([
+      prisma.agent.count(),
+      prisma.agent.count({
+        where: {
+          createdAt: {
+            lt: lastMonth,
+          },
+        },
+      }),
+      prisma.client.count(),
+      prisma.client.count({
+        where: {
+          clientType: {
+            in: ["Individual", "individual"],
+          },
+        },
+      }),
+      prisma.client.count({
+        where: {
+          clientType: {
+            in: ["Organization", "organization"],
+          },
+        },
+      }),
+      prisma.client.count({
+        where: {
+          createdAt: {
+            lt: lastMonth,
+          },
+        },
+      }),
+      prisma.task.count(),
+      prisma.task.count({
+        where: {
+          status: {
+            in: ["To Do", "Pending"],
+          },
+        },
+      }),
+      prisma.task.count({
+        where: {
+          status: "In Progress",
+        },
+      }),
+      prisma.task.count({
+        where: {
+          status: "Completed",
+        },
+      }),
+      prisma.task.count({
+        where: {
+          dueDate: {
+            lt: now,
+          },
+          status: {
+            notIn: ["Completed"],
+          },
+        },
+      }),
+      prisma.task.count({
+        where: {
+          createdAt: {
+            lt: lastMonth,
+          },
+        },
+      }),
+    ]);
+
     const activeAgents = totalAgents;
     const inactiveAgents = 0;
-
-    const agentsLastMonth = await prisma.agent.count({
-      where: {
-        createdAt: {
-          lt: lastMonth,
-        },
-      },
-    });
 
     const agentGrowth =
       agentsLastMonth > 0
@@ -26,74 +98,12 @@ export async function GET() {
           ? 100
           : 0;
 
-    const totalClients = await prisma.client.count();
-    const individualClients = await prisma.client.count({
-      where: {
-        clientType: {
-          in: ["Individual", "individual"],
-        },
-      },
-    });
-    const organizationClients = await prisma.client.count({
-      where: {
-        clientType: {
-          in: ["Organization", "organization"],
-        },
-      },
-    });
-
-    const clientsLastMonth = await prisma.client.count({
-      where: {
-        createdAt: {
-          lt: lastMonth,
-        },
-      },
-    });
-
     const clientGrowth =
       clientsLastMonth > 0
         ? ((totalClients - clientsLastMonth) / clientsLastMonth) * 100
         : totalClients > 0
           ? 100
           : 0;
-
-    const totalTasks = await prisma.task.count();
-    const pendingTasks = await prisma.task.count({
-      where: {
-        status: {
-          in: ["To Do", "Pending"],
-        },
-      },
-    });
-    const inProgressTasks = await prisma.task.count({
-      where: {
-        status: "In Progress",
-      },
-    });
-    const completedTasks = await prisma.task.count({
-      where: {
-        status: "Completed",
-      },
-    });
-
-    const overdueTasks = await prisma.task.count({
-      where: {
-        dueDate: {
-          lt: now,
-        },
-        status: {
-          notIn: ["Completed"],
-        },
-      },
-    });
-
-    const tasksLastMonth = await prisma.task.count({
-      where: {
-        createdAt: {
-          lt: lastMonth,
-        },
-      },
-    });
 
     const taskGrowth =
       tasksLastMonth > 0

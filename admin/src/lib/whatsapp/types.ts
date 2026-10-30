@@ -17,6 +17,21 @@ export type WhatsAppState = {
   };
   error: string | null;
   lastUpdatedAt: string;
+  // Set by the Cloud API provider; absent on the legacy WhatsApp Web engine.
+  provider?: "web" | "cloud";
+  capabilities?: {
+    editMessages: boolean;
+    deleteMessages: boolean;
+    templates: boolean;
+    logout: boolean;
+  };
+  // Present while the Cloud API number is not connected yet, so the admin
+  // panel can run Meta's Embedded Signup.
+  onboarding?: {
+    appId: string;
+    configId: string;
+    graphApiVersion: string;
+  } | null;
 };
 
 export type WhatsAppChatSummary = {
@@ -31,6 +46,9 @@ export type WhatsAppChatSummary = {
   isGroup: boolean;
   isMuted: boolean;
   isPinned: boolean;
+  // Cloud API: free-form replies are allowed until this time (ms); after it
+  // only approved templates can be sent. null = window closed / never opened.
+  windowExpiresAt?: number | null;
 };
 
 export type WhatsAppMessage = {
@@ -48,6 +66,20 @@ export type WhatsAppMessage = {
   quotedMessageId: string | null;
   quotedMessageBody: string | null;
   quotedMessageAuthor: string | null;
+  error?: string | null;
+};
+
+export type WhatsAppTemplate = {
+  name: string;
+  language: string;
+  category: string;
+  headerText: string | null;
+  bodyText: string;
+  footerText: string | null;
+  parameterFormat: "POSITIONAL" | "NAMED";
+  // Placeholder names in order ("1", "2" for positional templates).
+  headerParams: string[];
+  bodyParams: string[];
 };
 
 export type WhatsAppEventPayload = {

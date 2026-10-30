@@ -1,4 +1,6 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+
+import { requireWhatsAppUser } from "@/lib/whatsapp/route-auth";
 import crypto from "crypto";
 
 export const dynamic = "force-dynamic";
@@ -15,7 +17,10 @@ const TTL_MS = 60_000;
 // Mints a short-lived, HMAC-signed token so the browser can open the WhatsApp
 // backend's /stream directly (Amplify/CloudFront can't proxy SSE). The real
 // service token is signed with but never exposed to the client.
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const unauthorized = await requireWhatsAppUser(req);
+  if (unauthorized) return unauthorized;
+
   if (!SERVICE_TOKEN) {
     return NextResponse.json(
       { error: "WhatsApp service token not configured." },

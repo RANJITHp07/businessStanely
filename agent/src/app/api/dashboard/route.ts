@@ -150,7 +150,5 @@ export async function GET(req: NextRequest) {
     };
 
     return NextResponse.json(mockData);
-  } finally {
-    await prisma.$disconnect();
   }
 }

@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { requireWhatsAppUser } from "@/lib/whatsapp/route-auth";
+
 const WHATSAPP_BACKEND_URL =
   process.env.WHATSAPP_BACKEND_URL ??
   process.env.NEXT_PUBLIC_WHATSAPP_BACKEND_URL ??
@@ -10,6 +12,9 @@ const SERVICE_TOKEN =
   "";
 
 export async function GET(req: NextRequest) {
+  const unauthorized = await requireWhatsAppUser(req);
+  if (unauthorized) return unauthorized;
+
   const chatId = req.nextUrl.searchParams.get("chatId") ?? "";
   const limit = req.nextUrl.searchParams.get("limit") ?? "80";
   const url = `${WHATSAPP_BACKEND_URL}/messages?chatId=${encodeURIComponent(chatId)}&limit=${encodeURIComponent(limit)}`;
@@ -28,6 +33,9 @@ export async function GET(req: NextRequest) {
 }
 
 export async function PATCH(req: NextRequest) {
+  const unauthorized = await requireWhatsAppUser(req);
+  if (unauthorized) return unauthorized;
+
   const body = await req.json();
   const url = `${WHATSAPP_BACKEND_URL}/messages`;
 
@@ -48,6 +56,9 @@ export async function PATCH(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
+  const unauthorized = await requireWhatsAppUser(req);
+  if (unauthorized) return unauthorized;
+
   const body = await req.json();
   const url = `${WHATSAPP_BACKEND_URL}/messages`;
 

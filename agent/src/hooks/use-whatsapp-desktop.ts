@@ -7,6 +7,7 @@ import type {
   WhatsAppChatSummary,
   WhatsAppMessage,
   WhatsAppState,
+  WhatsAppTemplate,
 } from "@/lib/whatsapp/types";
 import { resolveAvatarsBatch } from "@/lib/whatsapp/avatar-cache";
 import { openWhatsAppStream } from "@/lib/whatsapp/stream";
@@ -126,6 +127,7 @@ export function useWhatsAppDesktop() {
   const deletedMessageIdsRef = useRef<Set<string>>(new Set());
   const editedMessagesRef = useRef<Map<string, WhatsAppMessage>>(new Map());
   const sendInFlightRef = useRef(false);
+  const [templates, setTemplates] = useState<WhatsAppTemplate[] | null>(null);
 
   const setSelectedChatId = (chatId: string | null) => {
     selectedChatIdRef.current = chatId;
@@ -581,6 +583,9 @@ export function useWhatsAppDesktop() {
                     payload.chatId !== selectedChatIdRef.current
                       ? (c.unreadCount || 0) + (payload.message!.fromMe ? 0 : 1)
                       : 0,
+                  // An incoming message reopens the 24h Cloud API reply window.
+                  windowExpiresAt:
+                    payload.chat?.windowExpiresAt ?? c.windowExpiresAt ?? null,
                 }
               : c,
           );
@@ -700,6 +705,7 @@ export function useWhatsAppDesktop() {
       isGroup: existing?.isGroup || chatId.endsWith("@g.us"),
       isMuted: existing?.isMuted || false,
       isPinned: existing?.isPinned || false,
+      windowExpiresAt: existing?.windowExpiresAt ?? null,
     }));
 
     if (!hasFile) {
@@ -784,6 +790,7 @@ export function useWhatsAppDesktop() {
         isGroup: existing?.isGroup || chatId.endsWith("@g.us"),
         isMuted: existing?.isMuted || false,
         isPinned: existing?.isPinned || false,
+        windowExpiresAt: existing?.windowExpiresAt ?? null,
       }));
     } catch (error) {
       if (!hasFile) {
@@ -842,6 +849,7 @@ export function useWhatsAppDesktop() {
         isGroup: existing?.isGroup || chatId.endsWith("@g.us"),
         isMuted: existing?.isMuted || false,
         isPinned: existing?.isPinned || false,
+        windowExpiresAt: existing?.windowExpiresAt ?? null,
       }));
     } catch (error) {
       if (previousEditedMessage) {
@@ -889,6 +897,7 @@ export function useWhatsAppDesktop() {
           isGroup: existing?.isGroup || chatId.endsWith("@g.us"),
           isMuted: existing?.isMuted || false,
           isPinned: existing?.isPinned || false,
+          windowExpiresAt: existing?.windowExpiresAt ?? null,
         }));
       }
     } catch (error) {
@@ -905,6 +914,61 @@ export function useWhatsAppDesktop() {
     setSelectedChatId(null);
     setSearchQuery("");
     await loadStatus();
+  };
+
+  // --- CLOUD API: TEMPLATES ---
+  const loadTemplates = async (refresh = false) => {
+    const data = await getJson<{ templates: WhatsAppTemplate[] }>(
+      `/api/whatsapp/templates${refresh ? "?refresh=1" : ""}`,
+    );
+    setTemplates(data.templates ?? []);
+    return data.templates ?? [];
+  };
+
+  const sendTemplate = async (
+    template: WhatsAppTemplate,
+    headerValues: string[],
+    bodyValues: string[],
+  ) => {
+    const chatId = selectedChatIdRef.current;
+    if (!chatId) return;
+    setIsSending(true);
+    try {
+      const data = await getJson<{ message: WhatsAppMessage }>(
+        "/api/whatsapp/send-template",
+        {
+          method: "POST",
+          body: JSON.stringify({
+            chatId,
+            name: template.name,
+            language: template.language,
+            headerValues,
+            bodyValues,
+          }),
+        },
+      );
+      setMessages((current) =>
+        current.some((message) => message.id === data.message.id)
+          ? current
+          : [...current, data.message],
+      );
+      upsertChatPreview(chatId, (existing) => ({
+        id: chatId,
+        name: existing?.name || fallbackChatName(chatId),
+        phoneNumber: existing?.phoneNumber || fallbackChatPhone(chatId),
+        lastMessage: data.message.body,
+        timestamp: data.message.timestamp,
+        unreadCount: 0,
+        avatarSeed: existing?.avatarSeed || fallbackChatName(chatId),
+        avatarUrl: existing?.avatarUrl || null,
+        isGroup: false,
+        isMuted: existing?.isMuted || false,
+        isPinned: existing?.isPinned || false,
+        windowExpiresAt: existing?.windowExpiresAt ?? null,
+      }));
+    } finally {
+      setIsSending(false);
+    }
   };
 
   return {
@@ -930,5 +994,8 @@ export function useWhatsAppDesktop() {
     state,
     isChatsLoading,
     chatsError,
+    templates,
+    loadTemplates,
+    sendTemplate,
   };
 }

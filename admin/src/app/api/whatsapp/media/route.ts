@@ -1,5 +1,7 @@
 import { NextRequest } from "next/server";
 
+import { requireWhatsAppUser } from "@/lib/whatsapp/route-auth";
+
 const WHATSAPP_BACKEND_URL =
   process.env.WHATSAPP_BACKEND_URL ??
   process.env.NEXT_PUBLIC_WHATSAPP_BACKEND_URL ??
@@ -10,6 +12,9 @@ const SERVICE_TOKEN =
   "";
 
 export async function GET(req: NextRequest) {
+  const unauthorized = await requireWhatsAppUser(req);
+  if (unauthorized) return unauthorized;
+
   const { searchParams } = new URL(req.url);
   const messageId = searchParams.get("messageId");
   if (!messageId) {

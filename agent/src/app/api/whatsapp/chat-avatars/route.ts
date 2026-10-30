@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { requireWhatsAppUser } from "@/lib/whatsapp/route-auth";
+
 const WHATSAPP_BACKEND_URL =
   process.env.WHATSAPP_BACKEND_URL ??
   process.env.NEXT_PUBLIC_WHATSAPP_BACKEND_URL ??
@@ -12,6 +14,9 @@ const SERVICE_TOKEN =
 // Batch avatar resolution — one request for a whole page of chats instead of
 // one request per chat row.
 export async function POST(req: NextRequest) {
+  const unauthorized = await requireWhatsAppUser(req);
+  if (unauthorized) return unauthorized;
+
   const body = await req.json().catch(() => null);
   const chatIds = Array.isArray(body?.chatIds) ? body.chatIds : [];
   if (chatIds.length === 0) {

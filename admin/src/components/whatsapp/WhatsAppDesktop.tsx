@@ -5,6 +5,7 @@ import { toast } from "react-toastify";
 
 import "./whatsapp-theme.css";
 import {
+    AlertCircle,
     Paperclip,
     ArrowLeft,
     Check,
@@ -43,6 +44,12 @@ import { useWhatsAppDesktop } from "@/hooks/use-whatsapp-desktop";
 import type { WhatsAppChatSummary, WhatsAppMessage } from "@/lib/whatsapp/types";
 import { isAudioFile } from "@/lib/audioAttachment";
 import { getCachedAvatar, resolveAvatar } from "@/lib/whatsapp/avatar-cache";
+import {
+    CloudConnectPanel,
+    TemplateComposer,
+    formatWindowRemaining,
+    isReplyWindowOpen,
+} from "@/components/whatsapp/CloudPanels";
 import {
     Dialog,
     DialogContent,
@@ -445,7 +452,18 @@ function WhatsAppDesktop() {
         isChatsLoading,
         isSearching,
         chatsError,
+        templates,
+        loadTemplates,
+        sendTemplate,
+        completeOnboarding,
     } = useWhatsAppDesktop();
+    // Cloud API (Meta) cannot edit/delete sent messages or log out, and only
+    // allows free-form replies within 24h of the customer's last message.
+    const isCloud = state.provider === "cloud";
+    const canEditMessages = state.capabilities?.editMessages ?? true;
+    const canDeleteMessages = state.capabilities?.deleteMessages ?? true;
+    const canLogout = state.capabilities?.logout ?? true;
+    const [now, setNow] = useState(() => Date.now());
     const [mobileSidebarOpen, setMobileSidebarOpen] = useState(true);
     const [isRetrying, setIsRetrying] = useState(false);
     const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
@@ -468,6 +486,13 @@ function WhatsAppDesktop() {
     useEffect(() => {
         setReplyTarget(null);
     }, [selectedChatId]);
+
+    // Re-evaluate the 24h reply window while a chat stays open.
+    useEffect(() => {
+        if (!isCloud) return;
+        const timer = setInterval(() => setNow(Date.now()), 30000);
+        return () => clearInterval(timer);
+    }, [isCloud]);
 
     const toggleTheme = () => {
         setTheme((current) => {
@@ -665,6 +690,10 @@ function WhatsAppDesktop() {
         );
     }
 
+    if (state.status !== "ready" && isCloud) {
+        return <CloudConnectPanel state={state} theme={theme} onComplete={completeOnboarding} />;
+    }
+
     if (state.status !== "ready") {
         return (
             <div className="wa-root relative flex min-h-screen w-full items-center justify-center overflow-hidden bg-[var(--wa-bg)] px-6 py-12 text-white" data-wa-theme={theme}>
@@ -776,14 +805,14 @@ function WhatsAppDesktop() {
                             >
                                 {theme === "dark" ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
                             </button>
-                            <button
+                            {canLogout ? <button
                                 type="button"
                                 onClick={logout}
                                 className="rounded-full p-2 text-[var(--wa-muted2)] transition hover:bg-[var(--wa-hover)] hover:text-white"
                                 title="Log out WhatsApp session"
                             >
                                 <LogOut className="h-5 w-5" />
-                            </button>
+                            </button> : null}
                         </div>
                     </div>
 
@@ -958,7 +987,7 @@ function WhatsAppDesktop() {
                                                                 </button>
                                                                 {message.fromMe ? (
                                                                     <>
-                                                                        <button
+                                                                        {canEditMessages ? <button
                                                                             type="button"
                                                                             onClick={() => startEdit(message)}
                                                                             disabled={!canEditMessage(message)}
@@ -966,15 +995,15 @@ function WhatsAppDesktop() {
                                                                             title="Edit message"
                                                                         >
                                                                             <Pencil className="h-3.5 w-3.5" />
-                                                                        </button>
-                                                                        <button
+                                                                        </button> : null}
+                                                                        {canDeleteMessages ? <button
                                                                             type="button"
                                                                             onClick={() => setMessageToDelete(message)}
                                                                             className="rounded p-1 text-[#54656f] hover:bg-black/10"
                                                                             title="Delete message"
                                                                         >
                                                                             <Trash2 className="h-3.5 w-3.5" />
-                                                                        </button>
+                                                                        </button> : null}
                                                                     </>
                                                                 ) : null}
                                                             </div>
@@ -982,7 +1011,14 @@ function WhatsAppDesktop() {
                                                             <div className="mt-1 flex items-center justify-end gap-1 text-[11px] text-[#667781]">
                                                                 <span>{formatTime(message.timestamp)}</span>
                                                                 {message.fromMe ? (
-                                                                    message.ack && message.ack > 1 ? (
+                                                                    message.ack === -1 ? (
+                                                                        <span className="flex items-center gap-1 text-red-600" title={message.error || "Not delivered"}>
+                                                                            <AlertCircle className="h-3.5 w-3.5" />
+                                                                            Not delivered
+                                                                        </span>
+                                                                    ) : isCloud && message.ack === 2 ? (
+                                                                        <CheckCheck className="h-3.5 w-3.5" />
+                                                                    ) : message.ack && message.ack > 1 ? (
                                                                         <CheckCheck className="h-3.5 w-3.5 text-[#53bdeb]" />
                                                                     ) : (
                                                                         <Check className="h-3.5 w-3.5" />
@@ -999,12 +1035,29 @@ function WhatsAppDesktop() {
                             </div>
 
                             <footer className="bg-[var(--wa-header)] px-3 py-3 md:px-4">
-                                <MessageComposer
-                                    isSending={isSending}
-                                    onSend={sendMessage}
-                                    replyTarget={replyTarget}
-                                    onCancelReply={() => setReplyTarget(null)}
-                                />
+                                {isCloud && !isReplyWindowOpen(selectedChat.windowExpiresAt, now) ? (
+                                    <TemplateComposer
+                                        key={selectedChat.id}
+                                        templates={templates}
+                                        isSending={isSending}
+                                        onLoad={loadTemplates}
+                                        onSend={sendTemplate}
+                                    />
+                                ) : (
+                                    <>
+                                        {isCloud && selectedChat.windowExpiresAt ? (
+                                            <p className="mb-2 flex items-center gap-1.5 text-[11px] text-[var(--wa-muted)]">
+                                                Reply window closes in {formatWindowRemaining(selectedChat.windowExpiresAt, now)}
+                                            </p>
+                                        ) : null}
+                                        <MessageComposer
+                                            isSending={isSending}
+                                            onSend={sendMessage}
+                                            replyTarget={replyTarget}
+                                            onCancelReply={() => setReplyTarget(null)}
+                                        />
+                                    </>
+                                )}
                             </footer>
                         </>
                     ) : (

@@ -1,5 +1,7 @@
 import { NextRequest } from "next/server";
 
+import { requireWhatsAppUser } from "@/lib/whatsapp/route-auth";
+
 export const dynamic = "force-dynamic";
 
 const WHATSAPP_BACKEND_URL =
@@ -12,6 +14,9 @@ const SERVICE_TOKEN =
   "";
 
 export async function GET(req: NextRequest) {
+  const unauthorized = await requireWhatsAppUser(req);
+  if (unauthorized) return unauthorized;
+
   const backendStreamUrl = `${WHATSAPP_BACKEND_URL}/stream`;
 
   let upstreamReader: ReadableStreamDefaultReader<Uint8Array> | null = null;

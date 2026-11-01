@@ -16,15 +16,10 @@ import {
   ChartTooltipContent,
 } from "@/components/ui/chart";
 import {
-  XAxis,
-  YAxis,
-  CartesianGrid,
   ResponsiveContainer,
   PieChart,
   Pie,
   Cell,
-  LineChart,
-  Line,
 } from "recharts";
 import {
   Users,
@@ -98,15 +93,6 @@ const mockDashboardStats = {
 };
 
 // Chart data
-
-const monthlyTasksData = [
-  { month: "Jan", completed: 45, created: 52 },
-  { month: "Feb", completed: 52, created: 48 },
-  { month: "Mar", completed: 48, created: 61 },
-  { month: "Apr", completed: 61, created: 55 },
-  { month: "May", completed: 55, created: 67 },
-  { month: "Jun", completed: 67, created: 59 },
-];
 
 // const agentPerformanceData = [
 //     { name: "John Smith", tasks: 28, completed: 25 },
@@ -456,7 +442,7 @@ export default function Dashboard() {
 
 
       {/* Charts Row 1 */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 gap-6">
         {/* Task Status Distribution */}
         <Card>
           <CardHeader>
@@ -519,53 +505,6 @@ export default function Dashboard() {
           </CardContent>
 
         </Card>
-
-        {/* Monthly Tasks Trend */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Monthly Tasks Trend</CardTitle>
-            <CardDescription>
-              Tasks created vs completed over time
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="overflow-x-auto">
-            <div className="w-full h-[300px]">
-              <ChartContainer config={chartConfig} className="w-full h-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={monthlyTasksData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="month" />
-                    <YAxis />
-                    <ChartTooltip content={<ChartTooltipContent />} />
-                    <Line
-                      type="monotone"
-                      dataKey="completed"
-                      stroke="var(--color-completed)"
-                      strokeWidth={3}
-                      dot={{
-                        fill: "var(--color-completed)",
-                        strokeWidth: 2,
-                        r: 4,
-                      }}
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="created"
-                      stroke="var(--color-created)"
-                      strokeWidth={3}
-                      dot={{
-                        fill: "var(--color-created)",
-                        strokeWidth: 2,
-                        r: 4,
-                      }}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </ChartContainer>
-            </div>
-          </CardContent>
-        </Card>
-
       </div>
 
       {/* Charts Row 2 */}

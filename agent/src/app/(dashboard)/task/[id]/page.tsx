@@ -56,11 +56,21 @@ import {
   Mail,
   Timer,
   Users,
+  ListChecks,
 } from "lucide-react";
 import { format } from "date-fns";
 import { Checkbox } from "@/components/ui/checkbox";
 import { uploadFileToS3Direct } from "@/lib/directUpload";
 import { isAudioAttachment } from "@/lib/audioAttachment";
+import { useAuth } from "@/hooks/useAuth";
+import {
+  DAILY_TRACK_PREFIX,
+  istDateKey,
+  isDailyTrackContent,
+} from "@/lib/dailyTrack";
+import { needsDailyTrack, type DailyTrackEntry } from "@/components/DailyTrackCell";
+import { DailyTrackForm } from "@/components/DailyTrackForm";
+import { DailyTrackList } from "@/components/DailyTrackList";
 
 // Task interface based on the API response
 interface Task {
@@ -137,6 +147,7 @@ interface Comment {
   authorType: string;
   content: string;
   createdAt: string;
+  updatedAt?: string;
   commentDate?: string;
   startTime?: string;
   endTime?: string;
@@ -243,6 +254,7 @@ export default function TaskDetails() {
   const router = useRouter();
   const taskId = params.id as string;
 
+  const { agent } = useAuth();
   const [task, setTask] = useState<Task | null>(null);
   // For optimistic UI
   const taskRef = useRef<Task | null>(null);
@@ -413,7 +425,43 @@ export default function TaskDetails() {
   };
 
   const daysRemaining = calculateDaysRemaining();
-  const commentsData = task?.comments || [];
+  // Daily track notes live in their own tab, so Interactions leaves them out.
+  const allComments = task?.comments || [];
+  const commentsData = allComments.filter((c) => !isDailyTrackContent(c.content));
+  const dailyTrackNotes = allComments.filter((c) => isDailyTrackContent(c.content));
+  const todayKey = istDateKey();
+  const todayDailyTrack = dailyTrackNotes.find(
+    (c) =>
+      c.authorType === "AGENT" &&
+      c.agent?.id === agent?.id &&
+      istDateKey(new Date(c.createdAt)) === todayKey,
+  );
+  const canAddDailyTrack = task ? needsDailyTrack(task, agent?.id) : false;
+
+  const handleDailyTrackSaved = (entry: DailyTrackEntry) => {
+    const content = `${DAILY_TRACK_PREFIX} ${entry.note}`;
+    setTask((prev) => {
+      if (!prev) return prev;
+      const comments = prev.comments || [];
+      if (comments.some((c) => c.id === entry.id)) {
+        return {
+          ...prev,
+          comments: comments.map((c) =>
+            c.id === entry.id ? { ...c, content, updatedAt: entry.updatedAt } : c,
+          ),
+        };
+      }
+      const created: Comment = {
+        id: entry.id,
+        authorType: "AGENT",
+        content,
+        createdAt: entry.updatedAt,
+        updatedAt: entry.updatedAt,
+        agent: agent ? { id: agent.id, name: agent.name } : undefined,
+      };
+      return { ...prev, comments: [created, ...comments] };
+    });
+  };
 
   const getPriorityBadge = (priority: string) => {
     const colors = {
@@ -942,12 +990,13 @@ export default function TaskDetails() {
 
   const getInteractionType = (content?: string) => {
     if (content?.startsWith("[CLIENT_UPDATE]")) return "CLIENT_UPDATE";
+    if (content?.startsWith("[DAILY_TRACK]")) return "DAILY_TRACK";
     return "NORMAL";
   };
 
   const getDisplayInteractionContent = (content?: string) => {
     if (!content) return "";
-    return content.replace(/^\[(CLIENT_UPDATE|NORMAL)\]\s*/, "");
+    return content.replace(/^\[(CLIENT_UPDATE|NORMAL|DAILY_TRACK)\]\s*/, "");
   };
 
   useEffect(() => {
@@ -1194,7 +1243,12 @@ export default function TaskDetails() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="To Do">To Do</SelectItem>
+                      <SelectItem
+                        value="To Do"
+                        disabled={task.status !== "To Do"}
+                      >
+                        To Do
+                      </SelectItem>
                       <SelectItem value="In Progress">
                         In Progress
                       </SelectItem>
@@ -1253,12 +1307,20 @@ export default function TaskDetails() {
               Interactions ({commentsData.length})
             </p>
           </TabsTrigger>
+          <TabsTrigger value="dailytrack" className="flex items-center gap-2">
+            <ListChecks className="h-4 w-4 hidden md:block" />
+            <p className="text-[12px] md:text-[14px]">
+              Daily Track ({dailyTrackNotes.length})
+            </p>
+          </TabsTrigger>
+          {/* Time Log tab hidden for now
           <TabsTrigger value="timelog" className="flex items-center gap-2">
             <Clock className="h-4 w-4 hidden md:block" />
             <p className="text-[12px] md:text-[14px]">
               Time Log ({timeLogsData.length})
             </p>
           </TabsTrigger>
+          */}
         </TabsList>
 
         {/* Task Details Tab */}
@@ -1730,7 +1792,9 @@ export default function TaskDetails() {
                             <Badge variant="outline" className="text-[10px] uppercase tracking-wide">
                               {getInteractionType(comment.content) === "CLIENT_UPDATE"
                                 ? "Client Update"
-                                : "Normal"}
+                                : getInteractionType(comment.content) === "DAILY_TRACK"
+                                  ? "Daily Track"
+                                  : "Normal"}
                             </Badge>
                             <span className="text-xs text-muted-foreground">
                               {formatDateTime(comment.createdAt)}
@@ -1858,7 +1922,38 @@ export default function TaskDetails() {
           </Card>
         </TabsContent>
 
-        {/* Time Log Tab */}
+        {/* Daily Track Tab */}
+        <TabsContent value="dailytrack" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Daily Track</CardTitle>
+              <CardDescription>
+                One short note per day while the task is In Progress
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {canAddDailyTrack ? (
+                <DailyTrackForm
+                  taskId={task.id}
+                  todayNote={
+                    todayDailyTrack
+                      ? getDisplayInteractionContent(todayDailyTrack.content)
+                      : undefined
+                  }
+                  onSaved={handleDailyTrackSaved}
+                />
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Daily track can be added only on In Progress tasks assigned to you.
+                </p>
+              )}
+              <Separator />
+              <DailyTrackList notes={dailyTrackNotes} />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Time Log Tab (hidden for now)
         <TabsContent value="timelog" className="space-y-6">
           <Card>
             <CardHeader>
@@ -1868,7 +1963,6 @@ export default function TaskDetails() {
               <CardDescription>Track time spent on this task.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              {/* Add Time Log */}
               <div className="space-y-3">
                 <Label className="text-sm font-medium">
                   Log New Time Entry
@@ -1911,7 +2005,6 @@ export default function TaskDetails() {
 
               <Separator />
 
-              {/* Time Logs List */}
               <div className="space-y-3">
                 {timeLogsData.length === 0 ? (
                   <p className="text-muted-foreground">
@@ -1949,6 +2042,7 @@ export default function TaskDetails() {
             </CardContent>
           </Card>
         </TabsContent>
+        */}
       </Tabs>
     </div>
   );

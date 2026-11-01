@@ -31,6 +31,11 @@ import {
 } from "@/components/ui/tooltip";
 import { Progress } from "@/components/ui/progress";
 import Link from "next/link";
+import {
+  DailyTrackCell,
+  needsDailyTrack,
+  useDailyTrack,
+} from "@/components/DailyTrackCell";
 
 function formatDate(dateString?: string) {
   if (!dateString) return "-";
@@ -158,6 +163,17 @@ export function SectionTable({ label, tasks, retainershipTasks, trigger, trigger
     return "text-blue-600"; // New Task
   })();
 
+  // Daily track applies to the agent's own In Progress work, so only that
+  // section gets the checkbox column.
+  const { agent } = useAuth();
+  const showDailyTrack =
+    label.toLowerCase().includes("progress") &&
+    !assignedByMe &&
+    !trigger &&
+    !retainershipTasks;
+  const { entries: dailyTrack, setEntry: setDailyTrack } =
+    useDailyTrack(showDailyTrack);
+
   return (
     <>
       <div className="flex items-center gap-4 min-w-0">
@@ -184,6 +200,7 @@ export function SectionTable({ label, tasks, retainershipTasks, trigger, trigger
               <div className="rounded-md overflow-hidden hidden md:block bg-white shadow-sm">
                 <Table className="w-full table-fixed text-sm [&_th]:py-3 [&_th]:h-12 [&_td]:py-3">
                   <colgroup>
+                    {showDailyTrack && <col className="w-[56px]" />}
                     <col className="w-[180px]" />
                     <col className="w-[130px]" />
                     <col className="w-[140px]" />
@@ -194,6 +211,11 @@ export function SectionTable({ label, tasks, retainershipTasks, trigger, trigger
                   </colgroup>
                   <TableHeader>
                     <TableRow className="bg-[#002FFF]">
+                      {showDailyTrack && (
+                        <TableHead className="text-white text-center px-1">
+                          Track
+                        </TableHead>
+                      )}
                       <TableHead className="text-white">Task</TableHead>
                       <TableHead className="text-white">Client</TableHead>
                       <TableHead className="text-white">Assigned To</TableHead>
@@ -211,7 +233,7 @@ export function SectionTable({ label, tasks, retainershipTasks, trigger, trigger
                     {tasks.length === 0 ? (
                       <TableRow>
                         <TableCell
-                          colSpan={7}
+                          colSpan={showDailyTrack ? 8 : 7}
                           className="text-center py-4 text-muted-foreground"
                         >
                           No tasks found.
@@ -277,6 +299,17 @@ export function SectionTable({ label, tasks, retainershipTasks, trigger, trigger
                             key={t.id}
                             className="hover:bg-muted/50 even:bg-muted/30"
                           >
+                            {showDailyTrack && (
+                              <TableCell className="align-top px-1">
+                                {needsDailyTrack(t, agent?.id) ? (
+                                  <DailyTrackCell
+                                    taskId={t.id}
+                                    entry={dailyTrack[t.id]}
+                                    onSaved={setDailyTrack}
+                                  />
+                                ) : null}
+                              </TableCell>
+                            )}
                             <TableCell
                               className="truncate max-w-[260px] aligne-top"
                               title={t.title || shortId}
@@ -448,7 +481,14 @@ export function SectionTable({ label, tasks, retainershipTasks, trigger, trigger
                         className="rounded-md border bg-white p-3 shadow-sm"
                       >
                         <div className="flex items-center justify-between gap-3">
-                          <div className="flex flex-col">
+                          {showDailyTrack && needsDailyTrack(t, agent?.id) ? (
+                            <DailyTrackCell
+                              taskId={t.id}
+                              entry={dailyTrack[t.id]}
+                              onSaved={setDailyTrack}
+                            />
+                          ) : null}
+                          <div className="flex flex-col flex-1 min-w-0">
                             <Link
                               href={`/task/${t.id}`}
                               className="font-medium text-[#1f7aff]"

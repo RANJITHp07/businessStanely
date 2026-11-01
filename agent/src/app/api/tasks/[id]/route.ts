@@ -279,6 +279,15 @@ export async function PUT(
       );
     }
 
+    // Once work has started an agent cannot send the task back to To Do;
+    // only an admin can.
+    if (body.status === "To Do" && task.status !== "To Do") {
+      return NextResponse.json(
+        { error: "A task that has started cannot be moved back to To Do" },
+        { status: 400 },
+      );
+    }
+
     // Enforce mutual exclusivity for followUpDuration and statusCheckDuration
     let { followUpDuration, statusCheckDuration } = body;
     if (

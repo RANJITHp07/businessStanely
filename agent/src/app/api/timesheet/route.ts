@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentAgent } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { Prisma } from "@prisma/client";
+import { DAILY_TRACK_MATCH, isDailyTrackContent } from "@/lib/dailyTrack";
 
 const IST_TIME_ZONE = "Asia/Kolkata";
 
@@ -105,8 +106,10 @@ export async function GET(req: NextRequest) {
 
     // A comment counts as in range when its startTime falls in range, or when it
     // has no startTime at all and was created in range (createdAt is used as the
-    // fallback work time below).
+    // fallback work time below). Daily track notes are status updates, not
+    // logged work, so they never count.
     const commentInRange: Prisma.CommentWhereInput = {
+      NOT: { content: { startsWith: DAILY_TRACK_MATCH } },
       OR: [
         { startTime: { gte: startDate, lte: endDate } },
         {
@@ -260,6 +263,8 @@ export async function GET(req: NextRequest) {
         agent.email;
 
       task.comments.forEach((comment) => {
+        if (isDailyTrackContent(comment.content)) return;
+
         // Fall back to createdAt so an entry logged without an explicit start
         // time still shows up instead of becoming an Invalid Date.
         const startAt = comment.startTime

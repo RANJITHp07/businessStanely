@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentAdmin } from "@/lib/auth";
 import prisma from "@/lib/prisma";
+import { isDailyTrackContent } from "@/lib/dailyTrack";
 
 const IST_TIME_ZONE = "Asia/Kolkata";
 
@@ -97,6 +98,9 @@ export async function GET(req: NextRequest) {
       const userName = task.assignedTo?.name || "Unknown";
 
       task.comments.forEach((comment) => {
+        // Daily track notes are status updates, not logged work.
+        if (isDailyTrackContent(comment.content)) return;
+
         const commentDate = comment.startTime
           ? new Date(comment.startTime)
           : new Date(comment.createdAt);

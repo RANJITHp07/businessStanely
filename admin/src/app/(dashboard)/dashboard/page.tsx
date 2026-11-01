@@ -15,25 +15,17 @@ import {
   ChartTooltipContent,
 } from "@/components/ui/chart";
 import {
-  XAxis,
-  YAxis,
-  CartesianGrid,
   ResponsiveContainer,
   PieChart,
   Pie,
   Cell,
-  LineChart,
-  Line,
 } from "recharts";
 import {
   Users,
   UserCheck,
   FileText,
-  CheckCircle,
-  AlertTriangle,
   TrendingUp,
   TrendingDown,
-  Calendar,
   Building2,
   User,
 } from "lucide-react";
@@ -71,15 +63,6 @@ const mockDashboardStats = {
 
 // Chart data
 
-const monthlyTasksData = [
-  { month: "Jan", completed: 45, created: 52 },
-  { month: "Feb", completed: 52, created: 48 },
-  { month: "Mar", completed: 48, created: 61 },
-  { month: "Apr", completed: 61, created: 55 },
-  { month: "May", completed: 55, created: 67 },
-  { month: "Jun", completed: 67, created: 59 },
-];
-
 // const agentPerformanceData = [
 //     { name: "John Smith", tasks: 28, completed: 25 },
 //     { name: "Sarah Johnson", tasks: 24, completed: 22 },
@@ -96,41 +79,6 @@ const monthlyTasksData = [
 //     { month: "May", individual: 96, organization: 56 },
 //     { month: "Jun", individual: 98, organization: 58 },
 // ];
-
-const recentActivities = [
-  {
-    id: 1,
-    type: "task_completed",
-    description: "Contract Review completed by John Smith",
-    time: "2 hours ago",
-    icon: CheckCircle,
-    color: "text-green-600",
-  },
-  {
-    id: 2,
-    type: "client_added",
-    description: "New client 'TechCorp Inc.' added to system",
-    time: "4 hours ago",
-    icon: UserCheck,
-    color: "text-blue-600",
-  },
-  {
-    id: 3,
-    type: "task_overdue",
-    description: "Legal Research task is now overdue",
-    time: "6 hours ago",
-    icon: AlertTriangle,
-    color: "text-red-600",
-  },
-  {
-    id: 4,
-    type: "agent_assigned",
-    description: "Emily Davis Ownership to new case",
-    time: "8 hours ago",
-    icon: Users,
-    color: "text-purple-600",
-  },
-];
 
 export default function Dashboard() {
   const [dashboardStats, setDashboardStats] = useState(mockDashboardStats);
@@ -345,7 +293,7 @@ export default function Dashboard() {
 
 
       {/* Charts Row 1 */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 gap-6">
         {/* Task Status Distribution */}
         <Card>
           <CardHeader>
@@ -412,92 +360,7 @@ export default function Dashboard() {
           </CardContent>
 
         </Card>
-
-        {/* Monthly Tasks Trend */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Monthly Tasks Trend</CardTitle>
-            <CardDescription>
-              Tasks created vs completed over time
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="overflow-x-auto">
-            <div className="w-full h-[300px]">
-              <ChartContainer config={chartConfig} className="w-full h-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={monthlyTasksData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="month" />
-                    <YAxis />
-                    <ChartTooltip content={<ChartTooltipContent />} />
-                    <Line
-                      type="monotone"
-                      dataKey="completed"
-                      stroke="var(--color-completed)"
-                      strokeWidth={3}
-                      dot={{
-                        fill: "var(--color-completed)",
-                        strokeWidth: 2,
-                        r: 4,
-                      }}
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="created"
-                      stroke="var(--color-created)"
-                      strokeWidth={3}
-                      dot={{
-                        fill: "var(--color-created)",
-                        strokeWidth: 2,
-                        r: 4,
-                      }}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </ChartContainer>
-            </div>
-          </CardContent>
-        </Card>
-
       </div>
-
-      {/* Charts Row 2 */}
-
-
-      {/* Recent Activity */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Calendar className="h-5 w-5" />
-            Recent Activity
-          </CardTitle>
-          <CardDescription>
-            Latest updates and activities in your system
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {recentActivities.map((activity) => (
-              <div
-                key={activity.id}
-                className="flex items-center space-x-4 p-3 rounded-lg bg-muted/50"
-              >
-                <div
-                  className={`p-2 rounded-full bg-background ${activity.color}`}
-                >
-                  <activity.icon className="h-4 w-4" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm font-medium">{activity.description}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {activity.time}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
 
       {/* Quick Actions */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

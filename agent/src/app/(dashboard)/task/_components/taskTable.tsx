@@ -73,6 +73,11 @@ import { X } from "lucide-react";
 import { useTablePage } from "@/hooks/useTablePage";
 import ServiceFilter from "./serviceFilter";
 import { useAgentContext } from "@/lib/agent-context";
+import {
+  DailyTrackCell,
+  needsDailyTrack,
+  useDailyTrack,
+} from "@/components/DailyTrackCell";
 
 const priorities = ["All Priorities", "Low", "Medium", "High"];
 const statuses = ["All Status", "To Do", "In Progress", "Hold", "Completed", "Abandoned"];
@@ -81,6 +86,7 @@ const durations = ["24hr", "48hr", "1w"];
 export default function TasksTable() {
   const router = useRouter();
   const currentAgent = useAgentContext();
+  const { entries: dailyTrack, setEntry: setDailyTrack } = useDailyTrack();
   // Hide the create entry point when the admin has revoked the permission.
   // Undefined while the agent is still loading, so default to showing it.
   const canCreateTask = currentAgent?.canCreateTask !== false;
@@ -850,6 +856,7 @@ export default function TasksTable() {
                   <Table>
                     <TableHeader>
                       <TableRow>
+                        <TableHead className="w-12 text-center">Track</TableHead>
                         <TableHead>Task</TableHead>
                         <TableHead>Client</TableHead>
                         <TableHead>Assigned To</TableHead>
@@ -864,7 +871,7 @@ export default function TasksTable() {
                       {currentTasks.length === 0 ? (
                         <TableRow>
                           <TableCell
-                            colSpan={7}
+                            colSpan={8}
                             className="text-center py-8 text-muted-foreground"
                           >
                             No tasks found matching your criteria.
@@ -881,6 +888,18 @@ export default function TasksTable() {
                                   task.statusCheckDuration && task.statusCheckDuration !== 'None' ? "bg-green-50" : ""
                                 }`}
                             >
+                              <TableCell
+                                className="w-12"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                {needsDailyTrack(task, currentAgent?.id) ? (
+                                  <DailyTrackCell
+                                    taskId={task.id}
+                                    entry={dailyTrack[task.id]}
+                                    onSaved={setDailyTrack}
+                                  />
+                                ) : null}
+                              </TableCell>
                               <TableCell className="max-w-36 truncate overflow-hidden whitespace-nowrap">
                                 <div className="space-y-1">
                                   <div className="font-medium">

@@ -39,6 +39,7 @@ import {
   Paperclip,
   Trash2,
   ArrowLeftRight,
+  ListChecks,
 } from "lucide-react";
 import { format } from "date-fns";
 import { Task, Agent, Comment, TimeLog } from "@/types";
@@ -49,6 +50,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { uploadFileToS3Direct } from "@/lib/directUpload";
 import { isAudioAttachment } from "@/lib/audioAttachment";
 import ConvertTaskDialog from "../_components/convertTaskDialog";
+import { isDailyTrackContent } from "@/lib/dailyTrack";
+import { DailyTrackList } from "@/components/DailyTrackList";
 
 export default function TaskDetails() {
   const MANAGEMENT_BASE_URL = "https://management.legalstanley.com";
@@ -749,14 +752,19 @@ export default function TaskDetails() {
     return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`
   }
 
+  // Daily track notes live in their own tab, so Interactions leaves them out.
+  const interactionComments = comments.filter((c) => !isDailyTrackContent(c.content));
+  const dailyTrackNotes = comments.filter((c) => isDailyTrackContent(c.content));
+
   const getInteractionType = (content?: string) => {
     if (content?.startsWith("[CLIENT_UPDATE]")) return "CLIENT_UPDATE";
+    if (content?.startsWith("[DAILY_TRACK]")) return "DAILY_TRACK";
     return "NORMAL";
   };
 
   const getDisplayInteractionContent = (content?: string) => {
     if (!content) return "";
-    return content.replace(/^\[(CLIENT_UPDATE|NORMAL)\]\s*/, "");
+    return content.replace(/^\[(CLIENT_UPDATE|NORMAL|DAILY_TRACK)\]\s*/, "");
   };
 
 
@@ -1212,9 +1220,16 @@ export default function TaskDetails() {
             <MessageSquare className="h-4 w-4 hidden md:block" />
             <p className="text-[12px] md:text-[14px]">
               {" "}
-              Interactions ({comments.length}){" "}
+              Interactions ({interactionComments.length}){" "}
             </p>
           </TabsTrigger>
+          <TabsTrigger value="dailytrack" className="flex items-center gap-2">
+            <ListChecks className="h-4 w-4 hidden md:block" />
+            <p className="text-[12px] md:text-[14px]">
+              Daily Track ({dailyTrackNotes.length})
+            </p>
+          </TabsTrigger>
+          {/* Time Log tab hidden for now
           <TabsTrigger value="timelog" className="flex items-center gap-2">
             <Clock className="h-4 w-4 hidden md:block" />
             <p className="text-[12px] md:text-[14px]">
@@ -1222,6 +1237,7 @@ export default function TaskDetails() {
               Time Log ({timeLogs.length}){" "}
             </p>
           </TabsTrigger>
+          */}
         </TabsList>
 
         {/* Task Details Tab */}
@@ -1883,11 +1899,11 @@ export default function TaskDetails() {
               <div className="space-y-4">
                 {commentsLoading ? (
                   <p className="text-muted-foreground">Loading interactions...</p>
-                ) : comments.length === 0 ? (
+                ) : interactionComments.length === 0 ? (
                   <p className="text-muted-foreground">No interactions yet.</p>
                 ) : (
                   <div className="space-y-4">
-                    {comments.map((comment) => (
+                    {interactionComments.map((comment) => (
                       <div
                         key={comment.id}
                         className="flex items-start gap-3 p-4 bg-muted/30 rounded-lg"
@@ -1914,7 +1930,9 @@ export default function TaskDetails() {
                             <Badge variant="outline" className="text-[10px] uppercase tracking-wide">
                               {getInteractionType(comment.content) === "CLIENT_UPDATE"
                                 ? "Client Update"
-                                : "Normal"}
+                                : getInteractionType(comment.content) === "DAILY_TRACK"
+                                  ? "Daily Track"
+                                  : "Normal"}
                             </Badge>
                             <span className="text-xs text-muted-foreground">
                               {formatDateTime(comment.createdAt, true)}
@@ -2072,7 +2090,26 @@ export default function TaskDetails() {
           </Card>
         </TabsContent>
 
-        {/* Time Log Tab */}
+        {/* Daily Track Tab */}
+        <TabsContent value="dailytrack" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Daily Track</CardTitle>
+              <CardDescription>
+                Daily notes the assigned agent left while the task was In Progress
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {commentsLoading ? (
+                <p className="text-muted-foreground">Loading daily track...</p>
+              ) : (
+                <DailyTrackList notes={dailyTrackNotes} />
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Time Log Tab (hidden for now)
         <TabsContent value="timelog" className="space-y-6">
           <Card>
             <CardHeader>
@@ -2154,6 +2191,7 @@ export default function TaskDetails() {
             </CardContent>
           </Card>
         </TabsContent>
+        */}
       </Tabs>
 
       <ConvertTaskDialog

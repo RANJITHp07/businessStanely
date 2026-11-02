@@ -3,11 +3,11 @@ import prisma from "@/lib/prisma";
 import { getCurrentAdmin } from "@/lib/auth";
 import { istDateKey } from "@/lib/dailyTrack";
 import {
-  findMissingDailyTrack,
+  buildDailyTrackReport,
   lastDailyTrackDates,
 } from "@/lib/dailyTrackReport";
 
-/** One agent's In Progress tasks that have no daily track note for `date`. */
+/** One agent's In Progress tasks, split by whether they have a day track note for `date`. */
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ agentId: string }> },
@@ -32,7 +32,7 @@ export async function GET(
     }
 
     const date = req.nextUrl.searchParams.get("date") || istDateKey();
-    const report = await findMissingDailyTrack(date, agentId);
+    const report = await buildDailyTrackReport(date, agentId);
     if (!report) {
       return NextResponse.json(
         { error: "Invalid date format. Use YYYY-MM-DD" },
@@ -40,24 +40,28 @@ export async function GET(
       );
     }
 
+    const notTracked = report.tasks.filter((t) => !t.note);
     const lastTracked = await lastDailyTrackDates(
-      report.missing.map((t) => t.id),
+      notTracked.map((t) => t.id),
       report.range.start,
     );
 
     return NextResponse.json({
       date,
       agent,
-      inProgress: report.inProgressByAgent.get(agentId) ?? 0,
-      tasks: report.missing.map(({ agent: _agent, ...task }) => ({
+      inProgress: report.tasks.length,
+      completed: report.tasks
+        .filter((t) => t.note)
+        .map(({ agent: _agent, ...task }) => task),
+      notCompleted: notTracked.map(({ agent: _agent, note: _note, ...task }) => ({
         ...task,
         lastTrackedAt: lastTracked.get(task.id) ?? null,
       })),
     });
   } catch (error) {
-    console.error("Error fetching agent daily tracker:", error);
+    console.error("Error fetching agent day tracker:", error);
     return NextResponse.json(
-      { error: "Failed to fetch daily tracker" },
+      { error: "Failed to fetch day tracker" },
       { status: 500 },
     );
   }

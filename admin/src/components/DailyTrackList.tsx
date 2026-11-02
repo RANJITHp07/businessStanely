@@ -34,10 +34,10 @@ function authorName(note: DailyTrackNote) {
     : note.agent?.name || "Former Agent";
 }
 
-/** Daily track notes of a task, newest first, one card per note. */
+/** Day track notes of a task, newest first, one card per note. */
 export function DailyTrackList({
   notes,
-  emptyText = "No daily track yet.",
+  emptyText = "No day track yet.",
 }: {
   notes: DailyTrackNote[];
   emptyText?: string;

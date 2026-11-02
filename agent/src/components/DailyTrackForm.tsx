@@ -8,7 +8,7 @@ import { Loader2 } from "lucide-react";
 import type { DailyTrackEntry } from "@/components/DailyTrackCell";
 
 /**
- * Today's daily track note box on the task detail page. `todayNote` is the
+ * Today's day track note box on the task detail page. `todayNote` is the
  * note the agent already saved today, if any; saving again rewrites it, the
  * same as the checkbox in the task tables.
  */
@@ -44,12 +44,12 @@ export function DailyTrackForm({
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError(data.error || "Could not save the daily track.");
+        setError(data.error || "Could not save the day track.");
         return;
       }
       onSaved(data.entry);
     } catch {
-      setError("Could not save the daily track.");
+      setError("Could not save the day track.");
     } finally {
       setSaving(false);
     }
@@ -60,7 +60,7 @@ export function DailyTrackForm({
   return (
     <div className="space-y-2 rounded-lg border-l-4 border-l-blue-400 bg-blue-50 p-4 dark:bg-blue-950/20">
       <p className="text-sm font-semibold text-blue-900 dark:text-blue-200">
-        {todayNote ? "Today's daily track (saved)" : "Add today's daily track"}
+        {todayNote ? "Today's day track (saved)" : "Add today's day track"}
       </p>
       <Textarea
         value={note}
@@ -71,7 +71,7 @@ export function DailyTrackForm({
             save();
           }
         }}
-        placeholder="What happened on this task today?"
+        placeholder="What's the update today?"
         className="min-h-[90px] bg-white text-sm dark:bg-background"
       />
       {error ? <p className="text-xs text-red-600">{error}</p> : null}

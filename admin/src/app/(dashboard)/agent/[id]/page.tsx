@@ -91,6 +91,8 @@ interface AgentActivity {
   entityTitle: string | null;
   content: string;
   createdAt: string;
+  startTime: string | null;
+  endTime: string | null;
 }
 
 interface ServiceRecord {
@@ -253,6 +255,19 @@ const ACTIVITY_TYPE_LABELS: Record<ActivityEntityType, string> = {
   opportunity: "Opportunity",
   enquiry: "Enquiry",
 };
+
+// Only comments logged with a work session have start and end times.
+function formatActivityDuration(activity: AgentActivity) {
+  if (!activity.startTime || !activity.endTime) return "-";
+  const minutes = Math.round(
+    (new Date(activity.endTime).getTime() - new Date(activity.startTime).getTime()) / 60000
+  );
+  if (!(minutes > 0)) return "-";
+  const hours = Math.floor(minutes / 60);
+  const remainder = minutes % 60;
+  if (hours === 0) return `${remainder}m`;
+  return remainder === 0 ? `${hours}h` : `${hours}h ${remainder}m`;
+}
 
 function groupActivitiesByDate(activities: AgentActivity[]) {
   return activities.reduce((acc, activity) => {
@@ -2399,6 +2414,7 @@ export default function AgentDetails() {
                                 <TableHead>Related To</TableHead>
                                 <TableHead>Interaction</TableHead>
                                 <TableHead>Date & Time</TableHead>
+                                <TableHead>Duration</TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -2428,6 +2444,7 @@ export default function AgentDetails() {
                                     {activity.content}
                                   </TableCell>
                                   <TableCell>{new Date(activity.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</TableCell>
+                                  <TableCell className="whitespace-nowrap">{formatActivityDuration(activity)}</TableCell>
                                 </TableRow>
                                 );
                               })}

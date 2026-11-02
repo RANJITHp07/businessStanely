@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentAdmin } from "@/lib/auth";
 import { istDateKey } from "@/lib/dailyTrack";
-import { findMissingDailyTrack } from "@/lib/dailyTrackReport";
+import { buildDailyTrackReport } from "@/lib/dailyTrackReport";
 
-/** Agents with In Progress tasks that have no daily track note for `date`. */
+/** Each agent with In Progress tasks and how many of them have a day track note for `date`. */
 export async function GET(req: NextRequest) {
   try {
     const admin = await getCurrentAdmin(req);
@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
     }
 
     const date = req.nextUrl.searchParams.get("date") || istDateKey();
-    const report = await findMissingDailyTrack(date);
+    const report = await buildDailyTrackReport(date);
     if (!report) {
       return NextResponse.json(
         { error: "Invalid date format. Use YYYY-MM-DD" },
@@ -20,33 +20,32 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    const byAgent = new Map<
-      string,
-      { id: string; name: string; email: string; missing: number }
-    >();
-    for (const task of report.missing) {
-      const row = byAgent.get(task.agent.id) ?? { ...task.agent, missing: 0 };
-      row.missing += 1;
-      byAgent.set(task.agent.id, row);
+    const counts = new Map<string, { tracked: number; inProgress: number }>();
+    for (const task of report.tasks) {
+      const row = counts.get(task.agent.id) ?? { tracked: 0, inProgress: 0 };
+      row.inProgress += 1;
+      if (task.note) row.tracked += 1;
+      counts.set(task.agent.id, row);
     }
 
-    const agents = [...byAgent.values()]
-      .map((row) => ({
-        ...row,
-        inProgress: report.inProgressByAgent.get(row.id) ?? row.missing,
-      }))
-      .sort((a, b) => b.missing - a.missing || a.name.localeCompare(b.name));
+    const agents = [...report.agents.values()]
+      .map((agent) => ({ ...agent, ...counts.get(agent.id)! }))
+      .sort(
+        (a, b) =>
+          b.inProgress - b.tracked - (a.inProgress - a.tracked) ||
+          a.name.localeCompare(b.name),
+      );
 
     return NextResponse.json({
       date,
       agents,
-      totalMissing: report.missing.length,
-      totalAgentsWithInProgress: report.inProgressByAgent.size,
+      totalTracked: report.tasks.filter((t) => t.note).length,
+      totalInProgress: report.tasks.length,
     });
   } catch (error) {
-    console.error("Error fetching daily tracker:", error);
+    console.error("Error fetching day tracker:", error);
     return NextResponse.json(
-      { error: "Failed to fetch daily tracker" },
+      { error: "Failed to fetch day tracker" },
       { status: 500 },
     );
   }

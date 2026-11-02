@@ -425,7 +425,7 @@ export default function TaskDetails() {
   };
 
   const daysRemaining = calculateDaysRemaining();
-  // Daily track notes live in their own tab, so Interactions leaves them out.
+  // Day track notes live in their own tab, so Interactions leaves them out.
   const allComments = task?.comments || [];
   const commentsData = allComments.filter((c) => !isDailyTrackContent(c.content));
   const dailyTrackNotes = allComments.filter((c) => isDailyTrackContent(c.content));
@@ -1310,7 +1310,7 @@ export default function TaskDetails() {
           <TabsTrigger value="dailytrack" className="flex items-center gap-2">
             <ListChecks className="h-4 w-4 hidden md:block" />
             <p className="text-[12px] md:text-[14px]">
-              Daily Track ({dailyTrackNotes.length})
+              Day Track ({dailyTrackNotes.length})
             </p>
           </TabsTrigger>
           {/* Time Log tab hidden for now
@@ -1793,7 +1793,7 @@ export default function TaskDetails() {
                               {getInteractionType(comment.content) === "CLIENT_UPDATE"
                                 ? "Client Update"
                                 : getInteractionType(comment.content) === "DAILY_TRACK"
-                                  ? "Daily Track"
+                                  ? "Day Track"
                                   : "Normal"}
                             </Badge>
                             <span className="text-xs text-muted-foreground">
@@ -1922,11 +1922,11 @@ export default function TaskDetails() {
           </Card>
         </TabsContent>
 
-        {/* Daily Track Tab */}
+        {/* Day Track Tab */}
         <TabsContent value="dailytrack" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Daily Track</CardTitle>
+              <CardTitle>Day Track</CardTitle>
               <CardDescription>
                 One short note per day while the task is In Progress
               </CardDescription>
@@ -1944,7 +1944,7 @@ export default function TaskDetails() {
                 />
               ) : (
                 <p className="text-sm text-muted-foreground">
-                  Daily track can be added only on In Progress tasks assigned to you.
+                  Day track can be added only on In Progress tasks assigned to you.
                 </p>
               )}
               <Separator />

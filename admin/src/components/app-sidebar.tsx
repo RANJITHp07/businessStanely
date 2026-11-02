@@ -79,7 +79,7 @@ const allItems: MenuItem[] = [
   { title: "Client", url: "/client", icon: UserSearch },
   { title: "Task", url: "/my-task", icon: ClipboardCheck },
   { title: "Timesheet", url: "/timesheet", icon: Calendar },
-  { title: "Daily Tracker", url: "/daily-tracker", icon: ListChecks },
+  { title: "Day Tracker", url: "/daily-tracker", icon: ListChecks },
   { title: "Services", url: "/task_category", icon: Boxes },
   { title: "Retainership", url: "/retainership", icon: Boxes },
   { title: "Request Quote", url: "/request-quote", icon: FileText },

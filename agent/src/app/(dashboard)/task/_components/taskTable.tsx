@@ -856,7 +856,7 @@ export default function TasksTable() {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="w-12 text-center">Track</TableHead>
+                        <TableHead className="w-20 text-center whitespace-nowrap">Day Track</TableHead>
                         <TableHead>Task</TableHead>
                         <TableHead>Client</TableHead>
                         <TableHead>Assigned To</TableHead>

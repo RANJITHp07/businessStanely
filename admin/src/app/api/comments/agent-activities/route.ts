@@ -41,6 +41,8 @@ export async function GET(req: NextRequest) {
         entityTitle: target?.title ?? null,
         content: comment.content,
         createdAt: comment.createdAt,
+        startTime: comment.startTime,
+        endTime: comment.endTime,
       };
     });
     return NextResponse.json(activities);

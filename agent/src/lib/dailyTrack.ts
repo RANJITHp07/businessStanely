@@ -1,5 +1,5 @@
 /**
- * Daily track: a short note an agent leaves once per day on every In Progress
+ * Day track: a short note an agent leaves once per day on every In Progress
  * task assigned to them. It is stored as an ordinary task Comment whose content
  * starts with DAILY_TRACK_PREFIX, the same way "[NORMAL]" and "[CLIENT_UPDATE]"
  * mark the other comment types. The admin app reads these through its own copy

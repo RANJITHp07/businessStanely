@@ -10,7 +10,7 @@ import {
   stripDailyTrackPrefix,
 } from "@/lib/dailyTrack";
 
-/** Today's (IST) daily track notes written by the signed-in agent, keyed by task. */
+/** Today's (IST) day track notes written by the signed-in agent, keyed by task. */
 export async function GET(req: NextRequest) {
   try {
     const agent = await getCurrentAgent(req);
@@ -46,16 +46,16 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ date, entries });
   } catch (error) {
-    console.error("Error fetching daily track:", error);
+    console.error("Error fetching day track:", error);
     return NextResponse.json(
-      { error: "Failed to fetch daily track" },
+      { error: "Failed to fetch day track" },
       { status: 500 },
     );
   }
 }
 
 /**
- * Saves today's daily track note on a task. One note per task per IST day: a
+ * Saves today's day track note on a task. One note per task per IST day: a
  * second save the same day rewrites that note instead of adding another.
  */
 export async function POST(req: NextRequest) {
@@ -84,13 +84,13 @@ export async function POST(req: NextRequest) {
     }
     if (task.assignedToId !== agent.id) {
       return NextResponse.json(
-        { error: "Only the assigned agent can add the daily track" },
+        { error: "Only the assigned agent can add the day track" },
         { status: 403 },
       );
     }
     if (!DAILY_TRACK_STATUSES.includes(task.status)) {
       return NextResponse.json(
-        { error: "Daily track is only for In Progress tasks" },
+        { error: "Day track is only for In Progress tasks" },
         { status: 400 },
       );
     }
@@ -137,9 +137,9 @@ export async function POST(req: NextRequest) {
       { status: existing ? 200 : 201 },
     );
   } catch (error) {
-    console.error("Error saving daily track:", error);
+    console.error("Error saving day track:", error);
     return NextResponse.json(
-      { error: "Failed to save daily track" },
+      { error: "Failed to save day track" },
       { status: 500 },
     );
   }

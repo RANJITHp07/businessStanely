@@ -98,7 +98,7 @@ export async function GET(req: NextRequest) {
       const userName = task.assignedTo?.name || "Unknown";
 
       task.comments.forEach((comment) => {
-        // Daily track notes are status updates, not logged work.
+        // Day track notes are status updates, not logged work.
         if (isDailyTrackContent(comment.content)) return;
 
         const commentDate = comment.startTime

@@ -23,7 +23,7 @@ export interface DailyTrackEntry {
 export type DailyTrackEntries = Record<string, DailyTrackEntry>;
 
 /**
- * Today's daily track notes for the signed-in agent. Pass `enabled: false` from
+ * Today's day track notes for the signed-in agent. Pass `enabled: false` from
  * tables that never show the checkbox so they skip the request.
  */
 export function useDailyTrack(enabled = true) {
@@ -39,7 +39,7 @@ export function useDailyTrack(enabled = true) {
         const data = await res.json();
         if (!cancelled) setEntries(data.entries ?? {});
       } catch (error) {
-        console.error("Failed to load daily track", error);
+        console.error("Failed to load day track", error);
       }
     })();
     return () => {
@@ -54,7 +54,7 @@ export function useDailyTrack(enabled = true) {
   return { entries, setEntry };
 }
 
-/** Whether a row should offer the daily track checkbox to this agent. */
+/** Whether a row should offer the day track checkbox to this agent. */
 export function needsDailyTrack(
   task: { status: string; assignedTo?: { id: string } | null },
   agentId?: string | null,
@@ -108,13 +108,13 @@ export function DailyTrackCell({
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError(data.error || "Could not save the daily track.");
+        setError(data.error || "Could not save the day track.");
         return;
       }
       onSaved(taskId, data.entry);
       setOpen(false);
     } catch {
-      setError("Could not save the daily track.");
+      setError("Could not save the day track.");
     } finally {
       setSaving(false);
     }
@@ -135,13 +135,13 @@ export function DailyTrackCell({
                 // Controlled with no change handler: a click only opens the
                 // note box, and the box ticks once a note is saved.
                 checked={tracked}
-                aria-label={tracked ? "Edit today's daily track" : "Add today's daily track"}
+                aria-label={tracked ? "Edit today's day track" : "Add today's day track"}
                 className={tracked ? "" : "border-blue-500"}
               />
             </PopoverTrigger>
           </TooltipTrigger>
           <TooltipContent sideOffset={6}>
-            {tracked ? "Daily track added today" : "Add today's daily track"}
+            {tracked ? "Day track added today" : "Add today's day track"}
           </TooltipContent>
         </Tooltip>
         <PopoverContent
@@ -150,7 +150,7 @@ export function DailyTrackCell({
           className="w-80 border-l-4 border-l-blue-400 bg-blue-50 p-3"
         >
           <div className="space-y-2">
-            <p className="text-sm font-semibold text-blue-900">Daily track</p>
+            <p className="text-sm font-semibold text-blue-900">Day track</p>
             <Textarea
               autoFocus
               value={note}
@@ -161,7 +161,7 @@ export function DailyTrackCell({
                   save();
                 }
               }}
-              placeholder="What happened on this task today?"
+              placeholder="What's the update today?"
               className="min-h-[90px] bg-white text-sm"
             />
             {error ? <p className="text-xs text-red-600">{error}</p> : null}

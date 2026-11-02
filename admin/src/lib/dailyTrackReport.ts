@@ -3,26 +3,34 @@ import {
   DAILY_TRACK_MATCH,
   DAILY_TRACK_STATUSES,
   istDayRange,
+  stripDailyTrackPrefix,
 } from "@/lib/dailyTrack";
 
-export interface MissingDailyTrackTask {
+export interface DailyTrackAgent {
+  id: string;
+  name: string;
+  email: string;
+}
+
+export interface DailyTrackTask {
   id: string;
   title: string;
-  priority: string;
   dueDate: Date | null;
   clientName: string;
-  agent: { id: string; name: string; email: string };
+  agent: DailyTrackAgent;
+  /** The assignee's note for the day, or null when they have not tracked it. */
+  note: { content: string; createdAt: Date; updatedAt: Date } | null;
 }
 
 /**
- * In Progress tasks whose assigned agent wrote no daily track note on them
- * during the IST day `dateKey`, plus how many In Progress tasks each agent had.
+ * Every In Progress task with its assigned agent's day track note for the IST
+ * day `dateKey` (null when there is none), plus the agents those tasks belong to.
  *
  * Status is read as it is now, not as it was on `dateKey`, so a past date
  * lists tasks that are In Progress today. Tasks created after that day are
  * left out, as are tasks of inactive or removed agents.
  */
-export async function findMissingDailyTrack(dateKey: string, agentId?: string) {
+export async function buildDailyTrackReport(dateKey: string, agentId?: string) {
   const range = istDayRange(dateKey);
   if (!range) return null;
 
@@ -36,9 +44,7 @@ export async function findMissingDailyTrack(dateKey: string, agentId?: string) {
     select: {
       id: true,
       title: true,
-      priority: true,
       dueDate: true,
-      assignedToId: true,
       assignedTo: { select: { id: true, name: true, email: true, status: true } },
       client: {
         select: {
@@ -56,24 +62,28 @@ export async function findMissingDailyTrack(dateKey: string, agentId?: string) {
     (t) => t.assignedTo && t.assignedTo.status?.toLowerCase() !== "inactive",
   );
 
-  const tracked = await prisma.comment.findMany({
+  const comments = await prisma.comment.findMany({
     where: {
       taskId: { in: liveTasks.map((t) => t.id) },
       content: { startsWith: DAILY_TRACK_MATCH },
       createdAt: { gte: range.start, lt: range.end },
     },
-    select: { taskId: true, authorId: true },
+    select: {
+      taskId: true,
+      authorId: true,
+      content: true,
+      createdAt: true,
+      updatedAt: true,
+    },
   });
   // Only the assignee's own note counts; a superior commenting does not
-  // discharge the agent's daily track.
-  const trackedKeys = new Set(tracked.map((c) => `${c.taskId}:${c.authorId}`));
+  // discharge the agent's day track.
+  const notes = new Map(comments.map((c) => [`${c.taskId}:${c.authorId}`, c]));
 
-  const inProgressByAgent = new Map<string, number>();
-  const missing: MissingDailyTrackTask[] = [];
-  for (const t of liveTasks) {
-    const agent = t.assignedTo!;
-    inProgressByAgent.set(agent.id, (inProgressByAgent.get(agent.id) ?? 0) + 1);
-    if (trackedKeys.has(`${t.id}:${agent.id}`)) continue;
+  const agents = new Map<string, DailyTrackAgent>();
+  const rows: DailyTrackTask[] = liveTasks.map((t) => {
+    const { id, name, email } = t.assignedTo!;
+    agents.set(id, { id, name, email });
 
     const c = t.client;
     const clientName = c
@@ -81,20 +91,27 @@ export async function findMissingDailyTrack(dateKey: string, agentId?: string) {
         ? `${c.firstName ?? ""} ${c.lastName ?? ""}`.trim()
         : c.organizationName ?? ""
       : "";
-    missing.push({
+    const note = notes.get(`${t.id}:${id}`);
+    return {
       id: t.id,
       title: t.title,
-      priority: t.priority,
       dueDate: t.dueDate,
       clientName,
-      agent: { id: agent.id, name: agent.name, email: agent.email },
-    });
-  }
+      agent: { id, name, email },
+      note: note
+        ? {
+            content: stripDailyTrackPrefix(note.content),
+            createdAt: note.createdAt,
+            updatedAt: note.updatedAt,
+          }
+        : null,
+    };
+  });
 
-  return { range, missing, inProgressByAgent };
+  return { range, tasks: rows, agents };
 }
 
-/** Latest daily track note before `before` for each task, keyed by task id. */
+/** Latest day track note before `before` for each task, keyed by task id. */
 export async function lastDailyTrackDates(taskIds: string[], before: Date) {
   if (taskIds.length === 0) return new Map<string, Date>();
   const comments = await prisma.comment.findMany({

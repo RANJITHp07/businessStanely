@@ -17,15 +17,15 @@ interface MissingAgentRow {
     id: string
     name: string
     email: string
-    missing: number
+    tracked: number
     inProgress: number
 }
 
 interface DailyTrackerResponse {
     date: string
     agents: MissingAgentRow[]
-    totalMissing: number
-    totalAgentsWithInProgress: number
+    totalTracked: number
+    totalInProgress: number
 }
 
 export default function DailyTrackerPage() {
@@ -43,11 +43,11 @@ export default function DailyTrackerPage() {
         fetchWithAuth(`/api/daily-tracker?date=${encodeURIComponent(date)}`)
             .then(async (res) => {
                 const body = await res.json()
-                if (!res.ok) throw new Error(body.error || "Failed to load daily tracker")
+                if (!res.ok) throw new Error(body.error || "Failed to load day tracker")
                 if (!cancelled) setData(body)
             })
             .catch((e) => {
-                if (!cancelled) setError(e instanceof Error ? e.message : "Failed to load daily tracker")
+                if (!cancelled) setError(e instanceof Error ? e.message : "Failed to load day tracker")
             })
             .finally(() => {
                 if (!cancelled) setLoading(false)
@@ -67,9 +67,9 @@ export default function DailyTrackerPage() {
         <div className="w-full container mx-auto px-3 sm:px-4 md:px-6 py-4 md:py-6 max-w-7xl space-y-6">
             <div className="flex flex-col gap-4 md:flex-row md:justify-between md:items-end">
                 <div>
-                    <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold break-words">Daily Tracker</h1>
+                    <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold break-words">Day Tracker</h1>
                     <p className="text-sm sm:text-base text-muted-foreground mt-2">
-                        Agents who have not added the daily track on their In Progress tasks
+                        Day track status of each agent on their In Progress tasks
                     </p>
                 </div>
                 <div className="space-y-2 w-full md:w-48">
@@ -82,13 +82,13 @@ export default function DailyTrackerPage() {
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                         <ClipboardCheck className="h-5 w-5" />
-                        Pending daily track
+                        Agents
                         {data ? <Badge variant="secondary">{data.agents.length}</Badge> : null}
                     </CardTitle>
                     <CardDescription>
                         {data
-                            ? `${data.totalMissing} task(s) without a daily track across ${data.agents.length} of ${data.totalAgentsWithInProgress} agent(s) with In Progress work. Click an agent to see the tasks.`
-                            : "Click an agent to see the tasks they have not tracked."}
+                            ? `${data.totalTracked} of ${data.totalInProgress} In Progress task(s) have a day track. Click an agent to see the tasks.`
+                            : "Click an agent to see the tasks."}
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -104,15 +104,14 @@ export default function DailyTrackerPage() {
                                 <TableHeader>
                                     <TableRow>
                                         <TableHead>Agent</TableHead>
-                                        <TableHead className="text-right">Not tracked</TableHead>
-                                        <TableHead className="text-right">In Progress tasks</TableHead>
+                                        <TableHead className="text-right">Status</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
                                     {!data || data.agents.length === 0 ? (
                                         <TableRow>
-                                            <TableCell colSpan={3} className="text-center py-8 text-muted-foreground">
-                                                Every agent has added the daily track for this date.
+                                            <TableCell colSpan={2} className="text-center py-8 text-muted-foreground">
+                                                No agents have In Progress tasks for this date.
                                             </TableCell>
                                         </TableRow>
                                     ) : (
@@ -140,9 +139,10 @@ export default function DailyTrackerPage() {
                                                     </div>
                                                 </TableCell>
                                                 <TableCell className="text-right">
-                                                    <Badge variant="destructive">{agent.missing}</Badge>
+                                                    <Badge variant={agent.tracked === agent.inProgress ? "secondary" : "destructive"}>
+                                                        {agent.tracked}/{agent.inProgress}
+                                                    </Badge>
                                                 </TableCell>
-                                                <TableCell className="text-right">{agent.inProgress}</TableCell>
                                             </TableRow>
                                         ))
                                     )}

@@ -8,18 +8,25 @@ import { istDateKey } from "@/lib/dailyTrack"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
-import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { ArrowLeft, FileText, Loader2 } from "lucide-react"
 import { TrackerDatePicker } from "../_components/TrackerDatePicker"
 import { TablePagination, usePagination } from "../_components/TablePagination"
 
-interface MissingTask {
+interface TrackerTask {
     id: string
     title: string
-    priority: string
     dueDate: string | null
     clientName: string
+}
+
+interface CompletedTask extends TrackerTask {
+    note: { content: string; createdAt: string; updatedAt: string }
+}
+
+interface NotCompletedTask extends TrackerTask {
     lastTrackedAt: string | null
 }
 
@@ -27,7 +34,8 @@ interface AgentDailyTrackerResponse {
     date: string
     agent: { id: string; name: string; email: string }
     inProgress: number
-    tasks: MissingTask[]
+    completed: CompletedTask[]
+    notCompleted: NotCompletedTask[]
 }
 
 function formatDate(value: string | null) {
@@ -53,11 +61,11 @@ export default function AgentDailyTrackerPage() {
         fetchWithAuth(`/api/daily-tracker/${agentId}?date=${encodeURIComponent(date)}`)
             .then(async (res) => {
                 const body = await res.json()
-                if (!res.ok) throw new Error(body.error || "Failed to load daily tracker")
+                if (!res.ok) throw new Error(body.error || "Failed to load day tracker")
                 if (!cancelled) setData(body)
             })
             .catch((e) => {
-                if (!cancelled) setError(e instanceof Error ? e.message : "Failed to load daily tracker")
+                if (!cancelled) setError(e instanceof Error ? e.message : "Failed to load day tracker")
             })
             .finally(() => {
                 if (!cancelled) setLoading(false)
@@ -67,7 +75,8 @@ export default function AgentDailyTrackerPage() {
         }
     }, [agentId, date])
 
-    const pagination = usePagination(data?.tasks ?? [], date)
+    const completedPages = usePagination(data?.completed ?? [], date)
+    const notCompletedPages = usePagination(data?.notCompleted ?? [], date)
 
     const setDate = (value: string) => {
         if (value) router.replace(`/daily-tracker/${agentId}?date=${value}`)
@@ -79,7 +88,7 @@ export default function AgentDailyTrackerPage() {
                 <div>
                     <Link href={`/daily-tracker?date=${date}`}>
                         <Button variant="ghost" className="px-0 mb-2 cursor-pointer">
-                            <ArrowLeft className="h-4 w-4 mr-2" /> Back to Daily Tracker
+                            <ArrowLeft className="h-4 w-4 mr-2" /> Back to Day Tracker
                         </Button>
                     </Link>
                     <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold break-words">
@@ -99,13 +108,12 @@ export default function AgentDailyTrackerPage() {
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                         <FileText className="h-5 w-5" />
-                        Tasks without daily track
-                        {data ? <Badge variant="destructive">{data.tasks.length}</Badge> : null}
+                        In Progress tasks
                     </CardTitle>
                     <CardDescription>
                         {data
-                            ? `${data.tasks.length} of ${data.inProgress} In Progress task(s) have no daily track for ${formatDate(data.date)}.`
-                            : "In Progress tasks with no daily track for the selected date."}
+                            ? `${data.completed.length} of ${data.inProgress} In Progress task(s) have a day track for ${formatDate(data.date)}.`
+                            : "Day track status of In Progress tasks for the selected date."}
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -116,51 +124,111 @@ export default function AgentDailyTrackerPage() {
                     ) : error ? (
                         <p className="text-center py-12 text-red-600">{error}</p>
                     ) : (
-                        <div className="rounded-md border overflow-x-auto">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Task</TableHead>
-                                        <TableHead>Client</TableHead>
-                                        <TableHead>Priority</TableHead>
-                                        <TableHead>Due Date</TableHead>
-                                        <TableHead>Last daily track</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {!data || data.tasks.length === 0 ? (
-                                        <TableRow>
-                                            <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
-                                                All In Progress tasks have a daily track for this date.
-                                            </TableCell>
-                                        </TableRow>
-                                    ) : (
-                                        pagination.pageRows.map((task) => (
-                                            <TableRow
-                                                key={task.id}
-                                                className="cursor-pointer hover:bg-muted/50"
-                                                onClick={() => router.push(`/task/${task.id}`)}
-                                            >
-                                                <TableCell className="font-medium max-w-64 truncate">{task.title}</TableCell>
-                                                <TableCell className="max-w-48 truncate">{task.clientName || "-"}</TableCell>
-                                                <TableCell>{task.priority}</TableCell>
-                                                <TableCell>{formatDate(task.dueDate)}</TableCell>
-                                                <TableCell>
-                                                    {task.lastTrackedAt ? (
-                                                        formatDate(task.lastTrackedAt)
-                                                    ) : (
-                                                        <span className="text-muted-foreground">Never</span>
-                                                    )}
-                                                </TableCell>
+                        <Tabs defaultValue="notCompleted" className="space-y-4">
+                            <TabsList className="grid w-full max-w-md grid-cols-2">
+                                <TabsTrigger value="completed">
+                                    Completed ({data?.completed.length ?? 0})
+                                </TabsTrigger>
+                                <TabsTrigger value="notCompleted">
+                                    Not Completed ({data?.notCompleted.length ?? 0})
+                                </TabsTrigger>
+                            </TabsList>
+
+                            <TabsContent value="completed">
+                                <div className="rounded-md border overflow-x-auto">
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow>
+                                                <TableHead>Task</TableHead>
+                                                <TableHead>Client</TableHead>
+                                                <TableHead>Due Date</TableHead>
+                                                <TableHead>Comment</TableHead>
                                             </TableRow>
-                                        ))
-                                    )}
-                                </TableBody>
-                            </Table>
-                            <div className="px-4">
-                                <TablePagination {...pagination} />
-                            </div>
-                        </div>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {completedPages.total === 0 ? (
+                                                <TableRow>
+                                                    <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                                                        No tasks have a day track for this date.
+                                                    </TableCell>
+                                                </TableRow>
+                                            ) : (
+                                                completedPages.pageRows.map((task) => (
+                                                    <TableRow
+                                                        key={task.id}
+                                                        className="cursor-pointer hover:bg-muted/50"
+                                                        onClick={() => router.push(`/task/${task.id}`)}
+                                                    >
+                                                        <TableCell className="font-medium max-w-64 truncate">{task.title}</TableCell>
+                                                        <TableCell className="max-w-48 truncate">{task.clientName || "-"}</TableCell>
+                                                        <TableCell>{formatDate(task.dueDate)}</TableCell>
+                                                        <TableCell className="max-w-72">
+                                                            <Tooltip>
+                                                                <TooltipTrigger asChild>
+                                                                    <p className="truncate">{task.note.content}</p>
+                                                                </TooltipTrigger>
+                                                                <TooltipContent className="max-w-md whitespace-pre-wrap">
+                                                                    {task.note.content}
+                                                                </TooltipContent>
+                                                            </Tooltip>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ))
+                                            )}
+                                        </TableBody>
+                                    </Table>
+                                    <div className="px-4">
+                                        <TablePagination {...completedPages} />
+                                    </div>
+                                </div>
+                            </TabsContent>
+
+                            <TabsContent value="notCompleted">
+                                <div className="rounded-md border overflow-x-auto">
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow>
+                                                <TableHead>Task</TableHead>
+                                                <TableHead>Client</TableHead>
+                                                <TableHead>Due Date</TableHead>
+                                                <TableHead>Last day track</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {notCompletedPages.total === 0 ? (
+                                                <TableRow>
+                                                    <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                                                        All In Progress tasks have a day track for this date.
+                                                    </TableCell>
+                                                </TableRow>
+                                            ) : (
+                                                notCompletedPages.pageRows.map((task) => (
+                                                    <TableRow
+                                                        key={task.id}
+                                                        className="cursor-pointer hover:bg-muted/50"
+                                                        onClick={() => router.push(`/task/${task.id}`)}
+                                                    >
+                                                        <TableCell className="font-medium max-w-64 truncate">{task.title}</TableCell>
+                                                        <TableCell className="max-w-48 truncate">{task.clientName || "-"}</TableCell>
+                                                        <TableCell>{formatDate(task.dueDate)}</TableCell>
+                                                        <TableCell>
+                                                            {task.lastTrackedAt ? (
+                                                                formatDate(task.lastTrackedAt)
+                                                            ) : (
+                                                                <span className="text-muted-foreground">Never</span>
+                                                            )}
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ))
+                                            )}
+                                        </TableBody>
+                                    </Table>
+                                    <div className="px-4">
+                                        <TablePagination {...notCompletedPages} />
+                                    </div>
+                                </div>
+                            </TabsContent>
+                        </Tabs>
                     )}
                 </CardContent>
             </Card>

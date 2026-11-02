@@ -163,7 +163,7 @@ export function SectionTable({ label, tasks, retainershipTasks, trigger, trigger
     return "text-blue-600"; // New Task
   })();
 
-  // Daily track applies to the agent's own In Progress work, so only that
+  // Day track applies to the agent's own In Progress work, so only that
   // section gets the checkbox column.
   const { agent } = useAuth();
   const showDailyTrack =
@@ -213,7 +213,7 @@ export function SectionTable({ label, tasks, retainershipTasks, trigger, trigger
                     <TableRow className="bg-[#002FFF]">
                       {showDailyTrack && (
                         <TableHead className="text-white text-center px-1">
-                          Track
+                         Day Track 
                         </TableHead>
                       )}
                       <TableHead className="text-white">Task</TableHead>

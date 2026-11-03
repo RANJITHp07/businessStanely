@@ -6,6 +6,7 @@ import {
   actorFromAgent,
   softDeleteData,
 } from "@/lib/audit";
+import { followUpUpdates } from "@/lib/taskFollowUp";
 
 interface TaskWithFields {
   categoryId?: string;
@@ -247,6 +248,7 @@ export async function PUT(
         assignedToId: true,
         dueDate: true,
         status: true,
+        active: true,
         followUpDuration: true,
         statusCheckDuration: true,
         // Needed to keep the recurring interval/unit pair in sync when only
@@ -308,6 +310,10 @@ export async function PUT(
       // If statusCheckDuration is being set, set followUpDuration to 'Working'
       followUpDuration = "Working";
     }
+    // Applied to `body` so the status side effects and duration audit below see it.
+    const followUpChanges = followUpUpdates(task, { ...body, followUpDuration });
+    Object.assign(body, followUpChanges);
+    followUpDuration = followUpChanges.followUpDuration ?? followUpDuration;
     // Transform relation IDs to nested connect objects for Prisma
     const updateData: Record<string, unknown> = {
       ...body,

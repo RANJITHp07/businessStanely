@@ -1,3 +1,5 @@
+import { FOLLOW_UP_STATUS } from "@/lib/taskFollowUp";
+
 /**
  * Day track: a short note an agent leaves once per day on every In Progress
  * task assigned to them. It is stored as an ordinary task Comment whose content
@@ -16,7 +18,7 @@ export const DAILY_TRACK_PREFIX = "[DAILY_TRACK]";
  */
 export const DAILY_TRACK_MATCH = "\\[DAILY_TRACK\\]";
 
-export const DAILY_TRACK_STATUSES = ["In Progress", "in progress"];
+export const DAILY_TRACK_STATUSES = ["In Progress", "in progress", FOLLOW_UP_STATUS];
 
 const IST_OFFSET_MS = 330 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;

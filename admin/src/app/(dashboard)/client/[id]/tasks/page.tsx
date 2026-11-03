@@ -60,6 +60,7 @@ function statusKey(s?: string) {
   const k = (s || "").toLowerCase().replace(/\s+/g, "");
   if (["todo", "pending"].includes(k)) return "todo";
   if (["inprogress", "progress"].includes(k)) return "inprogress";
+  if (k === "statuscheck&followup") return "followup";
   if (["completed"].includes(k)) return "completed";
   if (["hold"].includes(k)) return "hold";
   return k || "todo";
@@ -69,6 +70,7 @@ function sectionLabelToStatus(label: string) {
   const l = label.toLowerCase();
   if (l.includes("progress")) return "In Progress";
   if (l.includes("completed")) return "Completed";
+  if (l.includes("followup")) return "StatusCheck & Followup";
   if (l.includes("hold")) return "Hold";
   return "To Do";
 }
@@ -223,7 +225,7 @@ function SectionTable({
       <div className="flex items-center gap-4 min-w-0">
         <div className="w-[96px] h-auto hidden md:flex items-center justify-center self-stretch flex-shrink-0 bg-white rounded-lg py-6 px-2">
           <span
-            className={`block rotate-[-90deg] origin-center whitespace-nowrap tracking-widest font-semibold select-none text-[24px] ${labelColor}`}
+            className={`block rotate-[-90deg] origin-center ${label.toLowerCase().includes("followup") ? "w-[230px] text-center whitespace-normal leading-tight" : "whitespace-nowrap"} tracking-widest font-semibold select-none text-[24px] ${labelColor}`}
           >
             {label}
           </span>
@@ -489,6 +491,11 @@ function TaskSections({
         label="In Progress"
         tasks={tasksInProgress.slice(0, 3)}
         viewMoreHref={taskListHref("In Progress")}
+      />
+      <SectionTable
+        label="StatusCheck & Followup"
+        tasks={tasks.filter((t) => statusKey(t.status) === "followup").slice(0, 3)}
+        viewMoreHref={taskListHref("StatusCheck & Followup")}
       />
       <SectionTable label="Hold" tasks={tasksHold.slice(0, 3)} viewMoreHref={taskListHref("Hold")} />
       {future && (

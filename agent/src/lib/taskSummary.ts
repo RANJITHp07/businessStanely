@@ -13,6 +13,7 @@ export const SUMMARY_STATUS_SECTIONS = [
   },
   { key: "completed", statuses: ["Completed", "completed"] },
   { key: "hold", statuses: ["Hold", "hold"] },
+  { key: "followup", statuses: ["StatusCheck & Followup"] },
 ] as const;
 
 export type SummarySectionKey = (typeof SUMMARY_STATUS_SECTIONS)[number]["key"];
@@ -21,6 +22,7 @@ export function statusKey(status?: string | null): SummarySectionKey | string {
   const k = (status || "").toLowerCase().replace(/\s+/g, "");
   if (["todo", "pending"].includes(k)) return "todo";
   if (["inprogress", "progress"].includes(k)) return "inprogress";
+  if (k === "statuscheck&followup") return "followup";
   if (["completed"].includes(k)) return "completed";
   return k || "todo";
 }
@@ -31,6 +33,7 @@ export interface StatusCounts {
    *  unrecognised status. This is what the "Pending" stat card shows, and it
    *  matches the old client-side tally exactly. */
   todo: number;
+  /** Includes StatusCheck & Followup tasks, which are still being worked. */
   inprogress: number;
   completed: number;
   /** Subset of `todo`, broken out for the Hold section header. */
@@ -59,7 +62,7 @@ export function buildStatusCounts(
 
     const key = statusKey(group.status);
     if (key === "completed") counts.completed += n;
-    else if (key === "inprogress") counts.inprogress += n;
+    else if (key === "inprogress" || key === "followup") counts.inprogress += n;
     else {
       counts.todo += n;
       if (key === "hold") counts.hold += n;

@@ -204,18 +204,19 @@ function statusKey(s?: string) {
   const k = (s || "").toLowerCase().replace(/\s+/g, "");
   if (["todo", "pending"].includes(k)) return "todo";
   if (["inprogress", "progress"].includes(k)) return "inprogress";
+  if (k === "statuscheck&followup") return "followup";
   if (["completed"].includes(k)) return "completed";
   if (["hold"].includes(k)) return "hold";
   return k || "todo";
 }
 
-type SectionCounts = { todo: number; inprogress: number; completed: number; hold: number };
+type SectionCounts = { todo: number; inprogress: number; followup: number; completed: number; hold: number };
 
 // How many tasks fall in each status section. A tab's total is the sum of
 // these, so it matches the sections on screen; a status no section lists
 // (e.g. Abandoned) is left out of both.
 function countSections(tasks: Task[]): SectionCounts {
-  const counts: SectionCounts = { todo: 0, inprogress: 0, completed: 0, hold: 0 };
+  const counts: SectionCounts = { todo: 0, inprogress: 0, followup: 0, completed: 0, hold: 0 };
   for (const task of tasks) {
     const key = statusKey(task.status);
     if (key in counts) counts[key as keyof SectionCounts] += 1;
@@ -224,7 +225,7 @@ function countSections(tasks: Task[]): SectionCounts {
 }
 
 function sumSections(counts: SectionCounts) {
-  return counts.todo + counts.inprogress + counts.completed + counts.hold;
+  return counts.todo + counts.inprogress + counts.followup + counts.completed + counts.hold;
 }
 
 function normalizeStatus(value?: string) {
@@ -338,11 +339,12 @@ export default function AgentDetails() {
   // Only the first rows of future tasks are fetched; this is the full count.
   const [agentStandardFutureTotal, setAgentStandardFutureTotal] = useState(0);
   // Tasks this agent assigned to a junior: the newest few per status, keyed
-  // "todo" | "inprogress" | "completed" | "hold", plus each section's size.
+  // "todo" | "inprogress" | "followup" | "completed" | "hold", plus each section's size.
   const [assignedTaskSections, setAssignedTaskSections] = useState<Record<string, Task[]>>({});
   const [assignedSectionCounts, setAssignedSectionCounts] = useState<SectionCounts>({
     todo: 0,
     inprogress: 0,
+    followup: 0,
     completed: 0,
     hold: 0,
   });
@@ -618,7 +620,7 @@ export default function AgentDetails() {
     // mode returns the first rows of each status section and each section's
     // size, which is all the tab shows; "View more" opens the full list.
     const fetchAgentAssignedTasks = async () => {
-      const emptyCounts = { todo: 0, inprogress: 0, completed: 0, hold: 0 };
+      const emptyCounts = { todo: 0, inprogress: 0, followup: 0, completed: 0, hold: 0 };
       try {
         const response = await fetchWithAuth(
           `/api/tasks?assignedById=${id}&summary=true&limit=3`,
@@ -932,7 +934,7 @@ export default function AgentDetails() {
   const isAdvisorOnly = showAdvisorTabs && !showExecutionTabs;
   const isDualRole = showAdvisorTabs && showExecutionTabs;
 
-  const statusCounts = ["Completed", "To Do", "In Progress", "Hold"].reduce(
+  const statusCounts = ["Completed", "To Do", "In Progress", "StatusCheck & Followup", "Hold"].reduce(
     (acc, status) => {
       acc[status] = agentTasks.filter((task) => task.status === status).length;
       return acc;
@@ -1625,6 +1627,7 @@ export default function AgentDetails() {
                           "Completed",
                           "To Do",
                           "In Progress",
+                          "StatusCheck & Followup",
                           "Hold"
                         ].map((status) => (
                           <div className="flex justify-between items-center" key={status}>
@@ -1778,6 +1781,12 @@ export default function AgentDetails() {
                         agentId={id}
                       />
                       <SectionTable
+                        label="StatusCheck & Followup"
+                        count={standardSectionCounts.followup}
+                        tasks={standardAgentTasks.filter((task) => statusKey(task.status) === "followup").slice(0, 3)}
+                        agentId={id}
+                      />
+                      <SectionTable
                         label="Hold"
                         count={standardSectionCounts.hold}
                         tasks={standardAgentTasks.filter((task) => statusKey(task.status) === "hold").slice(0, 3)}
@@ -1822,6 +1831,12 @@ export default function AgentDetails() {
                         count={assignedSectionCounts.inprogress}
                         tasks={assignedTaskSections.inprogress || []}
                         viewMoreHref={`/task?assignedById=${id}&status=${encodeURIComponent("In Progress")}`}
+                      />
+                      <SectionTable
+                        label="StatusCheck & Followup"
+                        count={assignedSectionCounts.followup}
+                        tasks={assignedTaskSections.followup || []}
+                        viewMoreHref={`/task?assignedById=${id}&status=${encodeURIComponent("StatusCheck & Followup")}`}
                       />
                       <SectionTable
                         label="Hold"
@@ -2033,6 +2048,13 @@ export default function AgentDetails() {
                         label="In Progress"
                         count={retainershipSectionCounts.inprogress}
                         tasks={agentRetainershipTasks.filter((task) => statusKey(task.status) === "inprogress").slice(0, 3)}
+                        agentId={id}
+                        retainershipTasks={true}
+                      />
+                      <SectionTable
+                        label="StatusCheck & Followup"
+                        count={retainershipSectionCounts.followup}
+                        tasks={agentRetainershipTasks.filter((task) => statusKey(task.status) === "followup").slice(0, 3)}
                         agentId={id}
                         retainershipTasks={true}
                       />

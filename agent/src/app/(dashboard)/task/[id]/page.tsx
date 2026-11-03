@@ -71,6 +71,7 @@ import {
 import { needsDailyTrack, type DailyTrackEntry } from "@/components/DailyTrackCell";
 import { DailyTrackForm } from "@/components/DailyTrackForm";
 import { DailyTrackList } from "@/components/DailyTrackList";
+import { FOLLOW_UP_STATUS } from "@/lib/taskFollowUp";
 
 // Task interface based on the API response
 interface Task {
@@ -482,6 +483,7 @@ export default function TaskDetails() {
       "To Do": "bg-gray-100 text-gray-800 border-gray-200",
       "In Progress": "bg-blue-100 text-blue-800 border-blue-200",
       Hold: "bg-orange-100 text-orange-800 border-orange-200",
+      [FOLLOW_UP_STATUS]: "bg-purple-100 text-purple-800 border-purple-200",
       Completed: "bg-green-100 text-green-800 border-green-200",
       Overdue: "bg-red-100 text-red-800 border-red-200",
     };
@@ -489,6 +491,7 @@ export default function TaskDetails() {
       "To Do": <Clock className="w-3 h-3 mr-1" />,
       "In Progress": <Play className="w-3 h-3 mr-1" />,
       Hold: <AlertTriangle className="w-3 h-3 mr-1" />,
+      [FOLLOW_UP_STATUS]: <Clock className="w-3 h-3 mr-1" />,
       Completed: <CheckCircle className="w-3 h-3 mr-1" />,
       Overdue: <AlertTriangle className="w-3 h-3 mr-1" />,
     };
@@ -687,7 +690,13 @@ export default function TaskDetails() {
     const prevTask = { ...task };
     const map = task.statusProgressMap || {};
     const isCompleted = newStatus === "Completed";
-    const restoredProgress = isCompleted ? 100 : (typeof map[newStatus] === "number" ? map[newStatus] : 0);
+    const restoredProgress = isCompleted
+      ? 100
+      : typeof map[newStatus] === "number"
+        ? map[newStatus]
+        : newStatus === FOLLOW_UP_STATUS
+          ? (task.progress ?? 0)
+          : 0;
 
     let updatedDueDate = task.dueDate;
     if (newStatus === "Hold") {
@@ -841,6 +850,12 @@ export default function TaskDetails() {
     { value: "24hr", label: "24 Hours" },
     { value: "48hr", label: "48 Hours" },
     { value: "1w", label: "1 Week" },
+  ];
+  const instanceOptions = [
+    { value: "Working", label: "Working" },
+    { value: "24hr", label: "24 Hours Duration" },
+    { value: "48hr", label: "48 Hours Duration" },
+    { value: "1w", label: "1 Week Duration" },
   ];
 
   const handleFollowUpDurationChange = async (value: string) => {
@@ -1135,7 +1150,7 @@ export default function TaskDetails() {
               <div className="flex flex-col md:flex-row md:items-center gap-4 md:gap-6 p-0 md:p-4 bg-muted/30 rounded-lg">
                 <div className="flex items-center space-x-2">
                   <Label htmlFor="follow-up-duration" className="text-sm font-medium cursor-pointer">
-                    StatusCheck & Followup
+                    Instance
                   </Label>
                   <Select
                     value={task.followUpDuration || "Working"}
@@ -1145,7 +1160,7 @@ export default function TaskDetails() {
                       <SelectValue placeholder="Working" />
                     </SelectTrigger>
                     <SelectContent>
-                      {durationOptions.map(opt => (
+                      {instanceOptions.map(opt => (
                         <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
                       ))}
                     </SelectContent>
@@ -1232,7 +1247,7 @@ export default function TaskDetails() {
                   Last updated: {formatDateTime(task.updatedAt)}
                 </div>
               </div>
-              <div className="flex items-center gap-4">
+              <div className="flex flex-wrap items-center gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="status">Status</Label>
                   <Select
@@ -1252,6 +1267,7 @@ export default function TaskDetails() {
                       <SelectItem value="In Progress">
                         In Progress
                       </SelectItem>
+                      <SelectItem value={FOLLOW_UP_STATUS}>{FOLLOW_UP_STATUS}</SelectItem>
                       <SelectItem value="Hold">Hold</SelectItem>
                       <SelectItem value="Abandoned">Abandoned</SelectItem>
                       <SelectItem value="Completed">Completed</SelectItem>
@@ -1259,7 +1275,7 @@ export default function TaskDetails() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <div className="space-y-2 items-center w-96">
+                  <div className="space-y-2 items-center w-full max-w-96">
                     <Label htmlFor="progress">
                       Progress ({task.progress}%)
                     </Label>

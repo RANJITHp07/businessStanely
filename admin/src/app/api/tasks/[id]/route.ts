@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { includeDeleted } from "@/lib/softDelete";
+import { followUpUpdates } from "@/lib/taskFollowUp";
 
 export async function GET(
   req: NextRequest,
@@ -93,6 +94,9 @@ export async function PUT(
     if (!currentTask) {
       return NextResponse.json({ error: "Task not found" }, { status: 404 });
     }
+
+    // Applied to `body` so the status side effects and duration audit below see it.
+    Object.assign(body, followUpUpdates(currentTask, body));
 
     const allowedFields = [
       "title",

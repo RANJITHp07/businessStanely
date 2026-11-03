@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getCurrentAgent } from "@/lib/auth";
+import { FOLLOW_UP_STATUS } from "@/lib/taskFollowUp";
 
 type InteractionKind = "NORMAL" | "CLIENT_UPDATE";
 
@@ -156,7 +157,7 @@ export async function GET(req: NextRequest) {
         where: {
           assignedToId,
           active: true,
-          status: { in: ["In Progress", "in progress"] },
+          status: { in: ["In Progress", "in progress", FOLLOW_UP_STATUS] },
           createdAt: { lte: snapshotDate },
         },
         include: {
@@ -186,7 +187,7 @@ export async function GET(req: NextRequest) {
         where: {
           assignedToId,
           active: true,
-          status: { in: ["In Progress", "in progress"] },
+          status: { in: ["In Progress", "in progress", FOLLOW_UP_STATUS] },
           dueDate: { lte: snapshotDate, not: null },
         },
         select: {

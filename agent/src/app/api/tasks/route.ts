@@ -7,6 +7,7 @@ import {
   SUMMARY_STATUS_SECTIONS,
   buildStatusCounts,
 } from "@/lib/taskSummary";
+import { isFollowUpDuration, FOLLOW_UP_STATUS } from "@/lib/taskFollowUp";
 
 interface TaskWithAdditionalFields {
   progress?: number | null;
@@ -577,7 +578,10 @@ export async function POST(req: NextRequest) {
         title,
         ownerShipId: agent.id,
         description: description || null,
-        status: status || "To Do",
+        status:
+          active !== false && isFollowUpDuration(followUpDuration)
+            ? FOLLOW_UP_STATUS
+            : status || "To Do",
         priority: priority || "Medium",
         dueDate: taskDueDate,
         triggerDate: taskTriggerDate, // Save triggerDate

@@ -90,7 +90,7 @@ export async function POST(req: NextRequest) {
     }
     if (!DAILY_TRACK_STATUSES.includes(task.status)) {
       return NextResponse.json(
-        { error: "Day track is only for In Progress tasks" },
+        { error: "Day track is only for In Progress and StatusCheck & Followup tasks" },
         { status: 400 },
       );
     }

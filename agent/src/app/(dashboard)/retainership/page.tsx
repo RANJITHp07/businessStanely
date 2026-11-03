@@ -661,6 +661,11 @@ export default function RetainershipTable() {
                                     retainershipTasks={true}
                                 />
                                 <SectionTable
+                                    label="StatusCheck & Followup"
+                                    tasks={myRetainerships.filter((t) => ["followup"].includes(statusKey(t.status))).slice(0, 3)}
+                                    retainershipTasks={true}
+                                />
+                                <SectionTable
                                     label="Hold"
                                     tasks={myRetainerships.filter((t) => ["hold"].includes(statusKey(t.status))).slice(0, 3)}
                                     retainershipTasks={true}
@@ -704,6 +709,11 @@ export default function RetainershipTable() {
                                 <SectionTable
                                     label="In Progress"
                                     tasks={teamRetainerships.filter((t) => ["inprogress"].includes(statusKey(t.status))).slice(0, 3)}
+                                    retainershipTasks={true}
+                                />
+                                <SectionTable
+                                    label="StatusCheck & Followup"
+                                    tasks={teamRetainerships.filter((t) => ["followup"].includes(statusKey(t.status))).slice(0, 3)}
                                     retainershipTasks={true}
                                 />
                                 <SectionTable

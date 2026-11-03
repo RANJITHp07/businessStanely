@@ -9,6 +9,7 @@ import {
   normalizeWeekDays,
   occurrenceDeadline,
 } from "./recurrenceWindow";
+import { initialTaskStatus } from "@/lib/taskFollowUp";
 
 /**
  * The business runs on India time, but a trigger date is stored as UTC
@@ -134,7 +135,7 @@ export async function updateRecurringTaskSchedule(taskId: string) {
         currentPeriodStart: triggerDate,
         completed: false,
         progress: 0,
-        status: "To Do",
+        status: initialTaskStatus(task.followUpDuration),
         active: true,
         recurring: null,
         recurringType: null,
@@ -226,7 +227,7 @@ export async function updateRecurringTaskSchedule(taskId: string) {
       currentPeriodStart: currentStart,
       completed: false,
       progress: 0,
-      status: "To Do",
+      status: initialTaskStatus(task.followUpDuration),
       active: true,
     },
   });
@@ -272,7 +273,7 @@ export async function updateHoldTasks() {
           const resumedTask = await prisma.task.update({
             where: { id: task.id },
             data: {
-              status: "To Do",
+              status: initialTaskStatus(task.followUpDuration),
               active:true,
               holdDate: null,
               holdDaysLeft: null,

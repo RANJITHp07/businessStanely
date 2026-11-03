@@ -58,6 +58,7 @@ function statusKey(s?: string) {
     const k = (s || "").toLowerCase().replace(/\s+/g, "")
     if (["todo", "pending"].includes(k)) return "todo"
     if (["inprogress", "progress"].includes(k)) return "inprogress"
+    if (k === "statuscheck&followup") return "followup"
     if (["completed"].includes(k)) return "completed"
     if (["hold"].includes(k)) return "hold"
     return k || "todo"
@@ -66,6 +67,7 @@ function statusKey(s?: string) {
 const STATUS_SECTIONS = [
     { label: "New Task", key: "todo", status: "To Do" },
     { label: "In Progress", key: "inprogress", status: "In Progress" },
+    { label: "StatusCheck & Followup", key: "followup", status: "StatusCheck & Followup" },
     { label: "Hold", key: "hold", status: "Hold" },
     { label: "Completed", key: "completed", status: "Completed" },
 ] as const

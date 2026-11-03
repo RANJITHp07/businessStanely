@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { FOLLOW_UP_STATUS } from "@/lib/taskFollowUp";
 
 export async function GET() {
   try {
@@ -61,7 +62,7 @@ export async function GET() {
       }),
       prisma.task.count({
         where: {
-          status: "In Progress",
+          status: { in: ["In Progress", FOLLOW_UP_STATUS] },
         },
       }),
       prisma.task.count({

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { getCurrentAdmin } from "@/lib/auth";
+import { FOLLOW_UP_STATUS } from "@/lib/taskFollowUp";
 
 type InteractionKind = "NORMAL" | "CLIENT_UPDATE";
 
@@ -136,7 +137,7 @@ export async function GET(req: NextRequest) {
       {
         assignedToId,
         active: true,
-        status: { in: ["In Progress", "in progress"] },
+        status: { in: ["In Progress", "in progress", FOLLOW_UP_STATUS] },
         createdAt: { lte: snapshotDate },
       },
     ];

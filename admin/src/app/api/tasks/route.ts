@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { getCurrentAdmin } from "@/lib/auth";
 import { SUMMARY_STATUS_SECTIONS, buildStatusCounts } from "@/lib/taskSummary";
+import { isFollowUpDuration, FOLLOW_UP_STATUS } from "@/lib/taskFollowUp";
 
 // Only the columns the My Tasks summary tables actually render.
 const SUMMARY_TASK_INCLUDE = {
@@ -95,7 +96,10 @@ export async function POST(req: NextRequest) {
         title,
         ownerShipId: assignedToId!,
         description,
-        status,
+        status:
+          active !== false && isFollowUpDuration(followUpDuration)
+            ? FOLLOW_UP_STATUS
+            : status,
         priority,
         dueDate: taskDueDate,
         triggerDate: taskTriggerDate,

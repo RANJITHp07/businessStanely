@@ -59,10 +59,10 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { useRouter, useSearchParams } from "next/navigation"
-import { SectionTable, statusKey } from "../my-task/page"
+import { SectionTable } from "../my-task/page"
 import { countOverdue, countPendingTriggers, countRunning } from "@/lib/taskCounts"
 import { useTablePage } from "@/hooks/useTablePage"
-import { taskSection } from "@/lib/taskFollowUp";
+import { Task } from "@/types"
 
 
 // Updated the `DashboardRetainership` interface to include client details
@@ -86,6 +86,21 @@ interface DashboardRetainership {
     taskCount?: number;
 }
 
+/** The newest few tasks of each section, plus how many there are in total. */
+interface TaskSummary {
+    total: number;
+    sections: Record<string, Task[]>;
+    future: Task[];
+}
+
+const EMPTY_TASK_SUMMARY: TaskSummary = { total: 0, sections: {}, future: [] };
+
+const toTaskSummary = (data: { counts?: { total?: number }; sections?: Record<string, Task[]>; future?: Task[] }): TaskSummary => ({
+    total: data.counts?.total ?? 0,
+    sections: data.sections ?? {},
+    future: data.future ?? [],
+});
+
 export default function RetainershipTable() {
     const [retainerships, setRetainerships] = useState<DashboardRetainership[]>([])
     const [myLegislations, setMyLegislations] = useState<any[]>([]);
@@ -97,10 +112,12 @@ export default function RetainershipTable() {
     const [activeTab, setActiveTab] = useState("my-retainerships")
     const [currentUserRole, setCurrentUserRole] = useState<string>("")
 
-    const [myRetainerships, setMyRetainerships] = useState<DashboardRetainership[]>([]);
+    const [myRetainerships, setMyRetainerships] = useState<TaskSummary>(EMPTY_TASK_SUMMARY);
     const [triggerTask, setTriggerTask] = useState<any>([])
+    // Only the first rows of future tasks are fetched; this is the full count.
+    const [triggerTotal, setTriggerTotal] = useState(0)
     const [myClients, setMyClients] = useState<DashboardRetainership[]>([]);
-    const [teamRetainerships, setTeamRetainerships] = useState<DashboardRetainership[]>([]);
+    const [teamRetainerships, setTeamRetainerships] = useState<TaskSummary>(EMPTY_TASK_SUMMARY);
 
     const router = useRouter()
     const searchParams = useSearchParams()
@@ -135,20 +152,36 @@ export default function RetainershipTable() {
 
     // Fetch retainerships and clients assigned to the agent
     useEffect(() => {
-        const fetchDashboardData = async () => {
+        // Team members' retainership tasks (#12), in one query for the whole team.
+        const fetchTeamRetainerships = async () => {
             try {
-                setLoading(true);
+                const teamRes = await fetchWithAuth("/api/team-members", { silent401: true });
+                const team = teamRes.ok ? await teamRes.json() : [];
+                const ids = (Array.isArray(team) ? team : []).map((member: { id: string }) => member.id);
+                if (ids.length === 0) return setTeamRetainerships(EMPTY_TASK_SUMMARY);
 
+                const res = await fetchWithAuth(
+                    `/api/tasks?retainershipTasks=true&summary=true&limit=3&view=section&assignedToIds=${ids.join(",")}`,
+                    { silent401: true },
+                );
+                setTeamRetainerships(res.ok ? toTaskSummary(await res.json()) : EMPTY_TASK_SUMMARY);
+            } catch {
+                setTeamRetainerships(EMPTY_TASK_SUMMARY);
+            }
+        };
+
+        const fetchOwnData = async () => {
+            try {
                 const [
                     retainershipRes,
                     triggerRes,
                     clientsRes,
                     legislationsRes,
                 ] = await Promise.all([
-                    fetchWithAuth(`/api/tasks?retainershipTasks=true`, { silent401: true }),
-                    fetchWithAuth(`/api/tasks?trigger=true`, { silent401: true }),
+                    fetchWithAuth(`/api/tasks?retainershipTasks=true&summary=true&limit=3&view=section`, { silent401: true }),
+                    fetchWithAuth(`/api/tasks?trigger=true&lite=true&limit=3&view=section`, { silent401: true }),
                     fetchWithAuth(`/api/clients?assignedToId=me`, { silent401: true }),
-                    fetchWithAuth(`/api/legislation?assignedAgent=me`, { silent401: true }),
+                    fetchWithAuth(`/api/legislation?assignedAgent=me&view=table`, { silent401: true }),
                 ]);
 
                 if (!retainershipRes.ok || !clientsRes.ok || !legislationsRes.ok) {
@@ -170,41 +203,22 @@ export default function RetainershipTable() {
                 // The same query the Upcoming section's "View more" opens, so
                 // the preview and the full list cannot disagree. Completed
                 // recurring tasks are already part of it.
-                const triggers = triggerData.tasks || [];
-
-                setMyRetainerships(retainershipData.tasks || []);
-                setTriggerTask(triggers)
+                setMyRetainerships(toTaskSummary(retainershipData));
+                setTriggerTask(triggerData.tasks || [])
+                setTriggerTotal(triggerData.total ?? 0)
                 setMyClients(clientsData || []);
                 setMyLegislations(legislationsData || []);
-
-                // Team members' retainership tasks (#12): fetch the logged-in
-                // agent's team, then aggregate each member's retainership tasks.
-                try {
-                    const teamRes = await fetchWithAuth("/api/team-members", { silent401: true });
-                    const team = teamRes.ok ? await teamRes.json() : [];
-                    const teamTaskResults = await Promise.all(
-                        (Array.isArray(team) ? team : []).map(async (member: { id: string }) => {
-                            const r = await fetchWithAuth(
-                                `/api/tasks?retainershipTasks=true&assignedToId=${member.id}`,
-                                { silent401: true },
-                            );
-                            if (!r.ok) return [];
-                            const d = await r.json();
-                            return d.tasks || [];
-                        }),
-                    );
-                    setTeamRetainerships(teamTaskResults.flat());
-                } catch {
-                    setTeamRetainerships([]);
-                }
             } catch (error) {
-                setMyRetainerships([]);
+                setMyRetainerships(EMPTY_TASK_SUMMARY);
                 setMyClients([]);
                 setMyLegislations([]);
-                setTeamRetainerships([]);
-            } finally {
-                setLoading(false);
             }
+        };
+
+        const fetchDashboardData = async () => {
+            setLoading(true);
+            await Promise.all([fetchOwnData(), fetchTeamRetainerships()]);
+            setLoading(false);
         };
 
         fetchDashboardData();
@@ -379,15 +393,15 @@ export default function RetainershipTable() {
                     </TabsTrigger>
                     <TabsTrigger value="my-retainerships" className="flex items-center gap-2">
                         <CheckCircle className="h-4 w-4" />
-                        My Task Retainer ({myRetainerships.length})
+                        My Task Retainer ({myRetainerships.total})
                     </TabsTrigger>
                     <TabsTrigger value="my-trigger" className="flex items-center gap-2">
                         <CheckCircle className="h-4 w-4" />
-                        My Future Tasks ({triggerTask.length})
+                        My Future Tasks ({triggerTotal})
                     </TabsTrigger>
                     <TabsTrigger value="team-retainerships" className="flex items-center gap-2">
                         <CheckCircle className="h-4 w-4" />
-                        Team Retainership ({teamRetainerships.length})
+                        Team Retainership ({teamRetainerships.total})
                     </TabsTrigger>
                     <TabsTrigger value="my-clients" className="flex items-center gap-2">
                         <CheckCircle className="h-4 w-4" />
@@ -645,7 +659,7 @@ export default function RetainershipTable() {
                         <div className="flex justify-center items-center py-8">
                             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                         </div>
-                    ) : myRetainerships.length === 0 ? (
+                    ) : myRetainerships.total === 0 ? (
                         <p className="text-center text-muted-foreground">No retainership task assigned to you.</p>
                     ) : (
                         <div className="">
@@ -653,38 +667,32 @@ export default function RetainershipTable() {
                             <div className="space-y-3">
                                 <SectionTable
                                     label="New Task"
-                                    tasks={myRetainerships.filter((t) => taskSection(t) === "todo").slice(0, 3)}
+                                    tasks={myRetainerships.sections.todo || []}
                                     retainershipTasks={true}
                                 />
                                 <SectionTable
                                     label="In Progress"
-                                    tasks={myRetainerships.filter((t) => taskSection(t) === "inprogress").slice(0, 3)}
+                                    tasks={myRetainerships.sections.inprogress || []}
                                     retainershipTasks={true}
                                 />
                                 <SectionTable
                                     label="Followups"
-                                    tasks={myRetainerships.filter((t) => taskSection(t) === "followup").slice(0, 3)}
+                                    tasks={myRetainerships.sections.followup || []}
                                     retainershipTasks={true}
                                 />
                                 <SectionTable
                                     label="Hold"
-                                    tasks={myRetainerships.filter((t) => ["hold"].includes(statusKey(t.status))).slice(0, 3)}
+                                    tasks={myRetainerships.sections.hold || []}
                                     retainershipTasks={true}
                                 />
                                 <SectionTable
                                     label="Future"
-                                    tasks={myRetainerships
-                                        .filter((t) => {
-                                            const next = (t as DashboardRetainership & { triggerDate?: string; nextDueDate?: string });
-                                            const when = next.triggerDate ?? next.nextDueDate;
-                                            return when ? new Date(when) > new Date() : false;
-                                        })
-                                        .slice(0, 3)}
+                                    tasks={myRetainerships.future}
                                     retainershipTasks={true}
                                 />
                                 <SectionTable
                                     label="Completed"
-                                    tasks={myRetainerships.filter((t) => ["completed"].includes(statusKey(t.status))).slice(0, 3)}
+                                    tasks={myRetainerships.sections.completed || []}
                                     retainershipTasks={true}
                                 />
                             </div>
@@ -697,34 +705,34 @@ export default function RetainershipTable() {
                         <div className="flex justify-center items-center py-8">
                             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                         </div>
-                    ) : teamRetainerships.length === 0 ? (
+                    ) : teamRetainerships.total === 0 ? (
                         <p className="text-center text-muted-foreground">No retainership task found for your team.</p>
                     ) : (
                         <div className="">
                             <div className="space-y-3">
                                 <SectionTable
                                     label="New Task"
-                                    tasks={teamRetainerships.filter((t) => taskSection(t) === "todo").slice(0, 3)}
+                                    tasks={teamRetainerships.sections.todo || []}
                                     retainershipTasks={true}
                                 />
                                 <SectionTable
                                     label="In Progress"
-                                    tasks={teamRetainerships.filter((t) => taskSection(t) === "inprogress").slice(0, 3)}
+                                    tasks={teamRetainerships.sections.inprogress || []}
                                     retainershipTasks={true}
                                 />
                                 <SectionTable
                                     label="Followups"
-                                    tasks={teamRetainerships.filter((t) => taskSection(t) === "followup").slice(0, 3)}
+                                    tasks={teamRetainerships.sections.followup || []}
                                     retainershipTasks={true}
                                 />
                                 <SectionTable
                                     label="Hold"
-                                    tasks={teamRetainerships.filter((t) => ["hold"].includes(statusKey(t.status))).slice(0, 3)}
+                                    tasks={teamRetainerships.sections.hold || []}
                                     retainershipTasks={true}
                                 />
                                 <SectionTable
                                     label="Completed"
-                                    tasks={teamRetainerships.filter((t) => ["completed"].includes(statusKey(t.status))).slice(0, 3)}
+                                    tasks={teamRetainerships.sections.completed || []}
                                     retainershipTasks={true}
                                 />
                             </div>
@@ -736,7 +744,7 @@ export default function RetainershipTable() {
                         <div className="flex justify-center items-center py-8">
                             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
                         </div>
-                    ) : triggerTask.length === 0 ? (
+                    ) : triggerTotal === 0 ? (
                         <Card>
                             <CardContent className="text-center py-8 text-muted-foreground">
                                 No future-trigger tasks assigned to you.
@@ -746,7 +754,7 @@ export default function RetainershipTable() {
                         <div className="space-y-[40px]">
                             <SectionTable
                                 label="Upcoming Tasks"
-                                tasks={triggerTask.slice(0, 3)}
+                                tasks={triggerTask}
                                 trigger={true}
                             />
                         </div>

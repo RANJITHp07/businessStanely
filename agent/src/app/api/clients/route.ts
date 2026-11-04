@@ -62,7 +62,22 @@ export async function GET(req: NextRequest) {
         where: { assignedAgentId: agent?.id },
         select: {
           retainership: {
-            select: { client: true },
+            select: {
+              client: {
+                select: {
+                  id: true,
+                  clientType: true,
+                  firstName: true,
+                  lastName: true,
+                  organizationName: true,
+                  email: true,
+                  phoneNumber: true,
+                  gender: true,
+                  authorizedPersonName: true,
+                  createdAt: true,
+                },
+              },
+            },
           },
         },
       });

@@ -2,6 +2,31 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getCurrentAgent } from "@/lib/auth";
 
+/** Adds each legislation's latest task completion and sorts newest first. */
+function withLastCompletedDate<
+  T extends { tasks: { lastCompletedDate: Date | null }[] },
+>(legislations: T[]) {
+  return legislations
+    .map((legislation) => {
+      const completedDates = legislation.tasks
+        .map((task) => task.lastCompletedDate)
+        .filter((date): date is Date => Boolean(date));
+
+      return {
+        ...legislation,
+        lastCompletedDate:
+          completedDates.length > 0
+            ? new Date(Math.max(...completedDates.map((date) => date.getTime())))
+            : null,
+      };
+    })
+    .sort(
+      (a, b) =>
+        (b.lastCompletedDate?.getTime() ?? 0) -
+        (a.lastCompletedDate?.getTime() ?? 0),
+    );
+}
+
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
@@ -17,6 +42,52 @@ export async function GET(req: NextRequest) {
       }
 
       whereClause.assignedAgentId = agent.id;
+    }
+
+    // Only what the retainership page's legislation table renders and searches;
+    // its tasks are just counted.
+    if (searchParams.get("view") === "table") {
+      const legislations = await prisma.legislation.findMany({
+        where: whereClause,
+        select: {
+          id: true,
+          title: true,
+          description: true,
+          createdAt: true,
+          assignedAgent: { select: { id: true, name: true } },
+          retainership: {
+            select: {
+              clientId: true,
+              client: {
+                select: {
+                  clientType: true,
+                  firstName: true,
+                  lastName: true,
+                  organizationName: true,
+                  authorizedPersonName: true,
+                  gender: true,
+                },
+              },
+            },
+          },
+          tasks: {
+            select: {
+              active: true,
+              status: true,
+              dueDate: true,
+              lastCompletedDate: true,
+            },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+      });
+
+      return NextResponse.json(
+        withLastCompletedDate(legislations).map((legislation) => ({
+          ...legislation,
+          tasks: legislation.tasks.map(({ lastCompletedDate: _unused, ...task }) => task),
+        })),
+      );
     }
 
     const legislations = await prisma.legislation.findMany({
@@ -42,35 +113,7 @@ export async function GET(req: NextRequest) {
       orderBy: { createdAt: "desc" },
     });
 
-    const legislationsWithLastCompletedDate = legislations
-      .map((legislation) => {
-        const completedDates = (legislation.tasks || [])
-          .map((task) => task.lastCompletedDate)
-          .filter((date): date is Date => Boolean(date));
-
-        const lastCompletedDate =
-          completedDates.length > 0
-            ? new Date(
-                Math.max(...completedDates.map((date) => date.getTime())),
-              )
-            : null;
-
-        return {
-          ...legislation,
-          lastCompletedDate,
-        };
-      })
-      .sort((a, b) => {
-        const aTime = a.lastCompletedDate
-          ? new Date(a.lastCompletedDate).getTime()
-          : 0;
-        const bTime = b.lastCompletedDate
-          ? new Date(b.lastCompletedDate).getTime()
-          : 0;
-        return bTime - aTime;
-      });
-
-    return NextResponse.json(legislationsWithLastCompletedDate);
+    return NextResponse.json(withLastCompletedDate(legislations));
   } catch (error) {
     console.error("Error fetching legislations:", error);
     return NextResponse.json(

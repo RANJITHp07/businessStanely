@@ -43,8 +43,15 @@ const SUMMARY_TASK_INCLUDE = {
   category: { select: { id: true, name: true, status: true } },
 } satisfies Prisma.TaskInclude;
 
+// Large JSON columns the summary and lite rows never send.
+const SUMMARY_TASK_OMIT = {
+  completionHistory: true,
+  statusProgressMap: true,
+} satisfies Prisma.TaskOmit;
+
 type SummaryTask = Prisma.TaskGetPayload<{
   include: typeof SUMMARY_TASK_INCLUDE;
+  omit: typeof SUMMARY_TASK_OMIT;
 }>;
 
 function formatSummaryTask(task: SummaryTask) {
@@ -55,6 +62,9 @@ function formatSummaryTask(task: SummaryTask) {
     status: task.status,
     priority: task.priority,
     dueDate: task.dueDate,
+    progress: task.progress,
+    triggerDate: task.triggerDate,
+    nextDueDate: task.nextDueDate,
     lastCompletedDate: (task as SummaryTask & TaskWithAdditionalFields)
       .lastCompletedDate,
     createdAt: task.createdAt,
@@ -107,6 +117,18 @@ export async function GET(req: NextRequest) {
     // i.e. work it assigned to a junior. Only "me" is honoured so one agent
     // cannot list another agent's delegated work through this param.
     const assignedByMe = searchParams.get("assignedBy") === "me";
+    // Several agents at once, so a team's retainership tasks take one query.
+    const assignedToIds = searchParams
+      .get("assignedToIds")
+      ?.split(",")
+      .map((id) => id.trim())
+      .filter(Boolean);
+    // `view=section`: rows for a section table, which never shows the description.
+    const toRow = <T extends { description?: string | null }>(row: T) => {
+      if (searchParams.get("view") !== "section") return row;
+      const { description: _description, ...rest } = row;
+      return rest;
+    };
 
     const statusCheckDurations = statusCheckDurationParam
       ? statusCheckDurationParam
@@ -178,7 +200,7 @@ export async function GET(req: NextRequest) {
     // RETAINERSHIP TASKS
     else if (retainershipTasks === "true") {
       where = {
-        assignedToId,
+        assignedToId: assignedToIds?.length ? { in: assignedToIds } : assignedToId,
         active: true,
         OR: [
           { retainershipId: { not: null } },
@@ -377,24 +399,46 @@ export async function GET(req: NextRequest) {
 
       const rows = await prisma.task.findMany({
         where: finalWhere,
-        select: SUMMARY_ROW_SELECT,
+        select: { ...SUMMARY_ROW_SELECT, triggerDate: true, nextDueDate: true },
         orderBy: { createdAt: "desc" },
       });
       const { counts, sectionById } = summarizeTaskRows(rows, limit);
+
+      // The retainership page's Future section. A task can also sit in a status
+      // section, so these are tracked apart from `sectionById`.
+      const now = new Date();
+      const futureIds = new Set(
+        retainershipTasks === "true" && !assignedToIds?.length
+          ? rows
+              .filter((row) => {
+                const when = row.triggerDate ?? row.nextDueDate;
+                return when ? when > now : false;
+              })
+              .slice(0, limit)
+              .map((row) => row.id)
+          : [],
+      );
+
       const tasks = await prisma.task.findMany({
-        where: { id: { in: Array.from(sectionById.keys()) } },
+        where: {
+          id: { in: Array.from(new Set([...sectionById.keys(), ...futureIds])) },
+        },
         include: SUMMARY_TASK_INCLUDE,
+        omit: SUMMARY_TASK_OMIT,
         orderBy: { createdAt: "desc" },
       });
 
       return NextResponse.json({
         counts,
+        future: tasks
+          .filter((task) => futureIds.has(task.id))
+          .map((task) => toRow(formatSummaryTask(task))),
         sections: Object.fromEntries(
           SUMMARY_STATUS_SECTIONS.map(({ key }) => [
             key,
             tasks
               .filter((task) => sectionById.get(task.id) === key)
-              .map(formatSummaryTask),
+              .map((task) => toRow(formatSummaryTask(task))),
           ]),
         ),
       });
@@ -404,21 +448,23 @@ export async function GET(req: NextRequest) {
     // for lists that only render table columns. `limit` optionally caps the rows.
     if (searchParams.get("lite") === "true") {
       const limit = parseInt(searchParams.get("limit") || "", 10);
-      const tasks = await prisma.task.findMany({
-        where: finalWhere,
-        include: SUMMARY_TASK_INCLUDE,
-        orderBy: { createdAt: "desc" },
-        ...(limit > 0 ? { take: limit } : {}),
-      });
+      const [tasks, total] = await Promise.all([
+        prisma.task.findMany({
+          where: finalWhere,
+          include: SUMMARY_TASK_INCLUDE,
+          omit: SUMMARY_TASK_OMIT,
+          orderBy: { createdAt: "desc" },
+          ...(limit > 0 ? { take: limit } : {}),
+        }),
+        limit > 0 ? prisma.task.count({ where: finalWhere }) : undefined,
+      ]);
 
       return NextResponse.json({
+        total: total ?? tasks.length,
         tasks: tasks.map((task) => ({
-          ...formatSummaryTask(task),
-          progress: task.progress,
+          ...toRow(formatSummaryTask(task)),
           recurring: task.recurring,
           recurringType: task.recurringType,
-          triggerDate: task.triggerDate,
-          nextDueDate: task.nextDueDate,
           currentPeriodStart: task.currentPeriodStart,
         })),
       });

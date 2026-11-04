@@ -5,7 +5,7 @@
 // every spelling we've seen rather than a single value. This mirrors the
 // `statusKey` helper the My Tasks page used to apply client-side.
 
-import { isFollowUpTask } from "@/lib/taskFollowUp";
+import { isInFollowUpGroup } from "@/lib/taskFollowUp";
 
 export const SUMMARY_STATUS_SECTIONS = [
   { key: "todo", statuses: ["To Do", "to do", "todo", "Pending", "pending"] },
@@ -77,6 +77,7 @@ export const SUMMARY_ROW_SELECT = {
   id: true,
   status: true,
   followUpDuration: true,
+  followUpUntil: true,
   active: true,
 } as const;
 
@@ -84,6 +85,7 @@ type SummaryRow = {
   id: string;
   status: string | null;
   followUpDuration?: string | null;
+  followUpUntil?: Date | null;
   active?: boolean | null;
 };
 
@@ -110,7 +112,7 @@ export function summarizeTaskRows(rows: SummaryRow[], limit: number) {
 
     let key = SECTION_BY_STATUS.get(row.status ?? "");
     if (!key) continue;
-    if (key === "inprogress" && isFollowUpTask(row)) key = "followup";
+    if (key === "inprogress" && isInFollowUpGroup(row)) key = "followup";
 
     sectionCounts[key] += 1;
     if (sectionCounts[key] <= limit) sectionById.set(row.id, key);

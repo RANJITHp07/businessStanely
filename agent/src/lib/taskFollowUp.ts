@@ -1,13 +1,14 @@
 // The "Followups" group. It is not a task status: a task belongs
 // to the group while it is In Progress on a 48hr/1w "Instance"
 // (Task.followUpDuration), and its stored status stays In Progress. The Instance
-// only changes when someone changes it. Task.followUpUntil is the first day the
-// task needs a day track; it then needs one every 48hr/1w after that, whether or
-// not the earlier one was written. Setting an Instance again restarts the cycle.
+// only changes when someone changes it. Task.followUpUntil is the next day the
+// task is due: for that IST day it is listed under In Progress and needs a day
+// track. The next day it returns to the group until 48hr/1w later, whether or not
+// the note was written. Setting an Instance again restarts the cycle.
 //
 // Keep this file identical in `agent/src/lib` and `admin/src/lib`.
 
-import { istDateKey } from "./dailyTrack";
+import { istDateKey, istDayRange } from "./dailyTrack";
 
 export const FOLLOW_UP_GROUP = "Followups";
 
@@ -41,7 +42,10 @@ type GroupableTask = {
   followUpUntil?: Date | string | null;
 };
 
-/** Waiting (inactive) tasks join the group once the cron raises them. */
+/**
+ * On a 48hr/1w Instance, whether or not today is its due day.
+ * Waiting (inactive) tasks count once the cron raises them.
+ */
 export function isFollowUpTask(task: GroupableTask) {
   return (
     task.active !== false &&
@@ -60,8 +64,24 @@ export function needsDayTrackOn(task: GroupableTask, dateKey = istDateKey()) {
   if (!isFollowUpTask(task) || !task.followUpUntil) return true;
   const firstDay = istDateKey(new Date(task.followUpUntil));
   const days = (Date.parse(dateKey) - Date.parse(firstDay)) / DAY_MS;
+  // Before followUpUntil today and later mean "not due yet". An earlier date can
+  // only be a past day, and the sweep has since moved followUpUntil past it.
+  if (days < 0 && dateKey >= istDateKey()) return false;
   const cycleDays = FOLLOW_UP_WAIT_MS[task.followUpDuration || ""] / DAY_MS;
-  return days >= 0 && days % cycleDays === 0;
+  return ((days % cycleDays) + cycleDays) % cycleDays === 0;
+}
+
+/** In the Followups group now: on the Instance and not on a due day. */
+export function isInFollowUpGroup(task: GroupableTask) {
+  return isFollowUpTask(task) && !needsDayTrackOn(task);
+}
+
+/** followUpUntil moved on by whole cycles to today's IST day or later. */
+export function nextFollowUpDue(task: GroupableTask, now = new Date()) {
+  const due = new Date(task.followUpUntil as Date | string).getTime();
+  const today = istDayRange(istDateKey(now))!.start.getTime();
+  const cycle = FOLLOW_UP_WAIT_MS[task.followUpDuration || ""];
+  return new Date(due + Math.max(0, Math.ceil((today - due) / cycle)) * cycle);
 }
 
 /**
@@ -86,7 +106,7 @@ export function followUpTimer(
 
 /** The section a task is listed under: "followup", or its status bucket. */
 export function taskSection(task: GroupableTask) {
-  if (isFollowUpTask(task)) return "followup";
+  if (isInFollowUpGroup(task)) return "followup";
   const k = normalize(task.status);
   if (["todo", "pending"].includes(k)) return "todo";
   if (["inprogress", "progress"].includes(k)) return "inprogress";
@@ -98,8 +118,15 @@ const FOLLOW_UP_RULE = {
   followUpDuration: { in: FOLLOW_UP_DURATIONS },
 };
 
-/** Prisma filter for the tasks in the group; same rule as `isFollowUpTask`. */
+/** Prisma filter for tasks on the Instance; same rule as `isFollowUpTask`. */
 export const FOLLOW_UP_WHERE = { ...FOLLOW_UP_RULE, status: { in: IN_PROGRESS_STATUSES } };
+
+const startOfTomorrow = () => istDayRange(istDateKey())!.end;
+
+/** Prisma filter for the tasks in the group now; same rule as `isInFollowUpGroup`. */
+export function followUpGroupWhere() {
+  return { ...FOLLOW_UP_WHERE, followUpUntil: { gte: startOfTomorrow() } };
+}
 
 /** Prisma filter for In Progress tasks of the given spellings, outside the group. */
 export function inProgressOutsideGroupWhere(statuses: string[]) {
@@ -112,6 +139,9 @@ export function inProgressOutsideGroupWhere(statuses: string[]) {
       { followUpDuration: null },
       { followUpDuration: { isSet: false } },
       { followUpDuration: { notIn: FOLLOW_UP_DURATIONS } },
+      { followUpUntil: { lt: startOfTomorrow() } },
+      { followUpUntil: null },
+      { followUpUntil: { isSet: false } },
     ],
   };
 }
@@ -123,7 +153,7 @@ export function inProgressOutsideGroupWhere(statuses: string[]) {
  * or In Progress + 48hr would match nothing.
  */
 export function statusFilterWhere(value: string, durationFiltered = false) {
-  if (normalize(value) === normalize(FOLLOW_UP_GROUP)) return FOLLOW_UP_WHERE;
+  if (normalize(value) === normalize(FOLLOW_UP_GROUP)) return followUpGroupWhere();
   return isInProgressStatus(value) && !durationFiltered
     ? inProgressOutsideGroupWhere([value])
     : { status: value };

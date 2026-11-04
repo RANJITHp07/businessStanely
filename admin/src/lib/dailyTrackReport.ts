@@ -5,6 +5,7 @@ import {
   istDayRange,
   stripDailyTrackPrefix,
 } from "@/lib/dailyTrack";
+import { expireFollowUps } from "@/lib/followUpExpiry";
 import { needsDayTrackOn } from "@/lib/taskFollowUp";
 
 export interface DailyTrackAgent {
@@ -45,6 +46,8 @@ const CLIENT_NAME_SELECT = {
 export async function buildDailyTrackReport(dateKey: string, agentId?: string) {
   const range = istDayRange(dateKey);
   if (!range) return null;
+
+  await expireFollowUps();
 
   const tasks = await prisma.task.findMany({
     where: {

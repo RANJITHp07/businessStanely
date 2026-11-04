@@ -10,6 +10,7 @@ import {
   summarizeTaskRows,
 } from "@/lib/taskSummary";
 import { followUpTimer, statusFilterWhere } from "@/lib/taskFollowUp";
+import { expireFollowUps } from "@/lib/followUpExpiry";
 import { approvedOrNoCategoryConditions } from "@/lib/taskCategoryFilter";
 import { isSuperiorOfAll } from "@/lib/teamAccess";
 
@@ -93,6 +94,7 @@ function formatSummaryTask(task: SummaryTask) {
 
 export async function GET(req: NextRequest) {
   try {
+    await expireFollowUps();
     const agent = await getCurrentAgent(req);
 
     if (!agent) {

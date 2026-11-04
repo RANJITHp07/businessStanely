@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCurrentAgent } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { followUpTimer } from "@/lib/taskFollowUp";
+import { expireFollowUps } from "@/lib/followUpExpiry";
 import {
   recordDeletionAudit,
   actorFromAgent,
@@ -81,6 +82,7 @@ export async function GET(
   { params }: { params: { id: string } },
 ) {
   try {
+    await expireFollowUps();
     const agent = await getCurrentAgent(req);
 
     if (!agent) {

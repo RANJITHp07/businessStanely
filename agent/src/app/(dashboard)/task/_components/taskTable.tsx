@@ -1,7 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { fetchWithAuth } from "@/lib/fetchWithAuth";
-import { FOLLOW_UP_GROUP, isFollowUpTask } from "@/lib/taskFollowUp";
+import { FOLLOW_UP_GROUP, isInFollowUpGroup } from "@/lib/taskFollowUp";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -240,7 +240,7 @@ export default function TasksTable() {
       selectedStatuses.length === 0 ||
       selectedStatuses.includes(task.status) ||
       // "Followups" is a group, not a stored status: its tasks stay In Progress.
-      (selectedStatuses.includes(FOLLOW_UP_GROUP) && isFollowUpTask(task));
+      (selectedStatuses.includes(FOLLOW_UP_GROUP) && isInFollowUpGroup(task));
     const matchesFollowUp = selectedFollowUpDurations.length === 0 || (task.followUpDuration && selectedFollowUpDurations.includes(task.followUpDuration));
     const matchesStatusCheck = selectedStatusCheckDurations.length === 0 || (task.statusCheckDuration && selectedStatusCheckDurations.includes(task.statusCheckDuration));
 

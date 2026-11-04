@@ -1,8 +1,8 @@
 // Gives tasks already in the Followups group an end to their wait. The wait counts
 // from the latest Instance audit for the task's current duration, else from when the
-// task was last updated. A wait already over ends at the next task read, moving the
-// task back to In Progress with its Instance on Working. Only tasks without a
-// `followUpUntil` are touched, so it is safe to run again.
+// task was last updated. A wait already over is moved on to its next due day at the
+// next task read, keeping its Instance. Only tasks without a `followUpUntil` are
+// touched, so it is safe to run again.
 //
 //   npx tsx scripts/backfill-followup-until.ts             -> dry run, changes nothing
 //   npx tsx scripts/backfill-followup-until.ts --apply     -> writes a backup, then updates
@@ -51,7 +51,7 @@ async function backfill(apply: boolean) {
 
   const summary: Record<string, number> = {};
   for (const row of plan) {
-    const key = `${row.followUpDuration} / ${row.fromAudit ? "from audit" : "from updatedAt"} / ${row.followUpUntil.getTime() < now ? "WAIT OVER, returns to In Progress" : "stays in Followups"}`;
+    const key = `${row.followUpDuration} / ${row.fromAudit ? "from audit" : "from updatedAt"} / ${row.followUpUntil.getTime() < now ? "WAIT OVER, moves to next due day" : "stays in Followups"}`;
     summary[key] = (summary[key] ?? 0) + 1;
   }
   console.log(summary, `total ${plan.length}`);

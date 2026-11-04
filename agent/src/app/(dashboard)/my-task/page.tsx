@@ -165,11 +165,11 @@ export function SectionTable({ label, tasks, retainershipTasks, trigger, trigger
     return "text-blue-600"; // New Task
   })();
 
-  // Day track applies to the agent's own In Progress work and follow-ups, so
-  // only those sections get the checkbox column.
+  // Day track applies to the agent's own In Progress work, so only that
+  // section gets the checkbox column.
   const { agent } = useAuth();
   const showDailyTrack =
-    (label.toLowerCase().includes("progress") || label === "Followups") &&
+    label.toLowerCase().includes("progress") &&
     !assignedByMe &&
     !trigger;
   const { entries: dailyTrack, setEntry: setDailyTrack } =

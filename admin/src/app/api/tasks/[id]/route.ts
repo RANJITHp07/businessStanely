@@ -3,12 +3,14 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { includeDeleted } from "@/lib/softDelete";
 import { followUpTimer } from "@/lib/taskFollowUp";
+import { expireFollowUps } from "@/lib/followUpExpiry";
 
 export async function GET(
   req: NextRequest,
   { params }: { params: { id: string } },
 ) {
   try {
+    await expireFollowUps();
     const { id } = await params;
 
     // ?includeDeleted=true lets the task page open a soft-deleted task in a

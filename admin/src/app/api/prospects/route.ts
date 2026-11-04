@@ -1,3 +1,4 @@
+import { AGENT_SECRET_FIELDS } from "@/lib/agentSecretFields";
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
@@ -295,7 +296,7 @@ export async function POST(req: NextRequest) {
         createdByAgentId: agent.id,
         amount: typeof amount === "number" ? amount : undefined,
       },
-      include: { createdByAgent: true, assignedAgent: true },
+      include: { createdByAgent: { omit: AGENT_SECRET_FIELDS }, assignedAgent: { omit: AGENT_SECRET_FIELDS } },
     });
     return NextResponse.json({ prospect });
   } catch (error) {

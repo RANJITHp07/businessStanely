@@ -13,6 +13,7 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Loader2 } from "lucide-react";
 import { DAILY_TRACK_STATUSES } from "@/lib/dailyTrack";
+import { isFollowUpTask, needsDayTrackOn } from "@/lib/taskFollowUp";
 
 export interface DailyTrackEntry {
   id: string;
@@ -56,13 +57,38 @@ export function useDailyTrack(enabled = true) {
 
 /** Whether a row should offer the day track checkbox to this agent. */
 export function needsDailyTrack(
-  task: { status: string; assignedTo?: { id: string } | null },
+  task: {
+    status: string;
+    followUpDuration?: string | null;
+    followUpUntil?: Date | string | null;
+    active?: boolean | null;
+    assignedTo?: { id: string } | null;
+  },
   agentId?: string | null,
 ) {
   return (
     !!agentId &&
     task.assignedTo?.id === agentId &&
-    DAILY_TRACK_STATUSES.includes(task.status)
+    DAILY_TRACK_STATUSES.includes(task.status) &&
+    needsDayTrackOn(task)
+  );
+}
+
+/** Tells the agent a follow-up task's day track falls on today. */
+export function DailyTrackDueNotice({
+  task,
+  agentId,
+  done,
+}: {
+  task: Parameters<typeof needsDailyTrack>[0];
+  agentId?: string | null;
+  done?: boolean;
+}) {
+  if (done || !isFollowUpTask(task) || !needsDailyTrack(task, agentId)) return null;
+  return (
+    <span className="mt-1 inline-block w-fit rounded-md bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
+      Day track due today
+    </span>
   );
 }
 

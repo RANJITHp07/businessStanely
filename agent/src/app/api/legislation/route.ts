@@ -1,3 +1,4 @@
+import { AGENT_SECRET_FIELDS } from "@/lib/agentSecretFields";
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getCurrentAgent } from "@/lib/auth";
@@ -93,7 +94,7 @@ export async function GET(req: NextRequest) {
     const legislations = await prisma.legislation.findMany({
       where: whereClause,
       include: {
-        assignedAgent: true,
+        assignedAgent: { omit: AGENT_SECRET_FIELDS },
         retainership: {
           include: {
             client: true,

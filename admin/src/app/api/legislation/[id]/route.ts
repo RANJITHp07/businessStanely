@@ -1,3 +1,4 @@
+import { AGENT_SECRET_FIELDS } from "@/lib/agentSecretFields";
 import { NextRequest } from "next/server";
 import { getCurrentAdmin } from "@/lib/auth";
 import prisma from "@/lib/prisma";
@@ -15,7 +16,7 @@ export async function GET(req: Request, context: { params: { id: string } }) {
     const legislation = await prisma.legislation.findFirst({
       where: { id },
       include: {
-        assignedAgent: true,
+        assignedAgent: { omit: AGENT_SECRET_FIELDS },
         retainership: {
           include: {
             client: true,
@@ -92,7 +93,7 @@ export async function POST(req: Request, context: { params: { id: string } }) {
           assignedAgentId,
         },
         include: {
-          assignedAgent: true,
+          assignedAgent: { omit: AGENT_SECRET_FIELDS },
           retainership: {
             include: {
               client: true,
@@ -134,7 +135,7 @@ export async function DELETE(
     const existingLegislation = await prisma.legislation.findFirst({
       where: { id },
       include: {
-        assignedAgent: true,
+        assignedAgent: { omit: AGENT_SECRET_FIELDS },
         retainership: {
           include: {
             client: true,
@@ -154,7 +155,7 @@ export async function DELETE(
       where: { id },
       data: softDeleteData(actorFromAdmin(currentAdmin)),
       include: {
-        assignedAgent: true,
+        assignedAgent: { omit: AGENT_SECRET_FIELDS },
         retainership: {
           include: {
             client: true,

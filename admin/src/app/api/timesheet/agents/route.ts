@@ -1,3 +1,4 @@
+import { AGENT_SECRET_FIELDS } from "@/lib/agentSecretFields";
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentAdmin } from "@/lib/auth";
 import prisma from "@/lib/prisma";
@@ -35,9 +36,10 @@ export async function GET(req: NextRequest) {
       where: {
         id: { in: executionAgents.map((a) => a.id) },
       },
+      omit: AGENT_SECRET_FIELDS,
       include: {
-        superiorsLinks: { include: { superior: true } },
-        subordinatesLinks: { include: { subordinate: true } },
+        superiorsLinks: { include: { superior: { omit: AGENT_SECRET_FIELDS } } },
+        subordinatesLinks: { include: { subordinate: { omit: AGENT_SECRET_FIELDS } } },
       },
       orderBy: {
         createdAt: "desc",

@@ -34,44 +34,23 @@ export async function GET(
     // Find the retainership in database with creator information (user or agent)
     const retainership = await prisma.retainership.findUnique({
       where: { id },
-      include: {
-        createdByUser: {
-          select: {
-            id: true,
-            username: true,
-            email: true,
-            adminType: true,
-            photo: true,
-          },
-        },
-        createdByAgent: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            photo: true,
-          },
-        },
-        approvedBy: {
-          select: {
-            id: true,
-            username: true,
-          },
-        },
-        rejectedBy: {
-          select: {
-            id: true,
-            username: true,
-          },
-        },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        color: true,
+        status: true,
+        createdAt: true,
+        updatedAt: true,
+        rejectionReason: true,
+        createdByUser: { select: { username: true } },
+        createdByAgent: { select: { name: true } },
         legislation: {
-          include: {
-            assignedAgent: {
-              select: {
-                id: true,
-                name: true,
-              },
-            },
+          select: {
+            id: true,
+            title: true,
+            description: true,
+            assignedAgent: { select: { id: true, name: true } },
           },
         },
         client: {

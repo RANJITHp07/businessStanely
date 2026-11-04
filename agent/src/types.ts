@@ -121,6 +121,8 @@ export interface Task {
   progress?: number;
   followUpRequired?: boolean;
   followUpDuration?: string; // e.g., '24hr', '48hr', '1w', 'Working'
+  followUpUntil?: string | null;
+
   statusCheckDuration?: string; // e.g., '24hr', '48hr', '1w', 'Working'
   completed?: boolean;
   recurring?: number; // Recurring in months (1-12), undefined/null means not recurring

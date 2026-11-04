@@ -68,7 +68,7 @@ import {
   istDateKey,
   isDailyTrackContent,
 } from "@/lib/dailyTrack";
-import { needsDailyTrack, type DailyTrackEntry } from "@/components/DailyTrackCell";
+import { DailyTrackDueNotice, needsDailyTrack, type DailyTrackEntry } from "@/components/DailyTrackCell";
 import { DailyTrackForm } from "@/components/DailyTrackForm";
 import { DailyTrackList } from "@/components/DailyTrackList";
 
@@ -86,6 +86,8 @@ interface Task {
   updatedAt: string;
   followUpRequired: boolean;
   followUpDuration?: string;
+  followUpUntil?: string | null;
+  active?: boolean;
   statusCheckDuration?: string;
   completed: boolean;
   recurring?: number;
@@ -1940,6 +1942,11 @@ export default function TaskDetails() {
               <CardDescription>
                 One short note per day while the task is In Progress
               </CardDescription>
+              <DailyTrackDueNotice
+                task={task}
+                agentId={agent?.id}
+                done={!!todayDailyTrack}
+              />
             </CardHeader>
             <CardContent className="space-y-6">
               {canAddDailyTrack ? (
@@ -1954,7 +1961,7 @@ export default function TaskDetails() {
                 />
               ) : (
                 <p className="text-sm text-muted-foreground">
-                  Day track can be added only on In Progress tasks assigned to you.
+                  Day track can be added only on In Progress tasks assigned to you. A 48hr or 1w follow-up needs one only on its due day.
                 </p>
               )}
               <Separator />

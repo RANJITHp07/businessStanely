@@ -1,3 +1,4 @@
+import { AGENT_SECRET_FIELDS } from "@/lib/agentSecretFields";
 import prisma from "@/lib/prisma";
 
 export async function GET(req: Request, context: { params: { id: string } }) {
@@ -8,7 +9,7 @@ export async function GET(req: Request, context: { params: { id: string } }) {
     const legislation = await prisma.legislation.findUnique({
       where: { id },
       include: {
-        assignedAgent: true,
+        assignedAgent: { omit: AGENT_SECRET_FIELDS },
         retainership: {
           include: {
             client: true,

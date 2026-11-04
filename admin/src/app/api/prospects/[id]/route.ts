@@ -1,3 +1,4 @@
+import { AGENT_SECRET_FIELDS, USER_SECRET_FIELDS } from "@/lib/agentSecretFields";
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getCurrentAdmin } from "@/lib/auth";
@@ -23,13 +24,13 @@ export async function GET(
     const prospect = await prisma.prospect.findUnique({
       where: { id },
       include: {
-        assignedAgent: true,
-        createdByAgent: true,
+        assignedAgent: { omit: AGENT_SECRET_FIELDS },
+        createdByAgent: { omit: AGENT_SECRET_FIELDS },
         leadSource: true,
         comments: {
           include: {
-            user: true,
-            agent: true,
+            user: { omit: USER_SECRET_FIELDS },
+            agent: { omit: AGENT_SECRET_FIELDS },
           },
           orderBy: { createdAt: "desc" },
         },
@@ -254,8 +255,8 @@ export async function POST(
     const comment = await prisma.comment.findUnique({
       where: { id: result.newComment.id },
       include: {
-        agent: true,
-        user: true,
+        agent: { omit: AGENT_SECRET_FIELDS },
+        user: { omit: USER_SECRET_FIELDS },
       },
     });
     return NextResponse.json({ comment, prospectStatus: result.nextStatus });

@@ -1,14 +1,18 @@
 // The "Followups" group. It is not a task status: a task belongs
 // to the group while it is In Progress on a 48hr/1w "Instance"
-// (Task.followUpDuration), and its stored status stays In Progress. When the
-// duration ends (Task.followUpUntil), its Instance returns to Working, which
-// moves it back to In Progress; setting an Instance again restarts the wait.
+// (Task.followUpDuration), and its stored status stays In Progress. The Instance
+// only changes when someone changes it. Task.followUpUntil is the first day the
+// task needs a day track; it then needs one every 48hr/1w after that, whether or
+// not the earlier one was written. Setting an Instance again restarts the cycle.
 //
 // Keep this file identical in `agent/src/lib` and `admin/src/lib`.
+
+import { istDateKey } from "./dailyTrack";
 
 export const FOLLOW_UP_GROUP = "Followups";
 
 const HOUR_MS = 60 * 60 * 1000;
+const DAY_MS = 24 * HOUR_MS;
 const FOLLOW_UP_WAIT_MS: Record<string, number> = {
   "48hr": 48 * HOUR_MS,
   "1w": 7 * 24 * HOUR_MS,
@@ -34,6 +38,7 @@ type GroupableTask = {
   status?: string | null;
   followUpDuration?: string | null;
   active?: boolean | null;
+  followUpUntil?: Date | string | null;
 };
 
 /** Waiting (inactive) tasks join the group once the cron raises them. */
@@ -43,6 +48,20 @@ export function isFollowUpTask(task: GroupableTask) {
     FOLLOW_UP_DURATIONS.includes(task.followUpDuration || "") &&
     isInProgressStatus(task.status)
   );
+}
+
+/**
+ * Whether a task needs a day track on the IST day `dateKey`. Tasks outside the
+ * group need one every day; tasks in it only on their cycle's days. A group task
+ * with no followUpUntil has no known cycle, so it stays in the day tracker rather
+ * than silently never needing a note.
+ */
+export function needsDayTrackOn(task: GroupableTask, dateKey = istDateKey()) {
+  if (!isFollowUpTask(task) || !task.followUpUntil) return true;
+  const firstDay = istDateKey(new Date(task.followUpUntil));
+  const days = (Date.parse(dateKey) - Date.parse(firstDay)) / DAY_MS;
+  const cycleDays = FOLLOW_UP_WAIT_MS[task.followUpDuration || ""] / DAY_MS;
+  return days >= 0 && days % cycleDays === 0;
 }
 
 /**

@@ -1,9 +1,10 @@
+import { AGENT_SECRET_FIELDS } from "@/lib/agentSecretFields";
 import { Prisma } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 
 const FULL_INCLUDE = {
-  assignedAgent: true,
+  assignedAgent: { omit: AGENT_SECRET_FIELDS },
   retainership: { include: { client: true } },
   tasks: true,
 } satisfies Prisma.LegislationInclude;

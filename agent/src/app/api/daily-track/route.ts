@@ -9,6 +9,7 @@ import {
   istDayRange,
   stripDailyTrackPrefix,
 } from "@/lib/dailyTrack";
+import { needsDayTrackOn } from "@/lib/taskFollowUp";
 
 /** Today's (IST) day track notes written by the signed-in agent, keyed by task. */
 export async function GET(req: NextRequest) {
@@ -77,7 +78,7 @@ export async function POST(req: NextRequest) {
 
     const task = await prisma.task.findUnique({
       where: { id: taskId },
-      select: { assignedToId: true, status: true },
+      select: { assignedToId: true, status: true, followUpDuration: true, followUpUntil: true, active: true },
     });
     if (!task) {
       return NextResponse.json({ error: "Task not found" }, { status: 404 });
@@ -91,6 +92,12 @@ export async function POST(req: NextRequest) {
     if (!DAILY_TRACK_STATUSES.includes(task.status)) {
       return NextResponse.json(
         { error: "Day track is only for In Progress tasks" },
+        { status: 400 },
+      );
+    }
+    if (!needsDayTrackOn(task)) {
+      return NextResponse.json(
+        { error: "This follow-up task does not need a day track today" },
         { status: 400 },
       );
     }

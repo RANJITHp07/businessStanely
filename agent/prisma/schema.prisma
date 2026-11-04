@@ -369,7 +369,7 @@ model Task {
   progress         Int?      @default(0) // Progress percentage (0-100)
   followUpRequired Boolean   @default(false)
   followUpDuration     String? // e.g., "24hr", "48hr", "1w", "Working"
-  /// When a task in the Followups group returns to In Progress. Set when it enters the group.
+  /// First day a task in the Followups group needs a day track; repeats every 48hr/1w. Set when it enters the group.
   followUpUntil       DateTime?
   statusCheckDuration  String? // e.g., "24hr", "48hr", "1w", "Working"
   completed        Boolean   @default(false)

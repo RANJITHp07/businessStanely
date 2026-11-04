@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { AGENT_SECRET_FIELDS } from "@/lib/agentSecretFields";
 
 export async function GET(req: NextRequest) {
   try {
@@ -7,6 +8,7 @@ export async function GET(req: NextRequest) {
     const normalizedStatus = statusParam?.trim().toLowerCase();
 
     const agents = await prisma.agent.findMany({
+      omit: AGENT_SECRET_FIELDS,
       where:
         normalizedStatus === "inactive"
           ? { status: "inactive" }

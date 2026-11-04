@@ -1,3 +1,4 @@
+import { AGENT_SECRET_FIELDS, USER_SECRET_FIELDS } from "@/lib/agentSecretFields";
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import {
@@ -20,12 +21,12 @@ export async function GET(
         prospect: {
           include: {
             leadSource: true,
-            createdByAgent: true,
-            assignedAgent: true,
+            createdByAgent: { omit: AGENT_SECRET_FIELDS },
+            assignedAgent: { omit: AGENT_SECRET_FIELDS },
             comments: {
               include: {
-                user: true,
-                agent: true,
+                user: { omit: USER_SECRET_FIELDS },
+                agent: { omit: AGENT_SECRET_FIELDS },
               },
               orderBy: { createdAt: "desc" },
             },
@@ -33,8 +34,8 @@ export async function GET(
         },
         comments: {
           include: {
-            user: true,
-            agent: true,
+            user: { omit: USER_SECRET_FIELDS },
+            agent: { omit: AGENT_SECRET_FIELDS },
           },
           orderBy: { createdAt: "desc" },
         },
@@ -167,8 +168,8 @@ export async function POST(
     const comment = await prisma.comment.findUnique({
       where: { id: created.id },
       include: {
-        agent: true,
-        user: true,
+        agent: { omit: AGENT_SECRET_FIELDS },
+        user: { omit: USER_SECRET_FIELDS },
       },
     });
     return NextResponse.json({ comment });

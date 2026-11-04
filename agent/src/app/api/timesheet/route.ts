@@ -1,3 +1,4 @@
+import { AGENT_SECRET_FIELDS, USER_SECRET_FIELDS } from "@/lib/agentSecretFields";
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentAgent } from "@/lib/auth";
 import prisma from "@/lib/prisma";
@@ -170,11 +171,11 @@ export async function GET(req: NextRequest) {
               email: true,
             },
           },
-          assignedTo: true,
+          assignedTo: { omit: AGENT_SECRET_FIELDS },
           comments: {
             include: {
-              user: true,
-              agent: true,
+              user: { omit: USER_SECRET_FIELDS },
+              agent: { omit: AGENT_SECRET_FIELDS },
             },
             orderBy: {
               createdAt: "desc",

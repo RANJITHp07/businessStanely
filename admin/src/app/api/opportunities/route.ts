@@ -1,3 +1,4 @@
+import { AGENT_SECRET_FIELDS } from "@/lib/agentSecretFields";
 import { NextRequest, NextResponse } from "next/server";
 import prisma, { prismaRaw } from "@/lib/prisma";
 import { getCurrentAdmin } from "@/lib/auth";
@@ -195,7 +196,7 @@ export async function GET(req: NextRequest) {
     const opportunities = await prisma.opportunity.findMany({
       where: scope,
       include: {
-        prospect: { include: { assignedAgent: true, createdByAgent: true, leadSource: true } },
+        prospect: { include: { assignedAgent: { omit: AGENT_SECRET_FIELDS }, createdByAgent: { omit: AGENT_SECRET_FIELDS }, leadSource: true } },
         comments: true,
       },
       orderBy: { createdAt: "desc" },

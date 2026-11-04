@@ -1,15 +1,14 @@
+import { AGENT_SECRET_FIELDS } from "@/lib/agentSecretFields";
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { includeDeleted } from "@/lib/softDelete";
 import { followUpTimer } from "@/lib/taskFollowUp";
-import { expireFollowUps } from "@/lib/followUpExpiry";
 
 export async function GET(
   req: NextRequest,
   { params }: { params: { id: string } },
 ) {
   try {
-    await expireFollowUps();
     const { id } = await params;
 
     // ?includeDeleted=true lets the task page open a soft-deleted task in a
@@ -21,10 +20,10 @@ export async function GET(
     const task = await prisma.task.findFirst({
       where: allowDeleted ? { id, ...includeDeleted } : { id },
       include: {
-        ownerShipBy: true,
+        ownerShipBy: { omit: AGENT_SECRET_FIELDS },
         client: true,
-        createdBy: true,
-        assignedTo: true,
+        createdBy: { omit: AGENT_SECRET_FIELDS },
+        assignedTo: { omit: AGENT_SECRET_FIELDS },
         category: true, // Re-enabled category
         legislation: true, // Added legislation relation
         comments: {

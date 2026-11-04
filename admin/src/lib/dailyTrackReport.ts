@@ -5,6 +5,7 @@ import {
   istDayRange,
   stripDailyTrackPrefix,
 } from "@/lib/dailyTrack";
+import { needsDayTrackOn } from "@/lib/taskFollowUp";
 
 export interface DailyTrackAgent {
   id: string;
@@ -34,6 +35,8 @@ const CLIENT_NAME_SELECT = {
 /**
  * Every In Progress task with its assigned agent's day track note for the IST
  * day `dateKey` (null when there is none), plus the agents those tasks belong to.
+ * Tasks in the Followups group (48hr/1w Instance) are listed only on the days
+ * their cycle needs a day track.
  *
  * Status is read as it is now, not as it was on `dateKey`, so a past date
  * lists tasks that are In Progress today. Tasks created after that day are
@@ -54,6 +57,10 @@ export async function buildDailyTrackReport(dateKey: string, agentId?: string) {
       id: true,
       title: true,
       dueDate: true,
+      status: true,
+      active: true,
+      followUpDuration: true,
+      followUpUntil: true,
       legislationId: true,
       retainershipId: true,
       assignedTo: { select: { id: true, name: true, email: true, status: true } },
@@ -70,7 +77,10 @@ export async function buildDailyTrackReport(dateKey: string, agentId?: string) {
   });
 
   const liveTasks = tasks.filter(
-    (t) => t.assignedTo && t.assignedTo.status?.toLowerCase() !== "inactive",
+    (t) =>
+      t.assignedTo &&
+      t.assignedTo.status?.toLowerCase() !== "inactive" &&
+      needsDayTrackOn(t, dateKey),
   );
 
   const comments = await prisma.comment.findMany({

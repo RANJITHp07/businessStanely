@@ -188,6 +188,7 @@ export async function POST(req: NextRequest) {
     // Create the agent first
     const newAgent = await prisma.agent.create({
       data,
+      omit: AGENT_SECRET_FIELDS,
     });
 
     // If superiors are provided, create AgentSuperior links (agent is subordinate)
@@ -234,11 +235,11 @@ export async function POST(req: NextRequest) {
     // Fetch agent with superiors/subordinates (only active)
     const superiorsLinks = await prisma.agentSuperior.findMany({
       where: { subordinateId: newAgent.id, superior: { status: "active" } },
-      include: { superior: true },
+      include: { superior: { omit: AGENT_SECRET_FIELDS } },
     });
     const subordinatesLinks = await prisma.agentSuperior.findMany({
       where: { superiorId: newAgent.id, subordinate: { status: "active" } },
-      include: { subordinate: true },
+      include: { subordinate: { omit: AGENT_SECRET_FIELDS } },
     });
     const executionSubordinates = subordinatesLinks
       .filter((link) => link.teamType !== "advisor")

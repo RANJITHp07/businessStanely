@@ -1,8 +1,8 @@
+import { AGENT_SECRET_FIELDS } from "@/lib/agentSecretFields";
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentAgent } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { followUpTimer } from "@/lib/taskFollowUp";
-import { expireFollowUps } from "@/lib/followUpExpiry";
 import {
   recordDeletionAudit,
   actorFromAgent,
@@ -81,7 +81,6 @@ export async function GET(
   { params }: { params: { id: string } },
 ) {
   try {
-    await expireFollowUps();
     const agent = await getCurrentAgent(req);
 
     if (!agent) {
@@ -94,7 +93,7 @@ export async function GET(
     const task = await prisma.task.findUnique({
       where: { id: taskId },
       include: {
-        ownerShipBy: true,
+        ownerShipBy: { omit: AGENT_SECRET_FIELDS },
         client: {
           select: {
             id: true,

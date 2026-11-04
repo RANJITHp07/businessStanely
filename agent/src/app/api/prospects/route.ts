@@ -1,3 +1,4 @@
+import { AGENT_SECRET_FIELDS } from "@/lib/agentSecretFields";
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getAdvisorAgentType } from "@/lib/agentType";
@@ -115,7 +116,7 @@ export async function GET(req: NextRequest) {
 
     const prospects = await prisma.prospect.findMany({
       where,
-      include: { assignedAgent: true, createdByAgent: true, comments: true },
+      include: { assignedAgent: { omit: AGENT_SECRET_FIELDS }, createdByAgent: { omit: AGENT_SECRET_FIELDS }, comments: true },
       orderBy: { createdAt: "desc" },
     });
     return NextResponse.json({ prospects });
@@ -272,7 +273,7 @@ export async function POST(req: NextRequest) {
         amount: typeof amount === "number" ? amount : undefined,
         ...(service && { service }),
       },
-      include: { createdByAgent: true, assignedAgent: true },
+      include: { createdByAgent: { omit: AGENT_SECRET_FIELDS }, assignedAgent: { omit: AGENT_SECRET_FIELDS } },
     });
 
     return NextResponse.json({ prospect });

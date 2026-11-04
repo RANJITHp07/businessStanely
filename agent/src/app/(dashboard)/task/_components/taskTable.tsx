@@ -76,6 +76,7 @@ import ServiceFilter from "./serviceFilter";
 import { useAgentContext } from "@/lib/agent-context";
 import {
   DailyTrackCell,
+  DailyTrackDueNotice,
   needsDailyTrack,
   useDailyTrack,
 } from "@/components/DailyTrackCell";
@@ -910,6 +911,11 @@ export default function TasksTable() {
                                   <div className="font-medium">
                                     {task.title}
                                   </div>
+                                  <DailyTrackDueNotice
+                                    task={task}
+                                    agentId={currentAgent?.id}
+                                    done={!!dailyTrack[task.id]}
+                                  />
                                   {/* Show approved category only */}
                                   {task.category &&
                                     task.category.status === "approved" && (

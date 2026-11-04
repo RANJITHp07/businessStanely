@@ -266,6 +266,7 @@ export async function PUT(
     }
     const updatedAgent = await prisma.agent.update({
       where: { id },
+      omit: AGENT_SECRET_FIELDS,
       data: {
         ...agentData,
         agentType: finalAgentType,
@@ -330,11 +331,11 @@ export async function PUT(
     // Fetch updated superiors/subordinates (only active)
     const superiorsLinks = await prisma.agentSuperior.findMany({
       where: { subordinateId: id, superior: { status: "active" } },
-      include: { superior: true },
+      include: { superior: { omit: AGENT_SECRET_FIELDS } },
     });
     const subordinatesLinks = await prisma.agentSuperior.findMany({
       where: { superiorId: id, subordinate: { status: "active" } },
-      include: { subordinate: true },
+      include: { subordinate: { omit: AGENT_SECRET_FIELDS } },
     });
 
     const updatedSubordinates = subordinatesLinks

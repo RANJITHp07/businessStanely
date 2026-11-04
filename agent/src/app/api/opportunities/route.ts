@@ -1,3 +1,4 @@
+import { AGENT_SECRET_FIELDS } from "@/lib/agentSecretFields";
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
@@ -129,7 +130,7 @@ export async function GET(req: NextRequest) {
     // MongoDB does not support relation filtering in Prisma, so filter in-memory
     const allOpportunities = await prisma.opportunity.findMany({
       include: {
-        prospect: { include: { assignedAgent: true } },
+        prospect: { include: { assignedAgent: { omit: AGENT_SECRET_FIELDS } } },
         comments: true,
       },
       orderBy: { createdAt: "desc" },

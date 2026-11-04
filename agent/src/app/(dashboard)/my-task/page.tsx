@@ -33,6 +33,7 @@ import { Progress } from "@/components/ui/progress";
 import Link from "next/link";
 import {
   DailyTrackCell,
+  DailyTrackDueNotice,
   needsDailyTrack,
   useDailyTrack,
 } from "@/components/DailyTrackCell";
@@ -164,11 +165,11 @@ export function SectionTable({ label, tasks, retainershipTasks, trigger, trigger
     return "text-blue-600"; // New Task
   })();
 
-  // Day track applies to the agent's own In Progress work, so only that
-  // section gets the checkbox column.
+  // Day track applies to the agent's own In Progress work and follow-ups, so
+  // only those sections get the checkbox column.
   const { agent } = useAuth();
   const showDailyTrack =
-    label.toLowerCase().includes("progress") &&
+    (label.toLowerCase().includes("progress") || label === "Followups") &&
     !assignedByMe &&
     !trigger;
   const { entries: dailyTrack, setEntry: setDailyTrack } =
@@ -321,6 +322,13 @@ export function SectionTable({ label, tasks, retainershipTasks, trigger, trigger
                                 >
                                   {t.title || shortId}
                                 </Link>
+                                {showDailyTrack && (
+                                  <DailyTrackDueNotice
+                                    task={t}
+                                    agentId={agent?.id}
+                                    done={!!dailyTrack[t.id]}
+                                  />
+                                )}
                                 {categoryName ? (
                                   <div className="mt-2">
                                     <span className="inline-block bg-blue-50 text-blue-600 px-2 py-1 rounded-md text-xs">
@@ -498,6 +506,13 @@ export function SectionTable({ label, tasks, retainershipTasks, trigger, trigger
                             <span className="text-xs text-muted-foreground">
                               {t.title || "-"}
                             </span>
+                            {showDailyTrack && (
+                              <DailyTrackDueNotice
+                                task={t}
+                                agentId={agent?.id}
+                                done={!!dailyTrack[t.id]}
+                              />
+                            )}
                           </div>
                           <Tooltip>
                             <TooltipTrigger asChild>

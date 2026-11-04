@@ -1,10 +1,10 @@
+import { AGENT_SECRET_FIELDS } from "@/lib/agentSecretFields";
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { getCurrentAdmin } from "@/lib/auth";
 import { SUMMARY_ROW_SELECT, SUMMARY_STATUS_SECTIONS, summarizeTaskRows } from "@/lib/taskSummary";
 import { followUpTimer, statusFilterWhere } from "@/lib/taskFollowUp";
-import { expireFollowUps } from "@/lib/followUpExpiry";
 import { approvedOrNoCategoryConditions } from "@/lib/taskCategoryFilter";
 
 // Only the relation columns the task list actually renders. Pulling the whole
@@ -133,8 +133,8 @@ export async function POST(req: NextRequest) {
       },
       include: {
         client: true,
-        createdBy: true,
-        assignedTo: true,
+        createdBy: { omit: AGENT_SECRET_FIELDS },
+        assignedTo: { omit: AGENT_SECRET_FIELDS },
         category: true,
       },
     });
@@ -192,8 +192,6 @@ export async function GET(req: NextRequest) {
     if (!currentAdmin) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-
-    await expireFollowUps();
 
     const { searchParams } = new URL(req.url);
     const assignedToId = searchParams.get("assignedToId");

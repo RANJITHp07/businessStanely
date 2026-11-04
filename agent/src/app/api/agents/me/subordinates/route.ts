@@ -1,3 +1,4 @@
+import { AGENT_SECRET_FIELDS } from "@/lib/agentSecretFields";
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getCurrentAgent } from "@/lib/auth";
@@ -32,7 +33,7 @@ export async function GET(req: NextRequest) {
         status: "active",
       },
     },
-    include: { subordinate: true },
+    include: { subordinate: { omit: AGENT_SECRET_FIELDS } },
   });
   const subordinates = links.map((l) => l.subordinate);
   return NextResponse.json(subordinates);

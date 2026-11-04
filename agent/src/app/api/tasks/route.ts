@@ -1,3 +1,4 @@
+import { AGENT_SECRET_FIELDS, USER_SECRET_FIELDS } from "@/lib/agentSecretFields";
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentAgent } from "@/lib/auth";
 
@@ -9,8 +10,8 @@ import {
   summarizeTaskRows,
 } from "@/lib/taskSummary";
 import { followUpTimer, statusFilterWhere } from "@/lib/taskFollowUp";
-import { expireFollowUps } from "@/lib/followUpExpiry";
 import { approvedOrNoCategoryConditions } from "@/lib/taskCategoryFilter";
+import { isSuperiorOfAll } from "@/lib/teamAccess";
 
 interface TaskWithAdditionalFields {
   progress?: number | null;
@@ -84,6 +85,7 @@ function formatSummaryTask(task: SummaryTask) {
     ownerShipBy: task.ownerShipBy,
     assignedTo: task.assignedTo,
     followUpDuration: task.followUpDuration,
+    followUpUntil: task.followUpUntil,
     statusCheckDuration: task.statusCheckDuration,
     active: task.active,
   };
@@ -91,7 +93,6 @@ function formatSummaryTask(task: SummaryTask) {
 
 export async function GET(req: NextRequest) {
   try {
-    await expireFollowUps();
     const agent = await getCurrentAgent(req);
 
     if (!agent) {
@@ -123,6 +124,17 @@ export async function GET(req: NextRequest) {
       ?.split(",")
       .map((id) => id.trim())
       .filter(Boolean);
+    // An agent reads its own tasks and those of agents below it in the team.
+    const otherAgentIds = [...(assignedToIds ?? []), assignedToId].filter(
+      (id) => id !== agent.id,
+    );
+    if (
+      otherAgentIds.length > 0 &&
+      !(await isSuperiorOfAll(agent.id, otherAgentIds))
+    ) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
     // `view=section`: rows for a section table, which never shows the description.
     const toRow = <T extends { description?: string | null }>(row: T) => {
       if (searchParams.get("view") !== "section") return row;
@@ -249,10 +261,6 @@ export async function GET(req: NextRequest) {
     }
 
     // OPTIONAL FILTERS
-    if (!status && retainershipTasks === "true") {
-      where.status = { notIn: ["Completed", "completed"] };
-    }
-
     if (priority) {
       where.priority = priority;
     } else if (prioritiesParam) {
@@ -287,6 +295,19 @@ export async function GET(req: NextRequest) {
 
       where.AND = [currentAnd, filter];
     };
+
+    // A completed one-off retainership task belongs in the Completed section, so
+    // excluding every completed row left that section always empty. Only recurring
+    // rows (triggerDate set) are held back: once completed they are Future Tasks.
+    if (!status && retainershipTasks === "true") {
+      appendAndFilter({
+        OR: [
+          { triggerDate: null },
+          { triggerDate: { isSet: false } },
+          { status: { notIn: ["Completed", "completed"] } },
+        ],
+      });
+    }
 
     if (status) appendAndFilter(statusFilterWhere(status, !!followUpDurationsParam));
 
@@ -484,14 +505,14 @@ export async function GET(req: NextRequest) {
             email: true,
           },
         },
-        createdBy: true,
-        ownerShipBy: true,
-        assignedTo: true,
+        createdBy: { omit: AGENT_SECRET_FIELDS },
+        ownerShipBy: { omit: AGENT_SECRET_FIELDS },
+        assignedTo: { omit: AGENT_SECRET_FIELDS },
         category: true,
         comments: {
           include: {
-            user: true,
-            agent: true,
+            user: { omit: USER_SECRET_FIELDS },
+            agent: { omit: AGENT_SECRET_FIELDS },
           },
           orderBy: {
             createdAt: "desc",
@@ -540,6 +561,7 @@ export async function GET(req: NextRequest) {
       commentsCount: task.comments.length,
       recentComments: task.comments,
       followUpDuration: task.followUpDuration,
+      followUpUntil: task.followUpUntil,
       active: task.active,
       statusCheckDuration: task.statusCheckDuration,
       legislation: task.legislation,

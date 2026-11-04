@@ -1,3 +1,4 @@
+import { AGENT_SECRET_FIELDS, USER_SECRET_FIELDS } from "@/lib/agentSecretFields";
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentAdmin } from "@/lib/auth";
 import prisma from "@/lib/prisma";
@@ -37,8 +38,8 @@ export async function GET(
     const retainership = await prisma.retainership.findFirst({
       where: { id },
       include: {
-        createdByUser: true,
-        createdByAgent: true,
+        createdByUser: { omit: USER_SECRET_FIELDS },
+        createdByAgent: { omit: AGENT_SECRET_FIELDS },
         approvedBy: {
           select: {
             id: true,

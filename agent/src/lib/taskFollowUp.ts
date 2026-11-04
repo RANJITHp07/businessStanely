@@ -84,7 +84,17 @@ export const FOLLOW_UP_WHERE = { ...FOLLOW_UP_RULE, status: { in: IN_PROGRESS_ST
 
 /** Prisma filter for In Progress tasks of the given spellings, outside the group. */
 export function inProgressOutsideGroupWhere(statuses: string[]) {
-  return { status: { in: statuses }, NOT: FOLLOW_UP_RULE };
+  return {
+    status: { in: statuses },
+    // Spelled out instead of `NOT: FOLLOW_UP_RULE`: on MongoDB that also drops
+    // tasks whose followUpDuration is null or unset, which are not in the group.
+    OR: [
+      { active: false },
+      { followUpDuration: null },
+      { followUpDuration: { isSet: false } },
+      { followUpDuration: { notIn: FOLLOW_UP_DURATIONS } },
+    ],
+  };
 }
 
 /**

@@ -77,14 +77,20 @@ import {
 } from "lucide-react";
 import { Agent, Client, Task } from "@/types";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { fetchWithAuth } from "@/lib/fetchWithAuth";
 import { hasAdvisorRole, hasExecutionRole } from "@/lib/agentRole";
 import { cn } from "@/lib/utils";
 import RestoreAgentDialog from "@/app/(dashboard)/agent/_component/restoreAgentDialog";
-import { ProspectTable } from "@/app/(sales)/dashboard/prospects/tables/page";
-import { ProspectsTable } from "@/app/(sales)/dashboard/opportunities/tables/page";
-import { taskSection } from "@/lib/taskFollowUp";
 
+// These live in dashboard pages that also pull in recharts, so they load only
+// when a Leads or Opportunity tab opens.
+const ProspectTable = dynamic(() =>
+  import("@/app/(sales)/dashboard/prospects/tables/page").then((m) => m.ProspectTable),
+);
+const ProspectsTable = dynamic(() =>
+  import("@/app/(sales)/dashboard/opportunities/tables/page").then((m) => m.ProspectsTable),
+);
 
 type ActivityEntityType = "task" | "prospect" | "opportunity" | "enquiry";
 
@@ -150,15 +156,36 @@ interface AgentClient extends Client {
 interface DashboardTaskItem {
   id: string;
   title: string;
-  status: string;
-  priority: string;
   followUpDuration: string | null;
-  statusCheckDuration: string | null;
   clientName: string;
   referenceAt: string;
   expectedDuration?: string;
-  lastInteractionContent?: string | null;
-  lastInteractionAt?: string | null;
+}
+
+const EMPTY_DASHBOARD: DashboardStatusResponse = {
+  notTouchedTasks: [],
+  clientNotUpdatedTasks: [],
+  followUpStatusNotDoneTasks: [],
+  overdueTasks: [],
+};
+
+const EMPTY_SECTION_COUNTS: SectionCounts = {
+  todo: 0,
+  inprogress: 0,
+  followup: 0,
+  completed: 0,
+  hold: 0,
+};
+
+/** The list endpoints send totals; the page only lists a few rows of each. */
+type StatusSummary = { total: number; statusCounts: Record<string, number> };
+
+function countStatuses(summary: StatusSummary, ...statuses: string[]) {
+  return Object.entries(summary.statusCounts).reduce(
+    (sum, [status, count]) =>
+      statuses.includes(normalizeStatus(status)) ? sum + count : sum,
+    0,
+  );
 }
 
 interface DashboardStatusResponse {
@@ -202,29 +229,7 @@ function getClientTypeBadge(type?: string) {
   return <Badge className="bg-blue-100 text-blue-800 border-blue-200 border">Individual</Badge>;
 }
 
-// Helper to normalize status string
-function statusKey(s?: string) {
-  const k = (s || "").toLowerCase().replace(/\s+/g, "");
-  if (["todo", "pending"].includes(k)) return "todo";
-  if (["inprogress", "progress"].includes(k)) return "inprogress";
-  if (["completed"].includes(k)) return "completed";
-  if (["hold"].includes(k)) return "hold";
-  return k || "todo";
-}
-
 type SectionCounts = { todo: number; inprogress: number; followup: number; completed: number; hold: number };
-
-// How many tasks fall in each status section. A tab's total is the sum of
-// these, so it matches the sections on screen; a status no section lists
-// (e.g. Abandoned) is left out of both.
-function countSections(tasks: Task[]): SectionCounts {
-  const counts: SectionCounts = { todo: 0, inprogress: 0, followup: 0, completed: 0, hold: 0 };
-  for (const task of tasks) {
-    const key = taskSection(task);
-    if (key in counts) counts[key as keyof SectionCounts] += 1;
-  }
-  return counts;
-}
 
 function sumSections(counts: SectionCounts) {
   return counts.todo + counts.inprogress + counts.followup + counts.completed + counts.hold;
@@ -371,29 +376,21 @@ export default function AgentDetails() {
   const [restoreDialogOpen, setRestoreDialogOpen] = useState(false);
   // The agent's standard tasks: the newest three of each section plus totals.
   const [agentTaskSections, setAgentTaskSections] = useState<Record<string, Task[]>>({});
-  const [standardSectionCounts, setStandardSectionCounts] = useState<SectionCounts>({
-    todo: 0,
-    inprogress: 0,
-    followup: 0,
-    completed: 0,
-    hold: 0,
-  });
+  const [standardSectionCounts, setStandardSectionCounts] = useState<SectionCounts>(EMPTY_SECTION_COUNTS);
   const [agentTasksTotal, setAgentTasksTotal] = useState(0);
-  const [agentRetainershipTasks, setAgentRetainershipTasks] = useState<Task[]>([]);
+  // The agent's retainership tasks: the newest three of each section plus totals.
+  const [retainershipTaskSections, setRetainershipTaskSections] = useState<Record<string, Task[]>>({});
+  const [retainershipSectionCounts, setRetainershipSectionCounts] = useState<SectionCounts>(EMPTY_SECTION_COUNTS);
   const [agentTriggerTasks, setAgentTriggerTasks] = useState<Task[]>([]);
+  // Only the first rows of future triggers are fetched; this is the full count.
+  const [agentTriggerTotal, setAgentTriggerTotal] = useState(0);
   const [agentStandardFutureTasks, setAgentStandardFutureTasks] = useState<Task[]>([]);
   // Only the first rows of future tasks are fetched; this is the full count.
   const [agentStandardFutureTotal, setAgentStandardFutureTotal] = useState(0);
   // Tasks this agent assigned to a junior: the newest few per status, keyed
   // "todo" | "inprogress" | "followup" | "completed" | "hold", plus each section's size.
   const [assignedTaskSections, setAssignedTaskSections] = useState<Record<string, Task[]>>({});
-  const [assignedSectionCounts, setAssignedSectionCounts] = useState<SectionCounts>({
-    todo: 0,
-    inprogress: 0,
-    followup: 0,
-    completed: 0,
-    hold: 0,
-  });
+  const [assignedSectionCounts, setAssignedSectionCounts] = useState<SectionCounts>(EMPTY_SECTION_COUNTS);
   const [agentLegislations, setAgentLegislations] = useState<AgentLegislation[]>([]);
   const [legislationPage, setLegislationPage] = useState(1);
   const [legislationPageSize] = useState(10);
@@ -401,6 +398,8 @@ export default function AgentDetails() {
   const [agentClients, setAgentClients] = useState<AgentClient[]>([]);
   const [agentLeads, setAgentLeads] = useState<Task[]>([]);
   const [agentOpportunities, setAgentOpportunities] = useState<Task[]>([]);
+  const [leadSummary, setLeadSummary] = useState<StatusSummary>({ total: 0, statusCounts: {} });
+  const [opportunitySummary, setOpportunitySummary] = useState<StatusSummary>({ total: 0, statusCounts: {} });
   const [teamMembers, setTeamMembers] = useState<Agent[]>([]);
   const [loading, setLoading] = useState(true);
   // Covers the task list behind the stats, and the leads and opportunities.
@@ -411,12 +410,7 @@ export default function AgentDetails() {
   const [activeTab, setActiveTab] = useState<string>(searchParams.get("tab") || "details");
   const [taskOverviewTab, setTaskOverviewTab] = useState("standard-tasks");
   const [dashboardLoading, setDashboardLoading] = useState(true);
-  const [dashboardData, setDashboardData] = useState<DashboardStatusResponse>({
-    notTouchedTasks: [],
-    clientNotUpdatedTasks: [],
-    followUpStatusNotDoneTasks: [],
-    overdueTasks: [],
-  });
+  const [dashboardData, setDashboardData] = useState<DashboardStatusResponse>(EMPTY_DASHBOARD);
   const [dashboardDate, setDashboardDate] = useState<Date | undefined>(
     () => new Date(),
   );
@@ -470,6 +464,31 @@ export default function AgentDetails() {
     }
   }, []);
 
+  const fetchDashboardStatus = async (date?: Date) => {
+    try {
+      setDashboardLoading(true);
+      const params = new URLSearchParams({ assignedToId: id });
+      if (date) params.set("date", toISODate(date));
+      const response = await fetchWithAuth(`/api/agents/dashboard-status?${params.toString()}`);
+      if (response.ok) {
+        const data = (await response.json()) as DashboardStatusResponse;
+        setDashboardData({
+          notTouchedTasks: data.notTouchedTasks || [],
+          clientNotUpdatedTasks: data.clientNotUpdatedTasks || [],
+          followUpStatusNotDoneTasks: data.followUpStatusNotDoneTasks || [],
+          overdueTasks: data.overdueTasks || [],
+        });
+      } else {
+        setDashboardData(EMPTY_DASHBOARD);
+      }
+    } catch (error) {
+      console.error("Error fetching dashboard status:", error);
+      setDashboardData(EMPTY_DASHBOARD);
+    } finally {
+      setDashboardLoading(false);
+    }
+  };
+
   const fetchAgentLegislations = async (page = 1) => {
     if (!id) return;
     try {
@@ -504,7 +523,7 @@ export default function AgentDetails() {
     if (!id) return;
     const fetchAgent = async () => {
       try {
-        const response = await fetch(`/api/agents/${id}`);
+        const response = await fetch(`/api/agents/${id}?view=details`);
         if (response.ok) {
           const data = await response.json();
           setAgent(data);
@@ -526,11 +545,7 @@ export default function AgentDetails() {
           const dataRequests: Promise<void>[] = [];
 
           if (hasExecutionAccess) {
-            const today = new Date();
-            dataRequests.push(
-              fetchDashboardStatus(today),
-              fetchAgentTasks(),
-            );
+            dataRequests.push(fetchAgentTasks());
           }
 
           if (hasAdvisorAccess) {
@@ -554,7 +569,7 @@ export default function AgentDetails() {
 
     const fetchAgentTasks = async () => {
       try {
-        const response = await fetch(`/api/tasks?assignedToId=${id}&summary=true&limit=3`);
+        const response = await fetch(`/api/tasks?assignedToId=${id}&summary=true&limit=3&view=section`);
         if (response.ok) {
           const data = await response.json();
           setAgentTaskSections(data.sections || {});
@@ -566,47 +581,13 @@ export default function AgentDetails() {
       }
     };
 
-    const fetchDashboardStatus = async (date?: Date) => {
-      try {
-        setDashboardLoading(true);
-        const params = new URLSearchParams({ assignedToId: id });
-        if (date) params.set("date", toISODate(date));
-        const response = await fetchWithAuth(`/api/agents/dashboard-status?${params.toString()}`);
-        if (response.ok) {
-          const data = (await response.json()) as DashboardStatusResponse;
-          setDashboardData({
-            notTouchedTasks: data.notTouchedTasks || [],
-            clientNotUpdatedTasks: data.clientNotUpdatedTasks || [],
-            followUpStatusNotDoneTasks: data.followUpStatusNotDoneTasks || [],
-            overdueTasks: data.overdueTasks || [],
-          });
-        } else {
-          setDashboardData({
-            notTouchedTasks: [],
-            clientNotUpdatedTasks: [],
-            followUpStatusNotDoneTasks: [],
-            overdueTasks: [],
-          });
-        }
-      } catch (error) {
-        console.error("Error fetching dashboard status:", error);
-        setDashboardData({
-          notTouchedTasks: [],
-          clientNotUpdatedTasks: [],
-          followUpStatusNotDoneTasks: [],
-          overdueTasks: [],
-        });
-      } finally {
-        setDashboardLoading(false);
-      }
-    };
-
     const fetchAgentLeads = async () => {
       try {
-        const response = await fetch(`/api/prospects?assignedAgentId=${id}`);
+        const response = await fetch(`/api/prospects?assignedAgentId=${id}&view=agent-summary`);
         if (response.ok) {
           const data = await response.json();
           setAgentLeads(data.prospects);
+          setLeadSummary({ total: data.total, statusCounts: data.statusCounts });
         }
       } catch (error) {
         console.error("Error fetching agent leads:", error);
@@ -615,10 +596,11 @@ export default function AgentDetails() {
 
     const fetchAgentOpportunity = async () => {
       try {
-        const response = await fetch(`/api/opportunities?assignedAgentId=${id}&view=table`);
+        const response = await fetch(`/api/opportunities?assignedAgentId=${id}&view=agent-summary`);
         if (response.ok) {
           const data = await response.json();
           setAgentOpportunities(data.opportunities);
+          setOpportunitySummary({ total: data.total, statusCounts: data.statusCounts });
         }
       } catch (error) {
         console.error("Error fetching agent opportunities:", error);
@@ -633,23 +615,25 @@ export default function AgentDetails() {
   useEffect(() => {
     if (!agent || agent.id !== id) return;
 
+    // The API already holds back completed recurring rows (those belong to
+    // Future Triggers); completed one-offs stay in Completed.
     const fetchAgentRetainershipTasks = async () => {
       try {
         const response = await fetchWithAuth(
-          `/api/tasks?assignedToId=${id}&retainershipTasks=true`,
+          `/api/tasks?assignedToId=${id}&retainershipTasks=true&summary=true&limit=3&view=section`,
         );
         if (response.ok) {
           const data = await response.json();
-          // The API already holds back completed recurring rows (those belong
-          // to Future Triggers); completed one-offs belong in Completed, so
-          // dropping every completed row here left that section always empty.
-          setAgentRetainershipTasks(parseTaskResponse(data));
+          setRetainershipTaskSections(data.sections || {});
+          setRetainershipSectionCounts({ ...EMPTY_SECTION_COUNTS, ...data.sectionCounts });
         } else {
-          setAgentRetainershipTasks([]);
+          setRetainershipTaskSections({});
+          setRetainershipSectionCounts(EMPTY_SECTION_COUNTS);
         }
       } catch (error) {
         console.error("Error fetching agent retainership tasks:", error);
-        setAgentRetainershipTasks([]);
+        setRetainershipTaskSections({});
+        setRetainershipSectionCounts(EMPTY_SECTION_COUNTS);
       }
     };
 
@@ -658,18 +642,17 @@ export default function AgentDetails() {
     // what the section's "View more" link opens on /task.
     const fetchAgentTriggerTasks = async () => {
       try {
-        const triggerResponse = await fetchWithAuth(
-          `/api/tasks?assignedToId=${id}&trigger=true`,
+        const response = await fetchWithAuth(
+          `/api/tasks?assignedToId=${id}&trigger=true&page=1&limit=3&view=section`,
         );
-
-        setAgentTriggerTasks(
-          triggerResponse.ok
-            ? parseTaskResponse(await triggerResponse.json())
-            : [],
-        );
+        const data = response.ok ? await response.json() : null;
+        const rows = data ? parseTaskResponse(data) : [];
+        setAgentTriggerTasks(rows);
+        setAgentTriggerTotal(typeof data?.total === "number" ? data.total : rows.length);
       } catch (error) {
         console.error("Error fetching agent trigger tasks:", error);
         setAgentTriggerTasks([]);
+        setAgentTriggerTotal(0);
       }
     };
 
@@ -678,7 +661,7 @@ export default function AgentDetails() {
     const fetchAgentStandardFutureTasks = async () => {
       try {
         const response = await fetchWithAuth(
-          `/api/tasks?assignedToId=${id}&trigger=standard&page=1&limit=3`,
+          `/api/tasks?assignedToId=${id}&trigger=standard&page=1&limit=3&view=section`,
         );
 
         const data = response.ok ? await response.json() : null;
@@ -698,29 +681,28 @@ export default function AgentDetails() {
     // mode returns the first rows of each status section and each section's
     // size, which is all the tab shows; "View more" opens the full list.
     const fetchAgentAssignedTasks = async () => {
-      const emptyCounts = { todo: 0, inprogress: 0, followup: 0, completed: 0, hold: 0 };
       try {
         const response = await fetchWithAuth(
-          `/api/tasks?assignedById=${id}&summary=true&limit=3`,
+          `/api/tasks?assignedById=${id}&summary=true&limit=3&view=section`,
         );
         if (response.ok) {
           const data = await response.json();
           setAssignedTaskSections(data.sections || {});
-          setAssignedSectionCounts({ ...emptyCounts, ...data.sectionCounts });
+          setAssignedSectionCounts({ ...EMPTY_SECTION_COUNTS, ...data.sectionCounts });
         } else {
           setAssignedTaskSections({});
-          setAssignedSectionCounts(emptyCounts);
+          setAssignedSectionCounts(EMPTY_SECTION_COUNTS);
         }
       } catch (error) {
         console.error("Error fetching agent assigned tasks:", error);
         setAssignedTaskSections({});
-        setAssignedSectionCounts(emptyCounts);
+        setAssignedSectionCounts(EMPTY_SECTION_COUNTS);
       }
     };
 
     const fetchAgentClients = async () => {
       try {
-        const response = await fetchWithAuth(`/api/clients?assignedToId=${id}`);
+        const response = await fetchWithAuth(`/api/clients?assignedToId=${id}&view=agent-table`);
         if (response.ok) {
           const data = await response.json();
           setAgentClients(data || []);
@@ -779,6 +761,9 @@ export default function AgentDetails() {
       load();
     };
 
+    if (activeTab === "dashboard" && hasExecutionRole(agent.agentRole)) {
+      loadOnce("dashboard", () => fetchDashboardStatus(new Date()));
+    }
     if (activeTab === "tasks" && hasExecutionRole(agent.agentRole)) {
       loadOnce("tasks", () => {
         setTasksTabLoading(true);
@@ -998,7 +983,6 @@ export default function AgentDetails() {
   // Each section lists only its newest three rows, so the section labels carry
   // the real counts and each tab's total is the sum of its sections.
   const standardTasksTotal = sumSections(standardSectionCounts);
-  const retainershipSectionCounts = countSections(agentRetainershipTasks);
   const retainershipTasksTotal = sumSections(retainershipSectionCounts);
   const assignedTasksTotal = sumSections(assignedSectionCounts);
 
@@ -1034,21 +1018,10 @@ export default function AgentDetails() {
       ? Math.round((completedForStats / totalTasksForStats) * 100)
       : 0;
 
-  const liveTotalLeads = agentLeads.length;
-  const liveConvertedLeads = agentLeads.filter(
-    (lead) => normalizeStatus((lead as unknown as { status?: string }).status) === "converted",
-  ).length;
-  const liveClosedWon = agentOpportunities.filter(
-    (opportunity) =>
-      normalizeStatus((opportunity as unknown as { status?: string }).status) ===
-      "closed as won",
-  ).length;
-  const liveClosedLoss = agentOpportunities.filter(
-    (opportunity) => {
-      const status = normalizeStatus((opportunity as unknown as { status?: string }).status);
-      return status === "closed as loss" || status === "closed as lost";
-    },
-  ).length;
+  const liveTotalLeads = leadSummary.total;
+  const liveConvertedLeads = countStatuses(leadSummary, "converted");
+  const liveClosedWon = countStatuses(opportunitySummary, "closed as won");
+  const liveClosedLoss = countStatuses(opportunitySummary, "closed as loss", "closed as lost");
 
   const staticTotalLeads = Number(
     transferAuditSummary?.assignedLeadsTransferredCount || 0,
@@ -1092,7 +1065,6 @@ export default function AgentDetails() {
     title: string,
     description: string,
     rows: DashboardTaskItem[],
-    compact: boolean = false,
     accentColor: string = "border-l-gray-300",
     referenceLabel: string = "Last Relevant Interaction",
     showFollowUp: boolean = true,
@@ -1131,17 +1103,14 @@ export default function AgentDetails() {
                       <TableHead className="text-xs font-semibold">{referenceLabel}</TableHead>
                       {showFollowUp && <TableHead className="text-xs font-semibold">Follow-up</TableHead>}
                       {showClientUpdate && <TableHead className="text-xs font-semibold">Client Update</TableHead>}
-                      {!compact && <TableHead className="text-xs font-semibold">Status Check</TableHead>}
-                      {!compact && <TableHead className="text-xs font-semibold">Status</TableHead>}
-                      {!compact && <TableHead className="text-xs font-semibold text-right">Action</TableHead>}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {rows.map((item, idx) => (
                       <TableRow
                         key={item.id}
-                        className={compact ? "cursor-pointer hover:bg-muted/50 transition-colors" : "hover:bg-muted/30 transition-colors"}
-                        onClick={compact ? () => router.push(`/task/${item.id}`) : undefined}
+                        className="cursor-pointer hover:bg-muted/50 transition-colors"
+                        onClick={() => router.push(`/task/${item.id}`)}
                       >
                         <TableCell className="text-xs text-muted-foreground">{idx + 1}</TableCell>
                         <TableCell className="font-medium text-sm max-w-32 truncate">{item.title}</TableCell>
@@ -1167,20 +1136,6 @@ export default function AgentDetails() {
                             >
                               {item.expectedDuration || "Working"}
                             </span>
-                          </TableCell>
-                        )}
-                        {!compact && <TableCell className="text-sm">{item.statusCheckDuration || "Working"}</TableCell>}
-                        {!compact && <TableCell className="text-sm">{item.status}</TableCell>}
-                        {!compact && (
-                          <TableCell className="text-right">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="h-7 text-xs gap-1"
-                              onClick={() => router.push(`/task/${item.id}`)}
-                            >
-                              <Eye className="h-3 w-3" /> View
-                            </Button>
                           </TableCell>
                         )}
                       </TableRow>
@@ -1361,7 +1316,7 @@ export default function AgentDetails() {
               <TabsTrigger value="leads" className="flex items-center gap-2 whitespace-nowrap">
                 <FileText className="h-4 w-4 hidden md:block" />
                 <p className="text-[10px] md:text-[12px]">
-                  Leads ({tasksLoading ? "…" : agentLeads.length})
+                  Leads ({tasksLoading ? "…" : leadSummary.total})
                 </p>
               </TabsTrigger>
             )}
@@ -1369,7 +1324,7 @@ export default function AgentDetails() {
               <TabsTrigger value="opportunity" className="flex items-center gap-2 whitespace-nowrap">
                 <FileText className="h-4 w-4 hidden md:block" />
                 <p className="text-[10px] md:text-[12px]">
-                  Opportunity ({tasksLoading ? "…" : agentOpportunities.length})
+                  Opportunity ({tasksLoading ? "…" : opportunitySummary.total})
                 </p>
               </TabsTrigger>
             )}
@@ -1429,30 +1384,7 @@ export default function AgentDetails() {
                 <Button
                   size="sm"
                   className="h-8"
-                  onClick={() => {
-                    const fetchDashboard = async () => {
-                      try {
-                        setDashboardLoading(true);
-                        const params = new URLSearchParams({ assignedToId: id });
-                        if (dashboardDate) params.set("date", toISODate(dashboardDate));
-                        const response = await fetchWithAuth(`/api/agents/dashboard-status?${params.toString()}`);
-                        if (response.ok) {
-                          const data = (await response.json()) as DashboardStatusResponse;
-                          setDashboardData({
-                            notTouchedTasks: data.notTouchedTasks || [],
-                            clientNotUpdatedTasks: data.clientNotUpdatedTasks || [],
-                            followUpStatusNotDoneTasks: data.followUpStatusNotDoneTasks || [],
-                            overdueTasks: data.overdueTasks || [],
-                          });
-                        }
-                      } catch (err) {
-                        console.error(err);
-                      } finally {
-                        setDashboardLoading(false);
-                      }
-                    };
-                    fetchDashboard();
-                  }}
+                  onClick={() => fetchDashboardStatus(dashboardDate)}
                 >
                   Apply
                 </Button>
@@ -1464,28 +1396,7 @@ export default function AgentDetails() {
                     onClick={() => {
                       const today = new Date();
                       setDashboardDate(today);
-                      const fetchDashboard = async () => {
-                        try {
-                          setDashboardLoading(true);
-                          const params = new URLSearchParams({ assignedToId: id });
-                          params.set("date", toISODate(today));
-                          const response = await fetchWithAuth(`/api/agents/dashboard-status?${params.toString()}`);
-                          if (response.ok) {
-                            const data = (await response.json()) as DashboardStatusResponse;
-                            setDashboardData({
-                              notTouchedTasks: data.notTouchedTasks || [],
-                              clientNotUpdatedTasks: data.clientNotUpdatedTasks || [],
-                              followUpStatusNotDoneTasks: data.followUpStatusNotDoneTasks || [],
-                              overdueTasks: data.overdueTasks || [],
-                            });
-                          }
-                        } catch (err) {
-                          console.error(err);
-                        } finally {
-                          setDashboardLoading(false);
-                        }
-                      };
-                      fetchDashboard();
+                      fetchDashboardStatus(today);
                     }}
                   >
                     Today
@@ -1556,7 +1467,6 @@ export default function AgentDetails() {
                       "Touchbased Not Yet",
                       "All Tasks other than Followups has to be Touchbased once every day. ",
                       dashboardData.notTouchedTasks,
-                      true,
                       "border-l-amber-500",
                     )}
                   </div>
@@ -1565,7 +1475,6 @@ export default function AgentDetails() {
                       "Tasks where Client not updated",
                       "Every Client has to be updated at least once in 48 hours.",
                       dashboardData.clientNotUpdatedTasks,
-                      true,
                       "border-l-red-500",
                       "Last Relevant Interaction",
                       false,
@@ -1580,7 +1489,6 @@ export default function AgentDetails() {
                       "Follow-up & Status Not Done (24/48hrs /1-Week)",
                       "All Task has to be updated based on the Periodicity of Followup&StatusCheck",
                       dashboardData.followUpStatusNotDoneTasks,
-                      true,
                       "border-l-purple-500",
                     )}
                   </div>
@@ -1589,7 +1497,6 @@ export default function AgentDetails() {
                       "Overdue Tasks",
                       "The following Task Due date has crossed and require immediate completion",
                       dashboardData.overdueTasks,
-                      true,
                       "border-l-rose-500",
                       "Due Date",
                     )}
@@ -1820,7 +1727,7 @@ export default function AgentDetails() {
                     </TabsTrigger>
                     <TabsTrigger value="future-triggers" className="flex items-center gap-1 px-2 py-3 text-[10px] lg:text-sm whitespace-nowrap">
                       <Clock className="h-4 w-4 hidden lg:block flex-shrink-0" />
-                      Future Triggers ({agentTriggerTasks.length})
+                      Future Triggers ({agentTriggerTotal})
                     </TabsTrigger>
                     <TabsTrigger value="legislation-tab" className="flex items-center gap-1 px-2 py-3 text-[10px] lg:text-sm whitespace-nowrap">
                       <CheckCircle className="h-4 w-4 hidden lg:block flex-shrink-0" />
@@ -2103,7 +2010,7 @@ export default function AgentDetails() {
                 </TabsContent>
 
                 <TabsContent value="retainership-tasks" className="space-y-6">
-                  {agentRetainershipTasks.length === 0 ? (
+                  {retainershipTasksTotal === 0 ? (
                     <Card>
                       <CardContent className="text-center py-8 text-muted-foreground">
                         No retainership tasks assigned to this agent.
@@ -2114,35 +2021,35 @@ export default function AgentDetails() {
                       <SectionTable
                         label="New Task"
                         count={retainershipSectionCounts.todo}
-                        tasks={agentRetainershipTasks.filter((task) => taskSection(task) === "todo").slice(0, 3)}
+                        tasks={retainershipTaskSections.todo || []}
                         agentId={id}
                         retainershipTasks={true}
                       />
                       <SectionTable
                         label="In Progress"
                         count={retainershipSectionCounts.inprogress}
-                        tasks={agentRetainershipTasks.filter((task) => taskSection(task) === "inprogress").slice(0, 3)}
+                        tasks={retainershipTaskSections.inprogress || []}
                         agentId={id}
                         retainershipTasks={true}
                       />
                       <SectionTable
                         label="Followups"
                         count={retainershipSectionCounts.followup}
-                        tasks={agentRetainershipTasks.filter((task) => taskSection(task) === "followup").slice(0, 3)}
+                        tasks={retainershipTaskSections.followup || []}
                         agentId={id}
                         retainershipTasks={true}
                       />
                       <SectionTable
                         label="Hold"
                         count={retainershipSectionCounts.hold}
-                        tasks={agentRetainershipTasks.filter((task) => statusKey(task.status) === "hold").slice(0, 3)}
+                        tasks={retainershipTaskSections.hold || []}
                         agentId={id}
                         retainershipTasks={true}
                       />
                       <SectionTable
                         label="Completed"
                         count={retainershipSectionCounts.completed}
-                        tasks={agentRetainershipTasks.filter((task) => statusKey(task.status) === "completed").slice(0, 3)}
+                        tasks={retainershipTaskSections.completed || []}
                         agentId={id}
                         retainershipTasks={true}
                       />
@@ -2151,7 +2058,7 @@ export default function AgentDetails() {
                 </TabsContent>
 
                 <TabsContent value="future-triggers" className="space-y-6">
-                  {agentTriggerTasks.length === 0 ? (
+                  {agentTriggerTotal === 0 ? (
                     <Card>
                       <CardContent className="text-center py-8 text-muted-foreground">
                         No future-trigger tasks assigned to this agent.
@@ -2161,8 +2068,8 @@ export default function AgentDetails() {
                     <div className="space-y-[40px]">
                       <SectionTable
                         label="Upcoming Tasks"
-                        count={agentTriggerTasks.length}
-                        tasks={agentTriggerTasks.slice(0, 3)}
+                        count={agentTriggerTotal}
+                        tasks={agentTriggerTasks}
                         agentId={id}
                         trigger={true}
                       />

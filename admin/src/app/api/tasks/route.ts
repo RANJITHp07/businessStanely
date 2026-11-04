@@ -26,6 +26,30 @@ const TASK_LIST_INCLUDE = {
   category: { select: { id: true, name: true, status: true } },
 } satisfies Prisma.TaskInclude;
 
+// `view=section`: only the columns SectionTable renders. Full rows also carry
+// description, completionHistory and statusProgressMap, which it never reads.
+const TASK_SECTION_SELECT = {
+  id: true,
+  title: true,
+  status: true,
+  priority: true,
+  dueDate: true,
+  triggerDate: true,
+  nextDueDate: true,
+  lastCompletedDate: true,
+  client: {
+    select: {
+      clientType: true,
+      firstName: true,
+      lastName: true,
+      organizationName: true,
+      email: true,
+    },
+  },
+  assignedTo: { select: { name: true, agentType: true } },
+  category: { select: { name: true, status: true } },
+} satisfies Prisma.TaskSelect;
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -456,6 +480,11 @@ export async function GET(req: NextRequest) {
       finalWhere = { ...whereClause, active: true };
     }
 
+    const rowShape: Pick<Prisma.TaskFindManyArgs, "select" | "include"> =
+      searchParams.get("view") === "section"
+        ? { select: TASK_SECTION_SELECT }
+        : { include: TASK_LIST_INCLUDE };
+
     // Summary mode: the My Tasks dashboard only renders the newest few rows per
     // status plus the headline counts, so fetch exactly that instead of every
     // task. `limit` is the per-status row cap.
@@ -473,7 +502,7 @@ export async function GET(req: NextRequest) {
       const { counts, sectionCounts, sectionById, overdue } = summarizeTaskRows(rows, limit);
       const tasks = await prisma.task.findMany({
         where: { id: { in: Array.from(sectionById.keys()) } },
-        include: TASK_LIST_INCLUDE,
+        ...rowShape,
         orderBy: { createdAt: "desc" },
       });
 
@@ -494,7 +523,7 @@ export async function GET(req: NextRequest) {
 
     const taskQuery = {
       where: finalWhere,
-      include: TASK_LIST_INCLUDE,
+      ...rowShape,
       // A future-trigger view lists the next occurrence first. Newest-created
       // first scattered the trigger dates (a 2027 row above a next-week one).
       orderBy: isTriggerView

@@ -21,7 +21,8 @@ export async function GET(
     const agent = await prisma.agent.findUnique({
       where: {
         id: agentId
-      }
+      },
+      select: { id: true }
     });
 
     if (!agent) {
@@ -35,12 +36,14 @@ export async function GET(
       where: {
         agentId: agentId
       },
-      include: {
+      select: {
+        id: true,
+        note: true,
+        createdAt: true,
         createdByUser: {
           select: {
             id: true,
             username: true,
-            email: true,
             adminType: true
           }
         }
@@ -51,14 +54,9 @@ export async function GET(
     });
 
     // Map the response to match the expected format
-    const formattedRecords = serviceRecords.map(record => ({
+    const formattedRecords = serviceRecords.map(({ createdByUser, ...record }) => ({
       ...record,
-      createdBy: {
-        id: record.createdByUser.id,
-        username: record.createdByUser.username,
-        email: record.createdByUser.email,
-        adminType: record.createdByUser.adminType
-      }
+      createdBy: createdByUser
     }));
 
     return NextResponse.json({ serviceRecords: formattedRecords });

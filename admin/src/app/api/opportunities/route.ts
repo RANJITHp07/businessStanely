@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma, { prismaRaw } from "@/lib/prisma";
 import { getCurrentAdmin } from "@/lib/auth";
+import { firstRowsPerStatus } from "@/lib/statusSections";
+
+/** Rows the agent details page lists per status; the rest are only counted. */
+const AGENT_SUMMARY_ROWS_PER_STATUS = 5;
 
 function getAssignedAdvisorType(assignedAgent: {
   id: string;
@@ -29,6 +33,7 @@ export async function GET(req: NextRequest) {
     if (assignedAgentId) {
       assignedAgent = await prisma.agent.findUnique({
         where: { id: assignedAgentId },
+        select: { id: true, agentType: true, advisorAgentType: true, agentRole: true },
       });
 
       if (!assignedAgent) {
@@ -135,6 +140,37 @@ export async function GET(req: NextRequest) {
         select: { id: true },
       });
       scope = { prospectId: { in: prospects.map((prospect) => prospect.id) } };
+    }
+
+    if (req.nextUrl.searchParams.get("view") === "agent-summary") {
+      const rows = await prisma.opportunity.findMany({
+        where: scope,
+        select: { id: true, status: true },
+        orderBy: { createdAt: "desc" },
+      });
+      const { statusCounts, ids } = firstRowsPerStatus(
+        rows,
+        AGENT_SUMMARY_ROWS_PER_STATUS,
+      );
+      const opportunities = await prisma.opportunity.findMany({
+        where: { id: { in: ids } },
+        select: {
+          id: true,
+          name: true,
+          phoneNumber: true,
+          status: true,
+          nextFollowUp: true,
+          prospect: {
+            select: {
+              assignedAgent: { select: { name: true } },
+              createdByAgent: { select: { name: true } },
+              leadSource: { select: { name: true } },
+            },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+      });
+      return NextResponse.json({ opportunities, total: rows.length, statusCounts });
     }
 
     // Table view: only what the opportunity tables render.

@@ -16,7 +16,7 @@ export default function RootLayout({
     return (
         <AuthGuard>
             <AuthSessionTimeout />
-            <div className={`overflow-auto flex w-full`}>
+            <div className="relative overflow-auto flex w-full">
                 <SidebarProvider>
                     <AppSidebar />
                     <main className="flex flex-col flex-1 min-w-0">

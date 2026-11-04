@@ -22,12 +22,64 @@ const buildArchivedAgentEmail = (email: string, agentId: string) => {
   return `${normalized}.${suffix}`;
 };
 
+// Only what the agent details page renders. The edit form and diary still read
+// the full record from this route.
+const AGENT_DETAILS_SELECT = {
+  id: true,
+  name: true,
+  email: true,
+  phoneNumber: true,
+  agentType: true,
+  agentRole: true,
+  jurisdiction: true,
+  barAssociationId: true,
+  specializations: true,
+  photo: true,
+  status: true,
+} as const;
+
+const TEAM_MEMBER_SELECT = {
+  id: true,
+  name: true,
+  email: true,
+  photo: true,
+  agentType: true,
+  jurisdiction: true,
+  status: true,
+} as const;
+
 export async function GET(
   req: NextRequest,
   { params }: { params: { id: string } },
 ) {
   try {
     const { id } = await params;
+
+    if (req.nextUrl.searchParams.get("view") === "details") {
+      const [agent, teamLinks] = await Promise.all([
+        prisma.agent.findUnique({ where: { id }, select: AGENT_DETAILS_SELECT }),
+        prisma.agentSuperior.findMany({
+          where: { superiorId: id, subordinate: { status: "active" } },
+          select: {
+            teamType: true,
+            subordinate: { select: TEAM_MEMBER_SELECT },
+          },
+        }),
+      ]);
+      if (!agent) {
+        return NextResponse.json({ error: "Agent not found" }, { status: 404 });
+      }
+      return NextResponse.json({
+        ...agent,
+        subordinates: teamLinks
+          .filter((link) => link.teamType !== "advisor")
+          .map((link) => link.subordinate),
+        advisorSubordinates: teamLinks
+          .filter((link) => link.teamType === "advisor")
+          .map((link) => link.subordinate),
+      });
+    }
+
     // Superiors and subordinates are active only.
     const [agent, superiorsLinks, subordinatesLinks] = await Promise.all([
       prisma.agent.findUnique({ where: { id }, omit: AGENT_SECRET_FIELDS }),

@@ -8,8 +8,12 @@ const FULL_INCLUDE = {
   tasks: true,
 } satisfies Prisma.LegislationInclude;
 
-// Only what the agent details table renders: the tasks are just counted.
-const LITE_INCLUDE: Prisma.LegislationInclude = {
+// Only what the agent details and client tasks tables render: the tasks are
+// just counted.
+const LITE_SELECT = {
+  id: true,
+  title: true,
+  description: true,
   assignedAgent: { select: { id: true, name: true } },
   retainership: {
     select: {
@@ -25,8 +29,8 @@ const LITE_INCLUDE: Prisma.LegislationInclude = {
       },
     },
   },
-  tasks: { select: { id: true, active: true, status: true, dueDate: true } },
-};
+  tasks: { select: { active: true, status: true, dueDate: true } },
+} satisfies Prisma.LegislationSelect;
 
 export async function GET(req: NextRequest) {
   try {
@@ -53,10 +57,15 @@ export async function GET(req: NextRequest) {
         : {}),
     };
 
+    const rowShape: Pick<Prisma.LegislationFindManyArgs, "select" | "include"> =
+      searchParams.get("lite") === "true"
+        ? { select: LITE_SELECT }
+        : { include: FULL_INCLUDE };
+
     const [legislations, total] = await Promise.all([
       prisma.legislation.findMany({
         where,
-        include: searchParams.get("lite") === "true" ? LITE_INCLUDE : FULL_INCLUDE,
+        ...rowShape,
         orderBy: {
           createdAt: "desc",
         },

@@ -75,6 +75,19 @@ const CLIENT_TABLE_SELECT = {
   authorizedPersonName: true,
 } as const;
 
+// Only what the agent details Clients table renders.
+const CLIENT_AGENT_TABLE_SELECT = {
+  id: true,
+  clientType: true,
+  firstName: true,
+  lastName: true,
+  organizationName: true,
+  email: true,
+  phoneNumber: true,
+  gender: true,
+  authorizedPersonName: true,
+} as const;
+
 /** `name` prioritises `organizationName`, for organizations. */
 function withDisplayName<
   T extends { organizationName: string | null; firstName: string | null; lastName: string | null },
@@ -122,6 +135,29 @@ export async function GET(req: NextRequest) {
         orderBy: { createdAt: "desc" },
       });
       return NextResponse.json(clients.map(withDisplayName));
+    }
+
+    // The agent details table shows retainership counts, not task counts.
+    if (view === "agent-table") {
+      const clients = await prisma.client.findMany({
+        where,
+        select: CLIENT_AGENT_TABLE_SELECT,
+        orderBy: { createdAt: "desc" },
+      });
+      const retainershipGroups = await prisma.retainership.groupBy({
+        by: ["clientId"],
+        where: { clientId: { in: clients.map((client) => client.id) } },
+        _count: { _all: true },
+      });
+      const retainershipCounts = new Map(
+        retainershipGroups.map((group) => [group.clientId, group._count._all]),
+      );
+      return NextResponse.json(
+        clients.map((client) => ({
+          ...withDisplayName(client),
+          retainershipCount: retainershipCounts.get(client.id) ?? 0,
+        })),
+      );
     }
 
     const clients = await prisma.client.findMany({

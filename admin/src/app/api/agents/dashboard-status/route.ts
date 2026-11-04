@@ -64,36 +64,6 @@ const getLatestDate = (
   );
 };
 
-const getLatestComment = (
-  comments: Array<{ createdAt: Date; content: string | null }>,
-  type: InteractionKind | "ANY",
-): { createdAt: Date; content: string | null } | null => {
-  const filtered =
-    type === "ANY"
-      ? comments
-      : comments.filter(
-          (comment) => normalizeInteractionType(comment.content || "") === type,
-        );
-
-  if (filtered.length === 0) return null;
-
-  return filtered.reduce(
-    (latest, current) =>
-      current.createdAt > latest.createdAt ? current : latest,
-    filtered[0],
-  );
-};
-
-const cleanCommentContent = (content: string | null): string | null => {
-  if (!content) return null;
-  return (
-    content
-      .replace(/^\[CLIENT_UPDATE\]\s*/, "")
-      .replace(/^\[NORMAL\]\s*/, "")
-      .trim() || null
-  );
-};
-
 export async function GET(req: NextRequest) {
   try {
     const currentAdmin = await getCurrentAdmin(req);
@@ -150,8 +120,6 @@ export async function GET(req: NextRequest) {
     const taskSelect = {
       id: true,
       title: true,
-      status: true,
-      priority: true,
       followUpDuration: true,
       statusCheckDuration: true,
       followUpRequired: true,
@@ -159,7 +127,6 @@ export async function GET(req: NextRequest) {
       createdAt: true,
       client: {
         select: {
-          id: true,
           clientType: true,
           firstName: true,
           lastName: true,
@@ -211,10 +178,7 @@ export async function GET(req: NextRequest) {
         select: {
           id: true,
           title: true,
-          status: true,
-          priority: true,
           followUpDuration: true,
-          statusCheckDuration: true,
           dueDate: true,
           client: {
             select: {
@@ -232,10 +196,7 @@ export async function GET(req: NextRequest) {
     const notTouchedTasks = [] as Array<{
       id: string;
       title: string;
-      status: string;
-      priority: string;
       followUpDuration: string | null;
-      statusCheckDuration: string | null;
       clientName: string;
       referenceAt: string;
     }>;
@@ -243,24 +204,16 @@ export async function GET(req: NextRequest) {
     const clientNotUpdatedTasks = [] as Array<{
       id: string;
       title: string;
-      status: string;
-      priority: string;
       followUpDuration: string | null;
-      statusCheckDuration: string | null;
       clientName: string;
       referenceAt: string;
       expectedDuration: string;
-      lastInteractionContent: string | null;
-      lastInteractionAt: string | null;
     }>;
 
     const followUpStatusNotDoneTasks = [] as Array<{
       id: string;
       title: string;
-      status: string;
-      priority: string;
       followUpDuration: string | null;
-      statusCheckDuration: string | null;
       clientName: string;
       referenceAt: string;
     }>;
@@ -301,7 +254,6 @@ export async function GET(req: NextRequest) {
         task.statusCheckDuration ||
         "Working";
 
-      const latestNormal = getLatestDate(task.comments, "NORMAL");
       const latestClientUpdate = getLatestDate(task.comments, "CLIENT_UPDATE");
       const latestAny = getLatestDate(task.comments, "ANY");
       const clientName = getClientName(task);
@@ -319,10 +271,7 @@ export async function GET(req: NextRequest) {
           notTouchedTasks.push({
             id: task.id,
             title: task.title,
-            status: task.status,
-            priority: task.priority,
             followUpDuration: effectiveFollowUpDuration,
-            statusCheckDuration: effectiveStatusCheckDuration,
             clientName,
             referenceAt: reference.toISOString(),
           });
@@ -339,30 +288,13 @@ export async function GET(req: NextRequest) {
         maxDate(latestClientUpdate, clientAuditAt) ?? task.createdAt;
 
       if (hasExceededDuration(clientReference, expectedMs, snapshotDate)) {
-        // Find the actual last CLIENT_UPDATE comment; fall back to last NORMAL comment
-        const lastClientUpdateComment = getLatestComment(
-          task.comments,
-          "CLIENT_UPDATE",
-        );
-        const lastNormalComment = getLatestComment(task.comments, "NORMAL");
-        const lastRelevantComment =
-          lastClientUpdateComment ?? lastNormalComment;
-
         clientNotUpdatedTasks.push({
           id: task.id,
           title: task.title,
-          status: task.status,
-          priority: task.priority,
           followUpDuration: effectiveFollowUpDuration,
-          statusCheckDuration: effectiveStatusCheckDuration,
           clientName,
           referenceAt: clientReference.toISOString(),
           expectedDuration: durationLabelFromMs(expectedMs),
-          lastInteractionContent: cleanCommentContent(
-            lastRelevantComment?.content ?? null,
-          ),
-          lastInteractionAt:
-            lastRelevantComment?.createdAt.toISOString() ?? null,
         });
       }
 
@@ -384,10 +316,7 @@ export async function GET(req: NextRequest) {
           followUpStatusNotDoneTasks.push({
             id: task.id,
             title: task.title,
-            status: task.status,
-            priority: task.priority,
             followUpDuration: effectiveFollowUpDuration,
-            statusCheckDuration: effectiveStatusCheckDuration,
             clientName,
             referenceAt: reference.toISOString(),
           });
@@ -398,10 +327,7 @@ export async function GET(req: NextRequest) {
     const overdueTasks = overdueRaw.map((task) => ({
       id: task.id,
       title: task.title,
-      status: task.status,
-      priority: task.priority,
       followUpDuration: task.followUpDuration,
-      statusCheckDuration: task.statusCheckDuration,
       clientName: getClientName(task),
       referenceAt: task.dueDate?.toISOString() ?? "",
     }));

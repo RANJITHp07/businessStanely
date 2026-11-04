@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { getCurrentAdmin } from "@/lib/auth";
+import { firstRowsPerStatus } from "@/lib/statusSections";
 
 /**
  * Follow-up state only needs the assigned agent's newest comment, but comments
@@ -44,6 +45,21 @@ const PROSPECT_LIST_SELECT = {
     orderBy: { createdAt: "desc" as const },
     take: NEWEST_COMMENTS_SCANNED,
   },
+} satisfies Prisma.ProspectSelect;
+
+/** Rows the agent details page lists per status; the rest are only counted. */
+const AGENT_SUMMARY_ROWS_PER_STATUS = 5;
+
+const AGENT_SUMMARY_ROW_SELECT = {
+  id: true,
+  name: true,
+  email: true,
+  phoneNumber: true,
+  status: true,
+  nextFollowUp: true,
+  assignedAgent: { select: { name: true } },
+  createdByAgent: { select: { name: true } },
+  leadSource: { select: { name: true } },
 } satisfies Prisma.ProspectSelect;
 
 function getAssignedAdvisorType(assignedAgent: {
@@ -132,6 +148,7 @@ export async function GET(req: NextRequest) {
     if (assignedAgentId) {
       assignedAgent = await prisma.agent.findUnique({
         where: { id: assignedAgentId },
+        select: { agentType: true, advisorAgentType: true, agentRole: true },
       });
 
       if (!assignedAgent) {
@@ -191,6 +208,24 @@ export async function GET(req: NextRequest) {
         ),
         engagement,
       });
+    }
+
+    if (searchParams.get("view") === "agent-summary") {
+      const rows = await prisma.prospect.findMany({
+        where,
+        select: { id: true, status: true },
+        orderBy: { createdAt: "desc" },
+      });
+      const { statusCounts, ids } = firstRowsPerStatus(
+        rows,
+        AGENT_SUMMARY_ROWS_PER_STATUS,
+      );
+      const prospects = await prisma.prospect.findMany({
+        where: { id: { in: ids } },
+        select: AGENT_SUMMARY_ROW_SELECT,
+        orderBy: { createdAt: "desc" },
+      });
+      return NextResponse.json({ prospects, total: rows.length, statusCounts });
     }
 
     const prospects = await prisma.prospect.findMany({

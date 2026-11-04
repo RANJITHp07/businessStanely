@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Fragment } from "react";
+import { useState, useEffect, useRef, Fragment } from "react";
 import { notFound, useParams, useRouter, useSearchParams } from "next/navigation";
 import { SectionTable } from "@/components/SectionTable";
 import { Button } from "@/components/ui/button";
@@ -81,6 +81,7 @@ import { cn } from "@/lib/utils";
 import RestoreAgentDialog from "@/app/(dashboard)/agent/_component/restoreAgentDialog";
 import { ProspectTable } from "@/app/(sales)/dashboard/prospects/tables/page";
 import { ProspectsTable } from "@/app/(sales)/dashboard/opportunities/tables/page";
+import { taskSection } from "@/lib/taskFollowUp";
 
 
 type ActivityEntityType = "task" | "prospect" | "opportunity" | "enquiry";
@@ -204,7 +205,6 @@ function statusKey(s?: string) {
   const k = (s || "").toLowerCase().replace(/\s+/g, "");
   if (["todo", "pending"].includes(k)) return "todo";
   if (["inprogress", "progress"].includes(k)) return "inprogress";
-  if (k === "statuscheck&followup") return "followup";
   if (["completed"].includes(k)) return "completed";
   if (["hold"].includes(k)) return "hold";
   return k || "todo";
@@ -218,7 +218,7 @@ type SectionCounts = { todo: number; inprogress: number; followup: number; compl
 function countSections(tasks: Task[]): SectionCounts {
   const counts: SectionCounts = { todo: 0, inprogress: 0, followup: 0, completed: 0, hold: 0 };
   for (const task of tasks) {
-    const key = statusKey(task.status);
+    const key = taskSection(task);
     if (key in counts) counts[key as keyof SectionCounts] += 1;
   }
   return counts;
@@ -332,7 +332,16 @@ export default function AgentDetails() {
     at: string;
   } | null>(null);
   const [restoreDialogOpen, setRestoreDialogOpen] = useState(false);
-  const [agentTasks, setAgentTasks] = useState<Task[]>([]);
+  // The agent's standard tasks: the newest three of each section plus totals.
+  const [agentTaskSections, setAgentTaskSections] = useState<Record<string, Task[]>>({});
+  const [standardSectionCounts, setStandardSectionCounts] = useState<SectionCounts>({
+    todo: 0,
+    inprogress: 0,
+    followup: 0,
+    completed: 0,
+    hold: 0,
+  });
+  const [agentTasksTotal, setAgentTasksTotal] = useState(0);
   const [agentRetainershipTasks, setAgentRetainershipTasks] = useState<Task[]>([]);
   const [agentTriggerTasks, setAgentTriggerTasks] = useState<Task[]>([]);
   const [agentStandardFutureTasks, setAgentStandardFutureTasks] = useState<Task[]>([]);
@@ -357,7 +366,11 @@ export default function AgentDetails() {
   const [agentOpportunities, setAgentOpportunities] = useState<Task[]>([]);
   const [teamMembers, setTeamMembers] = useState<Agent[]>([]);
   const [loading, setLoading] = useState(true);
+  // Covers the task list behind the stats, and the leads and opportunities.
   const [tasksLoading, setTasksLoading] = useState(true);
+  // Covers the rest of the Tasks tab, which loads when the tab is first opened.
+  const [tasksTabLoading, setTasksTabLoading] = useState(true);
+  const loadedSections = useRef(new Set<string>());
   const [activeTab, setActiveTab] = useState<string>(searchParams.get("tab") || "details");
   const [taskOverviewTab, setTaskOverviewTab] = useState("standard-tasks");
   const [dashboardLoading, setDashboardLoading] = useState(true);
@@ -423,7 +436,7 @@ export default function AgentDetails() {
     if (!id) return;
     try {
       const response = await fetchWithAuth(
-        `/api/legislation?assignedAgent=${id}&page=${page}&pageSize=${legislationPageSize}`
+        `/api/legislation?assignedAgent=${id}&lite=true&page=${page}&pageSize=${legislationPageSize}`
       );
       if (response.ok) {
         const data = await response.json();
@@ -468,6 +481,10 @@ export default function AgentDetails() {
             );
           }
 
+          // The page renders now; each tab has its own loading state.
+          setTeamMembers(mergeTeamMembers(data));
+          setLoading(false);
+
           const dataRequests: Promise<void>[] = [];
 
           if (hasExecutionAccess) {
@@ -475,12 +492,6 @@ export default function AgentDetails() {
             dataRequests.push(
               fetchDashboardStatus(today),
               fetchAgentTasks(),
-              fetchAgentAssignedTasks(),
-              fetchAgentRetainershipTasks(),
-              fetchAgentTriggerTasks(),
-              fetchAgentStandardFutureTasks(),
-              fetchAgentLegislations(),
-              fetchAgentClients(),
             );
           }
 
@@ -491,8 +502,6 @@ export default function AgentDetails() {
           if (dataRequests.length > 0) {
             await Promise.all(dataRequests);
           }
-
-          setTeamMembers(mergeTeamMembers(data));
         } else {
           notFound();
         }
@@ -507,16 +516,15 @@ export default function AgentDetails() {
 
     const fetchAgentTasks = async () => {
       try {
-        const response = await fetch(`/api/tasks?assignedToId=${id}`);
+        const response = await fetch(`/api/tasks?assignedToId=${id}&summary=true&limit=3`);
         if (response.ok) {
           const data = await response.json();
-          setAgentTasks(parseTaskResponse(data));
-        } else {
-          setAgentTasks([]);
+          setAgentTaskSections(data.sections || {});
+          setStandardSectionCounts(data.sectionCounts);
+          setAgentTasksTotal(data.counts?.total ?? 0);
         }
       } catch (error) {
         console.error("Error fetching agent tasks:", error);
-        setAgentTasks([]);
       }
     };
 
@@ -554,6 +562,38 @@ export default function AgentDetails() {
         setDashboardLoading(false);
       }
     };
+
+    const fetchAgentLeads = async () => {
+      try {
+        const response = await fetch(`/api/prospects?assignedAgentId=${id}`);
+        if (response.ok) {
+          const data = await response.json();
+          setAgentLeads(data.prospects);
+        }
+      } catch (error) {
+        console.error("Error fetching agent leads:", error);
+      }
+    };
+
+    const fetchAgentOpportunity = async () => {
+      try {
+        const response = await fetch(`/api/opportunities?assignedAgentId=${id}&view=table`);
+        if (response.ok) {
+          const data = await response.json();
+          setAgentOpportunities(data.opportunities);
+        }
+      } catch (error) {
+        console.error("Error fetching agent opportunities:", error);
+      }
+    };
+
+    fetchAgent();
+  }, [id]);
+
+  // Data only one tab shows is fetched when that tab first opens, so the page
+  // does not pay for every tab up front.
+  useEffect(() => {
+    if (!agent || agent.id !== id) return;
 
     const fetchAgentRetainershipTasks = async () => {
       try {
@@ -655,30 +695,6 @@ export default function AgentDetails() {
       }
     };
 
-    const fetchAgentLeads = async () => {
-      try {
-        const response = await fetch(`/api/prospects?assignedAgentId=${id}`);
-        if (response.ok) {
-          const data = await response.json();
-          setAgentLeads(data.prospects);
-        }
-      } catch (error) {
-        console.error("Error fetching agent leads:", error);
-      }
-    };
-
-    const fetchAgentOpportunity = async () => {
-      try {
-        const response = await fetch(`/api/opportunities?assignedAgentId=${id}`);
-        if (response.ok) {
-          const data = await response.json();
-          setAgentOpportunities(data.opportunities);
-        }
-      } catch (error) {
-        console.error("Error fetching agent opportunities:", error);
-      }
-    };
-
     const fetchAgentActivities = async () => {
       try {
         const response = await fetch(
@@ -718,10 +734,32 @@ export default function AgentDetails() {
       }
     };
 
-    fetchAgent();
-    fetchAgentActivities();
-    fetchServiceRecords();
-  }, [id]);
+    const loadOnce = (section: string, load: () => void) => {
+      const key = `${id}:${section}`;
+      if (loadedSections.current.has(key)) return;
+      loadedSections.current.add(key);
+      load();
+    };
+
+    if (activeTab === "tasks" && hasExecutionRole(agent.agentRole)) {
+      loadOnce("tasks", () => {
+        setTasksTabLoading(true);
+        Promise.all([
+          fetchAgentAssignedTasks(),
+          fetchAgentRetainershipTasks(),
+          fetchAgentTriggerTasks(),
+          fetchAgentStandardFutureTasks(),
+          fetchAgentLegislations(),
+          fetchAgentClients(),
+        ]).finally(() => setTasksTabLoading(false));
+      });
+    }
+    if (activeTab === "activities") loadOnce("activities", fetchAgentActivities);
+    // An inactive agent's stats come from the transfer audit in these records.
+    if (activeTab === "service-records" || agent.status === "inactive") {
+      loadOnce("service-records", fetchServiceRecords);
+    }
+  }, [activeTab, agent, id]);
 
   // const getPriorityBadge = (priority: string) => {
   //   const colors = {
@@ -919,10 +957,8 @@ export default function AgentDetails() {
   const showExecutionTabs = hasExecutionRole(agent.agentRole);
   const showAdvisorTabs = hasAdvisorRole(agent.agentRole);
   const tabCount = 4 + (showExecutionTabs ? 2 : 0) + (showAdvisorTabs ? 2 : 0);
-  const standardAgentTasks = agentTasks.filter((task) => !task.legislationId);
   // Each section lists only its newest three rows, so the section labels carry
   // the real counts and each tab's total is the sum of its sections.
-  const standardSectionCounts = countSections(standardAgentTasks);
   const standardTasksTotal = sumSections(standardSectionCounts);
   const retainershipSectionCounts = countSections(agentRetainershipTasks);
   const retainershipTasksTotal = sumSections(retainershipSectionCounts);
@@ -934,13 +970,13 @@ export default function AgentDetails() {
   const isAdvisorOnly = showAdvisorTabs && !showExecutionTabs;
   const isDualRole = showAdvisorTabs && showExecutionTabs;
 
-  const statusCounts = ["Completed", "To Do", "In Progress", "StatusCheck & Followup", "Hold"].reduce(
-    (acc, status) => {
-      acc[status] = agentTasks.filter((task) => task.status === status).length;
-      return acc;
-    },
-    {} as Record<string, number>,
-  );
+  const statusCounts: Record<string, number> = {
+    Completed: standardSectionCounts.completed,
+    "To Do": standardSectionCounts.todo,
+    "In Progress": standardSectionCounts.inprogress,
+    Followups: standardSectionCounts.followup,
+    Hold: standardSectionCounts.hold,
+  };
 
   const taskStatusBreakdown = transferAuditSummary?.taskStatusBreakdown || {};
   const staticTotalTasks = Object.values(taskStatusBreakdown).reduce(
@@ -950,7 +986,7 @@ export default function AgentDetails() {
   const staticCompletedTasks = Number(transferAuditSummary?.completedTaskCount || 0);
 
   const totalTasksForStats =
-    agent.status === "inactive" ? staticTotalTasks : agentTasks.length;
+    agent.status === "inactive" ? staticTotalTasks : agentTasksTotal;
   const completedForStats =
     agent.status === "inactive"
       ? staticCompletedTasks
@@ -1279,7 +1315,7 @@ export default function AgentDetails() {
               <TabsTrigger value="tasks" className="flex items-center gap-2 whitespace-nowrap">
                 <FileText className="h-4 w-4 hidden md:block" />
                 <p className="text-[10px] md:text-[12px]">
-                  Tasks ({agentTasks.length})
+                  Tasks ({tasksLoading ? "…" : agentTasksTotal})
                 </p>
               </TabsTrigger>
             )}
@@ -1287,7 +1323,7 @@ export default function AgentDetails() {
               <TabsTrigger value="leads" className="flex items-center gap-2 whitespace-nowrap">
                 <FileText className="h-4 w-4 hidden md:block" />
                 <p className="text-[10px] md:text-[12px]">
-                  Leads ({agentLeads.length})
+                  Leads ({tasksLoading ? "…" : agentLeads.length})
                 </p>
               </TabsTrigger>
             )}
@@ -1295,7 +1331,7 @@ export default function AgentDetails() {
               <TabsTrigger value="opportunity" className="flex items-center gap-2 whitespace-nowrap">
                 <FileText className="h-4 w-4 hidden md:block" />
                 <p className="text-[10px] md:text-[12px]">
-                  Opportunity ({agentOpportunities.length})
+                  Opportunity ({tasksLoading ? "…" : agentOpportunities.length})
                 </p>
               </TabsTrigger>
             )}
@@ -1480,7 +1516,7 @@ export default function AgentDetails() {
                   <div className="flex-1 min-w-0">
                     {renderDashboardTable(
                       "Touchbased Not Yet",
-                      "All Tasks other than StatusCheck&Followup has to be Touchbased once every day. ",
+                      "All Tasks other than Followups has to be Touchbased once every day. ",
                       dashboardData.notTouchedTasks,
                       true,
                       "border-l-amber-500",
@@ -1627,7 +1663,7 @@ export default function AgentDetails() {
                           "Completed",
                           "To Do",
                           "In Progress",
-                          "StatusCheck & Followup",
+                          "Followups",
                           "Hold"
                         ].map((status) => (
                           <div className="flex justify-between items-center" key={status}>
@@ -1724,7 +1760,7 @@ export default function AgentDetails() {
               </div>
             </div>
 
-            {tasksLoading ? (
+            {tasksLoading || tasksTabLoading ? (
               <div className="flex justify-center items-center py-16 text-muted-foreground">
                 <Clock className="h-6 w-6 animate-spin mr-2" /> Loading tasks...
               </div>
@@ -1760,7 +1796,7 @@ export default function AgentDetails() {
                 </div>
 
                 <TabsContent value="standard-tasks" className="space-y-6">
-                  {standardAgentTasks.length === 0 && agentStandardFutureTasks.length === 0 ? (
+                  {agentTasksTotal === 0 && agentStandardFutureTasks.length === 0 ? (
                     <Card>
                       <CardContent className="text-center py-8 text-muted-foreground">
                         No standard tasks assigned to this agent.
@@ -1771,25 +1807,25 @@ export default function AgentDetails() {
                       <SectionTable
                         label="New Task"
                         count={standardSectionCounts.todo}
-                        tasks={standardAgentTasks.filter((task) => statusKey(task.status) === "todo").slice(0, 3)}
+                        tasks={agentTaskSections.todo || []}
                         agentId={id}
                       />
                       <SectionTable
                         label="In Progress"
                         count={standardSectionCounts.inprogress}
-                        tasks={standardAgentTasks.filter((task) => statusKey(task.status) === "inprogress").slice(0, 3)}
+                        tasks={agentTaskSections.inprogress || []}
                         agentId={id}
                       />
                       <SectionTable
-                        label="StatusCheck & Followup"
+                        label="Followups"
                         count={standardSectionCounts.followup}
-                        tasks={standardAgentTasks.filter((task) => statusKey(task.status) === "followup").slice(0, 3)}
+                        tasks={agentTaskSections.followup || []}
                         agentId={id}
                       />
                       <SectionTable
                         label="Hold"
                         count={standardSectionCounts.hold}
-                        tasks={standardAgentTasks.filter((task) => statusKey(task.status) === "hold").slice(0, 3)}
+                        tasks={agentTaskSections.hold || []}
                         agentId={id}
                       />
                       <SectionTable
@@ -1802,7 +1838,7 @@ export default function AgentDetails() {
                       <SectionTable
                         label="Completed"
                         count={standardSectionCounts.completed}
-                        tasks={standardAgentTasks.filter((task) => statusKey(task.status) === "completed").slice(0, 3)}
+                        tasks={agentTaskSections.completed || []}
                         agentId={id}
                       />
                     </div>
@@ -1833,10 +1869,10 @@ export default function AgentDetails() {
                         viewMoreHref={`/task?assignedById=${id}&status=${encodeURIComponent("In Progress")}`}
                       />
                       <SectionTable
-                        label="StatusCheck & Followup"
+                        label="Followups"
                         count={assignedSectionCounts.followup}
                         tasks={assignedTaskSections.followup || []}
-                        viewMoreHref={`/task?assignedById=${id}&status=${encodeURIComponent("StatusCheck & Followup")}`}
+                        viewMoreHref={`/task?assignedById=${id}&status=${encodeURIComponent("Followups")}`}
                       />
                       <SectionTable
                         label="Hold"
@@ -2040,21 +2076,21 @@ export default function AgentDetails() {
                       <SectionTable
                         label="New Task"
                         count={retainershipSectionCounts.todo}
-                        tasks={agentRetainershipTasks.filter((task) => statusKey(task.status) === "todo").slice(0, 3)}
+                        tasks={agentRetainershipTasks.filter((task) => taskSection(task) === "todo").slice(0, 3)}
                         agentId={id}
                         retainershipTasks={true}
                       />
                       <SectionTable
                         label="In Progress"
                         count={retainershipSectionCounts.inprogress}
-                        tasks={agentRetainershipTasks.filter((task) => statusKey(task.status) === "inprogress").slice(0, 3)}
+                        tasks={agentRetainershipTasks.filter((task) => taskSection(task) === "inprogress").slice(0, 3)}
                         agentId={id}
                         retainershipTasks={true}
                       />
                       <SectionTable
-                        label="StatusCheck & Followup"
+                        label="Followups"
                         count={retainershipSectionCounts.followup}
-                        tasks={agentRetainershipTasks.filter((task) => statusKey(task.status) === "followup").slice(0, 3)}
+                        tasks={agentRetainershipTasks.filter((task) => taskSection(task) === "followup").slice(0, 3)}
                         agentId={id}
                         retainershipTasks={true}
                       />
@@ -2310,7 +2346,6 @@ export default function AgentDetails() {
                       <TableRow>
                         <TableHead>Team Member</TableHead>
                         <TableHead>Role</TableHead>
-                        <TableHead>Specializations</TableHead>
                         <TableHead>Jurisdiction</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead className="text-right">Actions</TableHead>
@@ -2340,26 +2375,6 @@ export default function AgentDetails() {
                           </TableCell>
                           <TableCell>
                             {getAgentTypeBadge(member.agentType)}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex flex-wrap gap-1">
-                              {member.specializations
-                                .slice(0, 2)
-                                .map((spec) => (
-                                  <Badge
-                                    key={spec}
-                                    variant="outline"
-                                    className="text-xs"
-                                  >
-                                    {spec}
-                                  </Badge>
-                                ))}
-                              {member.specializations.length > 2 && (
-                                <Badge variant="outline" className="text-xs">
-                                  +{member.specializations.length - 2}
-                                </Badge>
-                              )}
-                            </div>
                           </TableCell>
                           <TableCell>
                             <div className="text-sm">{member.jurisdiction}</div>
@@ -2597,7 +2612,6 @@ export default function AgentDetails() {
                         method: "DELETE",
                       });
                       if (response.ok) {
-                        setAgentTasks((prevTasks) => prevTasks.filter((t) => t.id !== taskToDelete.id));
                         router.push(`/agent/${id}?tab=tasks`); // Redirect back to tasks tab
                       } else {
                         alert("Failed to delete the task. Please try again.");

@@ -46,24 +46,15 @@ export default function ClientDetailsPage() {
         fetchClient();
     }, [id]);
 
-    useEffect(() => {
-        const fetchAllClients = async () => {
-            try {
-                const response = await fetch('/api/clients');
-                if (response.ok) {
-                    setAllClients(await response.json());
-                }
-            } catch (error) {
-                console.error("Error fetching clients:", error);
-            }
-        };
-
-        fetchAllClients();
-    }, []);
-
     const openTransferDialog = (mode: TransferTasksMode) => {
         setTransferDialogMode(mode);
         setTransferDialogOpen(true);
+        // The target-client picker is the only reader of this list.
+        if (allClients.length > 0) return;
+        fetch('/api/clients?view=options')
+            .then((response) => (response.ok ? response.json() : []))
+            .then(setAllClients)
+            .catch((error) => console.error("Error fetching clients:", error));
     };
 
     // A deleted client has no detail page left to show, so leave for the list.

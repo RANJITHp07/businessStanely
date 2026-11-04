@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { getCurrentAdmin } from "@/lib/auth";
-import { FOLLOW_UP_STATUS } from "@/lib/taskFollowUp";
 
 type InteractionKind = "NORMAL" | "CLIENT_UPDATE";
 
@@ -137,7 +136,7 @@ export async function GET(req: NextRequest) {
       {
         assignedToId,
         active: true,
-        status: { in: ["In Progress", "in progress", FOLLOW_UP_STATUS] },
+        status: { in: ["In Progress", "in progress"] },
         createdAt: { lte: snapshotDate },
       },
     ];
@@ -148,7 +147,16 @@ export async function GET(req: NextRequest) {
       AND: [...baseAndFilters, ...extraFilters],
     });
 
-    const taskInclude = {
+    const taskSelect = {
+      id: true,
+      title: true,
+      status: true,
+      priority: true,
+      followUpDuration: true,
+      statusCheckDuration: true,
+      followUpRequired: true,
+      completed: true,
+      createdAt: true,
       client: {
         select: {
           id: true,
@@ -187,11 +195,39 @@ export async function GET(req: NextRequest) {
       },
     };
 
-    const tasks = await prisma.task.findMany({
-      where: buildWhere([]),
-      include: taskInclude,
-      orderBy: { updatedAt: "desc" },
-    });
+    const [tasks, overdueRaw] = await Promise.all([
+      prisma.task.findMany({
+        where: buildWhere([]),
+        select: taskSelect,
+        orderBy: { updatedAt: "desc" },
+      }),
+      prisma.task.findMany({
+        where: {
+          assignedToId,
+          active: true,
+          status: { notIn: ["Completed", "completed"] },
+          dueDate: { lte: snapshotDate, not: null },
+        },
+        select: {
+          id: true,
+          title: true,
+          status: true,
+          priority: true,
+          followUpDuration: true,
+          statusCheckDuration: true,
+          dueDate: true,
+          client: {
+            select: {
+              clientType: true,
+              firstName: true,
+              lastName: true,
+              organizationName: true,
+            },
+          },
+        },
+        orderBy: { dueDate: "asc" },
+      }),
+    ]);
 
     const notTouchedTasks = [] as Array<{
       id: string;
@@ -358,33 +394,6 @@ export async function GET(req: NextRequest) {
         }
       }
     }
-
-    const overdueRaw = await prisma.task.findMany({
-      where: {
-        assignedToId,
-        active: true,
-        status: { notIn: ["Completed", "completed"] },
-        dueDate: { lte: snapshotDate, not: null },
-      },
-      select: {
-        id: true,
-        title: true,
-        status: true,
-        priority: true,
-        followUpDuration: true,
-        statusCheckDuration: true,
-        dueDate: true,
-        client: {
-          select: {
-            clientType: true,
-            firstName: true,
-            lastName: true,
-            organizationName: true,
-          },
-        },
-      },
-      orderBy: { dueDate: "asc" },
-    });
 
     const overdueTasks = overdueRaw.map((task) => ({
       id: task.id,

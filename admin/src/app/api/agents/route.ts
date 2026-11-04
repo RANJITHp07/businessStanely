@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import prisma from "@/lib/prisma";
+import { AGENT_SECRET_FIELDS } from "@/lib/agentSecretFields";
 import { uploadToS3 } from "@/lib/aws";
 import { sendAgentInviteEmail } from "@/lib/email";
 import {
@@ -283,37 +284,67 @@ export async function POST(req: NextRequest) {
   }
 }
 
+// Only what the active and deleted agent tables render, filter and pass on to
+// their dialogs.
+const AGENT_TABLE_SELECT = {
+  id: true,
+  name: true,
+  email: true,
+  photo: true,
+  status: true,
+  jurisdiction: true,
+  agentRole: true,
+  agentType: true,
+  executionAgentType: true,
+  advisorAgentType: true,
+} as const;
+
 export async function GET(req: NextRequest) {
   try {
     const statusParam = req.nextUrl.searchParams.get("status");
     const normalizedStatus = statusParam?.trim().toLowerCase();
 
     const shouldReturnInactive = normalizedStatus === "inactive";
+    const matchesStatus = (agent: { status: string | null }) => {
+      const isInactive = agent.status?.trim().toLowerCase() === "inactive";
+      return shouldReturnInactive ? isInactive : !isInactive;
+    };
+
+    // The agent tables: one query, no team links.
+    if (req.nextUrl.searchParams.get("view") === "table") {
+      const agents = await prisma.agent.findMany({
+        select: AGENT_TABLE_SELECT,
+        orderBy: { createdAt: "desc" },
+      });
+      return NextResponse.json(agents.filter(matchesStatus));
+    }
+
     const agents = await prisma.agent.findMany({
+      omit: AGENT_SECRET_FIELDS,
       include: {
-        superiorsLinks: { include: { superior: true } },
-        subordinatesLinks: { include: { subordinate: true } },
+        superiorsLinks: { include: { superior: { omit: AGENT_SECRET_FIELDS } } },
+        subordinatesLinks: { include: { subordinate: { omit: AGENT_SECRET_FIELDS } } },
       },
       orderBy: {
         createdAt: "desc",
       },
     });
     const mappedAgents = agents
-      .map((agent) => ({
+      .map(({ superiorsLinks, subordinatesLinks, ...agent }) => ({
         ...agent,
-        superiors: agent.superiorsLinks
+        superiors: superiorsLinks
           .filter(
             (link) => link.superior.status?.trim().toLowerCase() !== "inactive",
           )
           .map((link) => link.superior),
-        subordinates: agent.subordinatesLinks
+        subordinates: subordinatesLinks
           .filter(
             (link) =>
               link.teamType !== "advisor" &&
               link.subordinate.status?.trim().toLowerCase() !== "inactive",
           )
           .map((link) => link.subordinate),
-        advisorSubordinates: agent.subordinatesLinks
+        advisorSubordinates: subordinatesLinks
           .filter(
             (link) =>
               link.teamType === "advisor" &&
@@ -321,10 +352,7 @@ export async function GET(req: NextRequest) {
           )
           .map((link) => link.subordinate),
       }))
-      .filter((agent) => {
-        const isInactive = agent.status?.trim().toLowerCase() === "inactive";
-        return shouldReturnInactive ? isInactive : !isInactive;
-      });
+      .filter(matchesStatus);
 
     return NextResponse.json(mappedAgents);
   } catch (error) {

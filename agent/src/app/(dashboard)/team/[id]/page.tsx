@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useState, useEffect } from "react";
+import { Fragment, useState, useEffect, useRef } from "react";
 import { notFound, useParams, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -47,6 +47,7 @@ import {
 import { Agent, Prospect, Task } from "@/types";
 import Link from "next/link";
 import { hasAdvisorRole, hasExecutionRole } from "@/lib/agentRole";
+import { taskSection } from "@/lib/taskFollowUp";
 
 interface AgentActivity {
   taskId: string;
@@ -83,11 +84,15 @@ function formatDateDMY(dateString?: string) {
   });
 }
 
+// The Performance Stats row a task counts under: its status, or the group.
+function statBucket(task: { status?: string | null; followUpDuration?: string | null; active?: boolean | null }) {
+  return taskSection(task) === "followup" ? "Followups" : task.status;
+}
+
 function statusKey(s?: string) {
   const k = (s || "").toLowerCase().replace(/\s+/g, "");
   if (["todo", "pending"].includes(k)) return "todo";
   if (["inprogress", "progress"].includes(k)) return "inprogress";
-  if (k === "statuscheck&followup") return "followup";
   if (["completed"].includes(k)) return "completed";
   if (["hold"].includes(k)) return "hold";
   return k || "todo";
@@ -97,7 +102,7 @@ function sectionLabelToStatus(label: string) {
   const l = label.toLowerCase();
   if (l.includes("progress")) return "In Progress";
   if (l.includes("completed")) return "Completed";
-  if (l.includes("followup")) return "StatusCheck & Followup";
+  if (l.includes("followup")) return "Followups";
   if (l.includes("hold")) return "Hold";
   return "To Do";
 }
@@ -244,7 +249,6 @@ function SectionTable({
                           const k = statusKey(t.status);
                           if (k === "completed") return "Completed";
                           if (k === "inprogress") return "In Progress";
-                          if (k === "followup") return "StatusCheck & Followup";
                           if (k === "hold") return "Hold";
                           return "To Do";
                         })();
@@ -369,7 +373,7 @@ function SectionTable({
                                   value={
                                     statusLabel === "Completed"
                                       ? 100
-                                      : statusLabel === "In Progress" || statusLabel === "StatusCheck & Followup"
+                                      : statusLabel === "In Progress"
                                         ? 50
                                         : 0
                                   }
@@ -484,9 +488,7 @@ function SectionTable({
                               ? "Completed"
                               : statusKey(t.status) === "inprogress"
                                 ? "In Progress"
-                                : statusKey(t.status) === "followup"
-                                  ? "StatusCheck & Followup"
-                                  : "To Do"}
+                                : "To Do"}
                           </div>
                         </div>
                       </div>
@@ -560,6 +562,8 @@ export default function AgentDetails() {
           }
 
           setTeamMembers(mergeTeamMembers(data));
+          // The page renders now; each tab has its own loading state.
+          setLoading(false);
 
           const requests: Promise<void>[] = [];
 
@@ -567,7 +571,7 @@ export default function AgentDetails() {
             requests.push(
               (async () => {
                 try {
-                  const tasksResponse = await fetch(`/api/tasks?assignedToId=${id}`);
+                  const tasksResponse = await fetch(`/api/tasks?assignedToId=${id}&lite=true`);
                   if (tasksResponse.ok) {
                     const tasksData = await tasksResponse.json();
                     setAgentTasks(parseTaskResponse(tasksData));
@@ -585,7 +589,7 @@ export default function AgentDetails() {
               (async () => {
                 try {
                   const retainershipTasksResponse = await fetch(
-                    `/api/tasks?assignedToId=${id}&retainershipTasks=true`,
+                    `/api/tasks?assignedToId=${id}&retainershipTasks=true&lite=true`,
                   );
                   if (retainershipTasksResponse.ok) {
                     const retainershipTasksData =
@@ -613,7 +617,7 @@ export default function AgentDetails() {
                   // so the preview and the full list cannot disagree. Completed
                   // recurring tasks are already part of it.
                   const triggerResponse = await fetch(
-                    `/api/tasks?assignedToId=${id}&trigger=true`,
+                    `/api/tasks?assignedToId=${id}&trigger=true&lite=true`,
                   );
                   setAgentTriggerTasks(
                     triggerResponse.ok
@@ -675,7 +679,13 @@ export default function AgentDetails() {
     };
 
     fetchTeamMemberDetails();
-    // Fetch activities
+  }, [id]);
+
+  // The Activities tab is the only reader of this list, so it loads on first open.
+  const activitiesLoadedFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (!id || activeTab !== "activities" || activitiesLoadedFor.current === id) return;
+    activitiesLoadedFor.current = id;
     const fetchAgentActivities = async () => {
       try {
         const response = await fetch(`/api/comments/agent-activities?agentId=${id}`);
@@ -690,7 +700,7 @@ export default function AgentDetails() {
       }
     };
     fetchAgentActivities();
-  }, [id, searchParams]);
+  }, [id, activeTab]);
 
   const getAgentTypeBadge = (type: string) => {
     const colors = {
@@ -1039,7 +1049,7 @@ export default function AgentDetails() {
                       "Completed",
                       "To Do",
                       "In Progress",
-                      "StatusCheck & Followup",
+                      "Followups",
                       "Hold"
                     ].map((status) => (
                       <div className="flex justify-between items-center" key={status}>
@@ -1056,7 +1066,7 @@ export default function AgentDetails() {
                                   ? "text-gray-500"
                                   : "text-gray-800")
                         }>
-                          {agentTasks.filter((task) => task.status === status).length}
+                          {agentTasks.filter((task) => statBucket(task) === status).length}
                         </span>
                       </div>
                     ))}
@@ -1153,17 +1163,17 @@ export default function AgentDetails() {
                     <div className="space-y-[40px]">
                       <SectionTable
                         label="New Task"
-                        tasks={agentTasks.filter((t) => ["todo"].includes(statusKey(t.status))).slice(0, 3)}
+                        tasks={agentTasks.filter((t) => taskSection(t) === "todo").slice(0, 3)}
                         agentId={id}
                       />
                       <SectionTable
                         label="In Progress"
-                        tasks={agentTasks.filter((t) => ["inprogress"].includes(statusKey(t.status))).slice(0, 3)}
+                        tasks={agentTasks.filter((t) => taskSection(t) === "inprogress").slice(0, 3)}
                         agentId={id}
                       />
                       <SectionTable
-                        label="StatusCheck & Followup"
-                        tasks={agentTasks.filter((t) => ["followup"].includes(statusKey(t.status))).slice(0, 3)}
+                        label="Followups"
+                        tasks={agentTasks.filter((t) => taskSection(t) === "followup").slice(0, 3)}
                         agentId={id}
                       />
                       <SectionTable
@@ -1193,19 +1203,19 @@ export default function AgentDetails() {
                     <div className="space-y-[40px]">
                       <SectionTable
                         label="New Task"
-                        tasks={agentRetainershipTasks.filter((t) => ["todo"].includes(statusKey(t.status))).slice(0, 3)}
+                        tasks={agentRetainershipTasks.filter((t) => taskSection(t) === "todo").slice(0, 3)}
                         agentId={id}
                         retainershipTasks={true}
                       />
                       <SectionTable
                         label="In Progress"
-                        tasks={agentRetainershipTasks.filter((t) => ["inprogress"].includes(statusKey(t.status))).slice(0, 3)}
+                        tasks={agentRetainershipTasks.filter((t) => taskSection(t) === "inprogress").slice(0, 3)}
                         agentId={id}
                         retainershipTasks={true}
                       />
                       <SectionTable
-                        label="StatusCheck & Followup"
-                        tasks={agentRetainershipTasks.filter((t) => ["followup"].includes(statusKey(t.status))).slice(0, 3)}
+                        label="Followups"
+                        tasks={agentRetainershipTasks.filter((t) => taskSection(t) === "followup").slice(0, 3)}
                         agentId={id}
                         retainershipTasks={true}
                       />

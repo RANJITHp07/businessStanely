@@ -46,7 +46,6 @@ export async function GET(req: NextRequest) {
               agentType: true,
               phoneNumber: true,
               jurisdiction: true,
-              specializations: true,
               photo: true,
               status: true,
               agentRole: true,

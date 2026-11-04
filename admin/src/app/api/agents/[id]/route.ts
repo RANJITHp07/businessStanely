@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { AGENT_SECRET_FIELDS } from "@/lib/agentSecretFields";
 import { uploadToS3, deleteFromS3 } from "@/lib/aws";
 import {
   ADVISOR_AGENT_ROLE,
@@ -26,22 +27,21 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const agent = await prisma.agent.findUnique({
-      where: { id },
-    });
+    // Superiors and subordinates are active only.
+    const [agent, superiorsLinks, subordinatesLinks] = await Promise.all([
+      prisma.agent.findUnique({ where: { id }, omit: AGENT_SECRET_FIELDS }),
+      prisma.agentSuperior.findMany({
+        where: { subordinateId: id, superior: { status: "active" } },
+        include: { superior: { omit: AGENT_SECRET_FIELDS } },
+      }),
+      prisma.agentSuperior.findMany({
+        where: { superiorId: id, subordinate: { status: "active" } },
+        include: { subordinate: { omit: AGENT_SECRET_FIELDS } },
+      }),
+    ]);
     if (!agent) {
       return NextResponse.json({ error: "Agent not found" }, { status: 404 });
     }
-    // Fetch superiors (only active)
-    const superiorsLinks = await prisma.agentSuperior.findMany({
-      where: { subordinateId: id, superior: { status: "active" } },
-      include: { superior: true },
-    });
-    // Fetch subordinates (only active)
-    const subordinatesLinks = await prisma.agentSuperior.findMany({
-      where: { superiorId: id, subordinate: { status: "active" } },
-      include: { subordinate: true },
-    });
 
     const executionSubordinates = subordinatesLinks
       .filter((link) => link.teamType !== "advisor")

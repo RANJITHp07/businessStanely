@@ -7,7 +7,10 @@ import {
   lastDailyTrackDates,
 } from "@/lib/dailyTrackReport";
 
-/** One agent's In Progress tasks, split by whether they have a day track note for `date`. */
+/**
+ * One agent's In Progress tasks, split by whether they have a day track note
+ * for `date`. Each task carries `isRetainership` so the page can separate them.
+ */
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ agentId: string }> },

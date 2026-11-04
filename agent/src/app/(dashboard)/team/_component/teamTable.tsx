@@ -63,7 +63,6 @@ export default function TeamsTable() {
     id: string;
     name: string;
     type?: string;
-    specializations?: string[];
     jurisdiction?: string;
     email?: string;
     photo?: string;
@@ -124,12 +123,7 @@ export default function TeamsTable() {
     const matchesSearch =
       team.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (team.email &&
-        team.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (team.specializations &&
-        team.specializations
-          .join(", ")
-          .toLowerCase()
-          .includes(searchTerm.toLowerCase()));
+        team.email.toLowerCase().includes(searchTerm.toLowerCase()));
 
     const matchesType =
       selectedType === "All Types" || team.type === selectedType;
@@ -212,7 +206,7 @@ export default function TeamsTable() {
                       <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                       <Input
                         id="search"
-                        placeholder="Search by name, email, or specialization..."
+                        placeholder="Search by name, email..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="pl-10 text-sm"
@@ -301,7 +295,6 @@ export default function TeamsTable() {
                     <TableRow isHeader>
                       <TableHead className="text-xs sm:text-sm">Team Member</TableHead>
                       <TableHead className="text-xs sm:text-sm">Type</TableHead>
-                      <TableHead className="text-xs sm:text-sm">Specializations</TableHead>
                       <TableHead className="text-xs sm:text-sm">Jurisdiction</TableHead>
                       <TableHead className="text-xs sm:text-sm text-right">Actions</TableHead>
                     </TableRow>
@@ -311,7 +304,7 @@ export default function TeamsTable() {
                     {currentTeams.length === 0 ? (
                       <TableRow>
                         <TableCell
-                          colSpan={5}
+                          colSpan={4}
                           className="text-center py-8 text-sm text-muted-foreground"
                         >
                           No teams found matching your criteria.
@@ -349,31 +342,6 @@ export default function TeamsTable() {
                               </div>
                             </TableCell>
                             <TableCell className="text-xs">{team.type || team.agentType}</TableCell>
-                            <TableCell>
-                              <div className="flex flex-wrap gap-1">
-                                {team.specializations &&
-                                  team.specializations
-                                    .slice(0, 2)
-                                    .map((spec) => (
-                                      <Badge
-                                        key={spec}
-                                        variant="outline"
-                                        className="text-xs"
-                                      >
-                                        {spec}
-                                      </Badge>
-                                    ))}
-                                {team.specializations &&
-                                  team.specializations.length > 2 && (
-                                    <Badge
-                                      variant="outline"
-                                      className="text-xs"
-                                    >
-                                      +{team.specializations.length - 2}
-                                    </Badge>
-                                  )}
-                              </div>
-                            </TableCell>
                             <TableCell className="text-xs">{team.jurisdiction}</TableCell>
                             <TableCell className="text-right">
                               <DropdownMenu>
@@ -457,29 +425,6 @@ export default function TeamsTable() {
                             <TableCell className="text-xs">
                               <div className="space-y-1">
                                 <div className="font-medium">{team.type}</div>
-                                <div className="flex flex-wrap gap-1">
-                                  {team.specializations &&
-                                    team.specializations
-                                      .slice(0, 1)
-                                      .map((spec) => (
-                                        <Badge
-                                          key={spec}
-                                          variant="outline"
-                                          className="text-xs"
-                                        >
-                                          {spec}
-                                        </Badge>
-                                      ))}
-                                  {team.specializations &&
-                                    team.specializations.length > 1 && (
-                                      <Badge
-                                        variant="outline"
-                                        className="text-xs"
-                                      >
-                                        +{team.specializations.length - 1}
-                                      </Badge>
-                                    )}
-                                </div>
                               </div>
                             </TableCell>
                             <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>

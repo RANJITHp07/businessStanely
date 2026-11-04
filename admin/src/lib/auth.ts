@@ -25,6 +25,19 @@ export interface AdminUser {
  * @returns Decoded JWT payload or null if invalid
  */
 export async function verifyAuth(req: NextRequest): Promise<JWTPayload | null> {
+  return (await resolveSession(req))?.decoded ?? null;
+}
+
+const SESSION_USER_SELECT = {
+  id: true,
+  email: true,
+  username: true,
+  adminType: true,
+  status: true,
+} as const;
+
+/** Verifies the token and returns the user row the session check already read. */
+async function resolveSession(req: NextRequest) {
   try {
     // Get token from cookies
     const token = req.cookies.get("auth-token")?.value;
@@ -50,7 +63,7 @@ export async function verifyAuth(req: NextRequest): Promise<JWTPayload | null> {
     if (decoded.userId && decoded.sessionToken) {
       const user = await prisma.user.findUnique({
         where: { id: decoded.userId },
-        select: { currentSessionToken: true, status: true },
+        select: { ...SESSION_USER_SELECT, currentSessionToken: true },
       });
       if (!user) {
         console.error("User not found in DB. User ID:", decoded.userId);
@@ -61,12 +74,14 @@ export async function verifyAuth(req: NextRequest): Promise<JWTPayload | null> {
         return null;
       }
       if (user.currentSessionToken !== decoded.sessionToken) {
-        console.error("Session token mismatch. DB token:", user.currentSessionToken, "JWT token:", decoded.sessionToken);
+        console.error("Session token mismatch for user:", decoded.userId);
         return null;
       }
+      const { currentSessionToken: _token, ...sessionUser } = user;
+      return { decoded, user: sessionUser };
     }
 
-    return decoded;
+    return { decoded, user: null };
   } catch (error) {
     console.error("Auth verification error:", error);
     return null;
@@ -100,22 +115,21 @@ export async function isOwner(email: string): Promise<boolean> {
 export async function getCurrentAdmin(
   req: NextRequest
 ): Promise<AdminUser | null> {
-  const decoded = await verifyAuth(req);
+  const session = await resolveSession(req);
+  const decoded = session?.decoded;
 
   if (!decoded?.email) {
     return null;
   }
 
-  const admin = await prisma.user.findUnique({
-    where: { email: decoded.email },
-    select: {
-      id: true,
-      email: true,
-      username: true,
-      adminType: true,
-      status: true,
-    },
-  });
+  // The session check has usually read this user already.
+  const admin =
+    session?.user?.email === decoded.email
+      ? session.user
+      : await prisma.user.findUnique({
+          where: { email: decoded.email },
+          select: SESSION_USER_SELECT,
+        });
 
   if (!admin || admin.status === "inactive") {
     return null;

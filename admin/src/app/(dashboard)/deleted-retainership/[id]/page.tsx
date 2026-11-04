@@ -121,7 +121,6 @@ const PRIORITY_COLORS: Record<string, string> = {
 const TASK_STATUSES = [
   "To Do",
   "In Progress",
-  "StatusCheck & Followup",
   "Hold",
   "Completed",
   "Abandoned",

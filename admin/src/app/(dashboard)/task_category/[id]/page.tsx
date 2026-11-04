@@ -26,6 +26,7 @@ import {
 import { useRouter } from "next/navigation"
 import { clientDisplayName } from "@/lib/entityNames"
 import { Task } from "@/types"
+import { taskSection } from "@/lib/taskFollowUp";
 
 export interface TaskCategory {
     id: string
@@ -58,7 +59,6 @@ function statusKey(s?: string) {
     const k = (s || "").toLowerCase().replace(/\s+/g, "")
     if (["todo", "pending"].includes(k)) return "todo"
     if (["inprogress", "progress"].includes(k)) return "inprogress"
-    if (k === "statuscheck&followup") return "followup"
     if (["completed"].includes(k)) return "completed"
     if (["hold"].includes(k)) return "hold"
     return k || "todo"
@@ -67,7 +67,7 @@ function statusKey(s?: string) {
 const STATUS_SECTIONS = [
     { label: "New Task", key: "todo", status: "To Do" },
     { label: "In Progress", key: "inprogress", status: "In Progress" },
-    { label: "StatusCheck & Followup", key: "followup", status: "StatusCheck & Followup" },
+    { label: "Followups", key: "followup", status: "Followups" },
     { label: "Hold", key: "hold", status: "Hold" },
     { label: "Completed", key: "completed", status: "Completed" },
 ] as const
@@ -311,7 +311,7 @@ export default function CategoryDetail({ params }: { params: Promise<{ id: strin
                                     <SectionTable
                                         key={section.key}
                                         label={section.label}
-                                        tasks={tasks.filter((task) => statusKey(task.status) === section.key).slice(0, 3)}
+                                        tasks={tasks.filter((task) => taskSection(task) === section.key).slice(0, 3)}
                                         viewMoreHref={`/task?categoryId=${resolvedParams.id}&status=${encodeURIComponent(section.status)}`}
                                     />
                                 ))}

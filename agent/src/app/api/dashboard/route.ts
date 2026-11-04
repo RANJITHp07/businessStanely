@@ -75,7 +75,7 @@ export async function GET(req: NextRequest) {
       },
       { 
         name: "In Progress", 
-        value: (taskStatusMap['inprogress'] || taskStatusMap['progress'] || 0) + (taskStatusMap['statuscheck&followup'] || 0), 
+        value: taskStatusMap['inprogress'] || taskStatusMap['progress'] || 0, 
         color: "#3b82f6" 
       },
       { 
@@ -106,7 +106,7 @@ export async function GET(req: NextRequest) {
       tasks: {
         total: totalTasks,
         pending: taskStatusMap['todo'] || taskStatusMap['pending'] || 0,
-        inProgress: (taskStatusMap['inprogress'] || taskStatusMap['progress'] || 0) + (taskStatusMap['statuscheck&followup'] || 0),
+        inProgress: taskStatusMap['inprogress'] || taskStatusMap['progress'] || 0,
         completed: taskStatusMap['completed'] || 0,
         overdue: taskStatusMap['overdue'] || 0,
         growth: -2.1, // You can calculate this based on historical data

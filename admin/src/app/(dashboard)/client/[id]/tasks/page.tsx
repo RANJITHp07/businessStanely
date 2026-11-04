@@ -43,6 +43,7 @@ import {
 } from "lucide-react";
 
 import { Task, Client } from "@/types";
+import { taskSection } from "@/lib/taskFollowUp";
 
 interface ClientLegislation {
   id: string;
@@ -60,7 +61,6 @@ function statusKey(s?: string) {
   const k = (s || "").toLowerCase().replace(/\s+/g, "");
   if (["todo", "pending"].includes(k)) return "todo";
   if (["inprogress", "progress"].includes(k)) return "inprogress";
-  if (k === "statuscheck&followup") return "followup";
   if (["completed"].includes(k)) return "completed";
   if (["hold"].includes(k)) return "hold";
   return k || "todo";
@@ -70,7 +70,7 @@ function sectionLabelToStatus(label: string) {
   const l = label.toLowerCase();
   if (l.includes("progress")) return "In Progress";
   if (l.includes("completed")) return "Completed";
-  if (l.includes("followup")) return "StatusCheck & Followup";
+  if (l.includes("followup")) return "Followups";
   if (l.includes("hold")) return "Hold";
   return "To Do";
 }
@@ -479,8 +479,8 @@ function TaskSections({
   // Optional "Future Tasks" section, shown under Completed.
   future?: { tasks: Task[]; viewMoreHref: string };
 }) {
-  const tasksNew = tasks.filter((t) => statusKey(t.status) === "todo");
-  const tasksInProgress = tasks.filter((t) => statusKey(t.status) === "inprogress");
+  const tasksNew = tasks.filter((t) => taskSection(t) === "todo");
+  const tasksInProgress = tasks.filter((t) => taskSection(t) === "inprogress");
   const tasksCompleted = tasks.filter((t) => statusKey(t.status) === "completed");
   const tasksHold = tasks.filter((t) => statusKey(t.status) === "hold");
 
@@ -493,9 +493,9 @@ function TaskSections({
         viewMoreHref={taskListHref("In Progress")}
       />
       <SectionTable
-        label="StatusCheck & Followup"
-        tasks={tasks.filter((t) => statusKey(t.status) === "followup").slice(0, 3)}
-        viewMoreHref={taskListHref("StatusCheck & Followup")}
+        label="Followups"
+        tasks={tasks.filter((t) => taskSection(t) === "followup").slice(0, 3)}
+        viewMoreHref={taskListHref("Followups")}
       />
       <SectionTable label="Hold" tasks={tasksHold.slice(0, 3)} viewMoreHref={taskListHref("Hold")} />
       {future && (
@@ -514,14 +514,41 @@ function TaskSections({
   );
 }
 
+const EMPTY_SUMMARY = {
+  /** The newest rows of each section, which is all the page lists. */
+  tasks: [] as Task[],
+  total: 0,
+  completed: 0,
+  inprogress: 0,
+  todo: 0,
+  overdue: 0,
+};
+
+function parseTaskSummary(data: {
+  sections?: Record<string, Task[]>;
+  counts?: { total?: number; completed?: number };
+  sectionCounts?: { inprogress?: number; todo?: number };
+  overdue?: number;
+}) {
+  return {
+    tasks: Object.values(data.sections ?? {}).flat(),
+    total: data.counts?.total ?? 0,
+    completed: data.counts?.completed ?? 0,
+    inprogress: data.sectionCounts?.inprogress ?? 0,
+    todo: data.sectionCounts?.todo ?? 0,
+    overdue: data.overdue ?? 0,
+  };
+}
+
 export default function ClientTasksPage() {
   const params = useParams();
   const id = params.id as string;
 
   const [client, setClient] = useState<Client | null>(null);
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [retainershipTasks, setRetainershipTasks] = useState<Task[]>([]);
+  const [taskSummary, setTaskSummary] = useState(EMPTY_SUMMARY);
+  const [retainershipSummary, setRetainershipSummary] = useState(EMPTY_SUMMARY);
   const [triggerTasks, setTriggerTasks] = useState<Task[]>([]);
+  const [triggerTotal, setTriggerTotal] = useState(0);
   const [standardFutureTasks, setStandardFutureTasks] = useState<Task[]>([]);
   const [legislations, setLegislations] = useState<ClientLegislation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -537,10 +564,10 @@ export default function ClientTasksPage() {
 
       const results = await Promise.allSettled([
         fetchWithAuth(`/api/clients/${id}`),
-        fetchWithAuth(`/api/tasks?clientId=${id}`),
-        fetchWithAuth(`/api/tasks?clientId=${id}&retainershipTasks=true`),
-        fetchWithAuth(`/api/tasks?clientId=${id}&trigger=true`),
-        fetchWithAuth(`/api/legislation?retainershipClientId=${id}&pageSize=100`),
+        fetchWithAuth(`/api/tasks?clientId=${id}&summary=true&limit=3`),
+        fetchWithAuth(`/api/tasks?clientId=${id}&retainershipTasks=true&summary=true&limit=3`),
+        fetchWithAuth(`/api/tasks?clientId=${id}&trigger=true&page=1&limit=3`),
+        fetchWithAuth(`/api/legislation?retainershipClientId=${id}&pageSize=100&lite=true`),
         fetchWithAuth(`/api/tasks?clientId=${id}&trigger=standard&page=1&limit=3`),
       ]);
       const [clientResult, tasksResult, retainershipResult, triggerResult, legislationResult, standardFutureResult] =
@@ -551,7 +578,7 @@ export default function ClientTasksPage() {
       }
 
       if (tasksResult.status === "fulfilled" && tasksResult.value.ok) {
-        setTasks(parseTaskResponse(await tasksResult.value.json()));
+        setTaskSummary(parseTaskSummary(await tasksResult.value.json()));
       } else if (tasksResult.status === "rejected") {
         console.error("Error fetching client tasks:", tasksResult.reason);
         setError("Failed to load tasks for this client.");
@@ -560,13 +587,15 @@ export default function ClientTasksPage() {
       }
 
       if (retainershipResult.status === "fulfilled" && retainershipResult.value.ok) {
-        setRetainershipTasks(parseTaskResponse(await retainershipResult.value.json()));
+        setRetainershipSummary(parseTaskSummary(await retainershipResult.value.json()));
       } else if (retainershipResult.status === "rejected") {
         console.error("Error fetching retainership tasks:", retainershipResult.reason);
       }
 
       if (triggerResult.status === "fulfilled" && triggerResult.value.ok) {
-        setTriggerTasks(parseTaskResponse(await triggerResult.value.json()));
+        const triggerData = await triggerResult.value.json();
+        setTriggerTasks(parseTaskResponse(triggerData));
+        setTriggerTotal(triggerData.total ?? 0);
       } else if (triggerResult.status === "rejected") {
         console.error("Error fetching future-trigger tasks:", triggerResult.reason);
       }
@@ -627,15 +656,8 @@ export default function ClientTasksPage() {
     );
   }
 
-  const completed = tasks.filter((t) => statusKey(t.status) === "completed").length;
-  const inprogress = tasks.filter((t) => statusKey(t.status) === "inprogress").length;
-  const todo = tasks.filter((t) => statusKey(t.status) === "todo").length;
-  const total = tasks.length;
+  const { total, completed, inprogress, todo, overdue } = taskSummary;
   const pct = (n: number) => (total ? Math.round((n / total) * 100) : 0);
-
-  const overdueTasks = tasks.filter(
-    (task) => task.dueDate && new Date(task.dueDate) < new Date() && statusKey(task.status) !== "completed",
-  );
 
   return (
     <section className="container mx-auto p-6 max-w-7xl space-y-8 overflow-x-hidden min-w-0">
@@ -756,7 +778,7 @@ export default function ClientTasksPage() {
         <StatCard title="Completed" value={completed} percent={pct(completed)} Icon={CheckCircle2} variant="completed" />
         <StatCard title="In Progress" value={inprogress} percent={pct(inprogress)} Icon={Loader2} variant="inprogress" />
         <StatCard title="Pending" value={todo} percent={pct(todo)} Icon={Clock} variant="pending" />
-        <StatCard title="Overdue" value={overdueTasks.length} percent={pct(overdueTasks.length)} Icon={AlertTriangle} variant="overdue" />
+        <StatCard title="Overdue" value={overdue} percent={pct(overdue)} Icon={AlertTriangle} variant="overdue" />
       </div>
 
       {/* Task Segmentation Tabs */}
@@ -765,15 +787,15 @@ export default function ClientTasksPage() {
           <TabsList className="grid h-auto min-w-max w-full grid-cols-4">
             <TabsTrigger value="standard" className="flex items-center gap-1 px-2 py-3 text-[10px] lg:text-sm whitespace-nowrap">
               <FileText className="h-4 w-4 hidden lg:block flex-shrink-0" />
-              Standard Tasks ({tasks.length})
+              Standard Tasks ({total})
             </TabsTrigger>
             <TabsTrigger value="retainership" className="flex items-center gap-1 px-2 py-3 text-[10px] lg:text-sm whitespace-nowrap">
               <CheckCircle className="h-4 w-4 hidden lg:block flex-shrink-0" />
-              Retainership Tasks ({retainershipTasks.length})
+              Retainership Tasks ({retainershipSummary.total})
             </TabsTrigger>
             <TabsTrigger value="triggers" className="flex items-center gap-1 px-2 py-3 text-[10px] lg:text-sm whitespace-nowrap">
               <Clock className="h-4 w-4 hidden lg:block flex-shrink-0" />
-              Future Triggers ({triggerTasks.length})
+              Future Triggers ({triggerTotal})
             </TabsTrigger>
             <TabsTrigger value="legislation" className="flex items-center gap-1 px-2 py-3 text-[10px] lg:text-sm whitespace-nowrap">
               <Gavel className="h-4 w-4 hidden lg:block flex-shrink-0" />
@@ -783,7 +805,7 @@ export default function ClientTasksPage() {
         </div>
 
         <TabsContent value="standard" className="space-y-6">
-          {tasks.length === 0 && standardFutureTasks.length === 0 ? (
+          {total === 0 && standardFutureTasks.length === 0 ? (
             <Card>
               <CardContent className="text-center py-8 text-muted-foreground">
                 No standard tasks found for this client.
@@ -791,7 +813,7 @@ export default function ClientTasksPage() {
             </Card>
           ) : (
             <TaskSections
-              tasks={tasks}
+              tasks={taskSummary.tasks}
               taskListHref={(label) =>
                 `/task?clientId=${id}&status=${encodeURIComponent(sectionLabelToStatus(label))}`
               }
@@ -804,7 +826,7 @@ export default function ClientTasksPage() {
         </TabsContent>
 
         <TabsContent value="retainership" className="space-y-6">
-          {retainershipTasks.length === 0 ? (
+          {retainershipSummary.total === 0 ? (
             <Card>
               <CardContent className="text-center py-8 text-muted-foreground">
                 No retainership tasks found for this client.
@@ -812,7 +834,7 @@ export default function ClientTasksPage() {
             </Card>
           ) : (
             <TaskSections
-              tasks={retainershipTasks}
+              tasks={retainershipSummary.tasks}
               taskListHref={(label) =>
                 `/task?clientId=${id}&retainershipTasks=true&status=${encodeURIComponent(sectionLabelToStatus(label))}`
               }

@@ -19,6 +19,17 @@ interface MissingAgentRow {
     email: string
     tracked: number
     inProgress: number
+    retainershipTracked: number
+    retainershipInProgress: number
+}
+
+function TrackedBadge({ tracked, total }: { tracked: number; total: number }) {
+    if (total === 0) return <span className="text-muted-foreground">-</span>
+    return (
+        <Badge variant={tracked === total ? "secondary" : "destructive"}>
+            {tracked}/{total}
+        </Badge>
+    )
 }
 
 interface DailyTrackerResponse {
@@ -26,6 +37,8 @@ interface DailyTrackerResponse {
     agents: MissingAgentRow[]
     totalTracked: number
     totalInProgress: number
+    totalRetainershipTracked: number
+    totalRetainershipInProgress: number
 }
 
 export default function DailyTrackerPage() {
@@ -87,7 +100,7 @@ export default function DailyTrackerPage() {
                     </CardTitle>
                     <CardDescription>
                         {data
-                            ? `${data.totalTracked} of ${data.totalInProgress} In Progress task(s) have a day track. Click an agent to see the tasks.`
+                            ? `${data.totalTracked} of ${data.totalInProgress} In Progress task(s) and ${data.totalRetainershipTracked} of ${data.totalRetainershipInProgress} retainership task(s) have a day track. Click an agent to see the tasks.`
                             : "Click an agent to see the tasks."}
                     </CardDescription>
                 </CardHeader>
@@ -104,13 +117,14 @@ export default function DailyTrackerPage() {
                                 <TableHeader>
                                     <TableRow>
                                         <TableHead>Agent</TableHead>
-                                        <TableHead className="text-right">Status</TableHead>
+                                        <TableHead className="text-right">Tasks</TableHead>
+                                        <TableHead className="text-right">Retainership</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
                                     {!data || data.agents.length === 0 ? (
                                         <TableRow>
-                                            <TableCell colSpan={2} className="text-center py-8 text-muted-foreground">
+                                            <TableCell colSpan={3} className="text-center py-8 text-muted-foreground">
                                                 No agents have In Progress tasks for this date.
                                             </TableCell>
                                         </TableRow>
@@ -139,9 +153,10 @@ export default function DailyTrackerPage() {
                                                     </div>
                                                 </TableCell>
                                                 <TableCell className="text-right">
-                                                    <Badge variant={agent.tracked === agent.inProgress ? "secondary" : "destructive"}>
-                                                        {agent.tracked}/{agent.inProgress}
-                                                    </Badge>
+                                                    <TrackedBadge tracked={agent.tracked} total={agent.inProgress} />
+                                                </TableCell>
+                                                <TableCell className="text-right">
+                                                    <TrackedBadge tracked={agent.retainershipTracked} total={agent.retainershipInProgress} />
                                                 </TableCell>
                                             </TableRow>
                                         ))

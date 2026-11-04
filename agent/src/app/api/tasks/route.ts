@@ -4,10 +4,13 @@ import { getCurrentAgent } from "@/lib/auth";
 import { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import {
+  SUMMARY_ROW_SELECT,
   SUMMARY_STATUS_SECTIONS,
-  buildStatusCounts,
+  summarizeTaskRows,
 } from "@/lib/taskSummary";
-import { isFollowUpDuration, FOLLOW_UP_STATUS } from "@/lib/taskFollowUp";
+import { followUpTimer, statusFilterWhere } from "@/lib/taskFollowUp";
+import { expireFollowUps } from "@/lib/followUpExpiry";
+import { approvedOrNoCategoryConditions } from "@/lib/taskCategoryFilter";
 
 interface TaskWithAdditionalFields {
   progress?: number | null;
@@ -35,9 +38,9 @@ const SUMMARY_TASK_INCLUDE = {
       email: true,
     },
   },
-  ownerShipBy: true,
-  assignedTo: true,
-  category: true,
+  ownerShipBy: { select: { id: true, name: true, agentType: true, status: true } },
+  assignedTo: { select: { id: true, name: true, agentType: true, status: true } },
+  category: { select: { id: true, name: true, status: true } },
 } satisfies Prisma.TaskInclude;
 
 type SummaryTask = Prisma.TaskGetPayload<{
@@ -72,11 +75,13 @@ function formatSummaryTask(task: SummaryTask) {
     assignedTo: task.assignedTo,
     followUpDuration: task.followUpDuration,
     statusCheckDuration: task.statusCheckDuration,
+    active: task.active,
   };
 }
 
 export async function GET(req: NextRequest) {
   try {
+    await expireFollowUps();
     const agent = await getCurrentAgent(req);
 
     if (!agent) {
@@ -202,8 +207,7 @@ export async function GET(req: NextRequest) {
         AND: [
           {
             OR: [
-              { category: null },
-              { category: { status: "approved" } },
+              ...(await approvedOrNoCategoryConditions()),
               { legislationId: { not: null } },
             ],
           },
@@ -217,15 +221,13 @@ export async function GET(req: NextRequest) {
         assignedToId,
         legislationId: null,
         AND: [
-          { OR: [{ category: null }, { category: { status: "approved" } }] },
+          { OR: await approvedOrNoCategoryConditions() },
         ],
       };
     }
 
     // OPTIONAL FILTERS
-    if (status) {
-      where.status = status;
-    } else if (retainershipTasks === "true") {
+    if (!status && retainershipTasks === "true") {
       where.status = { notIn: ["Completed", "completed"] };
     }
 
@@ -263,6 +265,8 @@ export async function GET(req: NextRequest) {
 
       where.AND = [currentAnd, filter];
     };
+
+    if (status) appendAndFilter(statusFilterWhere(status, !!followUpDurationsParam));
 
     if (
       clientUpdateFilter === "updated" ||
@@ -371,30 +375,52 @@ export async function GET(req: NextRequest) {
         50,
       );
 
-      const [groups, sections] = await Promise.all([
-        prisma.task.groupBy({
-          by: ["status"],
-          where: finalWhere,
-          _count: { _all: true },
-        }),
-        Promise.all(
-          SUMMARY_STATUS_SECTIONS.map(async ({ key, statuses }) => ({
-            key,
-            tasks: await prisma.task.findMany({
-              where: { ...finalWhere, status: { in: [...statuses] } },
-              include: SUMMARY_TASK_INCLUDE,
-              orderBy: { createdAt: "desc" },
-              take: limit,
-            }),
-          })),
-        ),
-      ]);
+      const rows = await prisma.task.findMany({
+        where: finalWhere,
+        select: SUMMARY_ROW_SELECT,
+        orderBy: { createdAt: "desc" },
+      });
+      const { counts, sectionById } = summarizeTaskRows(rows, limit);
+      const tasks = await prisma.task.findMany({
+        where: { id: { in: Array.from(sectionById.keys()) } },
+        include: SUMMARY_TASK_INCLUDE,
+        orderBy: { createdAt: "desc" },
+      });
 
       return NextResponse.json({
-        counts: buildStatusCounts(groups),
+        counts,
         sections: Object.fromEntries(
-          sections.map((s) => [s.key, s.tasks.map(formatSummaryTask)]),
+          SUMMARY_STATUS_SECTIONS.map(({ key }) => [
+            key,
+            tasks
+              .filter((task) => sectionById.get(task.id) === key)
+              .map(formatSummaryTask),
+          ]),
         ),
+      });
+    }
+
+    // Lite mode: the same rows without comments and the other heavy relations,
+    // for lists that only render table columns. `limit` optionally caps the rows.
+    if (searchParams.get("lite") === "true") {
+      const limit = parseInt(searchParams.get("limit") || "", 10);
+      const tasks = await prisma.task.findMany({
+        where: finalWhere,
+        include: SUMMARY_TASK_INCLUDE,
+        orderBy: { createdAt: "desc" },
+        ...(limit > 0 ? { take: limit } : {}),
+      });
+
+      return NextResponse.json({
+        tasks: tasks.map((task) => ({
+          ...formatSummaryTask(task),
+          progress: task.progress,
+          recurring: task.recurring,
+          recurringType: task.recurringType,
+          triggerDate: task.triggerDate,
+          nextDueDate: task.nextDueDate,
+          currentPeriodStart: task.currentPeriodStart,
+        })),
       });
     }
 
@@ -468,6 +494,7 @@ export async function GET(req: NextRequest) {
       commentsCount: task.comments.length,
       recentComments: task.comments,
       followUpDuration: task.followUpDuration,
+      active: task.active,
       statusCheckDuration: task.statusCheckDuration,
       legislation: task.legislation,
     }));
@@ -483,8 +510,6 @@ export async function GET(req: NextRequest) {
       { error: "Internal server error" },
       { status: 500 },
     );
-  } finally {
-    await prisma.$disconnect();
   }
 }
 
@@ -578,10 +603,8 @@ export async function POST(req: NextRequest) {
         title,
         ownerShipId: agent.id,
         description: description || null,
-        status:
-          active !== false && isFollowUpDuration(followUpDuration)
-            ? FOLLOW_UP_STATUS
-            : status || "To Do",
+        status: status || "To Do",
+        ...followUpTimer({}, { status: status || "To Do", followUpDuration, active }),
         priority: priority || "Medium",
         dueDate: taskDueDate,
         triggerDate: taskTriggerDate, // Save triggerDate
@@ -717,7 +740,5 @@ export async function POST(req: NextRequest) {
       { error: "Internal server error" },
       { status: 500 },
     );
-  } finally {
-    await prisma.$disconnect();
   }
 }

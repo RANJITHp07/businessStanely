@@ -135,7 +135,7 @@ export default function DeletedAgentTable({
   useEffect(() => {
     const fetchAgents = async () => {
       try {
-        const response = await fetchWithAuth("/api/agents?status=inactive");
+        const response = await fetchWithAuth("/api/agents?view=table&status=inactive");
         if (response.ok) {
           const data = await response.json();
           const rows = data.filter((agent: Agent) => config.hasRole(agent.agentRole));
@@ -161,11 +161,7 @@ export default function DeletedAgentTable({
     const displayEmail = sanitizeInactiveAgentEmail(agent.email);
     const matchesSearch =
       agent.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      displayEmail.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      agent.specializations
-        .join(", ")
-        .toLowerCase()
-        .includes(searchTerm.toLowerCase());
+      displayEmail.toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesType =
       selectedType === "All Types" || config.typeOf(agent) === selectedType;
@@ -231,7 +227,6 @@ export default function DeletedAgentTable({
                   <TableRow isHeader>
                     <TableHead className="text-xs sm:text-sm">Agent</TableHead>
                     <TableHead className="text-xs sm:text-sm">Type</TableHead>
-                    <TableHead className="text-xs sm:text-sm">Specializations</TableHead>
                     <TableHead className="text-xs sm:text-sm">Jurisdiction</TableHead>
                     <TableHead className="text-xs sm:text-sm text-right">Actions</TableHead>
                   </TableRow>
@@ -241,7 +236,7 @@ export default function DeletedAgentTable({
                   {currentAgents.length === 0 ? (
                     <TableRow>
                       <TableCell
-                        colSpan={5}
+                        colSpan={4}
                         className="text-center py-8 text-sm text-muted-foreground"
                       >
                         No deleted agents found matching your criteria.
@@ -271,20 +266,6 @@ export default function DeletedAgentTable({
                           </div>
                         </TableCell>
                         <TableCell>{getAgentTypeBadge(config.typeOf(agent))}</TableCell>
-                        <TableCell>
-                          <div className="flex flex-wrap gap-1">
-                            {agent.specializations.slice(0, 2).map((spec) => (
-                              <Badge key={spec} variant="outline" className="text-xs">
-                                {spec}
-                              </Badge>
-                            ))}
-                            {agent.specializations.length > 2 && (
-                              <Badge variant="outline" className="text-xs">
-                                +{agent.specializations.length - 2}
-                              </Badge>
-                            )}
-                          </div>
-                        </TableCell>
                         <TableCell className="text-sm">{agent.jurisdiction}</TableCell>
                         <TableCell
                           className="text-right"
@@ -326,7 +307,6 @@ export default function DeletedAgentTable({
                   <TableRow isHeader>
                     <TableHead className="text-xs">Agent</TableHead>
                     <TableHead className="text-xs">Type</TableHead>
-                    <TableHead className="text-xs">Specializations</TableHead>
                     <TableHead className="text-xs text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -335,7 +315,7 @@ export default function DeletedAgentTable({
                   {currentAgents.length === 0 ? (
                     <TableRow>
                       <TableCell
-                        colSpan={4}
+                        colSpan={3}
                         className="text-center py-8 text-xs text-muted-foreground"
                       >
                         No deleted agents found matching your criteria.
@@ -365,20 +345,6 @@ export default function DeletedAgentTable({
                           </div>
                         </TableCell>
                         <TableCell className="text-xs">{getAgentTypeBadge(config.typeOf(agent))}</TableCell>
-                        <TableCell>
-                          <div className="flex flex-wrap gap-0.5">
-                            {agent.specializations.slice(0, 1).map((spec) => (
-                              <Badge key={spec} variant="outline" className="text-xs">
-                                {spec}
-                              </Badge>
-                            ))}
-                            {agent.specializations.length > 1 && (
-                              <Badge variant="outline" className="text-xs">
-                                +{agent.specializations.length - 1}
-                              </Badge>
-                            )}
-                          </div>
-                        </TableCell>
                         <TableCell
                           className="text-right"
                           onClick={(e) => e.stopPropagation()}

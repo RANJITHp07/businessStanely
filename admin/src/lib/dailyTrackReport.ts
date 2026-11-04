@@ -17,10 +17,19 @@ export interface DailyTrackTask {
   title: string;
   dueDate: Date | null;
   clientName: string;
+  /** Linked to a retainership or legislation, the same test the task page uses. */
+  isRetainership: boolean;
   agent: DailyTrackAgent;
   /** The assignee's note for the day, or null when they have not tracked it. */
   note: { content: string; createdAt: Date; updatedAt: Date } | null;
 }
+
+const CLIENT_NAME_SELECT = {
+  clientType: true,
+  firstName: true,
+  lastName: true,
+  organizationName: true,
+} as const;
 
 /**
  * Every In Progress task with its assigned agent's day track note for the IST
@@ -45,13 +54,15 @@ export async function buildDailyTrackReport(dateKey: string, agentId?: string) {
       id: true,
       title: true,
       dueDate: true,
+      legislationId: true,
+      retainershipId: true,
       assignedTo: { select: { id: true, name: true, email: true, status: true } },
-      client: {
+      client: { select: CLIENT_NAME_SELECT },
+      // Retainership tasks may carry no clientId of their own.
+      retainership: { select: { client: { select: CLIENT_NAME_SELECT } } },
+      legislation: {
         select: {
-          clientType: true,
-          firstName: true,
-          lastName: true,
-          organizationName: true,
+          retainership: { select: { client: { select: CLIENT_NAME_SELECT } } },
         },
       },
     },
@@ -85,7 +96,8 @@ export async function buildDailyTrackReport(dateKey: string, agentId?: string) {
     const { id, name, email } = t.assignedTo!;
     agents.set(id, { id, name, email });
 
-    const c = t.client;
+    const c =
+      t.client ?? t.retainership?.client ?? t.legislation?.retainership?.client;
     const clientName = c
       ? c.clientType?.toLowerCase() === "individual"
         ? `${c.firstName ?? ""} ${c.lastName ?? ""}`.trim()
@@ -97,6 +109,7 @@ export async function buildDailyTrackReport(dateKey: string, agentId?: string) {
       title: t.title,
       dueDate: t.dueDate,
       clientName,
+      isRetainership: !!(t.legislationId || t.retainershipId),
       agent: { id, name, email },
       note: note
         ? {

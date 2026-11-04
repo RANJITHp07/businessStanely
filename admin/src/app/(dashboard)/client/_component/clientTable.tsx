@@ -167,7 +167,7 @@ export default function ClientsTable({
     useEffect(() => {
         const fetchClients = async () => {
             try {
-                const response = await fetch('/api/clients');
+                const response = await fetch('/api/clients?view=table');
                 if (response.ok) {
                     const data = await response.json();
                     setClients(data);
@@ -278,7 +278,7 @@ export default function ClientsTable({
         // A transfer changes task counts on both clients, so the cached rows are
         // stale even though nothing was removed.
         try {
-            const response = await fetch('/api/clients');
+            const response = await fetch('/api/clients?view=table');
             if (response.ok) {
                 setClients(await response.json());
             }

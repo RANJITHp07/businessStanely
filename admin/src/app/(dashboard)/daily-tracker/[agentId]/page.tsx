@@ -20,6 +20,7 @@ interface TrackerTask {
     title: string
     dueDate: string | null
     clientName: string
+    isRetainership: boolean
 }
 
 interface CompletedTask extends TrackerTask {
@@ -43,6 +44,119 @@ function formatDate(value: string | null) {
     const d = new Date(value)
     if (isNaN(d.getTime())) return "-"
     return d.toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "Asia/Kolkata" })
+}
+
+function CompletedTable({
+    pages,
+    emptyText,
+}: {
+    pages: ReturnType<typeof usePagination<CompletedTask>>
+    emptyText: string
+}) {
+    const router = useRouter()
+    return (
+        <div className="rounded-md border overflow-x-auto">
+            <Table>
+                <TableHeader>
+                    <TableRow>
+                        <TableHead>Task</TableHead>
+                        <TableHead>Client</TableHead>
+                        <TableHead>Due Date</TableHead>
+                        <TableHead>Comment</TableHead>
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    {pages.total === 0 ? (
+                        <TableRow>
+                            <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                                {emptyText}
+                            </TableCell>
+                        </TableRow>
+                    ) : (
+                        pages.pageRows.map((task) => (
+                            <TableRow
+                                key={task.id}
+                                className="cursor-pointer hover:bg-muted/50"
+                                onClick={() => router.push(`/task/${task.id}`)}
+                            >
+                                <TableCell className="font-medium max-w-64 truncate">{task.title}</TableCell>
+                                <TableCell className="max-w-48 truncate">{task.clientName || "-"}</TableCell>
+                                <TableCell>{formatDate(task.dueDate)}</TableCell>
+                                <TableCell className="max-w-72">
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <p className="truncate">{task.note.content}</p>
+                                        </TooltipTrigger>
+                                        <TooltipContent className="max-w-md whitespace-pre-wrap">
+                                            {task.note.content}
+                                        </TooltipContent>
+                                    </Tooltip>
+                                </TableCell>
+                            </TableRow>
+                        ))
+                    )}
+                </TableBody>
+            </Table>
+            <div className="px-4">
+                <TablePagination {...pages} />
+            </div>
+        </div>
+    )
+}
+
+function NotCompletedTable({
+    pages,
+    emptyText,
+}: {
+    pages: ReturnType<typeof usePagination<NotCompletedTask>>
+    emptyText: string
+}) {
+    const router = useRouter()
+    return (
+        <div className="rounded-md border overflow-x-auto">
+            <Table>
+                <TableHeader>
+                    <TableRow>
+                        <TableHead>Task</TableHead>
+                        <TableHead>Client</TableHead>
+                        <TableHead>Due Date</TableHead>
+                        <TableHead>Last day track</TableHead>
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    {pages.total === 0 ? (
+                        <TableRow>
+                            <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
+                                {emptyText}
+                            </TableCell>
+                        </TableRow>
+                    ) : (
+                        pages.pageRows.map((task) => (
+                            <TableRow
+                                key={task.id}
+                                className="cursor-pointer hover:bg-muted/50"
+                                onClick={() => router.push(`/task/${task.id}`)}
+                            >
+                                <TableCell className="font-medium max-w-64 truncate">{task.title}</TableCell>
+                                <TableCell className="max-w-48 truncate">{task.clientName || "-"}</TableCell>
+                                <TableCell>{formatDate(task.dueDate)}</TableCell>
+                                <TableCell>
+                                    {task.lastTrackedAt ? (
+                                        formatDate(task.lastTrackedAt)
+                                    ) : (
+                                        <span className="text-muted-foreground">Never</span>
+                                    )}
+                                </TableCell>
+                            </TableRow>
+                        ))
+                    )}
+                </TableBody>
+            </Table>
+            <div className="px-4">
+                <TablePagination {...pages} />
+            </div>
+        </div>
+    )
 }
 
 export default function AgentDailyTrackerPage() {
@@ -75,8 +189,20 @@ export default function AgentDailyTrackerPage() {
         }
     }, [agentId, date])
 
-    const completedPages = usePagination(data?.completed ?? [], date)
-    const notCompletedPages = usePagination(data?.notCompleted ?? [], date)
+    const completed = data?.completed ?? []
+    const notCompleted = data?.notCompleted ?? []
+    const completedNormal = completed.filter((t) => !t.isRetainership)
+    const completedRetainership = completed.filter((t) => t.isRetainership)
+    const notCompletedNormal = notCompleted.filter((t) => !t.isRetainership)
+    const notCompletedRetainership = notCompleted.filter((t) => t.isRetainership)
+
+    const completedNormalPages = usePagination(completedNormal, date)
+    const completedRetainershipPages = usePagination(completedRetainership, date)
+    const notCompletedNormalPages = usePagination(notCompletedNormal, date)
+    const notCompletedRetainershipPages = usePagination(notCompletedRetainership, date)
+
+    // Shared by both tabs, so switching Completed / Not Completed keeps the choice.
+    const [taskKind, setTaskKind] = useState<"normal" | "retainership">("normal")
 
     const setDate = (value: string) => {
         if (value) router.replace(`/daily-tracker/${agentId}?date=${value}`)
@@ -112,7 +238,7 @@ export default function AgentDailyTrackerPage() {
                     </CardTitle>
                     <CardDescription>
                         {data
-                            ? `${data.completed.length} of ${data.inProgress} In Progress task(s) have a day track for ${formatDate(data.date)}.`
+                            ? `${completedNormal.length} of ${completedNormal.length + notCompletedNormal.length} normal and ${completedRetainership.length} of ${completedRetainership.length + notCompletedRetainership.length} retainership In Progress task(s) have a day track for ${formatDate(data.date)}.`
                             : "Day track status of In Progress tasks for the selected date."}
                     </CardDescription>
                 </CardHeader>
@@ -127,106 +253,41 @@ export default function AgentDailyTrackerPage() {
                         <Tabs defaultValue="notCompleted" className="space-y-4">
                             <TabsList className="grid w-full max-w-md grid-cols-2">
                                 <TabsTrigger value="completed">
-                                    Completed ({data?.completed.length ?? 0})
+                                    Completed ({completed.length})
                                 </TabsTrigger>
                                 <TabsTrigger value="notCompleted">
-                                    Not Completed ({data?.notCompleted.length ?? 0})
+                                    Not Completed ({notCompleted.length})
                                 </TabsTrigger>
                             </TabsList>
 
                             <TabsContent value="completed">
-                                <div className="rounded-md border overflow-x-auto">
-                                    <Table>
-                                        <TableHeader>
-                                            <TableRow>
-                                                <TableHead>Task</TableHead>
-                                                <TableHead>Client</TableHead>
-                                                <TableHead>Due Date</TableHead>
-                                                <TableHead>Comment</TableHead>
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                            {completedPages.total === 0 ? (
-                                                <TableRow>
-                                                    <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
-                                                        No tasks have a day track for this date.
-                                                    </TableCell>
-                                                </TableRow>
-                                            ) : (
-                                                completedPages.pageRows.map((task) => (
-                                                    <TableRow
-                                                        key={task.id}
-                                                        className="cursor-pointer hover:bg-muted/50"
-                                                        onClick={() => router.push(`/task/${task.id}`)}
-                                                    >
-                                                        <TableCell className="font-medium max-w-64 truncate">{task.title}</TableCell>
-                                                        <TableCell className="max-w-48 truncate">{task.clientName || "-"}</TableCell>
-                                                        <TableCell>{formatDate(task.dueDate)}</TableCell>
-                                                        <TableCell className="max-w-72">
-                                                            <Tooltip>
-                                                                <TooltipTrigger asChild>
-                                                                    <p className="truncate">{task.note.content}</p>
-                                                                </TooltipTrigger>
-                                                                <TooltipContent className="max-w-md whitespace-pre-wrap">
-                                                                    {task.note.content}
-                                                                </TooltipContent>
-                                                            </Tooltip>
-                                                        </TableCell>
-                                                    </TableRow>
-                                                ))
-                                            )}
-                                        </TableBody>
-                                    </Table>
-                                    <div className="px-4">
-                                        <TablePagination {...completedPages} />
-                                    </div>
-                                </div>
+                                <Tabs value={taskKind} onValueChange={(v) => setTaskKind(v as "normal" | "retainership")} className="space-y-4">
+                                    <TabsList className="grid w-full max-w-md grid-cols-2">
+                                        <TabsTrigger value="normal">Normal Tasks ({completedNormal.length})</TabsTrigger>
+                                        <TabsTrigger value="retainership">Retainership ({completedRetainership.length})</TabsTrigger>
+                                    </TabsList>
+                                    <TabsContent value="normal">
+                                        <CompletedTable pages={completedNormalPages} emptyText="No normal tasks have a day track for this date." />
+                                    </TabsContent>
+                                    <TabsContent value="retainership">
+                                        <CompletedTable pages={completedRetainershipPages} emptyText="No retainership tasks have a day track for this date." />
+                                    </TabsContent>
+                                </Tabs>
                             </TabsContent>
 
                             <TabsContent value="notCompleted">
-                                <div className="rounded-md border overflow-x-auto">
-                                    <Table>
-                                        <TableHeader>
-                                            <TableRow>
-                                                <TableHead>Task</TableHead>
-                                                <TableHead>Client</TableHead>
-                                                <TableHead>Due Date</TableHead>
-                                                <TableHead>Last day track</TableHead>
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                            {notCompletedPages.total === 0 ? (
-                                                <TableRow>
-                                                    <TableCell colSpan={4} className="text-center py-8 text-muted-foreground">
-                                                        All In Progress tasks have a day track for this date.
-                                                    </TableCell>
-                                                </TableRow>
-                                            ) : (
-                                                notCompletedPages.pageRows.map((task) => (
-                                                    <TableRow
-                                                        key={task.id}
-                                                        className="cursor-pointer hover:bg-muted/50"
-                                                        onClick={() => router.push(`/task/${task.id}`)}
-                                                    >
-                                                        <TableCell className="font-medium max-w-64 truncate">{task.title}</TableCell>
-                                                        <TableCell className="max-w-48 truncate">{task.clientName || "-"}</TableCell>
-                                                        <TableCell>{formatDate(task.dueDate)}</TableCell>
-                                                        <TableCell>
-                                                            {task.lastTrackedAt ? (
-                                                                formatDate(task.lastTrackedAt)
-                                                            ) : (
-                                                                <span className="text-muted-foreground">Never</span>
-                                                            )}
-                                                        </TableCell>
-                                                    </TableRow>
-                                                ))
-                                            )}
-                                        </TableBody>
-                                    </Table>
-                                    <div className="px-4">
-                                        <TablePagination {...notCompletedPages} />
-                                    </div>
-                                </div>
+                                <Tabs value={taskKind} onValueChange={(v) => setTaskKind(v as "normal" | "retainership")} className="space-y-4">
+                                    <TabsList className="grid w-full max-w-md grid-cols-2">
+                                        <TabsTrigger value="normal">Normal Tasks ({notCompletedNormal.length})</TabsTrigger>
+                                        <TabsTrigger value="retainership">Retainership ({notCompletedRetainership.length})</TabsTrigger>
+                                    </TabsList>
+                                    <TabsContent value="normal">
+                                        <NotCompletedTable pages={notCompletedNormalPages} emptyText="All normal In Progress tasks have a day track for this date." />
+                                    </TabsContent>
+                                    <TabsContent value="retainership">
+                                        <NotCompletedTable pages={notCompletedRetainershipPages} emptyText="All retainership In Progress tasks have a day track for this date." />
+                                    </TabsContent>
+                                </Tabs>
                             </TabsContent>
                         </Tabs>
                     )}

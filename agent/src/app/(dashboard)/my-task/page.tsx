@@ -52,7 +52,6 @@ export function statusKey(s?: string) {
   const k = (s || "").toLowerCase().replace(/\s+/g, "");
   if (["todo", "pending"].includes(k)) return "todo";
   if (["inprogress", "progress"].includes(k)) return "inprogress";
-  if (k === "statuscheck&followup") return "followup";
   if (["completed"].includes(k)) return "completed";
   return k || "todo";
 }
@@ -61,7 +60,7 @@ function sectionLabelToStatus(label: string) {
   const l = label.toLowerCase();
   if (l.includes("progress")) return "In Progress";
   if (l.includes("completed")) return "Completed";
-  if (l.includes("followup")) return "StatusCheck & Followup";
+  if (l.includes("followup")) return "Followups";
   if (l.includes("hold")) return "Hold";
   // default for New Task / todo
   return "To Do";
@@ -265,7 +264,6 @@ export function SectionTable({ label, tasks, retainershipTasks, trigger, trigger
                           const k = statusKey(t.status);
                           if (k === "completed") return "Completed";
                           if (k === "inprogress") return "In Progress";
-                          if (k === "followup") return "StatusCheck & Followup";
                           if (k === "hold") return "Hold";
                           return "To Do";
                         })();
@@ -650,29 +648,42 @@ export default function MyTasksPage() {
   const canCreateTask = currentAgent?.canCreateTask !== false;
 
   useEffect(() => {
+    // The future list is supplementary: it loads on its own so the status
+    // sections never wait for it, and a failure here cannot blank them.
+    const loadFuture = async (agentId: string) => {
+      try {
+        // A completed recurring standard task drops out of every status
+        // section until the cron rolls it over, so the agent had no way to see
+        // when it comes back. `scope=standard` returns exactly those upcoming
+        // occurrences (no legislation, no retainership) for the Future Tasks
+        // section.
+        const res = await fetchWithAuth(
+          `/api/tasks?trigger=true&scope=standard&lite=true&limit=${SECTION_LIMIT}&assignedToId=${encodeURIComponent(
+            agentId
+          )}`,
+          { silent401: true }
+        );
+        const data = res.ok ? await res.json() : null;
+        setFutureTasks(data?.tasks ?? []);
+      } catch (e) {
+        console.error(e);
+        setFutureTasks([]);
+      }
+    };
+
     const load = async () => {
       if (!agent) {
         setSections({});
         setLoading(false);
         return;
       }
+      loadFuture(agent.id);
       try {
-        const url = `/api/tasks?summary=true&limit=${SECTION_LIMIT}&assignedToId=${encodeURIComponent(
-          agent.id
-        )}`;
-        // A completed recurring standard task drops out of every status
-        // section until the cron rolls it over, so the agent had no way to see
-        // when it comes back. `scope=standard` returns exactly those upcoming
-        // occurrences (no legislation, no retainership) for the Future Tasks
-        // section.
-        const futureUrl = `/api/tasks?trigger=true&scope=standard&assignedToId=${encodeURIComponent(
-          agent.id
-        )}`;
-
-        const [res, futureRes] = await Promise.all([
-          fetchWithAuth(url),
-          fetchWithAuth(futureUrl, { silent401: true }),
-        ]);
+        const res = await fetchWithAuth(
+          `/api/tasks?summary=true&limit=${SECTION_LIMIT}&assignedToId=${encodeURIComponent(
+            agent.id
+          )}`
+        );
         if (!res.ok) throw new Error("Failed to fetch tasks");
         const data = await res.json();
         setSections(data.sections ?? {});
@@ -684,22 +695,9 @@ export default function MyTasksPage() {
             todo: 0,
           }
         );
-
-        // The future list is supplementary: a failure there must not blank out
-        // the status sections the page is actually for.
-        if (futureRes.ok) {
-          const futureData = await futureRes.json();
-          const upcoming = (futureData.tasks ?? []).filter(
-            (t: Task) => !!t.triggerDate
-          );
-          setFutureTasks(upcoming);
-        } else {
-          setFutureTasks([]);
-        }
       } catch (e) {
         console.error(e);
         setSections({});
-        setFutureTasks([]);
       } finally {
         setLoading(false);
       }
@@ -782,7 +780,7 @@ export default function MyTasksPage() {
         <div className="space-y-[40px]">
           <SectionTable label="New Task" tasks={tasksNew} />
           <SectionTable label="In Progress" tasks={tasksInProgress} />
-          <SectionTable label="StatusCheck & Followup" tasks={sections.followup ?? []} />
+          <SectionTable label="Followups" tasks={sections.followup ?? []} />
           <SectionTable label="Hold" tasks={tasksHold} />
           {futureTasks.length > 0 && (
             <SectionTable

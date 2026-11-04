@@ -62,6 +62,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { SectionTable, statusKey } from "../my-task/page"
 import { countOverdue, countPendingTriggers, countRunning } from "@/lib/taskCounts"
 import { useTablePage } from "@/hooks/useTablePage"
+import { taskSection } from "@/lib/taskFollowUp";
 
 
 // Updated the `DashboardRetainership` interface to include client details
@@ -652,17 +653,17 @@ export default function RetainershipTable() {
                             <div className="space-y-3">
                                 <SectionTable
                                     label="New Task"
-                                    tasks={myRetainerships.filter((t) => ["todo"].includes(statusKey(t.status))).slice(0, 3)}
+                                    tasks={myRetainerships.filter((t) => taskSection(t) === "todo").slice(0, 3)}
                                     retainershipTasks={true}
                                 />
                                 <SectionTable
                                     label="In Progress"
-                                    tasks={myRetainerships.filter((t) => ["inprogress"].includes(statusKey(t.status))).slice(0, 3)}
+                                    tasks={myRetainerships.filter((t) => taskSection(t) === "inprogress").slice(0, 3)}
                                     retainershipTasks={true}
                                 />
                                 <SectionTable
-                                    label="StatusCheck & Followup"
-                                    tasks={myRetainerships.filter((t) => ["followup"].includes(statusKey(t.status))).slice(0, 3)}
+                                    label="Followups"
+                                    tasks={myRetainerships.filter((t) => taskSection(t) === "followup").slice(0, 3)}
                                     retainershipTasks={true}
                                 />
                                 <SectionTable
@@ -703,17 +704,17 @@ export default function RetainershipTable() {
                             <div className="space-y-3">
                                 <SectionTable
                                     label="New Task"
-                                    tasks={teamRetainerships.filter((t) => ["todo"].includes(statusKey(t.status))).slice(0, 3)}
+                                    tasks={teamRetainerships.filter((t) => taskSection(t) === "todo").slice(0, 3)}
                                     retainershipTasks={true}
                                 />
                                 <SectionTable
                                     label="In Progress"
-                                    tasks={teamRetainerships.filter((t) => ["inprogress"].includes(statusKey(t.status))).slice(0, 3)}
+                                    tasks={teamRetainerships.filter((t) => taskSection(t) === "inprogress").slice(0, 3)}
                                     retainershipTasks={true}
                                 />
                                 <SectionTable
-                                    label="StatusCheck & Followup"
-                                    tasks={teamRetainerships.filter((t) => ["followup"].includes(statusKey(t.status))).slice(0, 3)}
+                                    label="Followups"
+                                    tasks={teamRetainerships.filter((t) => taskSection(t) === "followup").slice(0, 3)}
                                     retainershipTasks={true}
                                 />
                                 <SectionTable

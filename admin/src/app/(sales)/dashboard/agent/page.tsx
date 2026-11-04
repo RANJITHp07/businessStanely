@@ -95,8 +95,6 @@ interface ClientAdvisor {
     id: string;
     name: string;
     email: string;
-    phoneNumber?: string;
-    specializations: string[];
     photo?: string;
     status?: string;
 }
@@ -132,8 +130,8 @@ function ClientAdvisorsModal({ leadMaker, open, onOpenChange }: ClientAdvisorsMo
 
             // Fetch active and deleted advisors so deleted entries are visible in Add/Remove panel.
             const [allRes, inactiveRes] = await Promise.all([
-                fetchWithAuth("/api/agents"),
-                fetchWithAuth("/api/agents?status=inactive"),
+                fetchWithAuth("/api/agents?view=table"),
+                fetchWithAuth("/api/agents?view=table&status=inactive"),
             ]);
 
             if (allRes.ok && inactiveRes.ok) {
@@ -153,8 +151,6 @@ function ClientAdvisorsModal({ leadMaker, open, onOpenChange }: ClientAdvisorsMo
                         id: a.id,
                         name: a.name,
                         email: a.email,
-                        phoneNumber: a.phoneNumber,
-                        specializations: a.specializations || [],
                         photo: a.photo || undefined,
                         status: a.status,
                     }));
@@ -316,11 +312,6 @@ function ClientAdvisorsModal({ leadMaker, open, onOpenChange }: ClientAdvisorsMo
                                                         {sanitizeInactiveAgentEmail(advisor.email)}
                                                     </div>
                                                 </div>
-                                                {advisor.specializations?.length > 0 && (
-                                                    <Badge variant="outline" className="text-xs flex-shrink-0">
-                                                        {advisor.specializations[0]}
-                                                    </Badge>
-                                                )}
                                             </div>
                                         ))}
                                     </div>
@@ -455,7 +446,7 @@ export default function AgentsTable() {
     useEffect(() => {
         const fetchAgents = async () => {
             try {
-                const response = await fetchWithAuth("/api/agents");
+                const response = await fetchWithAuth("/api/agents?view=table");
                 if (response.ok) {
                     const data = await response.json();
                     setAgents(data.filter((agent: Agent) => hasAdvisorRole(agent.agentRole)));
@@ -478,11 +469,7 @@ export default function AgentsTable() {
         const displayEmail = sanitizeInactiveAgentEmail(agent.email);
         const matchesSearch =
             agent.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            displayEmail.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            agent.specializations
-                .join(", ")
-                .toLowerCase()
-                .includes(searchTerm.toLowerCase());
+            displayEmail.toLowerCase().includes(searchTerm.toLowerCase());
 
         const matchesType =
             selectedType === "All Types" || getAdvisorType(agent) === selectedType;
@@ -708,7 +695,6 @@ export default function AgentsTable() {
                                                 <TableRow isHeader>
                                                     <TableHead className="text-xs sm:text-sm">Agent</TableHead>
                                                     <TableHead className="text-xs sm:text-sm">Type</TableHead>
-                                                    <TableHead className="text-xs sm:text-sm">Specializations</TableHead>
                                                     <TableHead className="text-xs sm:text-sm">Jurisdiction</TableHead>
                                                     <TableHead className="text-xs sm:text-sm text-right">Actions</TableHead>
                                                 </TableRow>
@@ -718,7 +704,7 @@ export default function AgentsTable() {
                                                 {currentAgents.length === 0 ? (
                                                     <TableRow>
                                                         <TableCell
-                                                            colSpan={5}
+                                                            colSpan={4}
                                                             className="text-center py-8 text-sm text-muted-foreground"
                                                         >
                                                             No agents found matching your criteria.
@@ -755,20 +741,6 @@ export default function AgentsTable() {
                                                                     </div>
                                                                 </TableCell>
                                                                 <TableCell>{getAgentTypeBadge(agent)}</TableCell>
-                                                                <TableCell>
-                                                                    <div className="flex flex-wrap gap-1">
-                                                                        {agent.specializations.slice(0, 2).map((spec) => (
-                                                                            <Badge key={spec} variant="outline" className="text-xs">
-                                                                                {spec}
-                                                                            </Badge>
-                                                                        ))}
-                                                                        {agent.specializations.length > 2 && (
-                                                                            <Badge variant="outline" className="text-xs">
-                                                                                +{agent.specializations.length - 2}
-                                                                            </Badge>
-                                                                        )}
-                                                                    </div>
-                                                                </TableCell>
                                                                 <TableCell className="text-sm">{agent.jurisdiction}</TableCell>
                                                                 <TableCell
                                                                     className="text-right"
@@ -832,7 +804,6 @@ export default function AgentsTable() {
                                                 <TableRow isHeader>
                                                     <TableHead className="text-xs">Agent</TableHead>
                                                     <TableHead className="text-xs">Type</TableHead>
-                                                    <TableHead className="text-xs">Specializations</TableHead>
                                                     <TableHead className="text-xs text-right">Actions</TableHead>
                                                 </TableRow>
                                             </TableHeader>
@@ -841,7 +812,7 @@ export default function AgentsTable() {
                                                 {currentAgents.length === 0 ? (
                                                     <TableRow>
                                                         <TableCell
-                                                            colSpan={4}
+                                                            colSpan={3}
                                                             className="text-center py-8 text-xs text-muted-foreground"
                                                         >
                                                             No agents found matching your criteria.
@@ -878,20 +849,6 @@ export default function AgentsTable() {
                                                                     </div>
                                                                 </TableCell>
                                                                 <TableCell className="text-xs">{getAgentTypeBadge(agent)}</TableCell>
-                                                                <TableCell>
-                                                                    <div className="flex flex-wrap gap-0.5">
-                                                                        {agent.specializations.slice(0, 1).map((spec) => (
-                                                                            <Badge key={spec} variant="outline" className="text-xs">
-                                                                                {spec}
-                                                                            </Badge>
-                                                                        ))}
-                                                                        {agent.specializations.length > 1 && (
-                                                                            <Badge variant="outline" className="text-xs">
-                                                                                +{agent.specializations.length - 1}
-                                                                            </Badge>
-                                                                        )}
-                                                                    </div>
-                                                                </TableCell>
                                                                 <TableCell
                                                                     className="text-right"
                                                                     onClick={(e) => e.stopPropagation()}

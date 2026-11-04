@@ -71,7 +71,6 @@ import {
 import { needsDailyTrack, type DailyTrackEntry } from "@/components/DailyTrackCell";
 import { DailyTrackForm } from "@/components/DailyTrackForm";
 import { DailyTrackList } from "@/components/DailyTrackList";
-import { FOLLOW_UP_STATUS } from "@/lib/taskFollowUp";
 
 // Task interface based on the API response
 interface Task {
@@ -483,7 +482,6 @@ export default function TaskDetails() {
       "To Do": "bg-gray-100 text-gray-800 border-gray-200",
       "In Progress": "bg-blue-100 text-blue-800 border-blue-200",
       Hold: "bg-orange-100 text-orange-800 border-orange-200",
-      [FOLLOW_UP_STATUS]: "bg-purple-100 text-purple-800 border-purple-200",
       Completed: "bg-green-100 text-green-800 border-green-200",
       Overdue: "bg-red-100 text-red-800 border-red-200",
     };
@@ -491,7 +489,6 @@ export default function TaskDetails() {
       "To Do": <Clock className="w-3 h-3 mr-1" />,
       "In Progress": <Play className="w-3 h-3 mr-1" />,
       Hold: <AlertTriangle className="w-3 h-3 mr-1" />,
-      [FOLLOW_UP_STATUS]: <Clock className="w-3 h-3 mr-1" />,
       Completed: <CheckCircle className="w-3 h-3 mr-1" />,
       Overdue: <AlertTriangle className="w-3 h-3 mr-1" />,
     };
@@ -694,9 +691,7 @@ export default function TaskDetails() {
       ? 100
       : typeof map[newStatus] === "number"
         ? map[newStatus]
-        : newStatus === FOLLOW_UP_STATUS
-          ? (task.progress ?? 0)
-          : 0;
+        : 0;
 
     let updatedDueDate = task.dueDate;
     if (newStatus === "Hold") {
@@ -1267,7 +1262,6 @@ export default function TaskDetails() {
                       <SelectItem value="In Progress">
                         In Progress
                       </SelectItem>
-                      <SelectItem value={FOLLOW_UP_STATUS}>{FOLLOW_UP_STATUS}</SelectItem>
                       <SelectItem value="Hold">Hold</SelectItem>
                       <SelectItem value="Abandoned">Abandoned</SelectItem>
                       <SelectItem value="Completed">Completed</SelectItem>

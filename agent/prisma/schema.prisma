@@ -35,6 +35,8 @@ model Prospect {
   updatedById     String?   @db.ObjectId
   updatedByType   String? // "USER" | "AGENT"
 
+  @@index([assignedAgentId])
+  @@index([createdByAgentId])
 }
 
 model Opportunity {
@@ -63,6 +65,7 @@ model Opportunity {
   updatedById     String?   @db.ObjectId
   updatedByType   String? // "USER" | "AGENT"
 
+  @@index([prospectId])
 }
 datasource db {
   provider = "mongodb"
@@ -205,6 +208,7 @@ model Client {
   updatedById     String?   @db.ObjectId
   updatedByType   String? // "USER" | "AGENT"
 
+  @@index([deletedAt])
 }
 
 model DiaryEntry {
@@ -348,6 +352,9 @@ model AgentSuperior {
 
   superior      Agent  @relation("AgentSuperiors_superior", fields: [superiorId], references: [id])
   subordinate   Agent  @relation("AgentSuperiors_subordinate", fields: [subordinateId], references: [id])
+
+  @@index([superiorId])
+  @@index([subordinateId])
 }
 model Task {
   id               String    @id @default(auto()) @map("_id") @db.ObjectId
@@ -359,6 +366,8 @@ model Task {
   progress         Int?      @default(0) // Progress percentage (0-100)
   followUpRequired Boolean   @default(false)
   followUpDuration     String? // e.g., "24hr", "48hr", "1w", "Working"
+  /// When a task in the Followups group returns to In Progress. Set when it enters the group.
+  followUpUntil       DateTime?
   statusCheckDuration  String? // e.g., "24hr", "48hr", "1w", "Working"
   completed        Boolean   @default(false)
   recurring        Int?      // Interval count, paired with recurringType; null means not recurring
@@ -430,6 +439,10 @@ model Task {
 
   @@index([assignedToId, legislationId, active, statusCheckDuration, status])
   @@index([categoryId, assignedToId, status, active])
+  @@index([ownerShipId, assignedToId, active])
+  @@index([active, createdAt])
+  @@index([legislationId])
+  @@index([clientId])
 }
 
 model TaskDurationAudit {
@@ -444,6 +457,8 @@ model TaskDurationAudit {
   changedByAgent   Agent?  @relation(fields: [changedByAgentId], references: [id])
   changedAt DateTime @default(now()) @updatedAt
   createdAt DateTime @default(now())
+
+  @@index([taskId, auditDate])
 }
 
 model Legislation {
@@ -474,6 +489,9 @@ model Legislation {
 
 
   @@index([deletedAt])
+  @@index([assignedAgentId])
+
+  @@index([retainershipId])
 }
 
 model Retainership {
@@ -523,6 +541,8 @@ model Retainership {
 
 
   @@index([deletedAt])
+
+  @@index([clientId])
 }
 
 model Comment {
@@ -568,6 +588,9 @@ model Comment {
 
 
   @@index([taskId, createdAt])
+  @@index([prospectId, createdAt])
+  @@index([opportunityId, createdAt])
+  @@index([authorId, authorType, createdAt])
 }
 
 model TaskCategory {
@@ -656,6 +679,8 @@ model ServiceRecord {
 
   createdBy     String @db.ObjectId
   createdByUser User   @relation("UserServiceRecords", fields: [createdBy], references: [id])
+
+  @@index([agentId, createdAt])
 }
 
 model LeadSource {
@@ -732,6 +757,8 @@ model ClientDiaryEntry {
   /// ClientDiaryRevision.
   updatedById     String?   @db.ObjectId
   updatedByType   String? // "USER" | "AGENT"
+
+  @@index([clientId])
 }
 
 /// Field-level history for client diary entries.

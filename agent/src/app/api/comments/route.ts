@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
+import { followUpTimer } from "@/lib/taskFollowUp";
 import { getCurrentAgent } from "@/lib/auth";
 import {
   recordDeletionAudit,
@@ -65,13 +66,16 @@ export async function POST(req: NextRequest) {
     // Verify the task exists and agent has access to it (creator, assigned, ownership, or superior of assigned/ownership)
     const task = await prisma.task.findUnique({
       where: { id: taskId },
-      select: { createdById: true, assignedToId: true, ownerShipId: true, status: true },
+      select: { createdById: true, assignedToId: true, ownerShipId: true, status: true, followUpDuration: true, active: true },
     });
 
     if (task && task.status === "To Do") {
       await prisma.task.update({
         where: { id: taskId },
-        data: { status: "In Progress" },
+        data: {
+          status: "In Progress",
+          ...followUpTimer(task, { status: "In Progress" }),
+        },
       });
     }
 

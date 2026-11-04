@@ -566,11 +566,21 @@ export interface RestorableRemoval {
  * null if there is nothing to restore.
  */
 export async function findRestorableRemoval(agentId: string): Promise<RestorableRemoval | null> {
-  const agent = await prisma.agent.findUnique({ where: { id: agentId } });
+  const agent = await prisma.agent.findUnique({
+    where: { id: agentId },
+    select: { status: true, agentRole: true, updatedAt: true },
+  });
   if (!agent) return null;
 
+  // Only audit notes matter here, not ordinary service records.
   const records = await prisma.serviceRecord.findMany({
-    where: { agentId },
+    where: {
+      agentId,
+      OR: [
+        { note: { startsWith: RESTORE_AUDIT_PREFIX } },
+        { note: { startsWith: REMOVAL_AUDIT_PREFIX } },
+      ],
+    },
     orderBy: { createdAt: "desc" },
     select: { id: true, note: true, createdAt: true },
   });

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
+import prisma, { prismaRaw } from "@/lib/prisma";
 import { getCurrentAdmin } from "@/lib/auth";
 
 function getAssignedAdvisorType(assignedAgent: {
@@ -122,34 +122,48 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    // MongoDB does not support relation filtering in Prisma, so filter in-memory
-    const allOpportunities = await prisma.opportunity.findMany({
+    // An advisor's opportunities are found through their prospects' ids, so only
+    // those rows are read. The raw client keeps opportunities whose prospect was
+    // soft deleted, which this list has always shown.
+    let scope: { prospectId: { in: string[] } } | undefined;
+    if (assignedAgentId && assignedAgent) {
+      const prospects = await prismaRaw.prospect.findMany({
+        where:
+          getAssignedAdvisorType(assignedAgent) === "Lead Maker"
+            ? { createdByAgentId: assignedAgentId }
+            : { assignedAgentId },
+        select: { id: true },
+      });
+      scope = { prospectId: { in: prospects.map((prospect) => prospect.id) } };
+    }
+
+    // Table view: only what the opportunity tables render.
+    if (req.nextUrl.searchParams.get("view") === "table") {
+      const opportunities = await prisma.opportunity.findMany({
+        where: scope,
+        include: {
+          prospect: {
+            select: {
+              assignedAgentId: true,
+              assignedAgent: { select: { id: true, name: true } },
+              createdByAgent: { select: { id: true, name: true } },
+              leadSource: { select: { name: true } },
+            },
+          },
+        },
+        orderBy: { createdAt: "desc" },
+      });
+      return NextResponse.json({ opportunities });
+    }
+
+    const opportunities = await prisma.opportunity.findMany({
+      where: scope,
       include: {
         prospect: { include: { assignedAgent: true, createdByAgent: true, leadSource: true } },
         comments: true,
       },
       orderBy: { createdAt: "desc" },
     });
-    let opportunities = allOpportunities;
-
-    if (assignedAgentId && assignedAgent) {
-      const advisorType = getAssignedAdvisorType(assignedAgent);
-
-      opportunities = allOpportunities.filter((opportunity) => {
-        if (advisorType === "Lead Maker") {
-          return opportunity.prospect?.createdByAgentId === assignedAgentId;
-        }
-
-        if (
-          advisorType === "Client Advisor" ||
-          advisorType === "Client Manager"
-        ) {
-          return opportunity.prospect?.assignedAgentId === assignedAgentId;
-        }
-
-        return true;
-      });
-    }
 
     return NextResponse.json({ opportunities });
   } catch (error) {

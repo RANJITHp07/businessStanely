@@ -15,7 +15,11 @@ export async function GET(req: NextRequest) {
     // Find all comments made by this agent, with whatever record each was left on
     const comments = await prisma.comment.findMany({
       where: { authorId: agentId, authorType: "AGENT" },
-      include: {
+      select: {
+        content: true,
+        createdAt: true,
+        startTime: true,
+        endTime: true,
         task: { select: { id: true, title: true } },
         prospect: { select: { id: true, name: true } },
         opportunity: { select: { id: true, name: true } },

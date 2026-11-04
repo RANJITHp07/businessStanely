@@ -1,5 +1,32 @@
+import { Prisma } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+
+const FULL_INCLUDE = {
+  assignedAgent: true,
+  retainership: { include: { client: true } },
+  tasks: true,
+} satisfies Prisma.LegislationInclude;
+
+// Only what the agent details table renders: the tasks are just counted.
+const LITE_INCLUDE: Prisma.LegislationInclude = {
+  assignedAgent: { select: { id: true, name: true } },
+  retainership: {
+    select: {
+      clientId: true,
+      client: {
+        select: {
+          clientType: true,
+          firstName: true,
+          lastName: true,
+          organizationName: true,
+          email: true,
+        },
+      },
+    },
+  },
+  tasks: { select: { id: true, active: true, status: true, dueDate: true } },
+};
 
 export async function GET(req: NextRequest) {
   try {
@@ -13,25 +40,23 @@ export async function GET(req: NextRequest) {
     // matches both null and an absent field, and it cascades deletes from a
     // deleted retainership. Spelling out `deletedAt: null` would suppress that
     // injection and hide every row where the field was never written.
+    const clientRetainerships = retainershipClientId
+      ? await prisma.retainership.findMany({
+          where: { clientId: retainershipClientId },
+          select: { id: true },
+        })
+      : null;
     const where = {
       ...(assignedAgent ? { assignedAgentId: assignedAgent } : {}),
-      ...(retainershipClientId
-        ? { retainership: { clientId: retainershipClientId } }
+      ...(clientRetainerships
+        ? { retainershipId: { in: clientRetainerships.map((r) => r.id) } }
         : {}),
     };
 
     const [legislations, total] = await Promise.all([
       prisma.legislation.findMany({
         where,
-        include: {
-          assignedAgent: true,
-          retainership: {
-            include: {
-              client: true,
-            },
-          },
-          tasks: true,
-        },
+        include: searchParams.get("lite") === "true" ? LITE_INCLUDE : FULL_INCLUDE,
         orderBy: {
           createdAt: "desc",
         },

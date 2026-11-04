@@ -2,16 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { getCurrentAdmin } from "@/lib/auth";
-import { SUMMARY_STATUS_SECTIONS, buildStatusCounts } from "@/lib/taskSummary";
-import { isFollowUpDuration, FOLLOW_UP_STATUS } from "@/lib/taskFollowUp";
-
-// Only the columns the My Tasks summary tables actually render.
-const SUMMARY_TASK_INCLUDE = {
-  client: true,
-  ownerShipBy: true,
-  assignedTo: true,
-  category: true,
-} satisfies Prisma.TaskInclude;
+import { SUMMARY_ROW_SELECT, SUMMARY_STATUS_SECTIONS, summarizeTaskRows } from "@/lib/taskSummary";
+import { followUpTimer, statusFilterWhere } from "@/lib/taskFollowUp";
+import { expireFollowUps } from "@/lib/followUpExpiry";
+import { approvedOrNoCategoryConditions } from "@/lib/taskCategoryFilter";
 
 // Only the relation columns the task list actually renders. Pulling the whole
 // related row for six relations was most of this endpoint's payload; `createdBy`
@@ -96,10 +90,7 @@ export async function POST(req: NextRequest) {
         title,
         ownerShipId: assignedToId!,
         description,
-        status:
-          active !== false && isFollowUpDuration(followUpDuration)
-            ? FOLLOW_UP_STATUS
-            : status,
+        status,
         priority,
         dueDate: taskDueDate,
         triggerDate: taskTriggerDate,
@@ -112,6 +103,7 @@ export async function POST(req: NextRequest) {
         recurringType: recurringTypeValue,
         recurringWeekDays: recurringWeekDaysValue,
         followUpDuration: followUpDuration || "Working",
+        ...followUpTimer({}, { status, followUpDuration, active }),
         statusCheckDuration: statusCheckDuration || "48hr",
         active,
       },
@@ -177,6 +169,8 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    await expireFollowUps();
+
     const { searchParams } = new URL(req.url);
     const assignedToId = searchParams.get("assignedToId");
     // Tasks this agent owns (ownerShipId) but has handed to someone else, i.e.
@@ -227,8 +221,7 @@ export async function GET(req: NextRequest) {
         AND: [
           {
             OR: [
-              { category: null },
-              { category: { status: "approved" } },
+              ...(await approvedOrNoCategoryConditions()),
               { legislationId: { not: null } },
             ],
           },
@@ -299,11 +292,6 @@ export async function GET(req: NextRequest) {
     if (retainershipId) {
       whereClause.retainershipId = retainershipId;
     }
-    if (statusesArray && statusesArray.length > 0) {
-      whereClause.status = { in: statusesArray };
-    } else if (status) {
-      whereClause.status = status;
-    }
     if (prioritiesParam) {
       const prioritiesArray = prioritiesParam
         .split(",")
@@ -344,6 +332,13 @@ export async function GET(req: NextRequest) {
 
       whereClause.AND = [currentAnd, filter];
     };
+
+    const statusFilterValues = statusesArray?.length ? statusesArray : status ? [status] : [];
+    if (statusFilterValues.length > 0) {
+      appendAndFilter({
+        OR: statusFilterValues.map((value) => statusFilterWhere(value, !!followUpDurationsParam)),
+      });
+    }
 
     if (
       clientUpdateFilter === "updated" ||
@@ -470,40 +465,30 @@ export async function GET(req: NextRequest) {
         50,
       );
 
-      console.log(finalWhere);
-
-      const [groups, sections] = await Promise.all([
-        prisma.task.groupBy({
-          by: ["status"],
-          where: finalWhere,
-          _count: { _all: true },
-        }),
-        Promise.all(
-          SUMMARY_STATUS_SECTIONS.map(async ({ key, statuses }) => ({
-            key,
-            tasks: await prisma.task.findMany({
-              where: { ...finalWhere, status: { in: [...statuses] } },
-              include: SUMMARY_TASK_INCLUDE,
-              orderBy: { createdAt: "desc" },
-              take: limit,
-            }),
-          })),
-        ),
-      ]);
+      const rows = await prisma.task.findMany({
+        where: finalWhere,
+        select: SUMMARY_ROW_SELECT,
+        orderBy: { createdAt: "desc" },
+      });
+      const { counts, sectionCounts, sectionById, overdue } = summarizeTaskRows(rows, limit);
+      const tasks = await prisma.task.findMany({
+        where: { id: { in: Array.from(sectionById.keys()) } },
+        include: TASK_LIST_INCLUDE,
+        orderBy: { createdAt: "desc" },
+      });
 
       return NextResponse.json({
-        counts: buildStatusCounts(groups),
-        sections: Object.fromEntries(sections.map((s) => [s.key, s.tasks])),
-        // Exact size of each section. `counts.todo` folds in Hold and unknown
-        // statuses (e.g. Abandoned), so it cannot label the New Task section.
-        sectionCounts: Object.fromEntries(
-          SUMMARY_STATUS_SECTIONS.map(({ key, statuses }) => [
+        counts,
+        sections: Object.fromEntries(
+          SUMMARY_STATUS_SECTIONS.map(({ key }) => [
             key,
-            groups
-              .filter((g) => (statuses as readonly string[]).includes(g.status ?? ""))
-              .reduce((sum, g) => sum + g._count._all, 0),
+            tasks.filter((task) => sectionById.get(task.id) === key),
           ]),
         ),
+        // Exact size of each section. `counts.todo` folds in Hold and unknown
+        // statuses (e.g. Abandoned), so it cannot label the New Task section.
+        sectionCounts,
+        overdue,
       });
     }
 

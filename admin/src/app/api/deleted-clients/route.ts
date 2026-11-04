@@ -20,6 +20,20 @@ export async function GET(req: NextRequest) {
 
     const clients = await prisma.client.findMany({
       where: onlyDeleted,
+      // Only what the deleted clients table renders and searches.
+      select: {
+        id: true,
+        clientType: true,
+        email: true,
+        phoneNumber: true,
+        firstName: true,
+        lastName: true,
+        gender: true,
+        organizationName: true,
+        entityType: true,
+        authorizedPersonName: true,
+        deletedAt: true,
+      },
       orderBy: { deletedAt: "desc" },
     });
 

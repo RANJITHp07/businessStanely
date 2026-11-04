@@ -102,7 +102,7 @@ export default function AgentsTable() {
   useEffect(() => {
     const fetchAgents = async () => {
       try {
-        const response = await fetchWithAuth("/api/agents");
+        const response = await fetchWithAuth("/api/agents?view=table");
         if (response.ok) {
           const data = await response.json();
           setAgents(data.filter((agent: Agent) => isVisibleExecutionAgent(agent)));
@@ -124,11 +124,7 @@ export default function AgentsTable() {
   const filteredAgents = agents.filter((agent) => {
     const matchesSearch =
       agent.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      agent.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      agent.specializations
-        .join(", ")
-        .toLowerCase()
-        .includes(searchTerm.toLowerCase());
+      agent.email.toLowerCase().includes(searchTerm.toLowerCase());
 
     const matchesType =
       selectedType === "All Types" || agent.agentType === selectedType;
@@ -342,7 +338,6 @@ export default function AgentsTable() {
                       <TableRow isHeader>
                         <TableHead className="text-xs sm:text-sm">Agent</TableHead>
                         <TableHead className="text-xs sm:text-sm">Type</TableHead>
-                        <TableHead className="text-xs sm:text-sm">Specializations</TableHead>
                         <TableHead className="text-xs sm:text-sm">Jurisdiction</TableHead>
                         <TableHead className="text-xs sm:text-sm text-right">Actions</TableHead>
                       </TableRow>
@@ -352,7 +347,7 @@ export default function AgentsTable() {
                       {currentAgents.length === 0 ? (
                         <TableRow>
                           <TableCell
-                            colSpan={5}
+                            colSpan={4}
                             className="text-center py-8 text-sm text-muted-foreground"
                           >
                             No agents found matching your criteria.
@@ -389,20 +384,6 @@ export default function AgentsTable() {
                                 </div>
                               </TableCell>
                               <TableCell>{getAgentTypeBadge(agent.agentType)}</TableCell>
-                              <TableCell>
-                                <div className="flex flex-wrap gap-1">
-                                  {agent.specializations.slice(0, 2).map((spec) => (
-                                    <Badge key={spec} variant="outline" className="text-xs">
-                                      {spec}
-                                    </Badge>
-                                  ))}
-                                  {agent.specializations.length > 2 && (
-                                    <Badge variant="outline" className="text-xs">
-                                      +{agent.specializations.length - 2}
-                                    </Badge>
-                                  )}
-                                </div>
-                              </TableCell>
                               <TableCell className="text-sm">{agent.jurisdiction}</TableCell>
                               <TableCell
                                 className="text-right"
@@ -455,7 +436,6 @@ export default function AgentsTable() {
                       <TableRow isHeader>
                         <TableHead className="text-xs">Agent</TableHead>
                         <TableHead className="text-xs">Type</TableHead>
-                        <TableHead className="text-xs">Specializations</TableHead>
                         <TableHead className="text-xs text-right">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -464,7 +444,7 @@ export default function AgentsTable() {
                       {currentAgents.length === 0 ? (
                         <TableRow>
                           <TableCell
-                            colSpan={4}
+                            colSpan={3}
                             className="text-center py-8 text-xs text-muted-foreground"
                           >
                             No agents found matching your criteria.
@@ -501,20 +481,6 @@ export default function AgentsTable() {
                                 </div>
                               </TableCell>
                               <TableCell className="text-xs">{getAgentTypeBadge(agent.agentType)}</TableCell>
-                              <TableCell>
-                                <div className="flex flex-wrap gap-0.5">
-                                  {agent.specializations.slice(0, 1).map((spec) => (
-                                    <Badge key={spec} variant="outline" className="text-xs">
-                                      {spec}
-                                    </Badge>
-                                  ))}
-                                  {agent.specializations.length > 1 && (
-                                    <Badge variant="outline" className="text-xs">
-                                      +{agent.specializations.length - 1}
-                                    </Badge>
-                                  )}
-                                </div>
-                              </TableCell>
                               <TableCell
                                 className="text-right"
                                 onClick={(e) => e.stopPropagation()}

@@ -43,6 +43,8 @@ model Prospect {
   updatedById     String?   @db.ObjectId
   updatedByType   String? // "USER" | "AGENT"
 
+  @@index([assignedAgentId])
+  @@index([createdByAgentId])
 }
 
 model Opportunity {
@@ -69,6 +71,7 @@ model Opportunity {
   updatedById     String?   @db.ObjectId
   updatedByType   String? // "USER" | "AGENT"
 
+  @@index([prospectId])
 }
 
 model User {
@@ -202,6 +205,7 @@ model Client {
   updatedById     String?   @db.ObjectId
   updatedByType   String? // "USER" | "AGENT"
 
+  @@index([deletedAt])
 }
 
 model ClientDiaryEntry {
@@ -227,6 +231,7 @@ model ClientDiaryEntry {
   updatedById     String?   @db.ObjectId
   updatedByType   String? // "USER" | "AGENT"
 
+  @@index([clientId])
 }
 
 /// Field-level history for client diary entries.
@@ -392,6 +397,9 @@ model AgentSuperior {
 
   superior    Agent @relation("AgentSuperiors_superior", fields: [superiorId], references: [id])
   subordinate Agent @relation("AgentSuperiors_subordinate", fields: [subordinateId], references: [id])
+
+  @@index([superiorId])
+  @@index([subordinateId])
 }
 
 model Task {
@@ -405,6 +413,8 @@ model Task {
   statusProgressMap   Json? // Map of status to progress percentage, e.g. {"To Do": 10, "In Progress": 50, "Completed": 100}
   followUpRequired    Boolean   @default(false)
   followUpDuration    String? // e.g., "24hr", "48hr", "1w", "Working"
+  /// When a task in the Followups group returns to In Progress. Set when it enters the group.
+  followUpUntil       DateTime?
   statusCheckDuration String? // e.g., "24hr", "48hr", "1w", "Working"
   completed           Boolean   @default(false)
   recurring           Int? // Interval count, paired with recurringType; null means not recurring
@@ -471,6 +481,10 @@ model Task {
 
   @@index([assignedToId, legislationId, active, statusCheckDuration, status])
   @@index([categoryId, assignedToId, status, active])
+  @@index([ownerShipId, assignedToId, active])
+  @@index([active, createdAt])
+  @@index([legislationId])
+  @@index([clientId])
 }
 
 model TaskDurationAudit {
@@ -485,6 +499,8 @@ model TaskDurationAudit {
   changedByAgent   Agent?   @relation(fields: [changedByAgentId], references: [id])
   changedAt        DateTime @default(now()) @updatedAt
   createdAt        DateTime @default(now())
+
+  @@index([taskId, auditDate])
 }
 
 model Legislation {
@@ -514,6 +530,9 @@ model Legislation {
 
 
   @@index([deletedAt])
+  @@index([assignedAgentId])
+
+  @@index([retainershipId])
 }
 
 model Retainership {
@@ -562,6 +581,8 @@ model Retainership {
 
 
   @@index([deletedAt])
+
+  @@index([clientId])
 }
 
 model Comment {
@@ -620,6 +641,9 @@ model Comment {
 
 
   @@index([taskId, createdAt])
+  @@index([prospectId, createdAt])
+  @@index([opportunityId, createdAt])
+  @@index([authorId, authorType, createdAt])
 }
 
 model TaskCategory {
@@ -708,6 +732,8 @@ model ServiceRecord {
 
   createdBy     String @db.ObjectId
   createdByUser User   @relation("UserServiceRecords", fields: [createdBy], references: [id])
+
+  @@index([agentId, createdAt])
 }
 
 model LeadSource {

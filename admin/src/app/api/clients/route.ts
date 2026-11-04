@@ -55,6 +55,39 @@ export async function POST(req: NextRequest) {
   }
 }
 
+const CLIENT_OPTION_SELECT = {
+  id: true,
+  email: true,
+  firstName: true,
+  lastName: true,
+  organizationName: true,
+} as const;
+
+// Only what the clients table renders and searches.
+const CLIENT_TABLE_SELECT = {
+  ...CLIENT_OPTION_SELECT,
+  clientType: true,
+  phoneNumber: true,
+  address: true,
+  gender: true,
+  preferredCommunication: true,
+  entityType: true,
+  authorizedPersonName: true,
+} as const;
+
+/** `name` prioritises `organizationName`, for organizations. */
+function withDisplayName<
+  T extends { organizationName: string | null; firstName: string | null; lastName: string | null },
+>(client: T) {
+  return {
+    ...client,
+    name:
+      client.organizationName ||
+      `${client.firstName || ""} ${client.lastName || ""}`.trim() ||
+      "Unknown Name",
+  };
+}
+
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
@@ -78,54 +111,62 @@ export async function GET(req: NextRequest) {
       );
     }
 
+    const where = clientIds ? { id: { in: clientIds } } : undefined;
+    const view = searchParams.get("view");
+
+    // Pickers only need a label for each client, so they skip the task counts.
+    if (view === "options") {
+      const clients = await prisma.client.findMany({
+        where,
+        select: CLIENT_OPTION_SELECT,
+        orderBy: { createdAt: "desc" },
+      });
+      return NextResponse.json(clients.map(withDisplayName));
+    }
+
     const clients = await prisma.client.findMany({
-      where: clientIds ? { id: { in: clientIds } } : undefined,
+      where,
+      ...(view === "table" ? { select: CLIENT_TABLE_SELECT } : {}),
       orderBy: {
         createdAt: "desc",
       },
     });
+    const ids = clients.map((client) => client.id);
 
     // The Client -> Task/Retainership relation includes are unreliable on
-    // MongoDB, so look up tasks and retainerships directly by clientId.
-    const [tasksByClient, retainershipCountsByClient] = await Promise.all([
-      prisma.task.findMany({
-        where: { clientId: { in: clients.map((c) => c.id) } },
-        select: { clientId: true, status: true },
+    // MongoDB, so count tasks and retainerships directly by clientId. The
+    // soft-delete extension injects the not-deleted filter: an explicit
+    // `deletedAt: null` would suppress that and, on MongoDB, match nothing for
+    // rows written before soft delete shipped.
+    const [taskGroups, retainershipGroups] = await Promise.all([
+      prisma.task.groupBy({
+        by: ["clientId", "status"],
+        where: { clientId: { in: ids } },
+        _count: { _all: true },
       }),
-      // The soft-delete extension injects the not-deleted filter here. An
-      // explicit `deletedAt: null` would suppress that injection and, on
-      // MongoDB, match nothing at all for rows written before soft delete
-      // shipped -- where the field is absent rather than null.
       prisma.retainership.groupBy({
         by: ["clientId"],
-        where: { clientId: { in: clients.map((c) => c.id) } },
+        where: { clientId: { in: ids } },
         _count: { _all: true },
       }),
     ]);
 
+    const statusCountsByClientId = new Map<string, Record<string, number>>();
+    for (const group of taskGroups) {
+      if (!group.clientId) continue;
+      const counts = statusCountsByClientId.get(group.clientId) ?? {};
+      counts[group.status] = group._count._all;
+      statusCountsByClientId.set(group.clientId, counts);
+    }
     const retainershipCountByClientId = new Map(
-      retainershipCountsByClient.map((r) => [r.clientId, r._count._all]),
+      retainershipGroups.map((group) => [group.clientId, group._count._all]),
     );
 
-    // Add a `name` field prioritizing `organizationName` for organizations
-    const clientsWithStatusCounts = clients.map((client) => {
-      // Count tasks by status
-      const statusCounts: Record<string, number> = {};
-      for (const task of tasksByClient) {
-        if (task.clientId !== client.id) continue;
-        statusCounts[task.status] = (statusCounts[task.status] || 0) + 1;
-      }
-      const retainershipCount = retainershipCountByClientId.get(client.id) || 0;
-      return {
-        ...client,
-        name:
-          client.organizationName ||
-          `${client.firstName || ""} ${client.lastName || ""}`.trim() ||
-          "Unknown Name",
-        statusCounts,
-        retainershipCount,
-      };
-    });
+    const clientsWithStatusCounts = clients.map((client) => ({
+      ...withDisplayName(client),
+      statusCounts: statusCountsByClientId.get(client.id) ?? {},
+      retainershipCount: retainershipCountByClientId.get(client.id) ?? 0,
+    }));
 
     return NextResponse.json(clientsWithStatusCounts);
   } catch (error) {

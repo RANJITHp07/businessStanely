@@ -45,7 +45,6 @@ function statusKey(s?: string) {
   const k = (s || "").toLowerCase().replace(/\s+/g, "");
   if (["todo", "pending"].includes(k)) return "todo";
   if (["inprogress", "progress"].includes(k)) return "inprogress";
-  if (k === "statuscheck&followup") return "followup";
   if (["completed"].includes(k)) return "completed";
   return k || "todo";
 }
@@ -54,7 +53,7 @@ function sectionLabelToStatus(label: string) {
   const l = label.toLowerCase();
   if (l.includes("progress")) return "In Progress";
   if (l.includes("completed")) return "Completed";
-  if (l.includes("followup")) return "StatusCheck & Followup";
+  if (l.includes("followup")) return "Followups";
   if (l.includes("hold")) return "Hold";
   // default for New Task / todo
   return "To Do";
@@ -250,7 +249,6 @@ export function SectionTable({
                           const k = statusKey(t.status);
                           if (k === "completed") return "Completed";
                           if (k === "inprogress") return "In Progress";
-                          if (k === "followup") return "StatusCheck & Followup";
                           if (k === "hold") return "Hold";
                           return "To Do";
                         })();
@@ -670,7 +668,7 @@ export default function MyTasksPage() {
         <div className="space-y-[40px]">
           <SectionTable label="New Task" tasks={tasksNew} />
           <SectionTable label="In Progress" tasks={tasksInProgress} />
-          <SectionTable label="StatusCheck & Followup" tasks={sections.followup ?? []} />
+          <SectionTable label="Followups" tasks={sections.followup ?? []} />
           <SectionTable label="Hold" tasks={tasksHold} />
           <SectionTable
             label="Future Tasks"

@@ -571,7 +571,7 @@ export default function Dashboard() {
             <div className="flex-1 min-w-0">
               {renderSlaTable(
                 "Touchbased Not Yet",
-                "All Tasks other than StatusCheck&Followup has to be Touchbased once every day. ",
+                "All Tasks other than Followups has to be Touchbased once every day. ",
                 slaData.notTouchedTasks,
                 "border-l-amber-500",
               )}

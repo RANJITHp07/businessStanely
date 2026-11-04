@@ -60,7 +60,7 @@ import ServiceFilter from "./serviceFilter"
 import ConvertTaskDialog from "./convertTaskDialog"
 
 const priorities = ["All Priorities", "Low", "Medium", "High"]
-const statuses = ["All Status", "To Do", "In Progress", "StatusCheck & Followup", "Hold", "Completed", "Abandoned"]
+const statuses = ["All Status", "To Do", "In Progress", "Followups", "Hold", "Completed", "Abandoned"]
 const durations = ["24hr", "48hr", "1w"]
 
 export default function TasksTable() {

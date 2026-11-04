@@ -52,7 +52,6 @@ import { isAudioAttachment } from "@/lib/audioAttachment";
 import ConvertTaskDialog from "../_components/convertTaskDialog";
 import { isDailyTrackContent } from "@/lib/dailyTrack";
 import { DailyTrackList } from "@/components/DailyTrackList";
-import { FOLLOW_UP_STATUS } from "@/lib/taskFollowUp";
 
 export default function TaskDetails() {
   const MANAGEMENT_BASE_URL = "https://management.legalstanley.com";
@@ -275,7 +274,6 @@ export default function TaskDetails() {
       "To Do": "bg-gray-100 text-gray-800 border-gray-200",
       "In Progress": "bg-blue-100 text-blue-800 border-blue-200",
       Hold: "bg-orange-100 text-orange-800 border-orange-200",
-      [FOLLOW_UP_STATUS]: "bg-purple-100 text-purple-800 border-purple-200",
       Completed: "bg-green-100 text-green-800 border-green-200",
       Overdue: "bg-red-100 text-red-800 border-red-200",
     };
@@ -284,7 +282,6 @@ export default function TaskDetails() {
       "To Do": <Clock className="w-3 h-3 mr-1" />,
       "In Progress": <Play className="w-3 h-3 mr-1" />,
       Hold: <AlertTriangle className="w-3 h-3 mr-1" />,
-      [FOLLOW_UP_STATUS]: <Clock className="w-3 h-3 mr-1" />,
       Completed: <CheckCircle className="w-3 h-3 mr-1" />,
       Overdue: <AlertTriangle className="w-3 h-3 mr-1" />,
     };
@@ -309,7 +306,6 @@ export default function TaskDetails() {
     const statusProgress = {
       "To Do": 0,
       "In Progress": 30,
-      [FOLLOW_UP_STATUS]: 30,
       Hold: 50,
       Completed: 100,
       Overdue: 0,
@@ -653,13 +649,7 @@ export default function TaskDetails() {
   const handleStatusChange = async (newStatus: string) => {
     if (!taskData) return;
     const prevTask = { ...taskData };
-    const restoredProgress = newStatus === "Completed"
-      ? 100
-      : newStatus === "In Progress"
-        ? 30
-        : newStatus === FOLLOW_UP_STATUS
-          ? (taskData.progress ?? 0)
-          : 0;
+    const restoredProgress = newStatus === "Completed" ? 100 : (newStatus === "In Progress" ? 30 : 0);
 
     setTaskData({
       ...taskData,
@@ -685,7 +675,6 @@ export default function TaskDetails() {
         setTaskData((prevTaskState) => ({
           ...prevTaskState!,
           ...data.task,
-          followUpDuration: data.followUpDuration ?? prevTaskState!.followUpDuration,
           comments: prevTaskState!.comments,
         }));
       } else {
@@ -713,7 +702,6 @@ export default function TaskDetails() {
         setTaskData(prevTaskState => ({
           ...prevTaskState!,
           ...data.task,
-          status: data.status ?? prevTaskState!.status,
           comments: prevTaskState!.comments,
         }));
       } else {
@@ -1284,7 +1272,6 @@ export default function TaskDetails() {
                           <SelectItem value="In Progress">
                             In Progress
                           </SelectItem>
-                          <SelectItem value={FOLLOW_UP_STATUS}>{FOLLOW_UP_STATUS}</SelectItem>
                           <SelectItem value="Hold">Hold</SelectItem>
                           <SelectItem value="Completed">Completed</SelectItem>
                         </SelectContent>
@@ -1533,7 +1520,6 @@ export default function TaskDetails() {
                             const statusProgress = {
                               "To Do": 0,
                               "In Progress": 30,
-                              [FOLLOW_UP_STATUS]: 30,
                               Hold: 50,
                               Completed: 100,
                               Overdue: 0,
@@ -1553,7 +1539,7 @@ export default function TaskDetails() {
                           ) : (
                             <Clock className="h-3 w-3 text-gray-400" />
                           )}
-                          StatusCheck & Followup
+                          Followups
                         </span>
                         <span
                           className={`font-medium ${taskData.followUpRequired

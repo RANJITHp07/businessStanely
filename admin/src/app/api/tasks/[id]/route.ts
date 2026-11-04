@@ -1,13 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { includeDeleted } from "@/lib/softDelete";
-import { followUpUpdates } from "@/lib/taskFollowUp";
+import { followUpTimer } from "@/lib/taskFollowUp";
+import { expireFollowUps } from "@/lib/followUpExpiry";
 
 export async function GET(
   req: NextRequest,
   { params }: { params: { id: string } },
 ) {
   try {
+    await expireFollowUps();
     const { id } = await params;
 
     // ?includeDeleted=true lets the task page open a soft-deleted task in a
@@ -94,9 +96,6 @@ export async function PUT(
     if (!currentTask) {
       return NextResponse.json({ error: "Task not found" }, { status: 404 });
     }
-
-    // Applied to `body` so the status side effects and duration audit below see it.
-    Object.assign(body, followUpUpdates(currentTask, body));
 
     const allowedFields = [
       "title",
@@ -247,6 +246,8 @@ export async function PUT(
         data.completed = false;
       }
     }
+    Object.assign(data, followUpTimer(currentTask, body));
+
     let updatedTask = await prisma.task.update({
       where: { id },
       data,

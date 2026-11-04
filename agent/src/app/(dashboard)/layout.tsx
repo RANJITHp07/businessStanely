@@ -6,6 +6,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 import Navigator from "@/components/navigator";
 import { ToastContainer } from "react-toastify";
 import { AuthGuard } from "@/components/AuthGuard";
+import { SidebarAccessProvider } from "@/components/SidebarAccessProvider";
 import AuthSessionTimeout from "@/components/AuthSessionTimeout";
 import WhatsAppPrefetcher from "@/components/whatsapp/WhatsAppPrefetcher";
 import { Plus, FileText, User, Layers, Users } from "lucide-react";
@@ -23,6 +24,7 @@ export default function RootLayout({
 
   return (
     <AuthGuard>
+      <SidebarAccessProvider>
       <AuthSessionTimeout />
       <WhatsAppPrefetcher />
       <div className="overflow-x-clip flex w-full">
@@ -95,6 +97,7 @@ export default function RootLayout({
         </SidebarProvider>
         <ToastContainer />
       </div>
+      </SidebarAccessProvider>
     </AuthGuard>
   );
 }

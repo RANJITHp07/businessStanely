@@ -54,6 +54,7 @@ export async function getCurrentAgent(req: NextRequest) {
         specializations: true,
         photo: true,
         canCreateTask: true,
+        hiddenSidebarItems: true,
         currentSessionToken: true,
       },
     });

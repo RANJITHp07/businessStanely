@@ -34,6 +34,7 @@ export interface Agent {
   autoAssign?: boolean;
   enquiryAutoAssign?: boolean;
   canCreateTask?: boolean;
+  hiddenSidebarItems?: string[];
   status: string;
 }
 export interface Task {

@@ -1,3 +1,4 @@
+import { sanitizeHiddenSidebarItems } from "@/lib/sidebarAccess";
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { AGENT_SECRET_FIELDS } from "@/lib/agentSecretFields";
@@ -205,6 +206,11 @@ export async function PUT(
     // Remove subordinates if present in agentData (not a valid field)
     if ("subordinates" in agentData) {
       delete agentData.subordinates;
+    }
+    if ("hiddenSidebarItems" in agentData) {
+      agentData.hiddenSidebarItems = sanitizeHiddenSidebarItems(
+        agentData.hiddenSidebarItems,
+      );
     }
     const updatedAgent = await prisma.agent.update({
       where: { id },

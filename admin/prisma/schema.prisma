@@ -313,6 +313,9 @@ model Agent {
   // tasks from the agent app? Legislation/retainership and service-linked task
   // creation is unaffected.
   canCreateTask        Boolean   @default(true)
+  // Admin-controlled: URLs of the agent app sidebar items hidden for this agent.
+  // Stored as hidden rather than allowed so new items stay visible. See lib/sidebarAccess.ts.
+  hiddenSidebarItems   String[]
   lastLogin            DateTime?
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt

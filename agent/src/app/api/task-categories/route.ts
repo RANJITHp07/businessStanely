@@ -1,8 +1,31 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentAgent } from "@/lib/auth";
+import type { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
+import { categorySearchConditions, parsePagination } from "@/lib/taskCategoryList";
 
 // GET /api/task-categories - Get all task categories
+function describeCreator(category: {
+  createdByUser: { username: string; adminType: string } | null;
+  createdByAgent: { name: string } | null;
+}) {
+  if (category.createdByUser) {
+    return {
+      createdBy: category.createdByUser.username,
+      createdByType: "user",
+      createdByRole: category.createdByUser.adminType, // "owner" or "admin"
+    };
+  }
+  if (category.createdByAgent) {
+    return {
+      createdBy: category.createdByAgent.name,
+      createdByType: "agent",
+      createdByRole: null,
+    };
+  }
+  return { createdBy: null, createdByType: null, createdByRole: null };
+}
+
 export async function GET(req: NextRequest) {
   try {
     // Get the current agent user
@@ -45,63 +68,103 @@ export async function GET(req: NextRequest) {
       return NextResponse.json(categories);
     }
 
-    // Get categories from the database with proper relations
-    // Get categories from the database with proper relations
-    const categories = await prisma.taskCategory.findMany({
-      where,
-      include: {
-        createdByUser: {
-          select: {
-            id: true,
-            username: true,
-            email: true,
-            adminType: true,
-          },
-        },
-        createdByAgent: {
+    // Paginated mode for the services table: one page of its columns, with task
+    // counts for that page only. Other callers still get the full list.
+    if (url.searchParams.has("page")) {
+      const { page, limit, skip } = parsePagination(url.searchParams);
+      const search = url.searchParams.get("search")?.trim();
+      const listWhere: Prisma.TaskCategoryWhereInput = search
+        ? { ...where, OR: await categorySearchConditions(search) }
+        : where;
+
+      const [rows, total, statusGroups] = await Promise.all([
+        prisma.taskCategory.findMany({
+          where: listWhere,
           select: {
             id: true,
             name: true,
-            email: true,
+            description: true,
+            status: true,
+            createdAt: true,
+            createdByUser: { select: { username: true, adminType: true } },
+            createdByAgent: { select: { name: true } },
           },
-        },
-        approvedBy: {
-          select: {
-            id: true,
-            username: true,
-          },
-        },
+          orderBy: { createdAt: "desc" },
+          skip,
+          take: limit,
+        }),
+        prisma.taskCategory.count({ where: listWhere }),
+        // The tab labels count every service, whatever the search or page.
+        prisma.taskCategory.groupBy({
+          by: ["status"],
+          where: { status: { not: "rejected" } },
+          _count: { _all: true },
+        }),
+      ]);
+
+      const pageTaskGroups = await prisma.task.groupBy({
+        by: ["categoryId"],
+        where: { categoryId: { in: rows.map((row) => row.id) } },
+        _count: { _all: true },
+      });
+      const pageTaskCounts = new Map(
+        pageTaskGroups.map((group) => [group.categoryId, group._count._all]),
+      );
+
+      return NextResponse.json({
+        data: rows.map((row) => ({
+          id: row.id,
+          name: row.name,
+          description: row.description || "",
+          status: row.status,
+          createdAt: row.createdAt.toISOString(),
+          ...describeCreator(row),
+          taskCount: pageTaskCounts.get(row.id) ?? 0,
+        })),
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+        counts: Object.fromEntries(statusGroups.map((group) => [group.status, group._count._all])),
+      });
+    }
+
+    const categories = await prisma.taskCategory.findMany({
+      where,
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        color: true,
+        status: true,
+        createdAt: true,
+        updatedAt: true,
+        createdByUserId: true,
+        createdByAgentId: true,
+        approvedById: true,
+        approvedAt: true,
+        timePeriod: true,
+        agentCanEditDays: true,
+        createdByUser: { select: { username: true, adminType: true } },
+        createdByAgent: { select: { name: true } },
+        approvedBy: { select: { username: true } },
       },
-      orderBy: {
-        createdAt: "desc",
-      },
+      orderBy: { createdAt: "desc" },
     });
 
-    // Get task counts for each category (this will be implemented later)
-    // For now, we'll return 0 for task counts
+    // One grouped count for every category, rather than a query per category.
+    const taskGroups = await prisma.task.groupBy({
+      by: ["categoryId"],
+      where: { categoryId: { in: categories.map((category) => category.id) } },
+      _count: { _all: true },
+    });
+    const taskCountById = new Map(
+      taskGroups.map((group) => [group.categoryId, group._count._all]),
+    );
 
     // Transform data for frontend
-    const transformedCategories = await Promise.all(
-      categories.map(async (category) => {
-        // Count tasks that belong to this category
-        const taskCount = await prisma.task.count({
-          where: {
-            categoryId: category.id,
-          },
-        });
-        // Determine creator name and type
-        let creatorName = null;
-        let creatorType = null;
-        let creatorRole = null;
-        if (category.createdByUser) {
-          creatorName = category.createdByUser.username;
-          creatorType = "user";
-          creatorRole = category.createdByUser.adminType; // "owner" or "admin"
-        } else if (category.createdByAgent) {
-          creatorName = category.createdByAgent.name;
-          creatorType = "agent";
-          creatorRole = null;
-        }
+    const transformedCategories = categories.map((category) => {
+      const taskCount = taskCountById.get(category.id) ?? 0;
         return {
           id: category.id,
           name: category.name,
@@ -110,9 +173,7 @@ export async function GET(req: NextRequest) {
           status: category.status,
           createdAt: category.createdAt.toISOString(),
           updatedAt: category.updatedAt.toISOString(),
-          createdBy: creatorName,
-          createdByType: creatorType,
-          createdByRole: creatorRole,
+          ...describeCreator(category),
           createdById: category.createdByUserId || category.createdByAgentId,
           approvedById: category.approvedById || null,
           approvedBy: category.approvedBy?.username || null,
@@ -122,8 +183,7 @@ export async function GET(req: NextRequest) {
           timePeriod: category.timePeriod,
           agentCanEditDays: category.agentCanEditDays ?? false,
         };
-      })
-    );
+    });
 
     return NextResponse.json(transformedCategories);
   } catch (error) {

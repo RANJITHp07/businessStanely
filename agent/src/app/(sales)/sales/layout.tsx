@@ -4,6 +4,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 import Navigator from "@/components/navigator";
 import { ToastContainer } from "react-toastify";
 import { AuthGuard } from "@/components/AuthGuard";
+import { SidebarAccessProvider } from "@/components/SidebarAccessProvider";
 import AuthSessionTimeout from "@/components/AuthSessionTimeout";
 
 export default function RootLayout({
@@ -13,6 +14,7 @@ export default function RootLayout({
 }>) {
     return (
         <AuthGuard>
+            <SidebarAccessProvider>
             <AuthSessionTimeout />
             <div className="overflow-x-clip flex w-full">
                 <SidebarProvider>
@@ -33,6 +35,7 @@ export default function RootLayout({
                 </SidebarProvider>
                 <ToastContainer />
             </div>
+            </SidebarAccessProvider>
         </AuthGuard>
     );
 }

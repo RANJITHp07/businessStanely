@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
+import { sidebarItemsForRole } from "@/lib/sidebarAccess";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Upload, X, User, FileText, Users, Search, UserPlus, UserCheck } from "lucide-react";
@@ -203,6 +204,7 @@ export default function AgentForm({ agent }: AgentFormProps) {
     autoAssign?: boolean
     enquiryAutoAssign?: boolean
     canCreateTask?: boolean
+    hiddenSidebarItems: string[]
   };
   const searchParams = useSearchParams();
   const agentRole = searchParams.get("agentRole");
@@ -229,7 +231,8 @@ export default function AgentForm({ agent }: AgentFormProps) {
     enquiryAutoAssign: agent?.enquiryAutoAssign ?? true,
     // `??` rather than `||` so an agent explicitly set to false stays false
     // when the edit form reloads.
-    canCreateTask: agent?.canCreateTask ?? true
+    canCreateTask: agent?.canCreateTask ?? true,
+    hiddenSidebarItems: agent?.hiddenSidebarItems ?? [],
   });
   const [agentSearch, setAgentSearch] = useState("");
   const [advisorAgentSearch, setAdvisorAgentSearch] = useState("");
@@ -867,6 +870,41 @@ export default function AgentForm({ agent }: AgentFormProps) {
                     affected.
                   </p>
                 </div>
+              </div>
+            </div>
+
+            {/* Sidebar visibility */}
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <Label>Sidebar Items</Label>
+                <p className="text-xs text-muted-foreground">
+                  Untick an item to hide it from this agent&apos;s sidebar and
+                  block its pages. Settings and Logout are always visible.
+                </p>
+              </div>
+              <div className="grid grid-cols-1 gap-3 rounded-lg border p-4 sm:grid-cols-2 lg:grid-cols-3">
+                {sidebarItemsForRole(formData.agentRole).map((item) => (
+                  <div key={item.key} className="flex items-center gap-2">
+                    <Checkbox
+                      id={`sidebar-item-${item.key}`}
+                      checked={!formData.hiddenSidebarItems.includes(item.key)}
+                      onCheckedChange={(checked) =>
+                        setFormData((prev) => ({
+                          ...prev,
+                          hiddenSidebarItems: checked
+                            ? prev.hiddenSidebarItems.filter((key) => key !== item.key)
+                            : [...prev.hiddenSidebarItems, item.key],
+                        }))
+                      }
+                    />
+                    <Label
+                      htmlFor={`sidebar-item-${item.key}`}
+                      className="text-sm font-normal"
+                    >
+                      {item.title}
+                    </Label>
+                  </div>
+                ))}
               </div>
             </div>
           </CardContent>

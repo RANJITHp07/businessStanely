@@ -45,6 +45,7 @@ import Image from "next/image";
 import Logo from "./../../public/Logo.jpg";
 import { hasAdvisorRole, hasExecutionRole, EXECUTION_AND_ADVISOR_AGENT_ROLE } from "@/lib/agentRole";
 import { getAdvisorAgentType } from "@/lib/agentType";
+import { useHiddenSidebarItems } from "@/components/SidebarAccessProvider";
 
 type MenuItem = {
   title: string;
@@ -162,6 +163,8 @@ export function AppSidebar() {
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
   const pathname = usePathname();
   const { setOpenMobile, isMobile } = useSidebar();
+  const hiddenItems = useHiddenSidebarItems();
+  const isVisible = (item: MenuItem) => !hiddenItems.includes(item.url);
   const { agentRole, agentType } = useMemo(() => {
     if (typeof window === "undefined") {
       return { agentRole: null as string | null, agentType: null as string | null };
@@ -260,7 +263,7 @@ export function AppSidebar() {
   ]);
 
   const renderItems = (items: MenuItem[]) =>
-    items.map((item) => {
+    items.filter(isVisible).map((item) => {
       const isActive =
         pathname === item.url ||
         (item.url !== "/dashboard" && pathname.startsWith(`${item.url}/`));
@@ -327,7 +330,7 @@ export function AppSidebar() {
             </SidebarGroup>
           )}
 
-          {isDualRole && showExecutionPanel && (
+          {isDualRole && showExecutionPanel && dashboardItems.some(isVisible) && (
             <SidebarGroup>
               <SidebarGroupLabel className="text-[16px] mt-[30px] text-white py-5 px-3 -ml-4 rounded-none border-b border-t border-white font-medium">
                 Execution Panel
@@ -340,7 +343,7 @@ export function AppSidebar() {
             </SidebarGroup>
           )}
 
-          {isDualRole && showSalesPanel && (
+          {isDualRole && showSalesPanel && visibleSalesItems.some(isVisible) && (
             <SidebarGroup>
               <SidebarGroupLabel className="text-[16px] text-white py-5 px-3 -ml-4 rounded-none border-b border-t border-white font-medium">
                 Sales Panel

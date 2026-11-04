@@ -95,5 +95,7 @@ export function useTablePage(key: string, defaultItemsPerPage = 20) {
         itemsPerPage,
         setItemsPerPage,
         clampToTotalPages,
+        /** False until a saved page has been read, so a fetch can wait for it. */
+        restored,
     }
 }

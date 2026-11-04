@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useState, useEffect } from "react"
+import { useState, useEffect } from "react"
 import { fetchWithAuth } from "@/lib/fetchWithAuth"
 import Link from "next/link"
 import { toast } from "react-toastify"
@@ -60,13 +60,24 @@ export default function TaskCategoryTable() {
     const [categories, setCategories] = useState<TaskCategory[]>([])
     const [searchTerm, setSearchTerm] = useState("")
     // Removed unused sortBy and sortByDate state
-    const { currentPage, setCurrentPage, itemsPerPage, setItemsPerPage, clampToTotalPages } =
+    const { currentPage, setCurrentPage, itemsPerPage, setItemsPerPage, clampToTotalPages, restored } =
         useTablePage("admin-dashboard-task_category-page")
     const [categoryToDelete, setCategoryToDelete] = useState<TaskCategory | null>(null)
+    // `loading` covers the table; the search box stays mounted while results
+    // change, so it only waits for the first response.
     const [loading, setLoading] = useState(true)
+    const [initialLoading, setInitialLoading] = useState(true)
+    const [debouncedSearch, setDebouncedSearch] = useState("")
+    const [total, setTotal] = useState(0)
+    const [statusCounts, setStatusCounts] = useState<Record<string, number>>({})
+    // Bumped after a delete so the current page and the counts are fetched again.
+    const [reloadKey, setReloadKey] = useState(0)
     const [activeTab, setActiveTab] = useState("approved")
     const [deletedCategories, setDeletedCategories] = useState<DeletedTaskCategory[]>([])
     const [deletedLoading, setDeletedLoading] = useState(false)
+    const [deletedPage, setDeletedPage] = useState(1)
+    const [deletedTotal, setDeletedTotal] = useState(0)
+    const [deletedCount, setDeletedCount] = useState(0)
     const [currentUserRole, setCurrentUserRole] = useState<string>("")
 
     const router = useRouter()
@@ -88,118 +99,124 @@ export default function TaskCategoryTable() {
         }
     }, [activeTab])
 
-    // State to store all categories for counting
-    const [allCategories, setAllCategories] = useState<TaskCategory[]>([]);
-
-    // Fetch all categories for counting tabs
-    useEffect(() => {
-        const fetchAllCategories = async () => {
-            try {
-                const response = await fetchWithAuth(`/api/task-categories`);
-
-                if (!response.ok) {
-                    throw new Error('Failed to fetch all categories');
-                }
-
-                const data = await response.json();
-                setAllCategories(data);
-            } catch (error) {
-                console.error("Error fetching all categories:", error);
-                setAllCategories([]);
-            }
-        };
-        fetchAllCategories();
-    }, []);
-
     // Deleted services live behind their own endpoint: the normal read path
     // filters them out, so they can only be listed separately.
-    const fetchDeletedCategories = useCallback(async () => {
-        try {
-            setDeletedLoading(true);
-            const response = await fetchWithAuth(`/api/deleted-task-categories`);
-
-            if (!response.ok) {
-                throw new Error('Failed to fetch deleted services');
-            }
-
-            const data = await response.json();
-            setDeletedCategories(Array.isArray(data) ? data : []);
-        } catch (error) {
-            console.error("Error fetching deleted services:", error);
-            setDeletedCategories([]);
-            if (error instanceof Error) {
-                toast.error(error.message);
-            }
-        } finally {
-            setDeletedLoading(false);
-        }
-    }, []);
-
     useEffect(() => {
-        fetchDeletedCategories();
-    }, [fetchDeletedCategories]);
+        if (!restored) return
+        let stale = false
 
-    useEffect(() => {
-        // The deleted tab has its own fetch above; this one only serves the
-        // approved and pending tabs.
-        if (activeTab === 'deleted') return;
-
-        const fetchCategories = async () => {
+        const fetchDeletedCategories = async () => {
+            setDeletedLoading(true)
             try {
-                setLoading(true);
-                // Fetch categories from API based on active tab
-                const status = activeTab === 'approved' ? 'approved' : 'pending';
-                const response = await fetchWithAuth(`/api/task-categories?status=${status}`);
+                const params = new URLSearchParams({
+                    page: String(deletedPage),
+                    limit: String(itemsPerPage),
+                })
+                if (debouncedSearch) params.set("search", debouncedSearch)
+                const response = await fetchWithAuth(`/api/deleted-task-categories?${params}`)
 
                 if (!response.ok) {
-                    throw new Error('Failed to fetch categories');
+                    throw new Error('Failed to fetch deleted services')
                 }
 
-                const data = await response.json();
-                setCategories(data);
+                const result = await response.json()
+                if (stale) return
+                setDeletedCategories(result.data)
+                setDeletedTotal(result.total)
+                setDeletedCount(result.allTotal)
             } catch (error) {
-                console.error("Error fetching categories:", error);
-                // Show empty state instead of mock data
-                setCategories([]);
+                if (stale) return
+                console.error("Error fetching deleted services:", error)
+                setDeletedCategories([])
+                setDeletedTotal(0)
                 if (error instanceof Error) {
-                    toast.error(error.message);
+                    toast.error(error.message)
                 }
             } finally {
-                setLoading(false);
+                if (!stale) setDeletedLoading(false)
             }
-        };
-        fetchCategories();
-    }, [activeTab])
+        }
 
+        fetchDeletedCategories()
+        return () => {
+            stale = true
+        }
+    }, [deletedPage, itemsPerPage, debouncedSearch, reloadKey, restored])
 
-    // Filter categories based on search and tab
-    const filteredCategories = categories.filter((category) => {
-        const matchesSearch =
-            category.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            (category.description?.toLowerCase() || "").includes(searchTerm.toLowerCase()) ||
-            (category.createdBy?.toLowerCase() || "").includes(searchTerm.toLowerCase());
+    // Search runs on the server, so wait for a pause in typing.
+    useEffect(() => {
+        const term = searchTerm.trim()
+        if (term === debouncedSearch) return
+        const timer = setTimeout(() => {
+            setDebouncedSearch(term)
+            setCurrentPage(1)
+            setDeletedPage(1)
+        }, 300)
+        return () => clearTimeout(timer)
+    }, [searchTerm, debouncedSearch, setCurrentPage])
 
-        const matchesTab = category.status === activeTab;
+    useEffect(() => {
+        if (!restored || activeTab === "deleted") return
+        let stale = false
 
-        return matchesSearch && matchesTab;
-    });
+        const fetchCategories = async () => {
+            setLoading(true)
+            try {
+                const params = new URLSearchParams({
+                    status: activeTab,
+                    page: String(currentPage),
+                    limit: String(itemsPerPage),
+                })
+                if (debouncedSearch) params.set("search", debouncedSearch)
+                const response = await fetchWithAuth(`/api/task-categories?${params}`)
 
-    // Apply sorting to filtered categories
-    const sortedCategories = filteredCategories
+                if (!response.ok) {
+                    throw new Error('Failed to fetch categories')
+                }
+
+                const result = await response.json()
+                if (stale) return
+                setCategories(result.data)
+                setTotal(result.total)
+                setStatusCounts(result.counts)
+            } catch (error) {
+                if (stale) return
+                console.error("Error fetching categories:", error)
+                // Show empty state instead of mock data
+                setCategories([])
+                setTotal(0)
+                if (error instanceof Error) {
+                    toast.error(error.message)
+                }
+            } finally {
+                if (!stale) {
+                    setLoading(false)
+                    setInitialLoading(false)
+                }
+            }
+        }
+
+        fetchCategories()
+        return () => {
+            stale = true
+        }
+    }, [activeTab, currentPage, itemsPerPage, debouncedSearch, reloadKey, restored])
+
 
     const resetFilters = () => {
         setSearchTerm("")
     }
 
-    // Pagination logic
-    const totalPages = Math.ceil(sortedCategories.length / itemsPerPage)
+    const totalPages = Math.ceil(total / itemsPerPage)
 
     useEffect(() => {
-        clampToTotalPages(totalPages)
-    }, [totalPages, clampToTotalPages])
-    const startIndex = (currentPage - 1) * itemsPerPage
-    const endIndex = startIndex + itemsPerPage
-    const currentCategories = sortedCategories.slice(startIndex, endIndex)
+        if (!loading) clampToTotalPages(totalPages)
+    }, [loading, totalPages, clampToTotalPages])
+
+    const handleTabChange = (value: string) => {
+        setActiveTab(value)
+        setCurrentPage(1)
+    }
 
     const handlePageChange = (page: number) => {
         setCurrentPage(page)
@@ -224,13 +241,8 @@ export default function TaskCategoryTable() {
 
             const result = await response.json().catch(() => ({}))
 
-            // Update both category lists in the UI
-            setCategories(categories.filter((category) => category.id !== categoryToDelete.id))
-            setAllCategories(allCategories.filter((category) => category.id !== categoryToDelete.id))
+            setReloadKey((key) => key + 1)
             setCategoryToDelete(null)
-            // The delete cascades to the service's tasks, so the deleted tab is
-            // refetched rather than patched locally.
-            fetchDeletedCategories()
             const deletedTaskCount = result?.deletedTaskCount ?? 0
             toast.success(
                 deletedTaskCount > 0
@@ -257,22 +269,10 @@ export default function TaskCategoryTable() {
         )
     }
 
-    // Get counts for tabs from allCategories to always show correct counts
-    const approvedCount = allCategories.filter((cat) => cat.status === "approved").length
-    const pendingCount = allCategories.filter((cat) => cat.status === "pending").length
-    const deletedCount = deletedCategories.length
+    const approvedCount = statusCounts.approved ?? 0
+    const pendingCount = statusCounts.pending ?? 0
 
-    // The deleted tab has its own list, so it gets its own search filter rather
-    // than going through the status-based one above.
-    const filteredDeletedCategories = deletedCategories.filter((category) => {
-        const term = searchTerm.toLowerCase()
-        return (
-            category.name.toLowerCase().includes(term) ||
-            (category.description?.toLowerCase() || "").includes(term) ||
-            (category.createdBy?.toLowerCase() || "").includes(term) ||
-            (category.deletedBy?.toLowerCase() || "").includes(term)
-        )
-    })
+    const deletedTotalPages = Math.ceil(deletedTotal / itemsPerPage)
 
     return (
         <div className="container mx-auto p-6 max-w-7xl">
@@ -301,7 +301,7 @@ export default function TaskCategoryTable() {
                         <CardDescription>Filter and search through your services</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                        {loading ? (
+                        {initialLoading ? (
                             <>
                                 <div className="h-[200px] w-full bg-gray-200 rounded-2xl mb-4"></div>
                                 <div className="flex justify-between gap-4">
@@ -344,7 +344,7 @@ export default function TaskCategoryTable() {
             </div>
 
             {/* Categories Table with Tabs */}
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+            <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-6">
                 <TabsList className="grid w-full grid-cols-3">
                     <TabsTrigger value="approved" className="flex items-center gap-2">
                         <CheckCircle className="h-4 w-4" />
@@ -366,7 +366,7 @@ export default function TaskCategoryTable() {
                             <div className="flex items-center justify-between">
                                 <CardTitle className="flex items-center gap-2">
                                     <CheckCircle className="h-5 w-5" />
-                                    Approved Services ({sortedCategories.length})
+                                    Approved Services ({total})
                                 </CardTitle>
                                 {/* <div className="flex items-center gap-2">
                                     <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
@@ -410,14 +410,14 @@ export default function TaskCategoryTable() {
                                                 </TableRow>
                                             </TableHeader>
                                             <TableBody>
-                                                {currentCategories.length === 0 ? (
+                                                {categories.length === 0 ? (
                                                     <TableRow>
                                                         <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                                                             No approved categories found matching your criteria.
                                                         </TableCell>
                                                     </TableRow>
                                                 ) : (
-                                                    currentCategories.map((category) => (
+                                                    categories.map((category) => (
                                                         <TableRow key={category.id} className="cursor-pointer hover:bg-muted/50" onClick={() => router.push(`/task_category/${category.id}`)}>
                                                             <TableCell>
                                                                 <div className="flex items-center space-x-3">
@@ -591,7 +591,7 @@ export default function TaskCategoryTable() {
                             <div className="flex items-center justify-between">
                                 <CardTitle className="flex items-center gap-2">
                                     <Clock className="h-5 w-5" />
-                                    Pending Categories ({sortedCategories.length})
+                                    Pending Categories ({total})
                                 </CardTitle>
                                 {/* <div className="flex items-center gap-2">
                                     <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
@@ -635,14 +635,14 @@ export default function TaskCategoryTable() {
                                                 </TableRow>
                                             </TableHeader>
                                             <TableBody>
-                                                {currentCategories.length === 0 ? (
+                                                {categories.length === 0 ? (
                                                     <TableRow>
                                                         <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                                                             No pending categories found matching your criteria.
                                                         </TableCell>
                                                     </TableRow>
                                                 ) : (
-                                                    currentCategories.map((category) => (
+                                                    categories.map((category) => (
                                                         <TableRow key={category.id} className="cursor-pointer hover:bg-muted/50" onClick={() => router.push(`/task_category/approve/${category.id}`)}>
                                                             <TableCell>
                                                                 <div className="flex items-center space-x-3">
@@ -803,7 +803,7 @@ export default function TaskCategoryTable() {
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2">
                                 <Trash2 className="h-5 w-5" />
-                                Deleted Services ({filteredDeletedCategories.length})
+                                Deleted Services ({deletedTotal})
                             </CardTitle>
                             <CardDescription>
                                 Deleted services and the tasks removed with them. Kept for
@@ -829,14 +829,14 @@ export default function TaskCategoryTable() {
                                             </TableRow>
                                         </TableHeader>
                                         <TableBody>
-                                            {filteredDeletedCategories.length === 0 ? (
+                                            {deletedCategories.length === 0 ? (
                                                 <TableRow>
                                                     <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                                                         No deleted services found matching your criteria.
                                                     </TableCell>
                                                 </TableRow>
                                             ) : (
-                                                filteredDeletedCategories.map((category) => (
+                                                deletedCategories.map((category) => (
                                                     <TableRow
                                                         key={category.id}
                                                         className="cursor-pointer hover:bg-muted/50"
@@ -907,6 +907,33 @@ export default function TaskCategoryTable() {
                                         </TableBody>
                                     </Table>
                                 </div>
+                                {deletedTotalPages > 1 && (
+                                    <div className="flex items-center justify-between py-4">
+                                        <div className="text-sm text-muted-foreground">
+                                            Page {deletedPage} of {deletedTotalPages}
+                                        </div>
+                                        <div className="flex items-center space-x-2">
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                aria-label="Previous page"
+                                                onClick={() => setDeletedPage(deletedPage - 1)}
+                                                disabled={deletedPage === 1}
+                                            >
+                                                <ChevronLeft className="h-4 w-4" />
+                                            </Button>
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                aria-label="Next page"
+                                                onClick={() => setDeletedPage(deletedPage + 1)}
+                                                disabled={deletedPage === deletedTotalPages}
+                                            >
+                                                <ChevronRight className="h-4 w-4" />
+                                            </Button>
+                                        </div>
+                                    </div>
+                                )}
                             </CardContent>
                         )}
                     </Card>

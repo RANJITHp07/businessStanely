@@ -1,3 +1,4 @@
+import { sanitizeHiddenSidebarItems } from "@/lib/sidebarAccess";
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import bcrypt from "bcryptjs";
@@ -41,6 +42,7 @@ export async function POST(req: NextRequest) {
       autoAssign,
       enquiryAutoAssign,
       canCreateTask,
+      hiddenSidebarItems,
       ...agentData
     } = body;
 
@@ -175,6 +177,7 @@ export async function POST(req: NextRequest) {
       // Default to allowed so agents created before this flag existed, and any
       // client that omits it, keep the previous behaviour.
       canCreateTask: canCreateTask ?? true,
+      hiddenSidebarItems: sanitizeHiddenSidebarItems(hiddenSidebarItems),
       ...(specializations?.length && {
         specializations: {
           set: specializations,

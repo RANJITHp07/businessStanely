@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getCurrentAdmin } from "@/lib/auth";
 import { onlyDeleted } from "@/lib/softDelete";
+import { categorySearchConditions, parsePagination } from "@/lib/taskCategoryList";
 
 /**
  * GET /api/deleted-task-categories — soft-deleted services, newest deletion
@@ -18,12 +19,38 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const { searchParams } = new URL(req.url);
+    const { page, limit, skip } = parsePagination(searchParams);
+    const search = searchParams.get("search")?.trim();
+    const where = search
+      ? {
+          ...onlyDeleted,
+          OR: await categorySearchConditions(search, { includeDeleter: true }),
+        }
+      : onlyDeleted;
+
+    const [total, allTotal] = await Promise.all([
+      prisma.taskCategory.count({ where }),
+      // The tab label counts every deleted service, whatever the search.
+      search ? prisma.taskCategory.count({ where: onlyDeleted }) : null,
+    ]);
+
     const categories = await prisma.taskCategory.findMany({
-      where: onlyDeleted,
+      where,
       orderBy: { deletedAt: "desc" },
-      include: {
-        createdByUser: { select: { id: true, username: true, adminType: true } },
-        createdByAgent: { select: { id: true, name: true } },
+      skip,
+      take: limit,
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        status: true,
+        createdAt: true,
+        deletedAt: true,
+        deletedById: true,
+        deletedByType: true,
+        createdByUser: { select: { username: true, adminType: true } },
+        createdByAgent: { select: { name: true } },
       },
     });
 
@@ -79,12 +106,16 @@ export async function GET(req: NextRequest) {
     for (const user of deletedUsers) deleterNameById.set(user.id, user.username);
     for (const agent of deletedAgents) deleterNameById.set(agent.id, agent.name);
 
-    return NextResponse.json(
-      categories.map((category) => ({
+    return NextResponse.json({
+      total,
+      allTotal: allTotal ?? total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+      data: categories.map((category) => ({
         id: category.id,
         name: category.name,
         description: category.description || "",
-        color: category.color,
         status: category.status,
         createdAt: category.createdAt.toISOString(),
         deletedAt: category.deletedAt?.toISOString() || null,
@@ -102,10 +133,9 @@ export async function GET(req: NextRequest) {
           ? "agent"
           : null,
         createdByRole: category.createdByUser?.adminType || null,
-        timePeriod: category.timePeriod,
         taskCount: taskCountById.get(category.id) || 0,
-      }))
-    );
+      })),
+    });
   } catch (error) {
     console.error("Error fetching deleted services:", error);
     return NextResponse.json(

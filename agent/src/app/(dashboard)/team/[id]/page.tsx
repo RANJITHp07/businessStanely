@@ -43,6 +43,8 @@ import {
   CheckCircle,
   Clock,
   TrendingUp,
+  CalendarDays,
+  ArrowRight,
 } from "lucide-react";
 import { Agent, Prospect, Task } from "@/types";
 import Link from "next/link";
@@ -54,6 +56,8 @@ interface AgentActivity {
   taskTitle: string;
   content: string;
   createdAt: string;
+  startTime: string | null;
+  endTime: string | null;
 }
 
 interface OpportunityRecord {
@@ -62,6 +66,53 @@ interface OpportunityRecord {
   nextFollowUp?: string;
   createdAt: string;
   prospect?: Prospect;
+}
+
+function formatActivityTime(value: string | null) {
+  if (!value) return "-";
+  return new Date(value).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+function formatActivityDuration(activity: AgentActivity) {
+  if (!activity.startTime || !activity.endTime) return "-";
+  const minutes = Math.round(
+    (new Date(activity.endTime).getTime() - new Date(activity.startTime).getTime()) / 60000
+  );
+  if (!(minutes > 0)) return "-";
+  const hours = Math.floor(minutes / 60);
+  const remainder = minutes % 60;
+  if (hours === 0) return `${remainder}m`;
+  return remainder === 0 ? `${hours}h` : `${hours}h ${remainder}m`;
+}
+
+/** When an interaction was logged, and the work session it covers. */
+function ActivityTimeCell({ activity }: { activity: AgentActivity }) {
+  const duration = formatActivityDuration(activity);
+  const logged = new Date(activity.createdAt);
+  return (
+    <div className="min-w-[190px] space-y-1.5">
+      <div className="flex items-center gap-1.5 text-sm font-medium whitespace-nowrap">
+        <CalendarDays className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
+        {logged.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
+        <span className="text-muted-foreground font-normal">
+          {logged.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+        </span>
+      </div>
+      {(activity.startTime || activity.endTime) && (
+        <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-muted-foreground">
+          <Clock className="h-3.5 w-3.5" aria-hidden="true" />
+          <span className="whitespace-nowrap" title="Start time">{formatActivityTime(activity.startTime)}</span>
+          <ArrowRight className="h-3 w-3" aria-label="to" />
+          <span className="whitespace-nowrap" title="End time">{formatActivityTime(activity.endTime)}</span>
+          {duration !== "-" && (
+            <Badge variant="secondary" className="ml-1 px-1.5 py-0 text-[11px] font-medium" title="Duration">
+              {duration}
+            </Badge>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function groupActivitiesByDate(activities: AgentActivity[]) {
@@ -541,11 +592,12 @@ export default function AgentDetails() {
 
   // Keep activeTab in sync with the tab query param
   useEffect(() => {
-    const tabParam = searchParams.get("tab");
-    if (tabParam && tabParam !== activeTab) {
-      setActiveTab(tabParam);
-    }
-  }, [searchParams, activeTab]);
+    // Only a URL change moves the tab. Reacting to activeTab as well put a click
+    // straight back on the old tab until the router caught up with the URL, and
+    // `location` rather than `searchParams` so a late update cannot undo a newer click.
+    const tabParam = new URLSearchParams(window.location.search).get("tab");
+    if (tabParam) setActiveTab(tabParam);
+  }, [searchParams]);
 
   useEffect(() => {
     if (!id) return;
@@ -1544,7 +1596,9 @@ export default function AgentDetails() {
                                   <TableCell style={{ wordBreak: 'break-word', whiteSpace: 'pre-line', maxWidth: 320 }}>
                                     {activity.content}
                                   </TableCell>
-                                  <TableCell>{new Date(activity.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</TableCell>
+                                  <TableCell className="align-top">
+                                    <ActivityTimeCell activity={activity} />
+                                  </TableCell>
                                 </TableRow>
                               ))}
                             </TableBody>

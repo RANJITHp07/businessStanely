@@ -72,6 +72,8 @@ import {
   ChevronsRight,
   RotateCcw,
   UserCheck,
+  CalendarDays,
+  ArrowRight,
 } from "lucide-react";
 import { Agent, Client, Task } from "@/types";
 import Link from "next/link";
@@ -258,6 +260,11 @@ const ACTIVITY_TYPE_LABELS: Record<ActivityEntityType, string> = {
 };
 
 // Only comments logged with a work session have start and end times.
+function formatActivityTime(value: string | null) {
+  if (!value) return "-";
+  return new Date(value).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
 function formatActivityDuration(activity: AgentActivity) {
   if (!activity.startTime || !activity.endTime) return "-";
   const minutes = Math.round(
@@ -268,6 +275,36 @@ function formatActivityDuration(activity: AgentActivity) {
   const remainder = minutes % 60;
   if (hours === 0) return `${remainder}m`;
   return remainder === 0 ? `${hours}h` : `${hours}h ${remainder}m`;
+}
+
+/** When an interaction was logged, and the work session it covers. */
+function ActivityTimeCell({ activity }: { activity: AgentActivity }) {
+  const duration = formatActivityDuration(activity);
+  const logged = new Date(activity.createdAt);
+  return (
+    <div className="min-w-[190px] space-y-1.5">
+      <div className="flex items-center gap-1.5 text-sm font-medium whitespace-nowrap">
+        <CalendarDays className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
+        {logged.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
+        <span className="text-muted-foreground font-normal">
+          {logged.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+        </span>
+      </div>
+      {(activity.startTime || activity.endTime) && (
+        <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-muted-foreground">
+          <Clock className="h-3.5 w-3.5" aria-hidden="true" />
+          <span className="whitespace-nowrap" title="Start time">{formatActivityTime(activity.startTime)}</span>
+          <ArrowRight className="h-3 w-3" aria-label="to" />
+          <span className="whitespace-nowrap" title="End time">{formatActivityTime(activity.endTime)}</span>
+          {duration !== "-" && (
+            <Badge variant="secondary" className="ml-1 px-1.5 py-0 text-[11px] font-medium" title="Duration">
+              {duration}
+            </Badge>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function groupActivitiesByDate(activities: AgentActivity[]) {
@@ -386,11 +423,12 @@ export default function AgentDetails() {
 
   // Keep activeTab in sync with the tab query param
   useEffect(() => {
-    const tabParam = searchParams.get("tab");
-    if (tabParam && tabParam !== activeTab) {
-      setActiveTab(tabParam);
-    }
-  }, [searchParams, activeTab]);
+    // Only a URL change moves the tab. Reacting to activeTab as well put a click
+    // straight back on the old tab until the router caught up with the URL, and
+    // `location` rather than `searchParams` so a late update cannot undo a newer click.
+    const tabParam = new URLSearchParams(window.location.search).get("tab");
+    if (tabParam) setActiveTab(tabParam);
+  }, [searchParams]);
   const [activities, setActivities] = useState<AgentActivity[]>([]);
   const [activitiesLoading, setActivitiesLoading] = useState(true);
   const [serviceRecords, setServiceRecords] = useState<ServiceRecord[]>([]);
@@ -2451,7 +2489,6 @@ export default function AgentDetails() {
                                 <TableHead>Related To</TableHead>
                                 <TableHead>Interaction</TableHead>
                                 <TableHead>Date & Time</TableHead>
-                                <TableHead>Duration</TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -2480,8 +2517,9 @@ export default function AgentDetails() {
                                   <TableCell style={{ wordBreak: 'break-word', whiteSpace: 'pre-line', maxWidth: 200 }}>
                                     {activity.content}
                                   </TableCell>
-                                  <TableCell>{new Date(activity.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</TableCell>
-                                  <TableCell className="whitespace-nowrap">{formatActivityDuration(activity)}</TableCell>
+                                  <TableCell className="align-top">
+                                    <ActivityTimeCell activity={activity} />
+                                  </TableCell>
                                 </TableRow>
                                 );
                               })}

@@ -35,6 +35,8 @@ export async function GET(req: NextRequest) {
       taskTitle: comment.task?.title,
       content: comment.content,
       createdAt: comment.createdAt,
+      startTime: comment.startTime,
+      endTime: comment.endTime,
     }));
     return NextResponse.json(activities);
   } catch (error) {

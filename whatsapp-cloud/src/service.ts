@@ -293,6 +293,34 @@ class CloudWhatsAppService {
   private mediaQueue: Promise<void> = Promise.resolve();
   private templatesCache: { at: number; templates: WhatsAppTemplate[] } | null = null;
 
+  // Shared read cache for the chat list and message pages. Many agents look at
+  // the same data, so identical reads collapse into one Mongo query. Entries are
+  // tagged with a version that every write bumps, so a cached value is never
+  // served after the data behind it changed.
+  private chatsVersion = 0;
+  private messageVersions = new Map<string, number>();
+  private readCache = new Map<string, { version: string; value: Promise<unknown> }>();
+
+  private bumpChats() {
+    this.chatsVersion += 1;
+  }
+
+  private bumpMessages(chatId: string) {
+    this.messageVersions.set(chatId, (this.messageVersions.get(chatId) ?? 0) + 1);
+  }
+
+  private cached<T>(key: string, version: string, load: () => Promise<T>): Promise<T> {
+    const hit = this.readCache.get(key);
+    if (hit && hit.version === version) return hit.value as Promise<T>;
+    if (this.readCache.size > 2000) this.readCache.clear();
+    const value = load();
+    this.readCache.set(key, { version, value });
+    value.catch(() => {
+      if (this.readCache.get(key)?.value === value) this.readCache.delete(key);
+    });
+    return value;
+  }
+
   getState(): WhatsAppState {
     return this.state;
   }
@@ -550,6 +578,7 @@ class CloudWhatsAppService {
   private async setProfileName(waId: string, name: string) {
     const { chats } = await getCollections();
     await chats.updateOne({ _id: digitsOnly(waId) }, { $set: { profileName: name } }, { upsert: true });
+    this.bumpChats();
   }
 
   private async applyContact(waId: string, name: string | null) {
@@ -561,6 +590,7 @@ class CloudWhatsAppService {
       await contacts.deleteOne({ _id: waId });
     }
     await chats.updateOne({ _id: waId }, { $set: { contactName: name } });
+    this.bumpChats();
   }
 
   private async storeMessage(
@@ -604,6 +634,7 @@ class CloudWhatsAppService {
 
     const inserted = await messages.updateOne({ _id: doc._id }, { $setOnInsert: doc }, { upsert: true });
     if (!inserted.upsertedCount) return; // duplicate delivery
+    this.bumpMessages(chatId);
 
     const existingChat = await chats.findOne({ _id: chatId });
     const update: Record<string, unknown> = {};
@@ -636,6 +667,7 @@ class CloudWhatsAppService {
       },
       { upsert: true, returnDocument: "after" },
     );
+    this.bumpChats();
 
     if (source !== "history") {
       if (parsed.media?.id) this.queueMediaDownload(doc._id, parsed.media.id);
@@ -662,6 +694,7 @@ class CloudWhatsAppService {
       { returnDocument: "after" },
     );
     if (result) {
+      this.bumpMessages(result.chatId);
       publishWhatsAppEvent("messages-updated", { chatId: toChatId(result.chatId) });
     }
   }
@@ -688,10 +721,12 @@ class CloudWhatsAppService {
     const localFile = safeFileName(messageId);
     await fs.writeFile(path.join(mediaDir, localFile), buffer);
     const { messages } = await getCollections();
-    await messages.updateOne(
+    const updated = await messages.findOneAndUpdate(
       { _id: messageId },
       { $set: { "media.localFile": localFile, "media.mimetype": mimetype } },
+      { projection: { chatId: 1 } },
     );
+    if (updated) this.bumpMessages(updated.chatId);
   }
 
   async getMedia(messageId: string) {
@@ -762,13 +797,15 @@ class CloudWhatsAppService {
     const term = search.trim();
 
     if (!term) {
-      const docs = await chats
-        .find({ timestamp: { $ne: null } })
-        .sort({ timestamp: -1 })
-        .skip((page - 1) * pageSize)
-        .limit(pageSize)
-        .toArray();
-      return docs.map((doc) => this.toChatSummary(doc));
+      return this.cached(`chats:${page}:${pageSize}`, String(this.chatsVersion), async () => {
+        const docs = await chats
+          .find({ timestamp: { $ne: null } })
+          .sort({ timestamp: -1 })
+          .skip((page - 1) * pageSize)
+          .limit(pageSize)
+          .toArray();
+        return docs.map((doc) => this.toChatSummary(doc));
+      });
     }
 
     const limit = page * pageSize;
@@ -815,16 +852,29 @@ class CloudWhatsAppService {
     this.requireReady();
     const waId = toWaId(chatId);
     const { chats, messages } = await getCollections();
-    const docs = await messages.find({ chatId: waId }).sort({ timestamp: -1 }).limit(limit).toArray();
+    const docs = await this.cached(
+      `messages:${waId}:${limit}`,
+      String(this.messageVersions.get(waId) ?? 0),
+      () => messages.find({ chatId: waId }).sort({ timestamp: -1 }).limit(limit).toArray(),
+    );
 
-    const chat = await chats.findOne({ _id: waId });
+    const chat = await this.cached(`chat:${waId}`, String(this.chatsVersion), () =>
+      chats.findOne({ _id: waId }, { projection: { unreadCount: 1 } }),
+    );
     if (chat?.unreadCount) {
-      await chats.updateOne({ _id: waId }, { $set: { unreadCount: 0 } });
-      const lastInbound = docs.find((doc) => !doc.fromMe && doc.source === "webhook");
-      if (lastInbound) void this.markRead(lastInbound._id);
+      // Only the first viewer clears it; the others see the bumped version.
+      const cleared = await chats.updateOne(
+        { _id: waId, unreadCount: { $gt: 0 } },
+        { $set: { unreadCount: 0 } },
+      );
+      this.bumpChats();
+      if (cleared.modifiedCount) {
+        const lastInbound = docs.find((doc) => !doc.fromMe && doc.source === "webhook");
+        if (lastInbound) void this.markRead(lastInbound._id);
+      }
     }
 
-    return docs.reverse().map((doc) => this.toMessage(doc));
+    return [...docs].reverse().map((doc) => this.toMessage(doc));
   }
 
   private async markRead(messageId: string) {
@@ -843,6 +893,7 @@ class CloudWhatsAppService {
   private async recordOutgoing(doc: CloudMessageDoc) {
     const { chats, messages } = await getCollections();
     await messages.updateOne({ _id: doc._id }, { $setOnInsert: doc }, { upsert: true });
+    this.bumpMessages(doc.chatId);
     const chat = await chats.findOneAndUpdate(
       { _id: doc.chatId },
       {
@@ -854,6 +905,7 @@ class CloudWhatsAppService {
       },
       { upsert: true, returnDocument: "after" },
     );
+    this.bumpChats();
     const message = this.toMessage(doc);
     publishWhatsAppEvent("message", {
       chatId: message.chatId,

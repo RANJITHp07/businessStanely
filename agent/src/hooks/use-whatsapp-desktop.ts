@@ -222,7 +222,7 @@ export function useWhatsAppDesktop() {
     preferredChatId?: string | null,
     retryCount = 0,
   ): Promise<string | null> => {
-    setIsChatsLoading(true);
+    if (retryCount === 0) setIsChatsLoading(true);
     setChatsError(null);
     try {
       const chatList = await fetchChatsPage(1, 15);
@@ -241,7 +241,17 @@ export function useWhatsAppDesktop() {
       setChatsError(null);
       // Keep the loading state on and retry gently while WhatsApp Web syncs —
       // but normally the `chats-updated` SSE event delivers the list first.
-      if (chatList.length === 0 && retryCount < CHATS_EMPTY_RETRY_LIMIT) {
+      // The Cloud API backend stores chats in its database and pushes a
+      // `chats-updated` event when a new one appears, so an empty list there is
+      // final; only the legacy WhatsApp Web engine needs to wait for its sync.
+      if (
+        chatList.length === 0 &&
+        stateRef.current.provider !== "cloud" &&
+        retryCount < CHATS_EMPTY_RETRY_LIMIT
+      ) {
+        // An empty list is valid (e.g. a fresh Cloud API number with no chats
+        // yet), so show the page now and keep retrying quietly in the background.
+        setIsChatsLoading(false);
         await new Promise((res) =>
           setTimeout(res, CHATS_EMPTY_RETRY_DELAY_MS),
         );

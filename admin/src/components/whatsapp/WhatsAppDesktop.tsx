@@ -15,17 +15,14 @@ import {
     LoaderCircle,
     LogOut,
     MessageSquare,
-    MoreVertical,
     Moon,
     Pencil,
-    Phone,
     Play,
     Reply,
     Search,
     SendHorizonal,
     Sun,
     Trash2,
-    Video,
 } from "lucide-react";
 
 const WHATSAPP_THEME_KEY = "wa-theme";
@@ -771,7 +768,7 @@ function WhatsAppDesktop() {
 
     return (
         <div className="wa-root flex min-h-screen w-full bg-[var(--wa-bg)] text-[var(--wa-text)]" data-wa-theme={theme}>
-            <div className="mx-auto flex h-screen w-full max-w-screen-2xl overflow-hidden border-x border-[var(--wa-border)] bg-[var(--wa-panel)] shadow-[0_20px_80px_rgba(0,0,0,0.35)]">
+            <div className="flex h-screen w-full overflow-hidden bg-[var(--wa-panel)]">
                 <aside className={`${mobileSidebarOpen ? "flex" : "hidden"} w-full max-w-full flex-col border-r border-[var(--wa-border)] bg-[var(--wa-panel)] md:flex md:w-80 md:max-w-[20rem] md:shrink-0`}>
                     <div className="flex items-center justify-between bg-[var(--wa-header)] px-4 py-3">
                         <div className="flex items-center gap-3">
@@ -914,12 +911,6 @@ function WhatsAppDesktop() {
                                     </div>
                                 </div>
 
-                                <div className="flex items-center gap-2 text-[var(--wa-muted2)]">
-                                    <button type="button" className="rounded-full p-2 transition hover:bg-[var(--wa-hover)] hover:text-white"><Video className="h-5 w-5" /></button>
-                                    <button type="button" className="rounded-full p-2 transition hover:bg-[var(--wa-hover)] hover:text-white"><Phone className="h-5 w-5" /></button>
-                                    <button type="button" className="rounded-full p-2 transition hover:bg-[var(--wa-hover)] hover:text-white"><Search className="h-5 w-5" /></button>
-                                    <button type="button" className="rounded-full p-2 transition hover:bg-[var(--wa-hover)] hover:text-white"><MoreVertical className="h-5 w-5" /></button>
-                                </div>
                             </header>
 
                             <div className="relative flex-1 overflow-hidden bg-[#efeae2] bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.45),transparent_35%),linear-gradient(180deg,rgba(255,255,255,0.12),rgba(255,255,255,0.12))]">
@@ -955,7 +946,7 @@ function WhatsAppDesktop() {
                                                         className={`flex ${message.fromMe ? "justify-end" : "justify-start"}`}
                                                     >
                                                         <div
-                                                            className={`group max-w-[85%] rounded-xl px-3 py-2 shadow-[0_1px_0.5px_rgba(11,20,26,0.13)] md:max-w-[70%] ${message.fromMe ? "rounded-tr-sm bg-[#d9fdd3] text-[#111b21]" : "rounded-tl-sm bg-white text-[#111b21]"}`}
+                                                            className={`group relative max-w-[85%] rounded-xl px-3 py-1.5 shadow-[0_1px_0.5px_rgba(11,20,26,0.13)] md:max-w-[70%] ${message.fromMe ? "rounded-tr-sm bg-[#d9fdd3] text-[#111b21]" : "rounded-tl-sm bg-white text-[#111b21]"}`}
                                                         >
                                                             {message.author && !message.fromMe ? (
                                                                 <p className="mb-1 text-xs font-medium text-[#667781]">{message.author}</p>
@@ -976,7 +967,7 @@ function WhatsAppDesktop() {
                                                                 <p className="wrap-break-word whitespace-pre-wrap text-[14px] leading-6">{message.body || "Unsupported message"}</p>
                                                             )}
 
-                                                            <div className={`mt-1 flex gap-1 opacity-0 transition group-hover:opacity-100 ${message.fromMe ? "justify-end" : "justify-start"}`}>
+                                                            <div className={`pointer-events-none absolute -top-3 z-10 flex gap-0.5 rounded-md bg-white/95 p-0.5 opacity-0 shadow-sm transition group-hover:pointer-events-auto group-hover:opacity-100 ${message.fromMe ? "right-2" : "left-2"}`}>
                                                                 <button
                                                                     type="button"
                                                                     onClick={() => setReplyTarget(message)}
@@ -1008,7 +999,7 @@ function WhatsAppDesktop() {
                                                                 ) : null}
                                                             </div>
 
-                                                            <div className="mt-1 flex items-center justify-end gap-1 text-[11px] text-[#667781]">
+                                                            <div className="-mt-0.5 flex items-center justify-end gap-1 text-[11px] leading-4 text-[#667781]">
                                                                 <span>{formatTime(message.timestamp)}</span>
                                                                 {message.fromMe ? (
                                                                     message.ack === -1 ? (

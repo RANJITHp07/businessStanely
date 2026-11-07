@@ -1026,7 +1026,7 @@ function WhatsAppDesktop() {
                             </div>
 
                             <footer className="bg-[var(--wa-header)] px-3 py-3 md:px-4">
-                                {isCloud && !isReplyWindowOpen(selectedChat.windowExpiresAt, now) ? (
+                                {isCloud && !selectedChat.isGroup && !isReplyWindowOpen(selectedChat.windowExpiresAt, now) ? (
                                     <TemplateComposer
                                         key={selectedChat.id}
                                         templates={templates}
@@ -1036,7 +1036,7 @@ function WhatsAppDesktop() {
                                     />
                                 ) : (
                                     <>
-                                        {isCloud && selectedChat.windowExpiresAt ? (
+                                        {isCloud && !selectedChat.isGroup && selectedChat.windowExpiresAt ? (
                                             <p className="mb-2 flex items-center gap-1.5 text-[11px] text-[var(--wa-muted)]">
                                                 Reply window closes in {formatWindowRemaining(selectedChat.windowExpiresAt, now)}
                                             </p>

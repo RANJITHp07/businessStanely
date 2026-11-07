@@ -1,6 +1,5 @@
-import fs from "fs/promises";
-import path from "path";
 
+import { readMedia, storeMedia } from "./media-store.js";
 import { publishWhatsAppEvent } from "./realtime.js";
 import type {
   WhatsAppChatSummary,
@@ -27,7 +26,6 @@ const LOG = (...args: unknown[]) => console.log("[WhatsApp Cloud]", ...args);
 const SERVICE_WINDOW_MS = 24 * 60 * 60 * 1000;
 const TEMPLATE_CACHE_MS = 5 * 60 * 1000;
 const RETRY_DELAY_MS = 30 * 1000;
-const mediaDir = path.resolve(process.env.WHATSAPP_MEDIA_DIR?.trim() || "wa-media");
 const defaultCountryCode = (process.env.WA_CLOUD_DEFAULT_COUNTRY_CODE ?? "91").replace(/\D/g, "");
 
 const ACK = { pending: 0, sent: 1, delivered: 2, read: 3, played: 4, failed: -1 } as const;
@@ -118,17 +116,36 @@ function digitsOnly(value: string) {
   return value.replace(/\D/g, "");
 }
 
-function isGroupId(value: string) {
-  return value.includes("@g.us") || value.includes("-");
+// Group chats are stored under "<group_id>@g.us"; individual chats under the
+// bare wa_id digits.
+function isGroupKey(value: string) {
+  return value.endsWith("@g.us");
 }
 
-// Accepts "919876543210@c.us", "+91 98765 43210" or a bare 10-digit Indian
-// number and returns the wa_id digits Cloud API uses.
+function groupKey(groupId: string) {
+  const id = groupId.trim().replace(/@g\.us$/, "");
+  return id ? `${id}@g.us` : "";
+}
+
+function groupIdFromKey(key: string) {
+  return key.replace(/@g\.us$/, "");
+}
+
+// Accepts "<group_id>@g.us" (returned as-is), "919876543210@c.us",
+// "+91 98765 43210" or a bare 10-digit Indian number (returned as the wa_id
+// digits Cloud API uses).
+function toChatKey(chatId: string) {
+  const raw = chatId.trim();
+  if (isGroupKey(raw)) {
+    const key = groupKey(raw);
+    if (!key) throw new CloudApiError("Invalid WhatsApp group.", 400);
+    return key;
+  }
+  return toWaId(raw);
+}
+
 function toWaId(chatId: string) {
   const raw = chatId.trim();
-  if (isGroupId(raw.split("@")[0] ?? "") || raw.endsWith("@g.us")) {
-    throw new CloudApiError("Group chats are disabled.", 403);
-  }
   let digits = digitsOnly(raw.split("@")[0] ?? "");
   if (digits.length === 10 && defaultCountryCode) {
     digits = `${defaultCountryCode}${digits}`;
@@ -139,8 +156,8 @@ function toWaId(chatId: string) {
   return digits;
 }
 
-function toChatId(waId: string) {
-  return `${waId}@c.us`;
+function toChatId(key: string) {
+  return isGroupKey(key) ? key : `${key}@c.us`;
 }
 
 function placeholders(text: string | undefined) {
@@ -186,9 +203,6 @@ function mediaPreview(type: string, body: string, filename?: string | null) {
   }
 }
 
-function safeFileName(id: string) {
-  return id.replace(/[^\w.-]/g, "_");
-}
 
 // Normalises any inbound/echo/history message into what we store. Returns
 // null for things that should not become a chat bubble (reactions etc.).
@@ -529,8 +543,16 @@ class CloudWhatsAppService {
               }
             }
             for (const message of value.messages ?? []) {
-              if (message.group_id || !message.from) continue;
-              await this.storeMessage(message, message.from, false, "webhook");
+              if (!message.from) continue;
+              if (message.group_id) {
+                const sender = digitsOnly(message.from);
+                const profile = value.contacts?.find((c) => digitsOnly(c.wa_id ?? "") === sender);
+                await this.storeMessage(message, groupKey(message.group_id), false, "webhook", {
+                  author: await this.participantName(sender, profile?.profile?.name),
+                });
+              } else {
+                await this.storeMessage(message, message.from, false, "webhook");
+              }
             }
             for (const status of value.statuses ?? []) {
               await this.applyStatus(status);
@@ -539,8 +561,11 @@ class CloudWhatsAppService {
           case "smb_message_echoes":
             // Sent from the WhatsApp Business app on the phone.
             for (const message of value.message_echoes ?? []) {
-              if (message.group_id || !message.to) continue;
-              await this.storeMessage(message, message.to, true, "echo");
+              if (message.group_id) {
+                await this.storeMessage(message, groupKey(message.group_id), true, "echo");
+              } else if (message.to) {
+                await this.storeMessage(message, message.to, true, "echo");
+              }
             }
             break;
           case "history":
@@ -549,10 +574,16 @@ class CloudWhatsAppService {
                 LOG("History sync error:", chunk.errors);
               }
               for (const thread of chunk.threads ?? []) {
-                if (!thread.id || isGroupId(thread.id)) continue;
+                if (!thread.id) continue;
+                // Group thread ids look like "1203...@g.us" or "<phone>-<time>".
+                const isGroupThread = thread.id.includes("@g.us") || thread.id.includes("-");
+                const threadKey = isGroupThread ? groupKey(thread.id.split("@")[0]!) : thread.id;
                 for (const message of thread.messages ?? []) {
-                  const fromMe = Boolean(businessDigits) && digitsOnly(message.from ?? "") === businessDigits;
-                  await this.storeMessage(message, thread.id, fromMe, "history");
+                  const sender = digitsOnly(message.from ?? "");
+                  const fromMe = Boolean(businessDigits) && sender === businessDigits;
+                  await this.storeMessage(message, threadKey, fromMe, "history", {
+                    author: isGroupThread && !fromMe && sender ? await this.participantName(sender) : null,
+                  });
                 }
               }
               LOG("History chunk stored", chunk.metadata ?? {});
@@ -572,6 +603,34 @@ class CloudWhatsAppService {
             break;
         }
       }
+    }
+  }
+
+  // Name shown above a group message: saved contact, else WhatsApp profile
+  // name, else the phone number.
+  private async participantName(waId: string, profileName?: string | null) {
+    if (!waId) return null;
+    const { chats, contacts } = await getCollections();
+    const contact = await contacts.findOne({ _id: waId });
+    if (contact?.name) return contact.name;
+    if (profileName) return profileName;
+    const chat = await chats.findOne({ _id: waId }, { projection: { profileName: 1 } });
+    return chat?.profileName || `+${waId}`;
+  }
+
+  // Groups API: GET /<group_id>?fields=subject. Best effort; groups the
+  // business does not own (or older API versions) just keep the fallback name.
+  private async fetchGroupSubject(key: string) {
+    try {
+      const config = this.config ?? (await this.loadConfig());
+      if (!config) return null;
+      const group = await graphRequest<{ subject?: string }>(config.accessToken, "GET", groupIdFromKey(key), {
+        query: { fields: "subject" },
+      });
+      return group.subject?.trim() || null;
+    } catch (error) {
+      LOG("Group subject lookup failed:", key, String(error));
+      return null;
     }
   }
 
@@ -598,11 +657,13 @@ class CloudWhatsAppService {
     counterpart: string,
     fromMe: boolean,
     source: CloudMessageDoc["source"],
+    options: { author?: string | null } = {},
   ) {
     const parsed = parseWaMessage(message);
     if (!parsed || !message.id) return;
 
-    const chatId = digitsOnly(counterpart);
+    const isGroup = isGroupKey(counterpart);
+    const chatId = isGroup ? counterpart : digitsOnly(counterpart);
     if (!chatId) return;
     const timestamp = Number(message.timestamp ?? 0) * 1000 || Date.now();
     const { chats, contacts, messages } = await getCollections();
@@ -625,6 +686,7 @@ class CloudWhatsAppService {
       body: parsed.body,
       timestamp,
       fromMe,
+      author: options.author ?? null,
       type: parsed.type,
       ack: fromMe ? (source === "history" ? historyAck(message.history_context?.status) : ACK.sent) : ACK.pending,
       media: parsed.media,
@@ -642,9 +704,13 @@ class CloudWhatsAppService {
       update.lastMessage = mediaPreview(parsed.type, parsed.body, parsed.media?.filename);
       update.timestamp = timestamp;
     }
-    if (!existingChat?.contactName) {
+    if (!isGroup && !existingChat?.contactName) {
       const contact = await contacts.findOne({ _id: chatId });
       if (contact) update.contactName = contact.name;
+    }
+    if (isGroup && !existingChat?.profileName) {
+      const subject = await this.fetchGroupSubject(chatId);
+      if (subject) update.profileName = subject;
     }
     const counters: Record<string, number> = {};
     if (!fromMe) {
@@ -717,13 +783,17 @@ class CloudWhatsAppService {
   }
 
   private async saveMediaFile(messageId: string, buffer: Buffer, mimetype: string) {
-    await fs.mkdir(mediaDir, { recursive: true });
-    const localFile = safeFileName(messageId);
-    await fs.writeFile(path.join(mediaDir, localFile), buffer);
+    const stored = await storeMedia(messageId, buffer, mimetype);
     const { messages } = await getCollections();
     const updated = await messages.findOneAndUpdate(
       { _id: messageId },
-      { $set: { "media.localFile": localFile, "media.mimetype": mimetype } },
+      {
+        $set: {
+          "media.mimetype": mimetype,
+          ...(stored.s3Key ? { "media.s3Key": stored.s3Key } : {}),
+          ...(stored.localFile ? { "media.localFile": stored.localFile } : {}),
+        },
+      },
       { projection: { chatId: 1 } },
     );
     if (updated) this.bumpMessages(updated.chatId);
@@ -734,17 +804,14 @@ class CloudWhatsAppService {
     const doc = await messages.findOne({ _id: messageId });
     if (!doc?.media) throw new CloudApiError("Media not found.", 404);
 
-    if (doc.media.localFile) {
-      try {
-        const buffer = await fs.readFile(path.join(mediaDir, doc.media.localFile));
-        return {
-          data: buffer.toString("base64"),
-          mimetype: doc.media.mimetype || "application/octet-stream",
-          filename: doc.media.filename || undefined,
-        };
-      } catch {
-        // Fall through and re-download.
-      }
+    // S3 first, then a local file (older uploads), else re-download from Meta.
+    const storedBuffer = await readMedia(doc.media);
+    if (storedBuffer) {
+      return {
+        data: storedBuffer.toString("base64"),
+        mimetype: doc.media.mimetype || "application/octet-stream",
+        filename: doc.media.filename || undefined,
+      };
     }
     if (!doc.media.id) throw new CloudApiError("Media is not available.", 404);
     const { buffer, mimetype } = await this.fetchAndStoreMedia(messageId, doc.media.id);
@@ -754,17 +821,20 @@ class CloudWhatsAppService {
   // ---- Reads ----
 
   private toChatSummary(chat: CloudChatDoc): WhatsAppChatSummary {
-    const name = chat.contactName || chat.profileName || `+${chat._id}`;
+    const isGroup = isGroupKey(chat._id);
+    const name = isGroup
+      ? chat.profileName || chat.contactName || "WhatsApp group"
+      : chat.contactName || chat.profileName || `+${chat._id}`;
     return {
       id: toChatId(chat._id),
       name,
-      phoneNumber: `+${chat._id}`,
+      phoneNumber: isGroup ? null : `+${chat._id}`,
       lastMessage: chat.lastMessage ?? "",
       timestamp: chat.timestamp ?? null,
       unreadCount: chat.unreadCount ?? 0,
       avatarSeed: name,
       avatarUrl: null,
-      isGroup: false,
+      isGroup,
       isMuted: false,
       isPinned: false,
       windowExpiresAt: chat.lastInboundAt ? chat.lastInboundAt + SERVICE_WINDOW_MS : null,
@@ -778,7 +848,7 @@ class CloudWhatsAppService {
       body: doc.body,
       timestamp: doc.timestamp,
       fromMe: doc.fromMe,
-      author: null,
+      author: doc.author ?? null,
       ack: doc.ack,
       hasMedia: Boolean(doc.media),
       mediaType: doc.type,
@@ -850,7 +920,7 @@ class CloudWhatsAppService {
 
   async listMessages(chatId: string, limit = 80) {
     this.requireReady();
-    const waId = toWaId(chatId);
+    const waId = toChatKey(chatId);
     const { chats, messages } = await getCollections();
     const docs = await this.cached(
       `messages:${waId}:${limit}`,
@@ -927,12 +997,19 @@ class CloudWhatsAppService {
     };
   }
 
-  private async postMessage(config: Omit<CloudConfigDoc, "_id">, payload: Record<string, unknown>) {
+  // `to` is a chat key: wa_id digits, or "<group_id>@g.us" for a group.
+  private async postMessage(
+    config: Omit<CloudConfigDoc, "_id">,
+    { to, ...payload }: { to: string } & Record<string, unknown>,
+  ) {
+    const recipient = isGroupKey(to)
+      ? { recipient_type: "group", to: groupIdFromKey(to) }
+      : { recipient_type: "individual", to };
     const response = await graphRequest<{ messages?: Array<{ id?: string }> }>(
       config.accessToken,
       "POST",
       `${config.phoneNumberId}/messages`,
-      { body: { messaging_product: "whatsapp", recipient_type: "individual", ...payload } },
+      { body: { messaging_product: "whatsapp", ...recipient, ...payload } },
     );
     const id = response.messages?.[0]?.id;
     if (!id) throw new CloudApiError("WhatsApp did not return a message id.", 502);
@@ -946,10 +1023,15 @@ class CloudWhatsAppService {
     quotedMessageId?: string,
   ) {
     const config = this.requireReady();
-    const waId = toWaId(chatId);
+    const waId = toChatKey(chatId);
     const { chats } = await getCollections();
     const chat = await chats.findOne({ _id: waId });
-    if (!chat?.lastInboundAt || Date.now() > chat.lastInboundAt + SERVICE_WINDOW_MS) {
+    // Groups are not gated by the 1:1 customer service window here; Meta
+    // rejects the send itself if the group does not allow it.
+    if (
+      !isGroupKey(waId) &&
+      (!chat?.lastInboundAt || Date.now() > chat.lastInboundAt + SERVICE_WINDOW_MS)
+    ) {
       throw new CloudApiError(
         "The 24-hour reply window is closed. Send an approved template message to restart the conversation.",
         422,
@@ -1002,7 +1084,7 @@ class CloudWhatsAppService {
     if (sendType === "document") mediaPayload.filename = media.filename;
 
     const id = await this.postMessage(config, { to: waId, type: sendType, [sendType]: mediaPayload, ...context });
-    await this.saveMediaFile(id, buffer, mimetype);
+    const stored = await storeMedia(id, buffer, mimetype);
     const message = await this.recordOutgoing({
       _id: id,
       chatId: waId,
@@ -1011,7 +1093,7 @@ class CloudWhatsAppService {
       fromMe: true,
       type: sendType,
       ack: ACK.pending,
-      media: { id: upload.id, mimetype, filename: media.filename, localFile: safeFileName(id) },
+      media: { id: upload.id, mimetype, filename: media.filename, ...stored },
       ...quoted,
       source: "api",
     });
@@ -1072,7 +1154,7 @@ class CloudWhatsAppService {
     bodyValues?: string[];
   }) {
     const config = this.requireReady();
-    const waId = toWaId(input.chatId);
+    const waId = toChatKey(input.chatId);
     const template = (await this.listTemplates()).find(
       (t) => t.name === input.name && t.language === input.language,
     );

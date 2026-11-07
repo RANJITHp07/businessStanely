@@ -14,8 +14,8 @@ export type CloudConfigDoc = {
 };
 
 export type CloudChatDoc = {
-  _id: string; // customer wa_id (digits only)
-  profileName?: string | null; // name the customer set on WhatsApp
+  _id: string; // customer wa_id (digits only), or "<group_id>@g.us" for groups
+  profileName?: string | null; // name the customer set on WhatsApp (group subject for groups)
   contactName?: string | null; // name saved in the phone's address book
   lastMessage?: string;
   timestamp?: number | null; // ms
@@ -31,10 +31,13 @@ export type CloudContactDoc = {
 
 export type CloudMessageDoc = {
   _id: string; // wamid
-  chatId: string; // wa_id digits
+  chatId: string; // wa_id digits, or "<group_id>@g.us"
   body: string;
   timestamp: number; // ms
   fromMe: boolean;
+  author?: string | null; // group messages: sender's display name
+  authorId?: string | null; // group messages from the groups bridge: sender JID (for read receipts/quotes)
+| null; // group messages: sender's display name
   type: string;
   ack: number;
   error?: string | null;
@@ -43,11 +46,13 @@ export type CloudMessageDoc = {
     mimetype?: string | null;
     filename?: string | null;
     localFile?: string | null;
+    s3Key?: string | null;
   } | null;
   quotedMessageId?: string | null;
   quotedMessageBody?: string | null;
   quotedMessageAuthor?: string | null;
-  source: "webhook" | "echo" | "history" | "api";
+  // "web" = live group message from the whatsapp-groups bridge (linked device).
+  source: "webhook" | "echo" | "history" | "api" | "web";
 };
 
 type Collections = {

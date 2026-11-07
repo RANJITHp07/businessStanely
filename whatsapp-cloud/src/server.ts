@@ -1,4 +1,5 @@
 import "dotenv/config";
+import { mediaStorage } from "./media-store.js";
 import crypto from "node:crypto";
 import express from "express";
 import cors from "cors";
@@ -424,6 +425,7 @@ app.get("/stream", streamAuth, (req, res) => {
 
 const server = app.listen(PORT, () => {
   console.log(`[WhatsApp Cloud] listening on http://localhost:${PORT}`);
+  console.log(`[WhatsApp Cloud] media storage: ${mediaStorage}`);
   whatsappService.ensureInitialized().catch((error: unknown) => {
     console.error("[WhatsApp Cloud] Failed to initialize:", error);
   });

@@ -79,6 +79,7 @@ function runEmbeddedSignup(onboarding: NonNullable<WhatsAppState["onboarding"]>)
             try {
                 const data = typeof event.data === "string" ? JSON.parse(event.data) : event.data;
                 if (data?.type !== "WA_EMBEDDED_SIGNUP") return;
+                console.info("[WhatsApp signup] Meta event:", data.event, data.data);
                 if (String(data.event).startsWith("FINISH")) {
                     const phoneNumberId = data.data?.phone_number_id;
                     const wabaId = data.data?.waba_id;
@@ -95,9 +96,16 @@ function runEmbeddedSignup(onboarding: NonNullable<WhatsAppState["onboarding"]>)
         };
 
         let timeout: ReturnType<typeof setTimeout> | null = null;
+        // If the Facebook window is closed without finishing, FB.login may never
+        // call back. Give up after a while so the button does not spin forever.
+        const overall = setTimeout(
+            () => finish(new Error("WhatsApp setup did not finish. If the Facebook window closed or was blocked, allow pop-ups and try again.")),
+            10 * 60 * 1000,
+        );
         const cleanup = () => {
             window.removeEventListener("message", onMessage);
             if (timeout) clearTimeout(timeout);
+            clearTimeout(overall);
         };
         window.addEventListener("message", onMessage);
 
@@ -105,6 +113,7 @@ function runEmbeddedSignup(onboarding: NonNullable<WhatsAppState["onboarding"]>)
             .then((FB) => {
                 FB.login(
                     (response) => {
+                        console.info("[WhatsApp signup] login response:", response?.authResponse ? "code received" : response);
                         code = response.authResponse?.code ?? null;
                         if (!code) {
                             finish(new Error("WhatsApp setup was not completed."));
@@ -144,6 +153,14 @@ export function CloudConnectPanel({
     onComplete?: (input: { code: string; phoneNumberId: string; wabaId: string }) => Promise<unknown>;
 }) {
     const [isConnecting, setIsConnecting] = useState(false);
+
+    // Load the Facebook SDK up front, so clicking Connect opens the login
+    // window straight away; browsers block pop-ups opened after a slow load.
+    const onboarding = state.onboarding;
+    useEffect(() => {
+        if (!onboarding || !onComplete) return;
+        loadFacebookSdk(onboarding.appId, onboarding.graphApiVersion).catch(() => undefined);
+    }, [onboarding, onComplete]);
 
     const connect = async () => {
         if (!state.onboarding || !onComplete) return;

@@ -431,6 +431,7 @@ async function connect() {
         status = "logged-out";
         LOG("Linked device was removed from the phone. Clearing the session; a new QR will be shown.");
         await fs.rm(AUTH_DIR, { recursive: true, force: true });
+        forgetAccount();
         scheduleReconnect(1000);
         return;
       }
@@ -537,6 +538,23 @@ function accountPhone(id: string | null | undefined) {
   return id ? id.split(":")[0]!.split("@")[0]! || null : null;
 }
 
+// Everything remembered about the linked account. Cleared when the device is
+// unlinked so the next number never sees the previous one's groups or contacts.
+function forgetAccount() {
+  groupCache.clear();
+  sentByApi.clear();
+  recentMessages.clear();
+  lidToPhone.clear();
+  pendingLidPairs.length = 0;
+  if (lidFlushTimer) clearTimeout(lidFlushTimer);
+  lidFlushTimer = null;
+  avatarCache.clear();
+  avatarLookups.clear();
+  hiddenNumberChats = 0;
+  clearOutbox();
+  setOutboxAccount(null);
+}
+
 // Removes this linked device from the phone; a new QR is shown afterwards.
 let unlinking = false;
 async function unlink() {
@@ -557,8 +575,7 @@ async function unlink() {
       // Already closed.
     }
     await fs.rm(AUTH_DIR, { recursive: true, force: true });
-    clearOutbox();
-    setOutboxAccount(null);
+    forgetAccount();
     status = "connecting";
     qrDataUrl = null;
     freshPairing428 = 0;

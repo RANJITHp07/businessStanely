@@ -3,3 +3,5 @@ dist/
 # Linked-device login session: anyone with these files can use the WhatsApp account.
 auth/
 .env
+.env.*
+!.env.example

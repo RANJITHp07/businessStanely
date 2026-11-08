@@ -378,6 +378,15 @@ function qrPage() {
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url ?? "/", "http://localhost");
   try {
+    // Public liveness check; reports only the link status, nothing secret.
+    if (req.method === "GET" && (url.pathname === "/" || url.pathname === "/health")) {
+      return json(res, 200, {
+        ok: true,
+        service: "whatsapp-groups",
+        uptimeSeconds: Math.round(process.uptime()),
+        status,
+      });
+    }
     if (!tokenOk(req, url)) {
       json(res, 401, { error: "Unauthorized" });
       return;

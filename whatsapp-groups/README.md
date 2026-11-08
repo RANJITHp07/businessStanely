@@ -33,9 +33,11 @@ The session is saved in `auth/` (keep it on a persistent disk; it is a login, ne
 commit it). If the device is removed on the phone, the service clears `auth/` and shows
 a new QR.
 
-## Routes (token: `x-whatsapp-service-token` or `?token=`)
+## Routes
 
-`GET /status`, `GET /qr`, `POST /send`, `POST /read`, `POST /refresh-groups`.
+Public: `GET /` and `GET /health` (liveness and link status, no secrets).
+
+Token required (`x-whatsapp-service-token` or `?token=`): `GET /status`, `GET /qr`, `POST /send`, `POST /read`, `POST /refresh-groups`.
 
 ## Limits
 

@@ -419,6 +419,10 @@ class CloudWhatsAppService {
 
   async ensureInitialized() {
     if (this.state.status === "ready") return;
+    // Not connected yet: nothing changes until onboarding saves a config (which
+    // resets the state to "idle"). Re-running here would flip every /status
+    // poll to "initializing" and hide the Connect button.
+    if (this.state.status === "disconnected") return;
     if (this.initializing) return this.initializing;
     // After a failure, /status and /stream polls must not re-hit Meta every
     // time (and flip the state back to "initializing"); the scheduled retry

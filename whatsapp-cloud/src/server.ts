@@ -137,6 +137,21 @@ function stringList(value: unknown) {
   return Array.isArray(value) ? value.map((item) => String(item ?? "")) : [];
 }
 
+// --- Health (public, no secrets) ---
+// 200 while the process is up. The channel statuses show whether Meta 1:1 and
+// the groups link are connected; they do not change the HTTP code.
+app.get(["/", "/health"], (_req, res) => {
+  const { status, channels } = whatsappService.getState();
+  res.json({
+    ok: true,
+    service: "whatsapp-cloud",
+    uptimeSeconds: Math.round(process.uptime()),
+    status,
+    meta: channels?.meta.status ?? null,
+    groups: channels?.groups?.status ?? null,
+  });
+});
+
 // --- Meta webhook ---
 app.get("/webhook", (req, res) => {
   if (

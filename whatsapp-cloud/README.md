@@ -78,4 +78,5 @@ Set `WHATSAPP_GROUPS_URL` here to turn it on; see `whatsapp-groups/README.md`.
 
 Same as `whatsapp/` (`/status`, `/chats`, `/messages`, `/send`, `/media`, `/stream`, `/chat-avatar(s)`,
 `/logout`) plus `/webhook` (Meta, signature-verified), `/onboard`, `/sync-history`, `/templates`,
-`/send-template`, `/groups/ingest` (groups bridge).
+`/send-template`, `/groups/ingest` (groups bridge). `GET /` and `GET /health` are public and return
+liveness plus the Meta and groups connection status.

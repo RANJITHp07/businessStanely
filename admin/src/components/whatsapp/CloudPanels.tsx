@@ -156,6 +156,7 @@ export function CloudConnectPanel({
     onComplete?: (input: { code: string; phoneNumberId: string; wabaId: string }) => Promise<unknown>;
 }) {
     const [isConnecting, setIsConnecting] = useState(false);
+    const [showGroupsLink, setShowGroupsLink] = useState(false);
 
     // Load the Facebook SDK up front, so clicking Connect opens the login
     // window straight away; browsers block pop-ups opened after a slow load.
@@ -234,6 +235,154 @@ export function CloudConnectPanel({
                             </button>
                         ) : null}
                     </>
+                )}
+
+                {onComplete && state.channels?.groups ? (
+                    <button
+                        type="button"
+                        onClick={() => setShowGroupsLink(true)}
+                        className="mt-3 w-full rounded-lg border border-[#00a884]/50 px-4 py-3 text-sm font-semibold text-[#00a884] transition hover:bg-[#00a884]/10"
+                    >
+                        Link WhatsApp groups (QR)
+                    </button>
+                ) : null}
+            </div>
+            {showGroupsLink ? <GroupsLinkDialog onClose={() => setShowGroupsLink(false)} /> : null}
+        </div>
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Groups: link the WhatsApp Web linked device (QR) from the admin panel
+// ---------------------------------------------------------------------------
+
+type GroupsLink = {
+    status: string;
+    linkedAs: string | null;
+    groups?: number;
+    error: string | null;
+    qrCodeDataUrl: string | null;
+};
+
+async function groupsLinkRequest(method: "GET" | "POST", action?: "link" | "unlink") {
+    const response = await fetch("/api/whatsapp/groups-link", {
+        method,
+        cache: "no-store",
+        headers: method === "POST" ? { "Content-Type": "application/json" } : undefined,
+        body: method === "POST" ? JSON.stringify({ action }) : undefined,
+    });
+    const data = await response.json().catch(() => null);
+    if (!response.ok) throw new Error(data?.error || "Could not reach the WhatsApp groups service.");
+    return data as GroupsLink;
+}
+
+export function GroupsLinkDialog({ onClose }: { onClose: () => void }) {
+    const [link, setLink] = useState<GroupsLink | null>(null);
+    const [error, setError] = useState<string | null>(null);
+    const [busy, setBusy] = useState(false);
+
+    useEffect(() => {
+        let stopped = false;
+        let timer: ReturnType<typeof setTimeout> | null = null;
+        const poll = async () => {
+            try {
+                const next = await groupsLinkRequest("GET");
+                if (stopped) return;
+                setLink(next);
+                setError(null);
+            } catch (err) {
+                if (!stopped) setError(err instanceof Error ? err.message : String(err));
+            }
+            if (!stopped) timer = setTimeout(poll, 3000);
+        };
+        // Ask for a fresh QR first, then keep polling until linked.
+        groupsLinkRequest("POST", "link")
+            .then((next) => !stopped && setLink(next))
+            .catch((err) => !stopped && setError(err instanceof Error ? err.message : String(err)))
+            .finally(() => {
+                if (!stopped) timer = setTimeout(poll, 3000);
+            });
+        return () => {
+            stopped = true;
+            if (timer) clearTimeout(timer);
+        };
+    }, []);
+
+    const unlink = async () => {
+        if (!window.confirm("Unlink WhatsApp groups? Group chats stop until a phone scans the QR again.")) return;
+        setBusy(true);
+        try {
+            setLink(await groupsLinkRequest("POST", "unlink"));
+            toast.success("Groups unlinked.");
+        } catch (err) {
+            toast.error(err instanceof Error ? err.message : "Failed to unlink.");
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    const linked = link?.status === "ready";
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4" onClick={onClose}>
+            <div
+                className="w-full max-w-md rounded-2xl border border-white/10 bg-[var(--wa-panel)] p-6 text-[var(--wa-text)] shadow-2xl"
+                onClick={(event) => event.stopPropagation()}
+            >
+                <div className="mb-4 flex items-start justify-between gap-4">
+                    <div>
+                        <h2 className="text-lg font-semibold">WhatsApp groups</h2>
+                        <p className="mt-1 text-sm text-[var(--wa-muted2)]">
+                            Groups come through WhatsApp Web, linked to a phone like a laptop would be.
+                        </p>
+                    </div>
+                    <button type="button" onClick={onClose} className="text-sm text-[var(--wa-muted)] hover:text-[var(--wa-text)]">
+                        Close
+                    </button>
+                </div>
+
+                {error ? (
+                    <div className="mb-4 rounded-lg border border-red-500/30 bg-red-900/20 px-4 py-3 text-sm text-red-400">{error}</div>
+                ) : null}
+
+                {linked ? (
+                    <div className="space-y-4">
+                        <div className="rounded-lg bg-[#00a884]/10 px-4 py-3 text-sm text-[#00a884]">
+                            Linked as {link?.linkedAs?.split(":")[0]?.split("@")[0] ?? "this phone"}
+                            {typeof link?.groups === "number" ? ` · ${link.groups} groups` : ""}
+                        </div>
+                        <button
+                            type="button"
+                            onClick={unlink}
+                            disabled={busy}
+                            className="w-full rounded-lg border border-red-500/40 px-4 py-2 text-sm text-red-400 hover:bg-red-900/20 disabled:opacity-50"
+                        >
+                            {busy ? "Unlinking…" : "Unlink groups"}
+                        </button>
+                    </div>
+                ) : (
+                    <div className="space-y-4">
+                        <ol className="space-y-2 text-sm text-[var(--wa-muted2)]">
+                            <li>1. On the phone, open WhatsApp Business (or WhatsApp).</li>
+                            <li>2. Go to Settings → Linked devices → Link a device.</li>
+                            <li>3. Scan this code.</li>
+                        </ol>
+                        <div className="flex min-h-[18rem] items-center justify-center rounded-xl bg-white p-4">
+                            {link?.qrCodeDataUrl ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img src={link.qrCodeDataUrl} alt="WhatsApp groups QR code" className="h-64 w-64" />
+                            ) : (
+                                <div className="flex items-center gap-2 text-sm text-[#54656f]">
+                                    <LoaderCircle className="h-5 w-5 animate-spin text-[#00a884]" />
+                                    {link?.status === "connecting" ? "Scan detected, linking…" : "Getting a QR code…"}
+                                </div>
+                            )}
+                        </div>
+                        <p className="text-xs text-[var(--wa-muted)]">
+                            The code refreshes by itself. Use a number that is on the WhatsApp app; a number moved fully to the
+                            Meta API cannot link devices.
+                        </p>
+                    </div>
                 )}
             </div>
         </div>

@@ -381,21 +381,24 @@ class CloudWhatsAppService {
   }
 
   // Polls the groups service so its health shows up in /status and the stream.
+  // Re-reads the groups link health and publishes the state if it changed.
+  async refreshGroupsHealth() {
+    if (!groupsBridgeEnabled) return;
+    const next = await groupsHealth();
+    const changed =
+      !this.groups || this.groups.status !== next.status || this.groups.linkedAs !== next.linkedAs;
+    this.groups = next;
+    if (changed) {
+      LOG("Groups service:", next.status, next.error ?? "");
+      this.state = { ...this.state, lastUpdatedAt: new Date().toISOString() };
+      publishWhatsAppEvent("state", { state: this.getState() });
+    }
+  }
+
   startGroupsMonitor(intervalMs = 15000) {
     if (!groupsBridgeEnabled || this.groupsTimer) return;
-    const check = async () => {
-      const next = await groupsHealth();
-      const changed =
-        !this.groups || this.groups.status !== next.status || this.groups.linkedAs !== next.linkedAs;
-      this.groups = next;
-      if (changed) {
-        LOG("Groups service:", next.status, next.error ?? "");
-        this.state = { ...this.state, lastUpdatedAt: new Date().toISOString() };
-        publishWhatsAppEvent("state", { state: this.getState() });
-      }
-    };
-    void check();
-    this.groupsTimer = setInterval(() => void check(), intervalMs);
+    void this.refreshGroupsHealth();
+    this.groupsTimer = setInterval(() => void this.refreshGroupsHealth(), intervalMs);
   }
 
   private onboardingInfo() {

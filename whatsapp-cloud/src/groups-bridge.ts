@@ -34,6 +34,32 @@ export async function groupsRequest<T>(path: string, body: unknown): Promise<T> 
   return data;
 }
 
+export type GroupsLinkState = {
+  status: string;
+  linkedAs: string | null;
+  groups?: number;
+  error: string | null;
+  qrCodeDataUrl: string | null;
+};
+
+// Link state including the QR image, for the admin "Link groups" dialog.
+export async function groupsLinkState(action?: "link" | "unlink"): Promise<GroupsLinkState> {
+  if (action) return groupsRequest<GroupsLinkState>(`/${action}`, {});
+  if (!baseUrl) throw new CloudApiError("WhatsApp groups are not enabled (WHATSAPP_GROUPS_URL is not set).", 503);
+  try {
+    const response = await fetch(`${baseUrl}/status`, {
+      headers: { "x-whatsapp-service-token": token },
+      signal: AbortSignal.timeout(5000),
+    });
+    return (await response.json()) as GroupsLinkState;
+  } catch (error) {
+    throw new CloudApiError(
+      `The WhatsApp groups service is not reachable: ${error instanceof Error ? error.message : String(error)}`,
+      503,
+    );
+  }
+}
+
 export type GroupsHealth = { status: string; error: string | null; linkedAs: string | null };
 
 // Never throws: an unreachable groups service is reported as "unreachable".

@@ -193,14 +193,14 @@ async function connect() {
         status = "logged-out";
         LOG("Linked device was removed from the phone. Clearing the session; a new QR will be shown.");
         await fs.rm(AUTH_DIR, { recursive: true, force: true });
-        setTimeout(() => safeConnect(), 1000);
+        scheduleReconnect(1000);
         return;
       }
       status = "disconnected";
       const delay = code === DisconnectReason.restartRequired ? 0 : reconnectDelayMs;
       reconnectDelayMs = Math.min(reconnectDelayMs * 2, 60_000);
       LOG(`Connection closed (${code ?? "unknown"}: ${lastError ?? ""}). Reconnecting in ${delay / 1000}s.`);
-      setTimeout(() => safeConnect(), delay);
+      scheduleReconnect(delay);
     }
   });
 
@@ -247,6 +247,48 @@ async function connect() {
   });
 }
 
+// Called when someone opens the "Link groups" dialog: if not linked, drop the
+// current attempt (which may be waiting out a long backoff after its QR codes
+// expired) and start a fresh one so a new QR shows up right away.
+async function startLinking() {
+  if (status === "ready") return;
+  if (status !== "qr" || !qrDataUrl) {
+    reconnectDelayMs = 2000;
+    generation++;
+    if (reconnectTimer) clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+    const old = sock;
+    sock = null;
+    try {
+      old?.end(undefined);
+    } catch {
+      // Already closed.
+    }
+    safeConnect();
+  }
+  for (let i = 0; i < 20 && !qrDataUrl && (status as string) !== "ready"; i++) {
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+}
+
+// Removes this linked device from the phone; a new QR is shown afterwards.
+async function unlink() {
+  if (sock && status === "ready") {
+    await sock.logout().catch(() => undefined);
+  }
+  await fs.rm(AUTH_DIR, { recursive: true, force: true });
+  await startLinking();
+}
+
+let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+function scheduleReconnect(delayMs: number) {
+  if (reconnectTimer) clearTimeout(reconnectTimer);
+  reconnectTimer = setTimeout(() => {
+    reconnectTimer = null;
+    safeConnect();
+  }, delayMs);
+}
+
 // A failed start (bad session files, network) must never kill the process:
 // retry with backoff and keep the HTTP side answering /status.
 function safeConnect() {
@@ -254,7 +296,7 @@ function safeConnect() {
     lastError = error instanceof Error ? error.message : String(error);
     status = "disconnected";
     LOG(`Start failed: ${lastError}. Retrying in ${reconnectDelayMs / 1000}s.`);
-    setTimeout(() => safeConnect(), reconnectDelayMs);
+    scheduleReconnect(reconnectDelayMs);
     reconnectDelayMs = Math.min(reconnectDelayMs * 2, 60_000);
   });
 }
@@ -401,6 +443,14 @@ const server = http.createServer(async (req, res) => {
     if (req.method === "POST" && url.pathname === "/read") {
       await markRead(await readJson(req));
       return json(res, 200, { ok: true });
+    }
+    if (req.method === "POST" && url.pathname === "/link") {
+      await startLinking();
+      return json(res, 200, statusBody());
+    }
+    if (req.method === "POST" && url.pathname === "/unlink") {
+      await unlink();
+      return json(res, 200, statusBody());
     }
     if (req.method === "POST" && url.pathname === "/refresh-groups") {
       if (sock) await refreshGroups(sock);

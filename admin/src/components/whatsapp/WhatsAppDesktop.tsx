@@ -23,6 +23,7 @@ import {
     SendHorizonal,
     Sun,
     Trash2,
+    Users,
 } from "lucide-react";
 
 const WHATSAPP_THEME_KEY = "wa-theme";
@@ -43,6 +44,7 @@ import { isAudioFile } from "@/lib/audioAttachment";
 import { getCachedAvatar, resolveAvatar } from "@/lib/whatsapp/avatar-cache";
 import {
     CloudConnectPanel,
+    GroupsLinkDialog,
     TemplateComposer,
     formatWindowRemaining,
     isReplyWindowOpen,
@@ -461,6 +463,9 @@ function WhatsAppDesktop() {
     const channelWarning = isCloud && state.status === "ready" ? state.error : null;
     const metaDown = isCloud && state.channels?.meta && state.channels.meta.status !== "ready";
     const [showMetaConnect, setShowMetaConnect] = useState(false);
+    const [showGroupsLink, setShowGroupsLink] = useState(false);
+    const groupsChannel = isCloud ? state.channels?.groups ?? null : null;
+    const groupsDown = Boolean(groupsChannel && groupsChannel.status !== "ready");
     const canEditMessages = state.capabilities?.editMessages ?? true;
     const canDeleteMessages = state.capabilities?.deleteMessages ?? true;
     const canLogout = state.capabilities?.logout ?? true;
@@ -772,6 +777,7 @@ function WhatsAppDesktop() {
 
     return (
         <div className="wa-root flex min-h-screen w-full bg-[var(--wa-bg)] text-[var(--wa-text)]" data-wa-theme={theme}>
+            {showGroupsLink ? <GroupsLinkDialog onClose={() => setShowGroupsLink(false)} /> : null}
             <div className="flex h-screen w-full overflow-hidden bg-[var(--wa-panel)]">
                 <aside className={`${mobileSidebarOpen ? "flex" : "hidden"} w-full max-w-full flex-col border-r border-[var(--wa-border)] bg-[var(--wa-panel)] md:flex md:w-80 md:max-w-[20rem] md:shrink-0`}>
                     <div className="flex items-center justify-between bg-[var(--wa-header)] px-4 py-3">
@@ -798,6 +804,16 @@ function WhatsAppDesktop() {
                         </div>
 
                         <div className="flex items-center gap-2">
+                            {groupsChannel ? (
+                                <button
+                                    type="button"
+                                    onClick={() => setShowGroupsLink(true)}
+                                    className={`rounded-full p-2 transition hover:bg-[var(--wa-hover)] ${groupsDown ? "text-amber-500" : "text-[var(--wa-muted2)] hover:text-white"}`}
+                                    title={groupsDown ? "WhatsApp groups not linked: scan the QR" : "WhatsApp groups link"}
+                                >
+                                    <Users className="h-5 w-5" />
+                                </button>
+                            ) : null}
                             <button
                                 type="button"
                                 onClick={toggleTheme}
@@ -827,6 +843,15 @@ function WhatsAppDesktop() {
                                         className="mt-1 block font-medium text-[#00a884] hover:underline"
                                     >
                                         Reconnect Meta
+                                    </button>
+                                ) : null}
+                                {groupsDown ? (
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowGroupsLink(true)}
+                                        className="mt-1 block font-medium text-[#00a884] hover:underline"
+                                    >
+                                        Link groups (scan QR)
                                     </button>
                                 ) : null}
                         </div>

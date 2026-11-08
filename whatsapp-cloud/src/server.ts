@@ -7,6 +7,7 @@ import compression from "compression";
 
 import { cloudWhatsAppService as whatsappService } from "./service.js";
 import { CloudApiError } from "./graph.js";
+import { groupsLinkState } from "./groups-bridge.js";
 import { subscribeWhatsAppEvent } from "./realtime.js";
 import type { WhatsAppEventPayload } from "./types.js";
 
@@ -191,6 +192,27 @@ type GroupIngestEvent =
   | ({ kind: "status" } & Parameters<typeof whatsappService.ingestGroupStatus>[0])
   | ({ kind: "media" } & Parameters<typeof whatsappService.ingestGroupMedia>[0])
   | { kind: "chats"; groups: Parameters<typeof whatsappService.ingestGroupChats>[0] };
+
+// Admin "Link groups" dialog: QR and link status of the groups linked device.
+// POST with {"action":"link"} starts a fresh QR; {"action":"unlink"} removes the device.
+app.get("/groups/link", auth, async (_req, res) => {
+  try {
+    res.json(await groupsLinkState());
+  } catch (error) {
+    sendError(res, error, "Failed to read the groups link status.");
+  }
+});
+
+app.post("/groups/link", auth, async (req, res) => {
+  const action = req.body?.action === "unlink" ? "unlink" : "link";
+  try {
+    const result = await groupsLinkState(action);
+    await whatsappService.refreshGroupsHealth();
+    res.json(result);
+  } catch (error) {
+    sendError(res, error, "Failed to link WhatsApp groups.");
+  }
+});
 
 let groupIngestQueue: Promise<unknown> = Promise.resolve();
 

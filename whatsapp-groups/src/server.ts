@@ -197,6 +197,13 @@ function pushDirectMessage(msg: WAMessage, history: boolean) {
     }
   }
   const converted = convertMessage(msg);
+  if (!history) {
+    // One line per live 1:1 message, so missing chats can be diagnosed.
+    const kind = msg.message ? Object.keys(msg.message).join(",") : `no content (stub ${msg.messageStubType ?? "-"})`;
+    LOG(
+      `1:1 ${msg.key.fromMe ? "sent" : "received"} ${phone ? `+${phone}` : `${lid}@lid`}: ${kind} -> ${converted ? "forwarded" : "ignored"}`,
+    );
+  }
   if (!converted) return;
   const fromMe = Boolean(msg.key.fromMe);
   enqueue({
@@ -222,6 +229,9 @@ function pushMessage(msg: WAMessage, history: boolean) {
   if (sentByApi.has(msg.key.id)) return;
   if (!isJidGroup(chatId)) {
     if (DIRECT_CHATS && isDirectJid(chatId)) pushDirectMessage(msg, history);
+    else if (DIRECT_CHATS && !history && !chatId.endsWith("@broadcast") && !chatId.endsWith("@newsletter")) {
+      LOG(`Message in unsupported chat ${chatId} ignored.`);
+    }
     return;
   }
   const converted = convertMessage(msg);
@@ -568,6 +578,54 @@ async function markRead(input: { chatId?: string; messageId?: string; participan
   ]);
 }
 
+// ---- Profile pictures ----
+// Cached for a while (WhatsApp rate-limits these lookups); a missing picture
+// is cached too. At most 4 lookups run at once.
+const AVATAR_TTL_MS = 6 * 60 * 60 * 1000;
+const avatarCache = new Map<string, { url: string | null; at: number }>();
+let avatarSlots = 4;
+const avatarWaiters: Array<() => void> = [];
+
+async function withAvatarSlot<T>(task: () => Promise<T>) {
+  if (avatarSlots === 0) await new Promise<void>((resolve) => avatarWaiters.push(resolve));
+  avatarSlots--;
+  try {
+    return await task();
+  } finally {
+    avatarSlots++;
+    avatarWaiters.shift()?.();
+  }
+}
+
+async function avatarFor(chatId: string): Promise<string | null> {
+  let jid: string;
+  try {
+    jid = toJid(chatId);
+  } catch {
+    return null;
+  }
+  const cached = avatarCache.get(jid);
+  if (cached && Date.now() - cached.at < AVATAR_TTL_MS) return cached.url;
+  const current = sock;
+  if (!current || status !== "ready") return cached?.url ?? null;
+  const url = await withAvatarSlot(() =>
+    Promise.race([
+      current.profilePictureUrl(jid, "image").catch(() => null),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 8000)),
+    ]),
+  );
+  if (avatarCache.size > 20000) avatarCache.clear();
+  avatarCache.set(jid, { url: url ?? null, at: Date.now() });
+  return url ?? null;
+}
+
+async function avatars(chatIds: unknown) {
+  const ids = Array.isArray(chatIds) ? chatIds.map(String).filter(Boolean).slice(0, 100) : [];
+  const urls: Record<string, string | null> = {};
+  await Promise.all(ids.map(async (id) => (urls[id] = await avatarFor(id))));
+  return { urls };
+}
+
 // ---- HTTP ----
 
 class HttpError extends Error {
@@ -608,6 +666,8 @@ function statusBody() {
   return {
     status,
     linkedAs: sock?.user?.id ?? null,
+    // The linked account's own WhatsApp name.
+    name: sock?.user?.name ?? sock?.user?.verifiedName ?? null,
     groups: groupCache.size,
     pendingEvents: outboxSize(),
     error: lastError,
@@ -651,6 +711,10 @@ const server = http.createServer(async (req, res) => {
     if (req.method === "POST" && url.pathname === "/read") {
       await markRead(await readJson(req));
       return json(res, 200, { ok: true });
+    }
+    if (req.method === "POST" && url.pathname === "/avatars") {
+      const body = (await readJson(req)) as { chatIds?: unknown };
+      return json(res, 200, await avatars(body.chatIds));
     }
     if (req.method === "POST" && url.pathname === "/link") {
       await startLinking();

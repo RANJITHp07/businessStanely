@@ -65,7 +65,7 @@ export async function groupsLinkState(action?: "link" | "unlink"): Promise<Group
   }
 }
 
-export type GroupsHealth = { status: string; error: string | null; linkedAs: string | null };
+export type GroupsHealth = { status: string; error: string | null; linkedAs: string | null; name?: string | null };
 
 // Never throws: an unreachable groups service is reported as "unreachable".
 export async function groupsHealth(): Promise<GroupsHealth> {
@@ -76,7 +76,7 @@ export async function groupsHealth(): Promise<GroupsHealth> {
     });
     const data = (await response.json().catch(() => ({}))) as Partial<GroupsHealth> & { error?: string };
     if (!response.ok) return { status: "error", error: data.error || `HTTP ${response.status}`, linkedAs: null };
-    return { status: data.status ?? "unknown", error: data.error ?? null, linkedAs: data.linkedAs ?? null };
+    return { status: data.status ?? "unknown", error: data.error ?? null, linkedAs: data.linkedAs ?? null, name: data.name ?? null };
   } catch (error) {
     return {
       status: "unreachable",

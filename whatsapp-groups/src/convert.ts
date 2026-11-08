@@ -158,6 +158,22 @@ export function convertMessage(msg: WAMessage): Converted | null {
         maxBytes: 0,
       };
     }
+    // Business / bot messages: show their text instead of "Unsupported".
+    case "templateMessage":
+    case "buttonsMessage":
+    case "listMessage":
+    case "interactiveMessage":
+    case "buttonsResponseMessage":
+    case "listResponseMessage":
+    case "templateButtonReplyMessage":
+    case "interactiveResponseMessage":
+    case "groupInviteMessage":
+    case "eventMessage": {
+      const body = businessText(content, kind);
+      return body
+        ? { message: { ...base, type: "text", text: { body } }, hasMedia: false, maxBytes: 0 }
+        : { message: { ...base, type: String(kind) }, hasMedia: false, maxBytes: 0 };
+    }
     case "reactionMessage":
     case "protocolMessage":
     case "senderKeyDistributionMessage":
@@ -170,5 +186,51 @@ export function convertMessage(msg: WAMessage): Converted | null {
     default:
       // Cloud shows "Unsupported message — open WhatsApp on the phone".
       return { message: { ...base, type: String(kind) }, hasMedia: false, maxBytes: 0 };
+  }
+}
+
+// Text of template, button, list and other business-style messages.
+function businessText(content: proto.IMessage, kind: string): string {
+  const join = (...parts: Array<string | null | undefined>) =>
+    parts.map((part) => part?.trim()).filter(Boolean).join("\n");
+  switch (kind) {
+    case "templateMessage": {
+      const t = content.templateMessage;
+      const h = t?.hydratedTemplate ?? t?.hydratedFourRowTemplate;
+      return join(
+        h?.hydratedTitleText,
+        h?.hydratedContentText,
+        h?.hydratedFooterText,
+        ...(h?.hydratedButtons ?? []).map(
+          (b) => b.quickReplyButton?.displayText ?? b.urlButton?.displayText ?? b.callButton?.displayText,
+        ).map((label) => (label ? `[${label}]` : null)),
+      );
+    }
+    case "buttonsMessage": {
+      const b = content.buttonsMessage;
+      return join(b?.text, b?.contentText, b?.footerText, ...(b?.buttons ?? []).map((x) => (x.buttonText?.displayText ? `[${x.buttonText.displayText}]` : null)));
+    }
+    case "listMessage": {
+      const l = content.listMessage;
+      return join(l?.title, l?.description, l?.footerText, l?.buttonText ? `[${l.buttonText}]` : null);
+    }
+    case "interactiveMessage": {
+      const i = content.interactiveMessage;
+      return join(i?.header?.title, i?.body?.text, i?.footer?.text);
+    }
+    case "buttonsResponseMessage":
+      return join(content.buttonsResponseMessage?.selectedDisplayText);
+    case "listResponseMessage":
+      return join(content.listResponseMessage?.title, content.listResponseMessage?.description);
+    case "templateButtonReplyMessage":
+      return join(content.templateButtonReplyMessage?.selectedDisplayText);
+    case "interactiveResponseMessage":
+      return join(content.interactiveResponseMessage?.body?.text);
+    case "groupInviteMessage":
+      return join(`Group invite: ${content.groupInviteMessage?.groupName ?? ""}`, content.groupInviteMessage?.caption);
+    case "eventMessage":
+      return join(`Event: ${content.eventMessage?.name ?? ""}`, content.eventMessage?.description);
+    default:
+      return "";
   }
 }

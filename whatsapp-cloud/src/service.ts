@@ -379,7 +379,7 @@ class CloudWhatsAppService {
           : linked?.error ?? `WhatsApp is not linked (${linked?.status ?? "unknown"}). Scan the QR to link the phone.`,
         onboarding: null,
         clientInfo: {
-          pushname: "WhatsApp",
+          pushname: linked?.name || "WhatsApp",
           wid: linked?.linkedAs ? `+${linked.linkedAs.split(":")[0]!.split("@")[0]}` : null,
           platform: "cloud-api",
         },
@@ -671,6 +671,8 @@ class CloudWhatsAppService {
 
   private async processWebhook(body: WebhookBody) {
     if (body.object !== "whatsapp_business_account") return;
+    // Meta is switched off while everything runs on the linked phone.
+    if (webDirectEnabled) return;
     if (!this.config) this.config = await this.loadConfig().catch(() => null);
 
     for (const entry of body.entry ?? []) {
@@ -1572,11 +1574,19 @@ class CloudWhatsAppService {
   // ---- Avatars (Cloud API exposes only the business's own picture) ----
 
   async getChatAvatarUrlById(chatId: string) {
+    if (webDirectEnabled) return (await this.getChatAvatarUrlsByIds([chatId]))[chatId] ?? null;
     const digits = digitsOnly(chatId.split("@")[0] ?? "");
     return digits && digits === this.businessPhoneDigits ? this.businessAvatarUrl : null;
   }
 
   async getChatAvatarUrlsByIds(chatIds: string[]) {
+    if (webDirectEnabled) {
+      // Real WhatsApp profile pictures, from the linked phone (cached there).
+      const result = await groupsRequest<{ urls?: Record<string, string | null> }>("/avatars", { chatIds }).catch(
+        () => ({ urls: {} as Record<string, string | null> }),
+      );
+      return Object.fromEntries(chatIds.map((id) => [id, result.urls?.[id] ?? null]));
+    }
     const urls: Record<string, string | null> = {};
     for (const chatId of chatIds) urls[chatId] = await this.getChatAvatarUrlById(chatId);
     return urls;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "react-toastify";
 import { Clock, LoaderCircle, MessageSquare, RefreshCw, SendHorizonal } from "lucide-react";
 
@@ -9,140 +9,68 @@ import type { WhatsAppState, WhatsAppTemplate } from "@/lib/whatsapp/types";
 // ---------------------------------------------------------------------------
 // Meta Embedded Signup (WhatsApp Business app "coexistence" onboarding)
 // https://developers.facebook.com/docs/whatsapp/embedded-signup/custom-flows/onboarding-business-app-users
+//
+// Uses the full-page redirect flow rather than the JavaScript SDK popup: the
+// popup's redirect_uri is an internal Facebook address the server can never
+// repeat, so Meta rejects the code exchange. Here the redirect_uri is this
+// page, the same value is sent to the server for the exchange, and it must be
+// listed under Valid OAuth Redirect URIs in the Meta app.
 // ---------------------------------------------------------------------------
 
-type FacebookSdk = {
-    init(options: Record<string, unknown>): void;
-    login(
-        callback: (response: { authResponse?: { code?: string } | null }) => void,
-        options: Record<string, unknown>,
-    ): void;
-};
+const SIGNUP_STATE_KEY = "wa-signup-state";
 
-declare global {
-    interface Window {
-        FB?: FacebookSdk;
-        fbAsyncInit?: () => void;
+function signupRedirectUri() {
+    return `${window.location.origin}${window.location.pathname}`;
+}
+
+function startEmbeddedSignup(onboarding: NonNullable<WhatsAppState["onboarding"]>) {
+    const state = crypto.randomUUID();
+    try {
+        sessionStorage.setItem(SIGNUP_STATE_KEY, state);
+    } catch {
+        // Private mode: the state check below is skipped.
     }
+    const params = new URLSearchParams({
+        client_id: onboarding.appId,
+        config_id: onboarding.configId,
+        redirect_uri: signupRedirectUri(),
+        response_type: "code",
+        override_default_response_type: "true",
+        state,
+        extras: JSON.stringify({
+            setup: {},
+            featureType: "whatsapp_business_app_onboarding",
+            sessionInfoVersion: "3",
+        }),
+    });
+    window.location.assign(`https://www.facebook.com/${onboarding.graphApiVersion}/dialog/oauth?${params}`);
 }
 
-let sdkPromise: Promise<FacebookSdk> | null = null;
-
-function loadFacebookSdk(appId: string, version: string) {
-    if (sdkPromise) return sdkPromise;
-    sdkPromise = new Promise<FacebookSdk>((resolve, reject) => {
-        window.fbAsyncInit = () => {
-            window.FB!.init({ appId, autoLogAppEvents: true, xfbml: false, version });
-            resolve(window.FB!);
-        };
-        const script = document.createElement("script");
-        script.src = "https://connect.facebook.net/en_US/sdk.js";
-        script.async = true;
-        script.defer = true;
-        script.crossOrigin = "anonymous";
-        script.onerror = () => {
-            sdkPromise = null;
-            reject(new Error("Could not load the Facebook SDK. Check ad blockers and try again."));
-        };
-        document.body.appendChild(script);
-    });
-    return sdkPromise;
-}
-
-type SignupSession = { phoneNumberId: string; wabaId: string };
-
-// Embedded Signup reports the selected number/WABA through postMessage; the
-// FB.login callback only carries the auth code. Wait for both.
-function runEmbeddedSignup(onboarding: NonNullable<WhatsAppState["onboarding"]>) {
-    return new Promise<SignupSession & { code: string }>((resolve, reject) => {
-        let session: SignupSession | null = null;
-        let code: string | null = null;
-        let settled = false;
-
-        const finish = (error?: Error) => {
-            if (settled) return;
-            if (error) {
-                settled = true;
-                cleanup();
-                reject(error);
-                return;
-            }
-            if (session && code) {
-                settled = true;
-                cleanup();
-                resolve({ ...session, code });
-            }
-        };
-
-        const onMessage = (event: MessageEvent) => {
-            if (!event.origin.endsWith("facebook.com")) return;
-            try {
-                const data = typeof event.data === "string" ? JSON.parse(event.data) : event.data;
-                if (data?.type !== "WA_EMBEDDED_SIGNUP") return;
-                console.info("[WhatsApp signup] Meta event:", data.event, data.data);
-                if (String(data.event).startsWith("FINISH")) {
-                    const phoneNumberId = data.data?.phone_number_id;
-                    const wabaId = data.data?.waba_id;
-                    if (phoneNumberId && wabaId) {
-                        session = { phoneNumberId, wabaId };
-                        finish();
-                    }
-                } else if (data.event === "CANCEL") {
-                    finish(new Error(data.data?.error_message || "WhatsApp setup was cancelled."));
-                }
-            } catch {
-                // Not an Embedded Signup message.
-            }
-        };
-
-        let timeout: ReturnType<typeof setTimeout> | null = null;
-        // If the Facebook window is closed without finishing, FB.login may never
-        // call back. Give up after a while so the button does not spin forever.
-        const overall = setTimeout(
-            () => finish(new Error("WhatsApp setup did not finish. If the Facebook window closed or was blocked, allow pop-ups and try again.")),
-            10 * 60 * 1000,
-        );
-        const cleanup = () => {
-            window.removeEventListener("message", onMessage);
-            if (timeout) clearTimeout(timeout);
-            clearTimeout(overall);
-        };
-        window.addEventListener("message", onMessage);
-
-        loadFacebookSdk(onboarding.appId, onboarding.graphApiVersion)
-            .then((FB) => {
-                FB.login(
-                    (response) => {
-                        console.info("[WhatsApp signup] login response:", response?.authResponse ? "code received" : response);
-                        code = response.authResponse?.code ?? null;
-                        if (!code) {
-                            finish(new Error("WhatsApp setup was not completed."));
-                            return;
-                        }
-                        // The session message normally arrives first; give it a moment.
-                        // If it never comes, send the code alone: the WhatsApp service
-                        // finds the account and number from the token.
-                        timeout = setTimeout(() => {
-                            console.info("[WhatsApp signup] no session message; the server will look up the number.");
-                            session = { phoneNumberId: "", wabaId: "" };
-                            finish();
-                        }, 8000);
-                        finish();
-                    },
-                    {
-                        config_id: onboarding.configId,
-                        response_type: "code",
-                        override_default_response_type: true,
-                        extras: {
-                            setup: {},
-                            featureType: "whatsapp_business_app_onboarding",
-                            sessionInfoVersion: "3",
-                        },
-                    },
-                );
-            })
-            .catch((error: Error) => finish(error));
-    });
+// Reads ?code / ?error after Facebook sends the browser back, then removes them
+// from the address bar so a reload does not reuse the one-time code.
+function takeSignupResult(): { code: string } | { error: string } | null {
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get("code");
+    const error = params.get("error_description") || params.get("error_message") || params.get("error");
+    if (!code && !error) return null;
+    const returnedState = params.get("state");
+    let expectedState: string | null = null;
+    try {
+        expectedState = sessionStorage.getItem(SIGNUP_STATE_KEY);
+        sessionStorage.removeItem(SIGNUP_STATE_KEY);
+    } catch {
+        expectedState = null;
+    }
+    for (const key of ["code", "state", "error", "error_code", "error_message", "error_description", "error_reason"]) {
+        params.delete(key);
+    }
+    const query = params.toString();
+    window.history.replaceState(null, "", `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash}`);
+    if (error) return { error: error.replace(/\+/g, " ") };
+    if (expectedState && returnedState !== expectedState) {
+        return { error: "The WhatsApp setup response did not match this browser session. Click Connect again." };
+    }
+    return { code: code! };
 }
 
 export function CloudConnectPanel({
@@ -158,30 +86,28 @@ export function CloudConnectPanel({
     const [isConnecting, setIsConnecting] = useState(false);
     const [showGroupsLink, setShowGroupsLink] = useState(false);
 
-    // Load the Facebook SDK up front, so clicking Connect opens the login
-    // window straight away; browsers block pop-ups opened after a slow load.
-    const onboarding = state.onboarding;
+    // Coming back from Facebook: finish the signup with the code in the URL.
+    const handledReturn = useRef(false);
     useEffect(() => {
-        if (!onboarding || !onComplete) return;
-        loadFacebookSdk(onboarding.appId, onboarding.graphApiVersion).catch(() => undefined);
-    }, [onboarding, onComplete]);
+        if (!onComplete || handledReturn.current) return;
+        handledReturn.current = true;
+        const result = takeSignupResult();
+        if (!result) return;
+        if ("error" in result) {
+            toast.error(result.error);
+            return;
+        }
+        setIsConnecting(true);
+        onComplete({ code: result.code, phoneNumberId: "", wabaId: "", redirectUris: [signupRedirectUri()] })
+            .then(() => toast.success("WhatsApp connected. Chats and history will appear as Meta syncs them."))
+            .catch((error: unknown) => toast.error(error instanceof Error ? error.message : "Failed to connect WhatsApp."))
+            .finally(() => setIsConnecting(false));
+    }, [onComplete]);
 
-    const connect = async () => {
+    const connect = () => {
         if (!state.onboarding || !onComplete) return;
         setIsConnecting(true);
-        try {
-            const result = await runEmbeddedSignup(state.onboarding);
-            // Meta sometimes wants the code exchanged with the address of the page
-            // the login was started from; the server tries these in turn.
-            const page = `${window.location.origin}${window.location.pathname}`;
-            const redirectUris = [...new Set([page, `${page}/`, `${window.location.origin}/`, window.location.origin])];
-            await onComplete({ ...result, redirectUris });
-            toast.success("WhatsApp connected. Chats and history will appear as Meta syncs them.");
-        } catch (error) {
-            toast.error(error instanceof Error ? error.message : "Failed to connect WhatsApp.");
-        } finally {
-            setIsConnecting(false);
-        }
+        startEmbeddedSignup(state.onboarding);
     };
 
     return (

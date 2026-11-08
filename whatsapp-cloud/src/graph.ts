@@ -114,7 +114,8 @@ export async function exchangeSignupCode(
   // JavaScript SDK popup that is usually none, sometimes an empty one, and
   // sometimes the page the login started from. A rejected attempt does not use
   // up the code, so try each candidate until one is accepted.
-  const candidates: Array<string | undefined> = [undefined, "", ...redirectUris.filter(Boolean)];
+  // The page sends the exact redirect_uri of a redirect-flow login: try it first.
+  const candidates: Array<string | undefined> = [...redirectUris.filter(Boolean), undefined, ""];
   let data: { access_token?: string } | null = null;
   let lastError: unknown = null;
   for (const candidate of candidates) {

@@ -38,7 +38,8 @@ export type CloudMessageDoc = {
   fromMe: boolean;
   author?: string | null; // group messages: sender's display name
   authorId?: string | null;
-  authorPhone?: string | null; // group sender's phone digits, when WhatsApp reveals it // group messages from the groups bridge: sender JID (for read receipts/quotes)
+  authorPhone?: string | null; // group sender's phone digits, when WhatsApp reveals it
+  mentions?: Array<{ id: string; phone?: string | null }> | null; // @mentioned people (linked phone) // group messages from the groups bridge: sender JID (for read receipts/quotes)
   type: string;
   ack: number;
   error?: string | null;

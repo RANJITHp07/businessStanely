@@ -811,7 +811,13 @@ class CloudWhatsAppService {
     counterpart: string,
     fromMe: boolean,
     source: CloudMessageDoc["source"],
-    options: { author?: string | null; authorId?: string | null; authorPhone?: string | null; groupSubject?: string | null } = {},
+    options: {
+      author?: string | null;
+      authorId?: string | null;
+      authorPhone?: string | null;
+      groupSubject?: string | null;
+      mentions?: CloudMessageDoc["mentions"];
+    } = {},
   ) {
     const parsed = parseWaMessage(message);
     if (!parsed || !message.id) return;
@@ -843,6 +849,7 @@ class CloudWhatsAppService {
       author: options.author ?? null,
       ...(options.authorId ? { authorId: options.authorId } : {}),
       ...(options.authorPhone ? { authorPhone: options.authorPhone } : {}),
+      ...(options.mentions?.length ? { mentions: options.mentions } : {}),
       type: parsed.type,
       ack: fromMe ? (source === "history" ? historyAck(message.history_context?.status) : ACK.sent) : ACK.pending,
       media: parsed.media,
@@ -1025,13 +1032,18 @@ class CloudWhatsAppService {
       return { phone, keys };
     };
     const groupDocs = docs.filter((doc) => !doc.fromMe && isGroupKey(doc.chatId) && (doc.authorId || doc.authorPhone));
-    // Phone numbers of senders known only by their hidden id.
+    const mentionDocs = docs.filter((doc) => doc.mentions?.length);
+    // Phone numbers of senders / mentioned people known only by hidden id.
     const missing = [
       ...new Set(
-        groupDocs
-          .filter((doc) => !doc.authorPhone && (doc.authorId ?? "").endsWith("@lid"))
-          .map((doc) => lidKey(doc.authorId!))
-          .filter((key) => key && !this.lidCache.has(key)),
+        [
+          ...groupDocs
+            .filter((doc) => !doc.authorPhone && (doc.authorId ?? "").endsWith("@lid"))
+            .map((doc) => lidKey(doc.authorId!)),
+          ...mentionDocs.flatMap((doc) =>
+            (doc.mentions ?? []).filter((m) => !m.phone && m.id.endsWith("@lid")).map((m) => lidKey(m.id)),
+          ),
+        ].filter((key) => key && !this.lidCache.has(key)),
       ),
     ];
     if (missing.length) {
@@ -1046,9 +1058,22 @@ class CloudWhatsAppService {
         if (phone) doc.authorPhone = phone;
       }
     }
+    const mentionKeys = (mention: { id: string; phone?: string | null }) => {
+      const phone =
+        digitsOnly(mention.phone ?? "") ||
+        (mention.id.endsWith("@s.whatsapp.net") ? digitsOnly(mention.id.split("@")[0] ?? "") : "") ||
+        (mention.id.endsWith("@lid") ? this.lidCache.get(lidKey(mention.id)) ?? "" : "");
+      const keys = [phone, mention.id.endsWith("@lid") ? lidKey(mention.id) : ""].filter(Boolean);
+      return { phone, keys };
+    };
     const names = new Map<string, string>();
-    if (groupDocs.length) {
-      const wanted = [...new Set(groupDocs.flatMap((doc) => senderKeys(doc).keys))];
+    if (groupDocs.length || mentionDocs.length) {
+      const wanted = [
+        ...new Set([
+          ...groupDocs.flatMap((doc) => senderKeys(doc).keys),
+          ...mentionDocs.flatMap((doc) => (doc.mentions ?? []).flatMap((m) => mentionKeys(m).keys)),
+        ]),
+      ];
       if (wanted.length) {
         const { contacts } = await getCollections();
         for (const contact of await contacts.find({ _id: { $in: wanted } }, { projection: { name: 1 } }).toArray()) {
@@ -1057,7 +1082,19 @@ class CloudWhatsAppService {
       }
     }
     return docs.map((doc) => {
-      const message = this.toMessage(doc);
+      let message = this.toMessage(doc);
+      // "@<id>" in the text becomes "@Saved name", else "@+<number>".
+      if (doc.mentions?.length && message.body) {
+        let body = message.body;
+        for (const mention of doc.mentions) {
+          const token = `@${mention.id.split("@")[0]}`;
+          if (!body.includes(token)) continue;
+          const { phone, keys } = mentionKeys(mention);
+          const label = keys.map((key) => names.get(key)).find(Boolean) ?? (phone ? `+${phone}` : null);
+          if (label) body = body.split(token).join(`@${label}`);
+        }
+        message = { ...message, body };
+      }
       if (doc.fromMe || !isGroupKey(doc.chatId) || !(doc.authorId || doc.authorPhone)) return message;
       const { phone, keys } = senderKeys(doc);
       const saved = keys.map((key) => names.get(key)).find(Boolean);
@@ -1568,6 +1605,7 @@ class CloudWhatsAppService {
     authorId?: string | null;
     authorPhone?: string | null;
     groupSubject?: string | null;
+    mentions?: CloudMessageDoc["mentions"];
     /** 1:1 only: the sender's WhatsApp profile name. */
     contactName?: string | null;
     message: WaMessage;
@@ -1579,6 +1617,7 @@ class CloudWhatsAppService {
       author: input.fromMe ? null : input.author ?? null,
       authorId: input.authorId ?? null,
       authorPhone: input.authorPhone ?? null,
+      mentions: Array.isArray(input.mentions) ? input.mentions : null,
       groupSubject: isGroupKey(key) ? input.groupSubject ?? null : input.fromMe ? null : input.contactName ?? null,
     });
     if (input.history) this.historyDirty = true;
@@ -1620,6 +1659,7 @@ class CloudWhatsAppService {
         author: input.fromMe ? null : input.author ?? null,
         ...(input.authorId ? { authorId: input.authorId } : {}),
         ...(input.authorPhone && !input.fromMe ? { authorPhone: input.authorPhone } : {}),
+        ...(Array.isArray(input.mentions) && input.mentions.length ? { mentions: input.mentions } : {}),
         type: parsed.type,
         ack: input.fromMe ? historyAck(message.history_context?.status) : ACK.pending,
         media: parsed.media,
@@ -1644,11 +1684,12 @@ class CloudWhatsAppService {
     await messages.bulkWrite(
       docs.map((doc) => {
         // Sender fields also fill in messages stored earlier without them.
-        const { author, authorId, authorPhone, ...rest } = doc;
+        const { author, authorId, authorPhone, mentions, ...rest } = doc;
         const sender = {
           ...(author ? { author } : {}),
           ...(authorId ? { authorId } : {}),
           ...(authorPhone ? { authorPhone } : {}),
+          ...(mentions?.length ? { mentions } : {}),
         };
         return {
           updateOne: {

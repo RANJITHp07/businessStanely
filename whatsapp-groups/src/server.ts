@@ -254,6 +254,17 @@ function isRecent(msg: WAMessage) {
   return !seconds || Date.now() / 1000 - seconds < HISTORY_MEDIA_DAYS * 86400;
 }
 
+// Mentioned people with their phone number when known, so whatsapp-cloud can
+// show "@Saved name" or "@+91..." instead of "@<id>".
+function mentionsOf(message: { mentions?: string[] }) {
+  if (!message.mentions?.length) return undefined;
+  return message.mentions.map((jid) => {
+    const bare = `${jid.split("@")[0]!.split(":")[0]}@${jid.split("@")[1] ?? ""}`;
+    const phone = phoneDigits(jid) ?? (jid.endsWith("@lid") ? lidToPhone.get(bare) ?? null : null);
+    return { id: bare, phone };
+  });
+}
+
 function pushDirectMessage(msg: WAMessage, history: boolean) {
   const phone = directPhone(msg);
   // When WhatsApp hides the number, keep the chat under its hidden id
@@ -282,6 +293,7 @@ function pushDirectMessage(msg: WAMessage, history: boolean) {
     fromMe,
     history,
     contactName: fromMe ? null : msg.pushName?.trim() || null,
+    mentions: mentionsOf(converted.message),
     message: { ...converted.message, from: fromMe ? undefined : phone ?? undefined },
   });
   if (
@@ -318,6 +330,7 @@ function pushMessage(msg: WAMessage, history: boolean) {
     authorId: fromMe ? null : authorId,
     authorPhone: fromMe ? null : authorPhone,
     groupSubject: groupCache.get(chatId)?.subject ?? null,
+    mentions: mentionsOf(converted.message),
     message: { ...converted.message, from: authorId ?? undefined },
   });
   if (

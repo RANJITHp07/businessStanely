@@ -46,6 +46,7 @@ import {
     formatWindowRemaining,
     isReplyWindowOpen,
 } from "@/components/whatsapp/CloudPanels";
+import { MessageText } from "@/components/whatsapp/MessageText";
 import {
     Dialog,
     DialogContent,
@@ -175,7 +176,7 @@ function MessageMedia({ message }: { message: WhatsAppMessage }) {
                     </a>
                 </div>
                 {message.body ? (
-                    <p className="mt-1 wrap-break-word whitespace-pre-wrap text-[14px] leading-6">{message.body}</p>
+                    <p className="mt-1 wrap-break-word whitespace-pre-wrap text-[14px] leading-6"><MessageText text={message.body} /></p>
                 ) : null}
             </div>
         );
@@ -214,7 +215,7 @@ function MessageMedia({ message }: { message: WhatsAppMessage }) {
                     </a>
                 </div>
                 {message.body ? (
-                    <p className="mt-1 wrap-break-word whitespace-pre-wrap text-[14px] leading-6">{message.body}</p>
+                    <p className="mt-1 wrap-break-word whitespace-pre-wrap text-[14px] leading-6"><MessageText text={message.body} /></p>
                 ) : null}
             </div>
         );
@@ -244,7 +245,7 @@ function MessageMedia({ message }: { message: WhatsAppMessage }) {
                     preload="metadata"
                 />
                 {message.body ? (
-                    <p className="mt-1 wrap-break-word whitespace-pre-wrap text-[14px] leading-6">{message.body}</p>
+                    <p className="mt-1 wrap-break-word whitespace-pre-wrap text-[14px] leading-6"><MessageText text={message.body} /></p>
                 ) : null}
             </div>
         );
@@ -263,7 +264,7 @@ function MessageMedia({ message }: { message: WhatsAppMessage }) {
                     <span className="truncate">{message.filename || "Document"}</span>
                 </a>
                 {message.body ? (
-                    <p className="mt-1 wrap-break-word whitespace-pre-wrap text-[14px] leading-6">{message.body}</p>
+                    <p className="mt-1 wrap-break-word whitespace-pre-wrap text-[14px] leading-6"><MessageText text={message.body} /></p>
                 ) : null}
             </div>
         );
@@ -961,7 +962,7 @@ export function WhatsAppDesktop() {
                                                             {message.hasMedia ? (
                                                                 <MessageMedia message={message} />
                                                             ) : (
-                                                                <p className="wrap-break-word whitespace-pre-wrap text-[14px] leading-6">{message.body || "Unsupported message"}</p>
+                                                                <p className="wrap-break-word whitespace-pre-wrap text-[14px] leading-6"><MessageText text={message.body || "Unsupported message"} /></p>
                                                             )}
 
                                                             <div className={`pointer-events-none absolute -top-3 z-10 flex gap-0.5 rounded-md bg-white/95 p-0.5 opacity-0 shadow-sm transition group-hover:pointer-events-auto group-hover:opacity-100 ${message.fromMe ? "right-2" : "left-2"}`}>

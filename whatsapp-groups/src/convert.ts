@@ -19,6 +19,8 @@ export type CloudShapedMessage = {
   location?: { latitude?: number; longitude?: number; name?: string; address?: string };
   contacts?: Array<{ name?: { formatted_name?: string } }>;
   context?: { id?: string };
+  /** WhatsApp ids (@s.whatsapp.net / @lid) mentioned in the text. */
+  mentions?: string[];
 };
 
 export type Converted = { message: CloudShapedMessage; hasMedia: boolean; maxBytes: number };
@@ -38,7 +40,8 @@ export function messageTimestampSeconds(msg: WAMessage) {
 
 function contextId(part: { contextInfo?: proto.IContextInfo | null } | null | undefined) {
   const id = part?.contextInfo?.stanzaId;
-  return id ? { context: { id } } : {};
+  const mentions = (part?.contextInfo?.mentionedJid ?? []).filter(Boolean);
+  return { ...(id ? { context: { id } } : {}), ...(mentions.length ? { mentions } : {}) };
 }
 
 // Returns null for things that are not a chat bubble (reactions, edits,

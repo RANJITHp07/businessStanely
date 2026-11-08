@@ -9,7 +9,7 @@ const BATCH_SIZE = 500;
 // Full history sync after linking can be tens of thousands of messages.
 const MAX_QUEUE = 100_000;
 
-export type IngestEvent = { kind: "message" | "status" | "media" | "chats" | "contacts" | "directChats" } & Record<string, unknown>;
+export type IngestEvent = { kind: "message" | "status" | "media" | "chats" | "contacts" | "directChats" | "lidPhones" } & Record<string, unknown>;
 
 const queue: IngestEvent[] = [];
 let flushing = false;
@@ -18,7 +18,7 @@ let timer: NodeJS.Timeout | null = null;
 
 // Chat lists and names are small and make the sidebar usable, so they jump
 // ahead of a large message backlog (history sync).
-const PRIORITY_KINDS = new Set(["chats", "contacts", "directChats"]);
+const PRIORITY_KINDS = new Set(["chats", "contacts", "directChats", "lidPhones"]);
 
 export function enqueue(event: IngestEvent) {
   if (queue.length >= MAX_QUEUE) {

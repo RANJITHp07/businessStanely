@@ -172,7 +172,33 @@ function toJid(chatId: string) {
 
 function rememberLid(lid: string | null | undefined, phoneJid: string | null | undefined) {
   const phone = phoneDigits(phoneJid);
-  if (lid?.endsWith("@lid") && phone) lidToPhone.set(lid, phone);
+  if (!lid?.endsWith("@lid") || !phone) return;
+  const key = `${lid.split("@")[0]!.split(":")[0]}@lid`;
+  if (lidToPhone.get(key) === phone) return;
+  lidToPhone.set(key, phone);
+  if (lid !== key) lidToPhone.set(lid, phone);
+  // Tell whatsapp-cloud, so hidden-id chats and senders show the number.
+  pendingLidPairs.push({ lid: key, phone });
+  if (!lidFlushTimer) {
+    lidFlushTimer = setTimeout(() => {
+      lidFlushTimer = null;
+      const pairs = pendingLidPairs.splice(0);
+      for (let i = 0; i < pairs.length; i += 1000) enqueue({ kind: "lidPhones", pairs: pairs.slice(i, i + 1000) });
+    }, 2000);
+  }
+}
+const pendingLidPairs: Array<{ lid: string; phone: string }> = [];
+let lidFlushTimer: ReturnType<typeof setTimeout> | null = null;
+
+// Group member lists carry both the hidden id and the phone number of each
+// member: the main source of numbers for hidden-id chats and senders.
+function learnFromGroups(groups: Array<Partial<GroupMetadata>>) {
+  for (const group of groups) {
+    for (const participant of group.participants ?? []) {
+      const p = participant as typeof participant & { lid?: string; jid?: string };
+      rememberLid(p.lid ?? (p.id?.endsWith("@lid") ? p.id : null), p.jid ?? (p.id?.endsWith("@s.whatsapp.net") ? p.id : null));
+    }
+  }
 }
 
 // Address-book names (and the names people set themselves) for 1:1 chats.
@@ -321,6 +347,7 @@ async function refreshGroups(current: WASocket) {
     const all = await current.groupFetchAllParticipating();
     for (const group of Object.values(all)) groupCache.set(group.id, group);
     pushGroups(Object.values(all));
+    learnFromGroups(Object.values(all));
     LOG(`Groups visible: ${groupCache.size}`);
   } catch (error) {
     LOG("Fetching groups failed:", error instanceof Error ? error.message : String(error));
@@ -445,6 +472,7 @@ async function connect() {
   current.ev.on("groups.upsert", (groups) => {
     for (const group of groups) groupCache.set(group.id, group);
     pushGroups(groups);
+    learnFromGroups(groups);
   });
 
   current.ev.on("groups.update", (updates) => {
@@ -458,7 +486,9 @@ async function connect() {
 
   current.ev.on("group-participants.update", async ({ id }) => {
     try {
-      groupCache.set(id, await current.groupMetadata(id));
+      const metadata = await current.groupMetadata(id);
+      groupCache.set(id, metadata);
+      learnFromGroups([metadata]);
     } catch {
       groupCache.delete(id);
     }

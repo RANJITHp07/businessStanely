@@ -984,11 +984,12 @@ class CloudWhatsAppService {
   private toChatSummary(chat: CloudChatDoc): WhatsAppChatSummary {
     const isGroup = isGroupKey(chat._id);
     const hiddenNumber = isLidKey(chat._id);
+    // 1:1: the saved contact name, else the number with country code, else
+    // (number still hidden) the person's own WhatsApp name.
+    const number = hiddenNumber ? (chat.phoneNumber ? `+${chat.phoneNumber}` : null) : `+${chat._id}`;
     const name = isGroup
       ? chat.profileName || chat.contactName || "WhatsApp group"
-      : chat.contactName ||
-        chat.profileName ||
-        (hiddenNumber ? (chat.phoneNumber ? `+${chat.phoneNumber}` : "WhatsApp contact") : `+${chat._id}`);
+      : chat.contactName || number || chat.profileName || "Number hidden by WhatsApp";
     return {
       id: toChatId(chat._id),
       name,
@@ -1024,6 +1025,27 @@ class CloudWhatsAppService {
       return { phone, keys };
     };
     const groupDocs = docs.filter((doc) => !doc.fromMe && isGroupKey(doc.chatId) && (doc.authorId || doc.authorPhone));
+    // Phone numbers of senders known only by their hidden id.
+    const missing = [
+      ...new Set(
+        groupDocs
+          .filter((doc) => !doc.authorPhone && (doc.authorId ?? "").endsWith("@lid"))
+          .map((doc) => lidKey(doc.authorId!))
+          .filter((key) => key && !this.lidCache.has(key)),
+      ),
+    ];
+    if (missing.length) {
+      const { lids } = await getCollections();
+      const found = new Map((await lids.find({ _id: { $in: missing } }).toArray()).map((doc) => [doc._id, doc.phone] as const));
+      if (this.lidCache.size > 50000) this.lidCache.clear();
+      for (const key of missing) this.lidCache.set(key, found.get(key) ?? null);
+    }
+    for (const doc of groupDocs) {
+      if (!doc.authorPhone && (doc.authorId ?? "").endsWith("@lid")) {
+        const phone = this.lidCache.get(lidKey(doc.authorId!));
+        if (phone) doc.authorPhone = phone;
+      }
+    }
     const names = new Map<string, string>();
     if (groupDocs.length) {
       const wanted = [...new Set(groupDocs.flatMap((doc) => senderKeys(doc).keys))];
@@ -1686,6 +1708,48 @@ class CloudWhatsAppService {
     const doc = await messages.findOne({ _id: input.id }, { projection: { chatId: 1 } });
     if (doc) publishWhatsAppEvent("messages-updated", { chatId: toChatId(doc.chatId) });
   }
+
+  // Hidden id -> phone pairs: remember them, put the number on hidden-id
+  // chats, and copy over a saved contact name known by the number.
+  async ingestLidPhones(pairs: Array<{ lid: string; phone: string }>) {
+    const clean = pairs
+      .map((pair) => ({ lid: lidKey(String(pair.lid ?? "")), phone: digitsOnly(String(pair.phone ?? "")) }))
+      .filter((pair) => pair.lid && pair.phone.length >= 8);
+    if (!clean.length) return;
+    const { lids, chats, contacts } = await getCollections();
+    const now = new Date();
+    await lids.bulkWrite(
+      clean.map((pair) => ({
+        updateOne: { filter: { _id: pair.lid }, update: { $set: { phone: pair.phone, updatedAt: now } }, upsert: true },
+      })),
+      { ordered: false },
+    );
+    const names = new Map(
+      (await contacts.find({ _id: { $in: clean.map((pair) => pair.phone) } }, { projection: { name: 1 } }).toArray()).map(
+        (contact) => [contact._id, contact.name] as const,
+      ),
+    );
+    const result = await chats.bulkWrite(
+      clean.map((pair) => {
+        const name = names.get(pair.phone);
+        return {
+          updateOne: {
+            filter: { _id: pair.lid },
+            update: { $set: { phoneNumber: pair.phone, ...(name ? { contactName: name } : {}) } },
+          },
+        };
+      }),
+      { ordered: false },
+    );
+    this.lidCache.clear();
+    if (result.modifiedCount) {
+      this.bumpChats();
+      publishWhatsAppEvent("chats-updated", { chatId: "numbers" });
+    }
+  }
+
+  // Small in-memory cache of hidden id -> phone for showing group senders.
+  private lidCache = new Map<string, string | null>();
 
   // The phone's 1:1 chat list (linked-phone mode): every conversation is
   // listed with its name, last activity and unread count, even before a new

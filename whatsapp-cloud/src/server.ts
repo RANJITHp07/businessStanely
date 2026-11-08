@@ -193,7 +193,8 @@ type GroupIngestEvent =
   | ({ kind: "media" } & Parameters<typeof whatsappService.ingestGroupMedia>[0])
   | { kind: "chats"; groups: Parameters<typeof whatsappService.ingestGroupChats>[0] }
   | { kind: "contacts"; contacts: Parameters<typeof whatsappService.ingestContacts>[0] }
-  | { kind: "directChats"; chats: Parameters<typeof whatsappService.ingestDirectChats>[0] };
+  | { kind: "directChats"; chats: Parameters<typeof whatsappService.ingestDirectChats>[0] }
+  | { kind: "lidPhones"; pairs: Parameters<typeof whatsappService.ingestLidPhones>[0] };
 
 // Admin "Link groups" dialog: QR and link status of the groups linked device.
 // POST with {"action":"link"} starts a fresh QR; {"action":"unlink"} removes the device.
@@ -254,6 +255,9 @@ app.post("/groups/ingest", auth, async (req, res) => {
           break;
         case "directChats":
           await whatsappService.ingestDirectChats(Array.isArray(event.chats) ? event.chats : []);
+          break;
+        case "lidPhones":
+          await whatsappService.ingestLidPhones(Array.isArray(event.pairs) ? event.pairs : []);
           break;
         default:
           break;

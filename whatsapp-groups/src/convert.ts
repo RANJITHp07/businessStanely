@@ -51,6 +51,19 @@ export function convertMessage(msg: WAMessage): Converted | null {
   if (!content || !kind) return null;
 
   const base = { id, timestamp: String(messageTimestampSeconds(msg)) };
+
+  // View-once media can't be opened on a linked device; say what it is.
+  const wrapped = msg.message;
+  const viewOnce =
+    Boolean(wrapped.viewOnceMessage || wrapped.viewOnceMessageV2 || wrapped.viewOnceMessageV2Extension) ||
+    Boolean(content.imageMessage?.viewOnce || content.videoMessage?.viewOnce || content.audioMessage?.viewOnce);
+  if (viewOnce) {
+    const what =
+      kind === "videoMessage" ? "video" : kind === "audioMessage" ? "voice message" : "photo";
+    const caption = content.imageMessage?.caption ?? content.videoMessage?.caption ?? "";
+    const body = `View-once ${what}: open WhatsApp on the phone to view it.${caption ? `\n${caption}` : ""}`;
+    return { message: { ...base, type: "text", text: { body } }, hasMedia: false, maxBytes: 0 };
+  }
   const fileLength = (part: { fileLength?: unknown } | null | undefined) => toNumber(part?.fileLength);
 
   switch (kind) {

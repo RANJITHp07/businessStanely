@@ -56,8 +56,13 @@ export type CloudMessageDoc = {
   source: "webhook" | "echo" | "history" | "api" | "web";
 };
 
+// Hidden WhatsApp id ("<lid>@lid") -> phone digits, learned from the linked
+// phone (group member lists, contacts, chats).
+export type CloudLidDoc = { _id: string; phone: string; updatedAt: Date };
+
 type Collections = {
   config: Collection<CloudConfigDoc>;
+  lids: Collection<CloudLidDoc>;
   chats: Collection<CloudChatDoc>;
   contacts: Collection<CloudContactDoc>;
   messages: Collection<CloudMessageDoc>;
@@ -81,6 +86,7 @@ export function getCollections(): Promise<Collections> {
     const db: Db = client.db(process.env.WHATSAPP_MONGODB_DB?.trim() || undefined);
     const collections: Collections = {
       config: db.collection<CloudConfigDoc>("whatsapp_cloud_config"),
+      lids: db.collection<CloudLidDoc>("whatsapp_cloud_lids"),
       chats: db.collection<CloudChatDoc>("whatsapp_cloud_chats"),
       contacts: db.collection<CloudContactDoc>("whatsapp_cloud_contacts"),
       messages: db.collection<CloudMessageDoc>("whatsapp_cloud_messages"),

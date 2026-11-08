@@ -12,6 +12,7 @@ import makeWASocket, {
   proto,
   useMultiFileAuthState,
   type AnyMessageContent,
+  type Chat,
   type Contact,
   type GroupMetadata,
   type WAMessage,
@@ -176,6 +177,32 @@ function pushContacts(contacts: Array<Partial<Contact>>) {
   }
   for (let i = 0; i < list.length; i += 500) {
     enqueue({ kind: "contacts", contacts: list.slice(i, i + 500) });
+  }
+}
+
+// The phone's 1:1 chat list (history sync and live chat updates), so every
+// conversation shows in the panel even before a new message arrives.
+function pushDirectChats(chats: Array<Partial<Chat>>) {
+  if (!DIRECT_CHATS) return;
+  const list: Array<{ chatId: string; name: string | null; timestamp: number | null; unreadCount: number | null }> = [];
+  for (const chat of chats) {
+    const id = chat.id ?? "";
+    if (!id || !isDirectJid(id)) continue;
+    const c = chat as Partial<Chat> & { pnJid?: string | null; lidJid?: string | null };
+    rememberLid(c.lidJid ?? (id.endsWith("@lid") ? id : null), c.pnJid ?? (id.endsWith("@s.whatsapp.net") ? id : null));
+    const phone = phoneDigits(id) ?? phoneDigits(c.pnJid) ?? (id.endsWith("@lid") ? lidToPhone.get(id) ?? null : null);
+    const lid = id.endsWith("@lid") ? id.split("@")[0]!.split(":")[0] : null;
+    if (!phone && !lid) continue;
+    const seconds = Number(chat.conversationTimestamp ?? chat.lastMessageRecvTimestamp ?? 0);
+    list.push({
+      chatId: phone ? `${phone}@c.us` : `${lid}@lid`,
+      name: chat.name?.trim() || null,
+      timestamp: seconds ? seconds * 1000 : null,
+      unreadCount: typeof chat.unreadCount === "number" ? chat.unreadCount : null,
+    });
+  }
+  for (let i = 0; i < list.length; i += 500) {
+    enqueue({ kind: "directChats", chats: list.slice(i, i + 500) });
   }
 }
 
@@ -367,14 +394,7 @@ async function connect() {
       rememberLid(c.lidJid ?? (c.id?.endsWith("@lid") ? c.id : null), c.pnJid ?? (c.id?.endsWith("@s.whatsapp.net") ? c.id : null));
     }
     pushContacts(contacts);
-    if (DIRECT_CHATS) {
-      // 1:1 chat names from history (the phone's saved name when there is one).
-      pushContacts(
-        chats
-          .filter((c) => c.id && !isJidGroup(c.id) && c.name)
-          .map((c) => ({ id: c.id, name: c.name ?? undefined })),
-      );
-    }
+    pushDirectChats(chats);
     LOG(`History: ${chats.length} chats, ${contacts.length} contacts, ${messages.length} messages${progress != null ? ` (${progress}%)` : ""}.`);
     pushGroups(chats.filter((c) => c.id && isJidGroup(c.id)).map((c) => ({ id: c.id, subject: c.name ?? undefined })));
     for (const msg of messages) pushMessage(msg, true);
@@ -399,6 +419,7 @@ async function connect() {
   current.ev.on("contacts.upsert", (contacts) => pushContacts(contacts));
   current.ev.on("contacts.update", (contacts) => pushContacts(contacts));
   current.ev.on("chats.phoneNumberShare", ({ lid, jid }) => rememberLid(lid, jid));
+  current.ev.on("chats.upsert", (chats) => pushDirectChats(chats));
 
   current.ev.on("groups.upsert", (groups) => {
     for (const group of groups) groupCache.set(group.id, group);

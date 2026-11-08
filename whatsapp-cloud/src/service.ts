@@ -1516,6 +1516,39 @@ class CloudWhatsAppService {
     if (doc) publishWhatsAppEvent("messages-updated", { chatId: toChatId(doc.chatId) });
   }
 
+  // The phone's 1:1 chat list (linked-phone mode): every conversation is
+  // listed with its name, last activity and unread count, even before a new
+  // message arrives here. Messages that do arrive keep these fields current.
+  async ingestDirectChats(
+    list: Array<{ chatId: string; name?: string | null; timestamp?: number | null; unreadCount?: number | null }>,
+  ) {
+    if (!webDirectEnabled) return;
+    const { chats } = await getCollections();
+    let changed = false;
+    for (const entry of list) {
+      let key: string;
+      try {
+        key = toChatKey(String(entry.chatId ?? ""));
+      } catch {
+        continue;
+      }
+      if (isGroupKey(key)) continue;
+      const update: Record<string, Record<string, unknown>> = {
+        $setOnInsert: { lastMessage: "", unreadCount: Math.max(0, Number(entry.unreadCount ?? 0)) },
+      };
+      const timestamp = Number(entry.timestamp ?? 0);
+      if (timestamp > 0) update.$max = { timestamp };
+      const name = entry.name?.trim();
+      if (name) update.$set = { contactName: name };
+      const result = await chats.updateOne({ _id: key }, update, { upsert: true });
+      if (result.upsertedCount || result.modifiedCount) changed = true;
+    }
+    if (changed) {
+      this.bumpChats();
+      publishWhatsAppEvent("chats-updated", { chatId: "chats" });
+    }
+  }
+
   // Address-book names from the linked phone (1:1). Saved for search and new
   // chats, and shown on existing chats.
   async ingestContacts(list: Array<{ phone: string; name: string }>) {

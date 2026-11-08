@@ -8,7 +8,7 @@ const BATCH_SIZE = 50;
 // Full history sync after linking can be tens of thousands of messages.
 const MAX_QUEUE = 100_000;
 
-export type IngestEvent = { kind: "message" | "status" | "media" | "chats" | "contacts" } & Record<string, unknown>;
+export type IngestEvent = { kind: "message" | "status" | "media" | "chats" | "contacts" | "directChats" } & Record<string, unknown>;
 
 const queue: IngestEvent[] = [];
 let flushing = false;

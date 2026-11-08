@@ -24,7 +24,7 @@ import pino from "pino";
 import QRCode from "qrcode";
 
 import { convertMessage, messageTimestampSeconds } from "./convert.js";
-import { enqueue, outboxSize } from "./outbox.js";
+import { clearOutbox, enqueue, outboxSize, setOutboxAccount } from "./outbox.js";
 
 // WhatsApp groups for the admin panel, through a WhatsApp Web linked device on
 // the firm's number. 1:1 chats stay on Meta's Cloud API (whatsapp-cloud/);
@@ -380,6 +380,7 @@ async function connect() {
   status = "connecting";
   const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
   const freshPairing = !state.creds.me;
+  setOutboxAccount(accountPhone(state.creds.me?.id));
   const { version } = await fetchLatestBaileysVersion().catch(() => ({ version: undefined }));
 
   const current = makeWASocket({
@@ -418,6 +419,7 @@ async function connect() {
       lastError = null;
       reconnectDelayMs = 2000;
       LOG(`Linked as ${current.user?.id}`);
+      setOutboxAccount(accountPhone(current.user?.id));
       void refreshGroups(current);
       void syncContacts(current, myGeneration);
     }
@@ -530,6 +532,11 @@ async function startLinking() {
   await waitForQr();
 }
 
+// "916238403528:53@s.whatsapp.net" -> "916238403528".
+function accountPhone(id: string | null | undefined) {
+  return id ? id.split(":")[0]!.split("@")[0]! || null : null;
+}
+
 // Removes this linked device from the phone; a new QR is shown afterwards.
 let unlinking = false;
 async function unlink() {
@@ -550,6 +557,8 @@ async function unlink() {
       // Already closed.
     }
     await fs.rm(AUTH_DIR, { recursive: true, force: true });
+    clearOutbox();
+    setOutboxAccount(null);
     status = "connecting";
     qrDataUrl = null;
     freshPairing428 = 0;

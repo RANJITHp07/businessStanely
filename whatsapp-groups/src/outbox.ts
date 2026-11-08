@@ -20,7 +20,21 @@ let timer: NodeJS.Timeout | null = null;
 // ahead of a large message backlog (history sync).
 const PRIORITY_KINDS = new Set(["chats", "contacts", "directChats", "lidPhones"]);
 
+// Phone digits of the linked account; every event carries it so cloud can
+// tell when a different number was linked and drop the previous one's chats.
+let account: string | null = null;
+export function setOutboxAccount(phone: string | null) {
+  account = phone;
+}
+
+// After unlinking: events of the old account must not reach cloud tagged as
+// the next one.
+export function clearOutbox() {
+  queue.length = 0;
+}
+
 export function enqueue(event: IngestEvent) {
+  if (account && event.account === undefined) event.account = account;
   if (queue.length >= MAX_QUEUE) {
     // Cloud has been down for a long time; drop the oldest event.
     queue.shift();

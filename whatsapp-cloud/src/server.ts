@@ -232,6 +232,12 @@ app.post("/groups/ingest", auth, async (req, res) => {
       await whatsappService.ingestHistoryMessages(batch);
     };
     for (const event of events) {
+      // A different linked number: drop the previous number's chats first.
+      const account = (event as { account?: unknown })?.account;
+      if (typeof account === "string") {
+        await flushHistory();
+        await whatsappService.ensureAccount(account);
+      }
       if (event?.kind === "message" && event.history) {
         history.push(event);
         continue;

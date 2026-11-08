@@ -61,8 +61,13 @@ export type CloudMessageDoc = {
 // phone (group member lists, contacts, chats).
 export type CloudLidDoc = { _id: string; phone: string; updatedAt: Date };
 
+// The phone number whose chats are stored. Linking a different number wipes
+// the stored chats so one account's data never shows under another.
+export type CloudAccountDoc = { _id: "linked"; phone: string; updatedAt: Date };
+
 type Collections = {
   config: Collection<CloudConfigDoc>;
+  account: Collection<CloudAccountDoc>;
   lids: Collection<CloudLidDoc>;
   chats: Collection<CloudChatDoc>;
   contacts: Collection<CloudContactDoc>;
@@ -87,6 +92,7 @@ export function getCollections(): Promise<Collections> {
     const db: Db = client.db(process.env.WHATSAPP_MONGODB_DB?.trim() || undefined);
     const collections: Collections = {
       config: db.collection<CloudConfigDoc>("whatsapp_cloud_config"),
+      account: db.collection<CloudAccountDoc>("whatsapp_cloud_account"),
       lids: db.collection<CloudLidDoc>("whatsapp_cloud_lids"),
       chats: db.collection<CloudChatDoc>("whatsapp_cloud_chats"),
       contacts: db.collection<CloudContactDoc>("whatsapp_cloud_contacts"),

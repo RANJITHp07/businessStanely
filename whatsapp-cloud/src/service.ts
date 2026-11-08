@@ -420,6 +420,7 @@ class CloudWhatsAppService {
   async refreshGroupsHealth() {
     if (!groupsBridgeEnabled) return;
     const next = await groupsHealth();
+    if (next.status === "ready" && next.linkedAs) await this.ensureAccount(next.linkedAs.split(":")[0]!.split("@")[0]!);
     const changed =
       !this.groups || this.groups.status !== next.status || this.groups.linkedAs !== next.linkedAs;
     this.groups = next;
@@ -428,6 +429,42 @@ class CloudWhatsAppService {
       this.state = { ...this.state, lastUpdatedAt: new Date().toISOString() };
       publishWhatsAppEvent("state", { state: this.getState() });
     }
+  }
+
+  // Linked phone: the stored chats belong to one number. When a different
+  // number is linked, the previous number's chats, messages, contacts and
+  // hidden-id mappings are removed before the new number's data is saved.
+  private accountPhone: string | null = null;
+  private accountQueue: Promise<void> = Promise.resolve();
+
+  ensureAccount(phone: string | null | undefined): Promise<void> {
+    const digits = (phone ?? "").replace(/\D/g, "");
+    if (!webDirectEnabled || !digits || digits === this.accountPhone) return this.accountQueue;
+    this.accountQueue = this.accountQueue.then(async () => {
+      if (digits === this.accountPhone) return;
+      const { account, chats, messages, contacts, lids } = await getCollections();
+      const stored = await account.findOne({ _id: "linked" });
+      if (stored && stored.phone !== digits) {
+        LOG(`Linked number changed from +${stored.phone} to +${digits}; removing the previous number's chats.`);
+        const [c, m, k, l] = await Promise.all([
+          chats.deleteMany({}),
+          messages.deleteMany({}),
+          contacts.deleteMany({}),
+          lids.deleteMany({}),
+        ]);
+        LOG(`Removed ${c.deletedCount} chats, ${m.deletedCount} messages, ${k.deletedCount} contacts, ${l.deletedCount} hidden ids.`);
+        this.readCache.clear();
+        this.messageVersions.clear();
+        this.olderRequested.clear();
+        this.bumpChats();
+        publishWhatsAppEvent("chats-updated", { chatId: "account" });
+      }
+      if (!stored || stored.phone !== digits) {
+        await account.updateOne({ _id: "linked" }, { $set: { phone: digits, updatedAt: new Date() } }, { upsert: true });
+      }
+      this.accountPhone = digits;
+    });
+    return this.accountQueue;
   }
 
   startGroupsMonitor(intervalMs = 15000) {

@@ -1,0 +1,74 @@
+// Delivers events to whatsapp-cloud (POST /groups/ingest) in order, batched,
+// retrying until cloud accepts them, so a cloud restart loses nothing that
+// arrived while this process was up.
+
+const cloudUrl = (process.env.WHATSAPP_CLOUD_URL ?? "http://localhost:4002").trim().replace(/\/+$/, "");
+const token = process.env.WHATSAPP_SERVICE_TOKEN?.trim() || "";
+const BATCH_SIZE = 50;
+const MAX_QUEUE = 20000;
+
+export type IngestEvent = { kind: "message" | "status" | "media" | "chats" } & Record<string, unknown>;
+
+const queue: IngestEvent[] = [];
+let flushing = false;
+let retryDelayMs = 1000;
+let timer: NodeJS.Timeout | null = null;
+
+export function enqueue(event: IngestEvent) {
+  if (queue.length >= MAX_QUEUE) {
+    // Cloud has been down for a long time; drop the oldest event.
+    queue.shift();
+    console.warn("[WhatsApp Groups] Outbox full, dropped the oldest event.");
+  }
+  queue.push(event);
+  schedule(50);
+}
+
+function schedule(delayMs: number) {
+  if (timer || flushing) return;
+  timer = setTimeout(() => {
+    timer = null;
+    void flush();
+  }, delayMs);
+}
+
+async function flush() {
+  if (flushing || queue.length === 0) return;
+  flushing = true;
+  try {
+    while (queue.length) {
+      // Media events carry base64 files; send them one at a time.
+      const batch =
+        queue[0]!.kind === "media"
+          ? [queue[0]!]
+          : queue.slice(0, BATCH_SIZE).filter((_, i, all) => all.slice(0, i + 1).every((e) => e.kind !== "media"));
+      const response = await fetch(`${cloudUrl}/groups/ingest`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-whatsapp-service-token": token },
+        body: JSON.stringify({ events: batch }),
+        signal: AbortSignal.timeout(60_000),
+      });
+      if (!response.ok) {
+        const text = await response.text().catch(() => "");
+        throw new Error(`cloud returned ${response.status} ${text.slice(0, 200)}`);
+      }
+      queue.splice(0, batch.length);
+      retryDelayMs = 1000;
+    }
+  } catch (error) {
+    console.warn(
+      `[WhatsApp Groups] Could not deliver ${queue.length} event(s) to ${cloudUrl}, retrying in ${retryDelayMs / 1000}s:`,
+      error instanceof Error ? error.message : String(error),
+    );
+    flushing = false;
+    schedule(retryDelayMs);
+    retryDelayMs = Math.min(retryDelayMs * 2, 60_000);
+    return;
+  }
+  flushing = false;
+  if (queue.length) schedule(50);
+}
+
+export function outboxSize() {
+  return queue.length;
+}

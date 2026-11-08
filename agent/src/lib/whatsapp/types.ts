@@ -25,6 +25,12 @@ export type WhatsAppState = {
     templates: boolean;
     logout: boolean;
   };
+  // Cloud provider: health of each side. 1:1 chats go through Meta, groups
+  // through the whatsapp-groups linked device; either can be down alone.
+  channels?: {
+    meta: { status: WhatsAppConnectionStatus; error: string | null };
+    groups: { status: string; error: string | null; linkedAs: string | null } | null;
+  };
   // Present while the Cloud API number is not connected yet, so the admin
   // panel can run Meta's Embedded Signup.
   onboarding?: {

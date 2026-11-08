@@ -33,3 +33,24 @@ export async function groupsRequest<T>(path: string, body: unknown): Promise<T> 
   }
   return data;
 }
+
+export type GroupsHealth = { status: string; error: string | null; linkedAs: string | null };
+
+// Never throws: an unreachable groups service is reported as "unreachable".
+export async function groupsHealth(): Promise<GroupsHealth> {
+  try {
+    const response = await fetch(`${baseUrl}/status`, {
+      headers: { "x-whatsapp-service-token": token },
+      signal: AbortSignal.timeout(5000),
+    });
+    const data = (await response.json().catch(() => ({}))) as Partial<GroupsHealth> & { error?: string };
+    if (!response.ok) return { status: "error", error: data.error || `HTTP ${response.status}`, linkedAs: null };
+    return { status: data.status ?? "unknown", error: data.error ?? null, linkedAs: data.linkedAs ?? null };
+  } catch (error) {
+    return {
+      status: "unreachable",
+      error: `The WhatsApp groups service is not reachable: ${error instanceof Error ? error.message : String(error)}`,
+      linkedAs: null,
+    };
+  }
+}

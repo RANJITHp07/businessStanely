@@ -453,6 +453,9 @@ export function WhatsAppDesktop() {
     // Cloud API (Meta) cannot edit/delete sent messages, and only allows
     // free-form replies within 24h of the customer's last message.
     const isCloud = state.provider === "cloud";
+    // One side (Meta 1:1 or the groups device) can be down while the other works.
+    const channelWarning = isCloud && state.status === "ready" ? state.error : null;
+    const metaDown = isCloud && state.channels?.meta && state.channels.meta.status !== "ready";
     const canEditMessages = state.capabilities?.editMessages ?? true;
     const canDeleteMessages = state.capabilities?.deleteMessages ?? true;
     const [now, setNow] = useState(() => Date.now());
@@ -797,6 +800,12 @@ export function WhatsAppDesktop() {
                             </button>
                         </div>
                     </div>
+
+                    {channelWarning ? (
+                        <div className="border-b border-[var(--wa-border)] bg-amber-500/10 px-4 py-2 text-xs text-amber-500">
+                            <p>{channelWarning}</p>
+                        </div>
+                    ) : null}
 
                     <div className="border-b border-[var(--wa-border)] px-3 py-3">
                         <label className="flex items-center gap-3 rounded-lg bg-[var(--wa-header)] px-4 py-2.5 text-sm text-[var(--wa-muted)] focus-within:ring-1 focus-within:ring-[#00a884]">

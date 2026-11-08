@@ -1,6 +1,7 @@
 
 import { readMedia, storeMedia } from "./media-store.js";
 import { publishWhatsAppEvent } from "./realtime.js";
+import { groupsBridgeEnabled, groupsHealth, groupsRequest, type GroupsHealth } from "./groups-bridge.js";
 import type {
   WhatsAppChatSummary,
   WhatsAppMessage,
@@ -26,6 +27,7 @@ const LOG = (...args: unknown[]) => console.log("[WhatsApp Cloud]", ...args);
 const SERVICE_WINDOW_MS = 24 * 60 * 60 * 1000;
 const TEMPLATE_CACHE_MS = 5 * 60 * 1000;
 const RETRY_DELAY_MS = 30 * 1000;
+const TOKEN_RETRY_DELAY_MS = 5 * 60 * 1000;
 const defaultCountryCode = (process.env.WA_CLOUD_DEFAULT_COUNTRY_CODE ?? "91").replace(/\D/g, "");
 
 const ACK = { pending: 0, sent: 1, delivered: 2, read: 3, played: 4, failed: -1 } as const;
@@ -335,13 +337,64 @@ class CloudWhatsAppService {
     return value;
   }
 
+  // `this.state` is the Meta (1:1) side only. What the panels see combines it
+  // with the groups side: if either works the panel opens, and the broken
+  // side is reported in `error` / `channels` instead of blocking everything.
+  private groups: GroupsHealth | null = null;
+  private retryAt = 0;
+  private groupsTimer: NodeJS.Timeout | null = null;
+
   getState(): WhatsAppState {
-    return this.state;
+    const meta = this.state;
+    const channels = {
+      meta: { status: meta.status, error: meta.error },
+      groups: groupsBridgeEnabled ? this.groups ?? { status: "unknown", error: null, linkedAs: null } : null,
+    };
+    const groupsReady = channels.groups?.status === "ready";
+    if (meta.status === "ready") {
+      const groupsProblem =
+        groupsBridgeEnabled && !groupsReady
+          ? `Group chats are not working (${channels.groups?.status}). ${channels.groups?.error ?? "Link the groups device again."}`
+          : null;
+      return { ...meta, error: meta.error ?? groupsProblem, channels };
+    }
+    if (groupsReady) {
+      return {
+        ...meta,
+        status: "ready",
+        error: `1:1 chats (Meta Cloud API) are not working: ${meta.error ?? meta.status}`,
+        clientInfo: {
+          pushname: meta.clientInfo.pushname ?? "WhatsApp groups",
+          wid: meta.clientInfo.wid ?? channels.groups?.linkedAs ?? "groups",
+          platform: "cloud-api",
+        },
+        channels,
+      };
+    }
+    return { ...meta, channels };
   }
 
   private setState(patch: Partial<WhatsAppState>) {
     this.state = { ...this.state, ...patch, lastUpdatedAt: new Date().toISOString() };
-    publishWhatsAppEvent("state", { state: this.state });
+    publishWhatsAppEvent("state", { state: this.getState() });
+  }
+
+  // Polls the groups service so its health shows up in /status and the stream.
+  startGroupsMonitor(intervalMs = 15000) {
+    if (!groupsBridgeEnabled || this.groupsTimer) return;
+    const check = async () => {
+      const next = await groupsHealth();
+      const changed =
+        !this.groups || this.groups.status !== next.status || this.groups.linkedAs !== next.linkedAs;
+      this.groups = next;
+      if (changed) {
+        LOG("Groups service:", next.status, next.error ?? "");
+        this.state = { ...this.state, lastUpdatedAt: new Date().toISOString() };
+        publishWhatsAppEvent("state", { state: this.getState() });
+      }
+    };
+    void check();
+    this.groupsTimer = setInterval(() => void check(), intervalMs);
   }
 
   private onboardingInfo() {
@@ -367,18 +420,23 @@ class CloudWhatsAppService {
   async ensureInitialized() {
     if (this.state.status === "ready") return;
     if (this.initializing) return this.initializing;
+    // After a failure, /status and /stream polls must not re-hit Meta every
+    // time (and flip the state back to "initializing"); the scheduled retry
+    // does that. Onboarding resets the state to "idle", which skips this.
+    if (this.state.status === "error" && Date.now() < this.retryAt) return;
     this.initializing = this.initialize().finally(() => {
       this.initializing = null;
     });
     return this.initializing;
   }
 
-  private scheduleRetry() {
+  private scheduleRetry(delayMs = RETRY_DELAY_MS) {
     if (this.retryTimer) return;
+    this.retryAt = Date.now() + delayMs;
     this.retryTimer = setTimeout(() => {
       this.retryTimer = null;
       void this.ensureInitialized();
-    }, RETRY_DELAY_MS);
+    }, delayMs);
   }
 
   private async initialize() {
@@ -439,13 +497,18 @@ class CloudWhatsAppService {
           : message,
         onboarding: tokenInvalid ? this.onboardingInfo() : this.state.onboarding,
       });
-      if (!tokenInvalid) this.scheduleRetry();
+      // An invalid token will not fix itself quickly; check again every 5 min
+      // (a new token in .env needs a restart, the Connect flow applies at once).
+      this.scheduleRetry(tokenInvalid ? TOKEN_RETRY_DELAY_MS : RETRY_DELAY_MS);
     }
   }
 
   private requireReady() {
     if (this.state.status !== "ready" || !this.config) {
-      throw new CloudApiError("WhatsApp is not connected.", 503);
+      throw new CloudApiError(
+        `1:1 chats (Meta Cloud API) are not connected${this.state.error ? `: ${this.state.error}` : "."}`,
+        503,
+      );
     }
     return this.config;
   }
@@ -544,6 +607,8 @@ class CloudWhatsAppService {
             }
             for (const message of value.messages ?? []) {
               if (!message.from) continue;
+              // With the groups bridge on, groups come from the linked device.
+              if (message.group_id && groupsBridgeEnabled) continue;
               if (message.group_id) {
                 const sender = digitsOnly(message.from);
                 const profile = value.contacts?.find((c) => digitsOnly(c.wa_id ?? "") === sender);
@@ -561,6 +626,7 @@ class CloudWhatsAppService {
           case "smb_message_echoes":
             // Sent from the WhatsApp Business app on the phone.
             for (const message of value.message_echoes ?? []) {
+              if (message.group_id && groupsBridgeEnabled) continue;
               if (message.group_id) {
                 await this.storeMessage(message, groupKey(message.group_id), true, "echo");
               } else if (message.to) {
@@ -577,6 +643,7 @@ class CloudWhatsAppService {
                 if (!thread.id) continue;
                 // Group thread ids look like "1203...@g.us" or "<phone>-<time>".
                 const isGroupThread = thread.id.includes("@g.us") || thread.id.includes("-");
+                if (isGroupThread && groupsBridgeEnabled) continue;
                 const threadKey = isGroupThread ? groupKey(thread.id.split("@")[0]!) : thread.id;
                 for (const message of thread.messages ?? []) {
                   const sender = digitsOnly(message.from ?? "");
@@ -657,7 +724,7 @@ class CloudWhatsAppService {
     counterpart: string,
     fromMe: boolean,
     source: CloudMessageDoc["source"],
-    options: { author?: string | null } = {},
+    options: { author?: string | null; authorId?: string | null; groupSubject?: string | null } = {},
   ) {
     const parsed = parseWaMessage(message);
     if (!parsed || !message.id) return;
@@ -687,6 +754,7 @@ class CloudWhatsAppService {
       timestamp,
       fromMe,
       author: options.author ?? null,
+      ...(options.authorId ? { authorId: options.authorId } : {}),
       type: parsed.type,
       ack: fromMe ? (source === "history" ? historyAck(message.history_context?.status) : ACK.sent) : ACK.pending,
       media: parsed.media,
@@ -708,7 +776,9 @@ class CloudWhatsAppService {
       const contact = await contacts.findOne({ _id: chatId });
       if (contact) update.contactName = contact.name;
     }
-    if (isGroup && !existingChat?.profileName) {
+    if (isGroup && options.groupSubject && options.groupSubject !== existingChat?.profileName) {
+      update.profileName = options.groupSubject;
+    } else if (isGroup && !existingChat?.profileName && !groupsBridgeEnabled) {
       const subject = await this.fetchGroupSubject(chatId);
       if (subject) update.profileName = subject;
     }
@@ -717,8 +787,8 @@ class CloudWhatsAppService {
       if (!existingChat?.lastInboundAt || timestamp > existingChat.lastInboundAt) {
         update.lastInboundAt = timestamp;
       }
-      if (source === "webhook") counters.unreadCount = 1;
-    } else if (source === "echo") {
+      if (source === "webhook" || source === "web") counters.unreadCount = 1;
+    } else if (source === "echo" || source === "web") {
       // Replying from the phone means the chat was read there.
       update.unreadCount = 0;
     }
@@ -862,7 +932,7 @@ class CloudWhatsAppService {
   }
 
   async getPaginatedChats(search = "", page = 1, pageSize = 50) {
-    this.requireReady();
+    // Reads come from MongoDB, so they work even while Meta is down.
     const { chats, contacts } = await getCollections();
     const term = search.trim();
 
@@ -919,7 +989,6 @@ class CloudWhatsAppService {
   }
 
   async listMessages(chatId: string, limit = 80) {
-    this.requireReady();
     const waId = toChatKey(chatId);
     const { chats, messages } = await getCollections();
     const docs = await this.cached(
@@ -939,8 +1008,16 @@ class CloudWhatsAppService {
       );
       this.bumpChats();
       if (cleared.modifiedCount) {
-        const lastInbound = docs.find((doc) => !doc.fromMe && doc.source === "webhook");
-        if (lastInbound) void this.markRead(lastInbound._id);
+        const lastInbound = docs.find((doc) => !doc.fromMe && (doc.source === "webhook" || doc.source === "web"));
+        if (lastInbound?.source === "web") {
+          void groupsRequest("/read", {
+            chatId: waId,
+            messageId: lastInbound._id,
+            participant: lastInbound.authorId ?? null,
+          }).catch((error) => LOG("Group mark read failed:", String(error)));
+        } else if (lastInbound) {
+          void this.markRead(lastInbound._id);
+        }
       }
     }
 
@@ -1022,8 +1099,12 @@ class CloudWhatsAppService {
     media?: { data: string; mimetype: string; filename: string },
     quotedMessageId?: string,
   ) {
-    const config = this.requireReady();
     const waId = toChatKey(chatId);
+    // Group sends go to the linked device and do not need Meta.
+    if (isGroupKey(waId) && groupsBridgeEnabled) {
+      return this.sendGroupMessage(waId, body, media, quotedMessageId);
+    }
+    const config = this.requireReady();
     const { chats } = await getCollections();
     const chat = await chats.findOne({ _id: waId });
     // Groups are not gated by the 1:1 customer service window here; Meta
@@ -1155,6 +1236,9 @@ class CloudWhatsAppService {
   }) {
     const config = this.requireReady();
     const waId = toChatKey(input.chatId);
+    if (isGroupKey(waId) && groupsBridgeEnabled) {
+      throw new CloudApiError("Templates are for 1:1 chats. Send a normal message to the group.", 422);
+    }
     const template = (await this.listTemplates()).find(
       (t) => t.name === input.name && t.language === input.language,
     );
@@ -1215,6 +1299,125 @@ class CloudWhatsAppService {
     });
   }
 
+  // ---- Groups bridge (whatsapp-groups linked device) ----
+
+  private async sendGroupMessage(
+    key: string,
+    body: string,
+    media?: { data: string; mimetype: string; filename: string },
+    quotedMessageId?: string,
+  ) {
+    const { messages } = await getCollections();
+    const original = quotedMessageId ? await messages.findOne({ _id: quotedMessageId }) : null;
+    const quoted = await this.quotedFields(quotedMessageId);
+    const text = body.trim();
+    const result = await groupsRequest<{ id: string; timestamp?: number; type?: string }>("/send", {
+      chatId: key,
+      body: text,
+      media: media ?? null,
+      quoted: original
+        ? { id: original._id, body: original.body, fromMe: original.fromMe, participant: original.authorId ?? null }
+        : null,
+    });
+    if (!result.id) throw new CloudApiError("The groups service did not return a message id.", 502);
+
+    let storedMedia: CloudMessageDoc["media"] = null;
+    let type = "chat";
+    if (media) {
+      const base64 = media.data.includes(",") ? media.data.slice(media.data.indexOf(",") + 1) : media.data;
+      const mimetype = media.mimetype.split(";")[0]!.trim() || "application/octet-stream";
+      type = result.type || sendTypeForMimetype(mimetype);
+      storedMedia = {
+        id: null,
+        mimetype,
+        filename: media.filename,
+        ...(await storeMedia(result.id, Buffer.from(base64, "base64"), mimetype)),
+      };
+    }
+    return this.recordOutgoing({
+      _id: result.id,
+      chatId: key,
+      body: text,
+      timestamp: result.timestamp || Date.now(),
+      fromMe: true,
+      type,
+      ack: ACK.pending,
+      media: storedMedia,
+      ...quoted,
+      source: "api",
+    });
+  }
+
+  // Called by the groups service for each group message it sees (live or
+  // history). `message` is already in Cloud API webhook shape.
+  async ingestGroupMessage(input: {
+    chatId: string;
+    fromMe: boolean;
+    history: boolean;
+    author?: string | null;
+    authorId?: string | null;
+    groupSubject?: string | null;
+    message: WaMessage;
+  }) {
+    const key = groupKey(input.chatId);
+    if (!key || !input.message?.id) return;
+    await this.storeMessage(input.message, key, input.fromMe, input.history ? "history" : "web", {
+      author: input.fromMe ? null : input.author ?? null,
+      authorId: input.authorId ?? null,
+      groupSubject: input.groupSubject ?? null,
+    });
+    if (input.history) this.historyDirty = true;
+  }
+
+  private historyDirty = false;
+
+  // Batched "chats-updated" after a history burst, so the panel refreshes once.
+  flushGroupHistory() {
+    if (!this.historyDirty) return;
+    this.historyDirty = false;
+    publishWhatsAppEvent("chats-updated", { chatId: "history" });
+  }
+
+  async ingestGroupStatus(input: { id: string; ack: number }) {
+    if (!input.id || !Number.isFinite(input.ack)) return;
+    const { messages } = await getCollections();
+    const result = await messages.findOneAndUpdate(
+      { _id: input.id },
+      input.ack === ACK.failed ? { $set: { ack: ACK.failed } } : { $max: { ack: input.ack } },
+      { returnDocument: "after", projection: { chatId: 1 } },
+    );
+    if (result) {
+      this.bumpMessages(result.chatId);
+      publishWhatsAppEvent("messages-updated", { chatId: toChatId(result.chatId) });
+    }
+  }
+
+  async ingestGroupMedia(input: { id: string; data: string; mimetype: string }) {
+    if (!input.id || !input.data) return;
+    await this.saveMediaFile(input.id, Buffer.from(input.data, "base64"), input.mimetype || "application/octet-stream");
+    const { messages } = await getCollections();
+    const doc = await messages.findOne({ _id: input.id }, { projection: { chatId: 1 } });
+    if (doc) publishWhatsAppEvent("messages-updated", { chatId: toChatId(doc.chatId) });
+  }
+
+  // Group list / renames. Only updates names; a chat appears in the list once
+  // it has a message (same rule as 1:1 chats).
+  async ingestGroupChats(groups: Array<{ id: string; subject?: string | null }>) {
+    const { chats } = await getCollections();
+    let changed = false;
+    for (const group of groups) {
+      const key = groupKey(group.id ?? "");
+      const subject = group.subject?.trim();
+      if (!key || !subject) continue;
+      const result = await chats.updateOne({ _id: key }, { $set: { profileName: subject } }, { upsert: true });
+      if (result.modifiedCount || result.upsertedCount) changed = true;
+    }
+    if (changed) {
+      this.bumpChats();
+      publishWhatsAppEvent("chats-updated", { chatId: "groups" });
+    }
+  }
+
   async editMessage(_messageId: string, _body: string): Promise<WhatsAppMessage> {
     throw new CloudApiError("The WhatsApp Cloud API cannot edit sent messages. Edit it from the phone.", 422);
   }
@@ -1249,6 +1452,7 @@ class CloudWhatsAppService {
 
   async shutdownClient() {
     if (this.retryTimer) clearTimeout(this.retryTimer);
+    if (this.groupsTimer) clearInterval(this.groupsTimer);
   }
 }
 

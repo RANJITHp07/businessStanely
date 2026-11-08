@@ -170,6 +170,48 @@ app.post("/webhook", (req, res) => {
   void whatsappService.handleWebhook(req.body);
 });
 
+// --- Groups bridge (whatsapp-groups service pushes group traffic here) ---
+type GroupIngestEvent =
+  | ({ kind: "message" } & Parameters<typeof whatsappService.ingestGroupMessage>[0])
+  | ({ kind: "status" } & Parameters<typeof whatsappService.ingestGroupStatus>[0])
+  | ({ kind: "media" } & Parameters<typeof whatsappService.ingestGroupMedia>[0])
+  | { kind: "chats"; groups: Parameters<typeof whatsappService.ingestGroupChats>[0] };
+
+let groupIngestQueue: Promise<unknown> = Promise.resolve();
+
+app.post("/groups/ingest", auth, async (req, res) => {
+  const events: GroupIngestEvent[] = Array.isArray(req.body?.events) ? req.body.events : [];
+  // Serialised like webhooks, so a status never races its own message.
+  const run = groupIngestQueue.then(async () => {
+    for (const event of events) {
+      switch (event?.kind) {
+        case "message":
+          await whatsappService.ingestGroupMessage(event);
+          break;
+        case "status":
+          await whatsappService.ingestGroupStatus(event);
+          break;
+        case "media":
+          await whatsappService.ingestGroupMedia(event);
+          break;
+        case "chats":
+          await whatsappService.ingestGroupChats(Array.isArray(event.groups) ? event.groups : []);
+          break;
+        default:
+          break;
+      }
+    }
+    whatsappService.flushGroupHistory();
+  });
+  groupIngestQueue = run.catch(() => undefined);
+  try {
+    await run;
+    res.json({ ok: true, count: events.length });
+  } catch (error) {
+    sendError(res, error, "Failed to store group events.");
+  }
+});
+
 // --- Status ---
 app.get("/status", auth, (_req, res) => {
   whatsappService.ensureInitialized().catch((error: unknown) => {
@@ -426,6 +468,7 @@ app.get("/stream", streamAuth, (req, res) => {
 const server = app.listen(PORT, () => {
   console.log(`[WhatsApp Cloud] listening on http://localhost:${PORT}`);
   console.log(`[WhatsApp Cloud] media storage: ${mediaStorage}`);
+  whatsappService.startGroupsMonitor();
   whatsappService.ensureInitialized().catch((error: unknown) => {
     console.error("[WhatsApp Cloud] Failed to initialize:", error);
   });

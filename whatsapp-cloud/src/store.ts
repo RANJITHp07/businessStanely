@@ -37,7 +37,6 @@ export type CloudMessageDoc = {
   fromMe: boolean;
   author?: string | null; // group messages: sender's display name
   authorId?: string | null; // group messages from the groups bridge: sender JID (for read receipts/quotes)
-| null; // group messages: sender's display name
   type: string;
   ack: number;
   error?: string | null;

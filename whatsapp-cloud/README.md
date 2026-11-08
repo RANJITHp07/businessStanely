@@ -11,7 +11,7 @@ routes, same SSE stream — so the admin panel only needs `WHATSAPP_BACKEND_URL`
 
 | Works | Not possible on Cloud API |
 | --- | --- |
-| 1:1 chats, text, photos, video, audio, documents, replies | Group chats (blocked on purpose) |
+| 1:1 chats, text, photos, video, audio, documents, replies | Group chats on the Cloud API (use `whatsapp-groups/`, see below) |
 | Messages sent from the phone (echoes) | Editing / deleting sent messages |
 | Read receipts, delivered/read ticks | Calls, status/stories, profile pictures of customers |
 | Contacts + ~6 months history import | Free-form messages 24h after the customer's last message (template only) |
@@ -69,8 +69,13 @@ both panels (`NEXT_PUBLIC_*` is baked in at build time).
 
 To roll back, point those variables at the old `whatsapp/` service again. It needs a new QR scan.
 
+## Groups
+
+Groups go through the separate `whatsapp-groups/` service (WhatsApp Web linked device).
+Set `WHATSAPP_GROUPS_URL` here to turn it on; see `whatsapp-groups/README.md`.
+
 ## Routes
 
 Same as `whatsapp/` (`/status`, `/chats`, `/messages`, `/send`, `/media`, `/stream`, `/chat-avatar(s)`,
 `/logout`) plus `/webhook` (Meta, signature-verified), `/onboard`, `/sync-history`, `/templates`,
-`/send-template`.
+`/send-template`, `/groups/ingest` (groups bridge).

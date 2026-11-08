@@ -928,7 +928,7 @@ function WhatsAppDesktop() {
                                         </button>
                                     );
                                 })}
-                                {hasMoreChats && (
+                                {hasMoreChats && !searchQuery.trim() && (
                                     <div className="flex justify-center py-2">
                                         <button
                                             type="button"

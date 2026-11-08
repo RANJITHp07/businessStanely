@@ -1,8 +1,10 @@
 import crypto from "node:crypto";
 import fs from "node:fs/promises";
 import http from "node:http";
+import path from "node:path";
 
 import makeWASocket, {
+  ALL_WA_PATCH_NAMES,
   Browsers,
   DisconnectReason,
   downloadMediaMessage,
@@ -166,7 +168,7 @@ function rememberLid(lid: string | null | undefined, phoneJid: string | null | u
 // Address-book names (and the names people set themselves) for 1:1 chats.
 function pushContacts(contacts: Array<Partial<Contact>>) {
   if (!DIRECT_CHATS) return;
-  const list: Array<{ phone: string; name: string }> = [];
+  const list: Array<{ phone: string; name: string; phoneNumber?: string }> = [];
   for (const contact of contacts) {
     const id = contact.id ?? "";
     const lidJid = contact.lid ?? (id.endsWith("@lid") ? id : null);
@@ -174,9 +176,11 @@ function pushContacts(contacts: Array<Partial<Contact>>) {
     const phone = phoneDigits(contact.jid) ?? phoneDigits(id) ?? (lidJid ? lidToPhone.get(lidJid) ?? null : null);
     const name = (contact.name || contact.notify || contact.verifiedName || "").trim();
     if (!name) continue;
-    // Hidden-number contacts are kept under their hidden id, like their chats.
+    // Name both keys a chat may be stored under: the phone number and the
+    // hidden id (WhatsApp addresses many chats by the hidden id only).
+    const lidKey = lidJid ? `${lidJid.split("@")[0]!.split(":")[0]}@lid` : null;
     if (phone) list.push({ phone, name });
-    else if (lidJid) list.push({ phone: `${lidJid.split("@")[0]!.split(":")[0]}@lid`, name });
+    if (lidKey) list.push({ phone: lidKey, name, ...(phone ? { phoneNumber: phone } : {}) });
   }
   for (let i = 0; i < list.length; i += 500) {
     enqueue({ kind: "contacts", contacts: list.slice(i, i + 500) });
@@ -364,6 +368,7 @@ async function connect() {
       reconnectDelayMs = 2000;
       LOG(`Linked as ${current.user?.id}`);
       void refreshGroups(current);
+      void syncContacts(current, myGeneration);
     }
     if (connection === "close") {
       const code = (lastDisconnect?.error as { output?: { statusCode?: number } } | undefined)?.output?.statusCode;
@@ -390,7 +395,7 @@ async function connect() {
     }
   });
 
-  current.ev.on("messaging-history.set", ({ messages, chats, contacts, progress }) => {
+  current.ev.on("messaging-history.set", ({ messages, chats, contacts, progress, syncType }) => {
     // Learn hidden-id -> phone pairs first, so the messages below can be placed.
     for (const chat of chats) {
       const c = chat as typeof chat & { pnJid?: string | null; lidJid?: string | null };
@@ -398,7 +403,9 @@ async function connect() {
     }
     pushContacts(contacts);
     pushDirectChats(chats);
-    LOG(`History: ${chats.length} chats, ${contacts.length} contacts, ${messages.length} messages${progress != null ? ` (${progress}%)` : ""}.`);
+    LOG(
+      `History${syncType === proto.HistorySync.HistorySyncType.ON_DEMAND ? " (older messages on request)" : ""}: ${chats.length} chats, ${contacts.length} contacts, ${messages.length} messages${progress != null ? ` (${progress}%)` : ""}.`,
+    );
     pushGroups(chats.filter((c) => c.id && isJidGroup(c.id)).map((c) => ({ id: c.id, subject: c.name ?? undefined })));
     for (const msg of messages) pushMessage(msg, true);
   });
@@ -602,6 +609,53 @@ async function markRead(input: { chatId?: string; messageId?: string; participan
   ]);
 }
 
+// ---- Saved contact names (WhatsApp "app state") ----
+// Baileys only runs this sync when history arrives within 20 s of linking,
+// which often misses; then no saved names ever come. Run it ourselves after
+// connecting: a full sync the first time, incremental afterwards.
+async function syncContacts(current: WASocket, myGeneration: number) {
+  if (!DIRECT_CHATS) return;
+  await new Promise((resolve) => setTimeout(resolve, 15_000));
+  if (myGeneration !== generation || sock !== current || status !== "ready") return;
+  // Bump this when the way contacts are forwarded changes, to re-send them all.
+  const marker = path.join(AUTH_DIR, ".contacts-synced-v2");
+  const files = await fs.readdir(AUTH_DIR).catch(() => [] as string[]);
+  const markerPresent = files.includes(".contacts-synced-v2");
+  if (!markerPresent) {
+    // Forget the stored versions so WhatsApp sends the whole contact list again.
+    await Promise.all(
+      files
+        .filter((name) => name.startsWith("app-state-sync-version-"))
+        .map((name) => fs.rm(path.join(AUTH_DIR, name), { force: true })),
+    );
+  }
+  const initial = !markerPresent || !files.some((name) => name.startsWith("app-state-sync-version-"));
+  try {
+    LOG(`Syncing saved contacts (${initial ? "full" : "changes only"})...`);
+    await current.resyncAppState(ALL_WA_PATCH_NAMES, initial);
+    await fs.writeFile(marker, new Date().toISOString());
+    LOG("Saved contacts synced.");
+  } catch (error) {
+    LOG("Contact sync failed:", error instanceof Error ? error.message : String(error));
+  }
+}
+
+// ---- Older messages on demand ----
+// Asks the phone for the messages before the oldest one we have in a chat;
+// they arrive as an ON_DEMAND history sync.
+async function fetchOlder(input: { chatId?: string; oldestId?: string; oldestTimestamp?: number; oldestFromMe?: boolean; count?: number }) {
+  if (!sock || status !== "ready") throw httpError(503, "WhatsApp is not linked.");
+  if (!input.chatId || !input.oldestId || !input.oldestTimestamp) throw httpError(400, "chatId, oldestId and oldestTimestamp are required.");
+  const remoteJid = toJid(input.chatId);
+  const count = Math.min(Math.max(Number(input.count ?? 50), 1), 50);
+  const requestId = await sock.fetchMessageHistory(
+    count,
+    { remoteJid, id: input.oldestId, fromMe: Boolean(input.oldestFromMe) },
+    Math.floor(Number(input.oldestTimestamp) / 1000),
+  );
+  return { requestId };
+}
+
 // ---- Profile pictures ----
 // Cached for a while (WhatsApp rate-limits these lookups); a missing picture
 // is cached too. At most 4 lookups run at once.
@@ -735,6 +789,9 @@ const server = http.createServer(async (req, res) => {
     if (req.method === "POST" && url.pathname === "/read") {
       await markRead(await readJson(req));
       return json(res, 200, { ok: true });
+    }
+    if (req.method === "POST" && url.pathname === "/history") {
+      return json(res, 200, await fetchOlder((await readJson(req)) as Parameters<typeof fetchOlder>[0]));
     }
     if (req.method === "POST" && url.pathname === "/avatars") {
       const body = (await readJson(req)) as { chatIds?: unknown };

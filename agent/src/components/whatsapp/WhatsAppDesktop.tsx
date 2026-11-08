@@ -453,6 +453,9 @@ export function WhatsAppDesktop() {
     // Cloud API (Meta) cannot edit/delete sent messages, and only allows
     // free-form replies within 24h of the customer's last message.
     const isCloud = state.provider === "cloud";
+    // The 24-hour reply window is a Meta rule; on the linked phone (templates
+    // off) messages can always be sent.
+    const replyWindowApplies = isCloud && state.capabilities?.templates !== false;
     // One side (Meta 1:1 or the groups device) can be down while the other works.
     const channelWarning = isCloud && state.status === "ready" ? state.error : null;
     const metaDown = isCloud && state.channels?.meta && state.channels.meta.status !== "ready";
@@ -1020,7 +1023,7 @@ export function WhatsAppDesktop() {
                             </div>
 
                             <footer className="bg-[var(--wa-header)] px-3 py-3 md:px-4">
-                                {isCloud && !selectedChat.isGroup && !isReplyWindowOpen(selectedChat.windowExpiresAt, now) ? (
+                                {replyWindowApplies && !selectedChat.isGroup && !isReplyWindowOpen(selectedChat.windowExpiresAt, now) ? (
                                     <TemplateComposer
                                         key={selectedChat.id}
                                         templates={templates}
@@ -1030,7 +1033,7 @@ export function WhatsAppDesktop() {
                                     />
                                 ) : (
                                     <>
-                                        {isCloud && !selectedChat.isGroup && selectedChat.windowExpiresAt ? (
+                                        {replyWindowApplies && !selectedChat.isGroup && selectedChat.windowExpiresAt ? (
                                             <p className="mb-2 flex items-center gap-1.5 text-[11px] text-[var(--wa-muted)]">
                                                 Reply window closes in {formatWindowRemaining(selectedChat.windowExpiresAt, now)}
                                             </p>

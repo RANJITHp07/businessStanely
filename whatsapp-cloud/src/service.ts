@@ -984,11 +984,13 @@ class CloudWhatsAppService {
     const hiddenNumber = isLidKey(chat._id);
     const name = isGroup
       ? chat.profileName || chat.contactName || "WhatsApp group"
-      : chat.contactName || chat.profileName || (hiddenNumber ? "WhatsApp contact" : `+${chat._id}`);
+      : chat.contactName ||
+        chat.profileName ||
+        (hiddenNumber ? (chat.phoneNumber ? `+${chat.phoneNumber}` : "WhatsApp contact") : `+${chat._id}`);
     return {
       id: toChatId(chat._id),
       name,
-      phoneNumber: isGroup || hiddenNumber ? null : `+${chat._id}`,
+      phoneNumber: isGroup ? null : hiddenNumber ? (chat.phoneNumber ? `+${chat.phoneNumber}` : null) : `+${chat._id}`,
       lastMessage: chat.lastMessage ?? "",
       timestamp: chat.timestamp ?? null,
       unreadCount: chat.unreadCount ?? 0,
@@ -997,7 +999,8 @@ class CloudWhatsAppService {
       isGroup,
       isMuted: false,
       isPinned: false,
-      windowExpiresAt: chat.lastInboundAt ? chat.lastInboundAt + SERVICE_WINDOW_MS : null,
+      // No 24-hour window on the linked phone; only Meta has one.
+      windowExpiresAt: webDirectEnabled ? null : chat.lastInboundAt ? chat.lastInboundAt + SERVICE_WINDOW_MS : null,
     };
   }
 
@@ -1096,6 +1099,12 @@ class CloudWhatsAppService {
       String(this.messageVersions.get(waId) ?? 0),
       () => messages.find({ chatId: waId }).sort({ timestamp: -1 }).limit(limit).toArray(),
     );
+
+    // Linked phone: if this chat has fewer messages here than the panel asks
+    // for, ask the phone for the ones before the oldest we have.
+    if (webDirectEnabled && docs.length > 0 && docs.length < limit) {
+      this.requestOlderMessages(waId, docs[docs.length - 1]!);
+    }
 
     const chat = await this.cached(`chat:${waId}`, String(this.chatsVersion), () =>
       chats.findOne({ _id: waId }, { projection: { unreadCount: 1 } }),
@@ -1466,16 +1475,7 @@ class CloudWhatsAppService {
     message: WaMessage;
   }) {
     if (!input.message?.id) return;
-    let key = "";
-    if (isGroupKey(input.chatId ?? "")) {
-      key = groupKey(input.chatId);
-    } else if (webDirectEnabled) {
-      try {
-        key = isLidKey(input.chatId ?? "") ? lidKey(input.chatId) : toWaId(input.chatId ?? "");
-      } catch {
-        return;
-      }
-    }
+    const key = this.ingestKey(input.chatId);
     if (!key) return;
     await this.storeMessage(input.message, key, input.fromMe, input.history ? "history" : "web", {
       author: input.fromMe ? null : input.author ?? null,
@@ -1483,6 +1483,117 @@ class CloudWhatsAppService {
       groupSubject: isGroupKey(key) ? input.groupSubject ?? null : input.fromMe ? null : input.contactName ?? null,
     });
     if (input.history) this.historyDirty = true;
+  }
+
+  // Chat key for a chat id coming from the linked device, or "" to skip it.
+  private ingestKey(chatId: string | null | undefined) {
+    const raw = chatId ?? "";
+    if (isGroupKey(raw)) return groupKey(raw);
+    if (!webDirectEnabled) return "";
+    try {
+      return isLidKey(raw) ? lidKey(raw) : toWaId(raw);
+    } catch {
+      return "";
+    }
+  }
+
+  // History from linking arrives in thousands; save a whole batch in two
+  // database calls instead of several round-trips per message. Live messages
+  // still go through storeMessage (unread counts, events to the panels).
+  async ingestHistoryMessages(inputs: Array<Parameters<CloudWhatsAppService["ingestGroupMessage"]>[0]>) {
+    const docs: CloudMessageDoc[] = [];
+    const latest = new Map<string, { timestamp: number; preview: string; name: string | null; group: boolean }>();
+    for (const input of inputs) {
+      const message = input.message;
+      if (!message?.id) continue;
+      const key = this.ingestKey(input.chatId);
+      if (!key) continue;
+      const parsed = parseWaMessage(message);
+      if (!parsed) continue;
+      const group = isGroupKey(key);
+      const timestamp = Number(message.timestamp ?? 0) * 1000 || Date.now();
+      docs.push({
+        _id: message.id,
+        chatId: key,
+        body: parsed.body,
+        timestamp,
+        fromMe: input.fromMe,
+        author: input.fromMe ? null : input.author ?? null,
+        ...(input.authorId ? { authorId: input.authorId } : {}),
+        type: parsed.type,
+        ack: input.fromMe ? historyAck(message.history_context?.status) : ACK.pending,
+        media: parsed.media,
+        ...(message.context?.id ? { quotedMessageId: message.context.id, quotedMessageBody: null, quotedMessageAuthor: null } : {}),
+        source: "history",
+      });
+      const name = group ? input.groupSubject ?? null : input.fromMe ? null : input.contactName ?? null;
+      const current = latest.get(key);
+      if (!current || timestamp >= current.timestamp) {
+        latest.set(key, {
+          timestamp,
+          preview: mediaPreview(parsed.type, parsed.body, parsed.media?.filename),
+          name: name ?? current?.name ?? null,
+          group,
+        });
+      } else if (!current.name && name) {
+        current.name = name;
+      }
+    }
+    if (!docs.length) return;
+    const { chats, messages } = await getCollections();
+    await messages.bulkWrite(
+      docs.map((doc) => ({ updateOne: { filter: { _id: doc._id }, update: { $setOnInsert: doc }, upsert: true } })),
+      { ordered: false },
+    );
+    await chats.bulkWrite(
+      [...latest].map(([key, info]) => ({
+        updateOne: {
+          filter: { _id: key },
+          // Only move the preview forward; never overwrite a newer message.
+          update: [
+            {
+              $set: {
+                lastMessage: {
+                  $cond: [{ $gte: [info.timestamp, { $ifNull: ["$timestamp", 0] }] }, info.preview, { $ifNull: ["$lastMessage", ""] }],
+                },
+                timestamp: { $max: [{ $ifNull: ["$timestamp", 0] }, info.timestamp] },
+                unreadCount: { $ifNull: ["$unreadCount", 0] },
+                ...(info.name
+                  ? { profileName: info.group ? info.name : { $ifNull: ["$profileName", info.name] } }
+                  : {}),
+              },
+            },
+          ],
+          upsert: true,
+        },
+      })),
+      { ordered: false },
+    );
+    for (const key of latest.keys()) {
+      this.bumpMessages(key);
+      // Older messages someone asked for: refresh that open chat.
+      if (this.olderRequested.has(key)) {
+        publishWhatsAppEvent("messages-updated", { chatId: toChatId(key) });
+      }
+    }
+    this.bumpChats();
+    this.historyDirty = true;
+  }
+
+  // Chats with an on-demand history request in flight (key -> requested at).
+  private olderRequested = new Map<string, number>();
+
+  private requestOlderMessages(key: string, oldest: CloudMessageDoc) {
+    const last = this.olderRequested.get(key) ?? 0;
+    if (Date.now() - last < 2 * 60 * 1000) return;
+    this.olderRequested.set(key, Date.now());
+    void groupsRequest("/history", {
+      chatId: key,
+      oldestId: oldest._id,
+      oldestTimestamp: oldest.timestamp,
+      oldestFromMe: oldest.fromMe,
+      count: 50,
+    }).catch((error) => LOG("Older messages request failed:", String(error)));
   }
 
   private historyDirty = false;
@@ -1551,7 +1662,7 @@ class CloudWhatsAppService {
 
   // Address-book names from the linked phone (1:1). Saved for search and new
   // chats, and shown on existing chats.
-  async ingestContacts(list: Array<{ phone: string; name: string }>) {
+  async ingestContacts(list: Array<{ phone: string; name: string; phoneNumber?: string | null }>) {
     const { chats, contacts } = await getCollections();
     let changed = false;
     let contactsChanged = false;
@@ -1571,7 +1682,11 @@ class CloudWhatsAppService {
         { $set: { name, updatedAt: new Date() } },
         { upsert: true },
       );
-      const result = await chats.updateOne({ _id: waId, contactName: { $ne: name } }, { $set: { contactName: name } });
+      const phoneNumber = isLidKey(waId) ? digitsOnly(String(entry.phoneNumber ?? "")) : "";
+      const result = await chats.updateOne(
+        { _id: waId, $or: [{ contactName: { $ne: name } }, ...(phoneNumber ? [{ phoneNumber: { $ne: phoneNumber } }] : [])] },
+        { $set: { contactName: name, ...(phoneNumber ? { phoneNumber } : {}) } },
+      );
       if (saved.upsertedCount || saved.modifiedCount) contactsChanged = true;
       if (result.modifiedCount) changed = true;
     }

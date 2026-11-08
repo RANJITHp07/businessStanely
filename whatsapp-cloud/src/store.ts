@@ -21,6 +21,7 @@ export type CloudChatDoc = {
   timestamp?: number | null; // ms
   unreadCount?: number;
   lastInboundAt?: number | null; // ms, drives the 24h customer service window
+  phoneNumber?: string | null; // "<lid>@lid" chats: the real number, once WhatsApp reveals it
 };
 
 export type CloudContactDoc = {

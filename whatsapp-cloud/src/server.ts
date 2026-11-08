@@ -222,7 +222,20 @@ app.post("/groups/ingest", auth, async (req, res) => {
   const events: GroupIngestEvent[] = Array.isArray(req.body?.events) ? req.body.events : [];
   // Serialised like webhooks, so a status never races its own message.
   const run = groupIngestQueue.then(async () => {
+    // Consecutive history messages are saved in one bulk write.
+    let history: Array<Parameters<typeof whatsappService.ingestHistoryMessages>[0][number]> = [];
+    const flushHistory = async () => {
+      if (!history.length) return;
+      const batch = history;
+      history = [];
+      await whatsappService.ingestHistoryMessages(batch);
+    };
     for (const event of events) {
+      if (event?.kind === "message" && event.history) {
+        history.push(event);
+        continue;
+      }
+      await flushHistory();
       switch (event?.kind) {
         case "message":
           await whatsappService.ingestGroupMessage(event);
@@ -246,6 +259,7 @@ app.post("/groups/ingest", auth, async (req, res) => {
           break;
       }
     }
+    await flushHistory();
     whatsappService.flushGroupHistory();
   });
   groupIngestQueue = run.catch(() => undefined);

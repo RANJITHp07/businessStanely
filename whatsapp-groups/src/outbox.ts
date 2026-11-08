@@ -4,7 +4,8 @@
 
 const cloudUrl = (process.env.WHATSAPP_CLOUD_URL ?? "http://localhost:4002").trim().replace(/\/+$/, "");
 const token = process.env.WHATSAPP_SERVICE_TOKEN?.trim() || "";
-const BATCH_SIZE = 50;
+// History arrives in thousands; larger batches are bulk-saved on the cloud side.
+const BATCH_SIZE = 500;
 // Full history sync after linking can be tens of thousands of messages.
 const MAX_QUEUE = 100_000;
 
@@ -15,13 +16,24 @@ let flushing = false;
 let retryDelayMs = 1000;
 let timer: NodeJS.Timeout | null = null;
 
+// Chat lists and names are small and make the sidebar usable, so they jump
+// ahead of a large message backlog (history sync).
+const PRIORITY_KINDS = new Set(["chats", "contacts", "directChats"]);
+
 export function enqueue(event: IngestEvent) {
   if (queue.length >= MAX_QUEUE) {
     // Cloud has been down for a long time; drop the oldest event.
     queue.shift();
     console.warn("[WhatsApp Groups] Outbox full, dropped the oldest event.");
   }
-  queue.push(event);
+  if (PRIORITY_KINDS.has(event.kind)) {
+    // After any priority events already queued, before everything else.
+    let index = 0;
+    while (index < queue.length && PRIORITY_KINDS.has(queue[index]!.kind)) index++;
+    queue.splice(index, 0, event);
+  } else {
+    queue.push(event);
+  }
   schedule(50);
 }
 
@@ -53,7 +65,12 @@ async function flush() {
         const text = await response.text().catch(() => "");
         throw new Error(`cloud returned ${response.status} ${text.slice(0, 200)}`);
       }
-      queue.splice(0, batch.length);
+      // Priority events may have been inserted at the front while this batch
+      // was in flight, so remove exactly the items that were sent.
+      for (const sent of batch) {
+        const index = queue.indexOf(sent);
+        if (index !== -1) queue.splice(index, 1);
+      }
       retryDelayMs = 1000;
     }
   } catch (error) {

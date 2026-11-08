@@ -120,10 +120,13 @@ function runEmbeddedSignup(onboarding: NonNullable<WhatsAppState["onboarding"]>)
                             return;
                         }
                         // The session message normally arrives first; give it a moment.
-                        timeout = setTimeout(
-                            () => finish(new Error("Meta did not report the connected phone number. Try again.")),
-                            15000,
-                        );
+                        // If it never comes, send the code alone: the WhatsApp service
+                        // finds the account and number from the token.
+                        timeout = setTimeout(() => {
+                            console.info("[WhatsApp signup] no session message; the server will look up the number.");
+                            session = { phoneNumberId: "", wabaId: "" };
+                            finish();
+                        }, 8000);
                         finish();
                     },
                     {

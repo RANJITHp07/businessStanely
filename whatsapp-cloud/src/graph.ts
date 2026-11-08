@@ -109,6 +109,37 @@ export async function exchangeSignupCode(
   return data.access_token;
 }
 
+export type TokenInfo = {
+  /** Unix seconds; 0 means the token never expires. */
+  expiresAt: number;
+  scopes: string[];
+  /** WhatsApp Business account ids the token was granted. */
+  wabaIds: string[];
+};
+
+// Asks Meta what a token can access. Used when Embedded Signup returns only
+// the auth code and not the phone number / WABA ids.
+export async function inspectToken(appId: string, appSecret: string, token: string): Promise<TokenInfo> {
+  const response = await fetch(
+    graphUrl("debug_token", { input_token: token, access_token: `${appId}|${appSecret}` }),
+    { signal: AbortSignal.timeout(requestTimeoutMs) },
+  );
+  const { data } = await parseGraphResponse<{
+    data?: {
+      expires_at?: number;
+      scopes?: string[];
+      granular_scopes?: Array<{ scope: string; target_ids?: string[] }>;
+    };
+  }>(response);
+  const wabaIds = new Set<string>();
+  for (const grant of data?.granular_scopes ?? []) {
+    if (grant.scope.startsWith("whatsapp_business_")) {
+      for (const id of grant.target_ids ?? []) wabaIds.add(id);
+    }
+  }
+  return { expiresAt: data?.expires_at ?? 0, scopes: data?.scopes ?? [], wabaIds: [...wabaIds] };
+}
+
 // Media URLs returned by Graph are short-lived and must be fetched with the
 // same bearer token.
 export async function downloadMedia(token: string, mediaId: string) {

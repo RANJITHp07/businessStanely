@@ -12,6 +12,7 @@ import {
   CloudApiError,
   downloadMedia,
   exchangeSignupCode,
+  inspectToken,
   graphRequest,
   graphVersion,
 } from "./graph.js";
@@ -519,7 +520,7 @@ class CloudWhatsAppService {
 
   // ---- Onboarding (Embedded Signup, WhatsApp Business app coexistence) ----
 
-  async completeSignup(input: { code: string; phoneNumberId: string; wabaId: string }) {
+  async completeSignup(input: { code: string; phoneNumberId?: string; wabaId?: string }) {
     const appId = process.env.META_APP_ID?.trim();
     const appSecret = process.env.META_APP_SECRET?.trim();
     if (!appId || !appSecret) {
@@ -527,8 +528,50 @@ class CloudWhatsAppService {
     }
 
     const accessToken = await exchangeSignupCode(appId, appSecret, input.code);
+
+    const tokenInfo = await inspectToken(appId, appSecret, accessToken).catch((error: unknown) => {
+      console.warn("[WhatsApp Cloud] Could not inspect the signup token:", error);
+      return null;
+    });
+    if (tokenInfo) {
+      console.log(
+        `[WhatsApp Cloud] Signup token expires: ${
+          tokenInfo.expiresAt ? new Date(tokenInfo.expiresAt * 1000).toISOString() : "never"
+        }; scopes: ${tokenInfo.scopes.join(", ")}; WhatsApp accounts: ${tokenInfo.wabaIds.join(", ") || "none"}`,
+      );
+    }
+
+    // Meta does not always send the session message with the ids; then find
+    // them from what the token was granted.
+    let wabaId = input.wabaId?.trim() || "";
+    let phoneNumberId = input.phoneNumberId?.trim() || "";
+    if (!wabaId) {
+      wabaId = tokenInfo?.wabaIds[0] ?? "";
+      if (!wabaId) {
+        throw new CloudApiError(
+          "This Meta login did not give access to a WhatsApp Business account. Use a WhatsApp Embedded Signup configuration and pick the WhatsApp account during the login.",
+          422,
+        );
+      }
+    }
+    if (!phoneNumberId) {
+      const numbers = await graphRequest<{ data?: Array<{ id: string; display_phone_number?: string }> }>(
+        accessToken,
+        "GET",
+        `${wabaId}/phone_numbers`,
+        { query: { fields: "id,display_phone_number" } },
+      );
+      phoneNumberId = numbers.data?.[0]?.id ?? "";
+      if (!phoneNumberId) {
+        throw new CloudApiError(`The WhatsApp Business account ${wabaId} has no phone number.`, 422);
+      }
+      console.log(
+        `[WhatsApp Cloud] Signup used WhatsApp account ${wabaId}, number ${numbers.data?.[0]?.display_phone_number ?? phoneNumberId}`,
+      );
+    }
+
     // Without this subscription Meta delivers no webhooks for the number.
-    await graphRequest(accessToken, "POST", `${input.wabaId}/subscribed_apps`);
+    await graphRequest(accessToken, "POST", `${wabaId}/subscribed_apps`);
 
     const { config } = await getCollections();
     await config.updateOne(
@@ -536,8 +579,8 @@ class CloudWhatsAppService {
       {
         $set: {
           accessToken,
-          phoneNumberId: input.phoneNumberId,
-          wabaId: input.wabaId,
+          phoneNumberId,
+          wabaId,
           connectedAt: new Date(),
           historySyncRequestedAt: null,
         },

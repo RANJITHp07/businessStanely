@@ -101,6 +101,8 @@ export async function exchangeSignupCode(
         client_id: appId,
         client_secret: appSecret,
         code,
+        // Keep Meta's error messages in English whatever the account locale.
+        locale: "en_US",
         ...(redirectUri !== undefined ? { redirect_uri: redirectUri } : {}),
       }),
       { signal: AbortSignal.timeout(requestTimeoutMs) },
@@ -124,8 +126,15 @@ export async function exchangeSignupCode(
       break;
     } catch (error) {
       lastError = error;
-      if (!(error instanceof Error) || !/redirect_uri/i.test(error.message)) throw error;
-      console.warn(`[WhatsApp Cloud] Code exchange rejected for redirect_uri ${JSON.stringify(candidate ?? null)}.`);
+      // 100 = redirect_uri mismatch, 191 = URL domain not in the app's domains.
+      // Messages can come back localized, so check the code too.
+      const retryable =
+        error instanceof CloudApiError &&
+        (error.code === 100 || error.code === 191 || /redirect_uri|domain/i.test(error.message));
+      if (!retryable) throw error;
+      console.warn(
+        `[WhatsApp Cloud] Code exchange rejected for redirect_uri ${JSON.stringify(candidate ?? null)}: ${(error as Error).message}`,
+      );
     }
   }
   if (!data) throw lastError;

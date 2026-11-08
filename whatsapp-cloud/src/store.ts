@@ -37,7 +37,8 @@ export type CloudMessageDoc = {
   timestamp: number; // ms
   fromMe: boolean;
   author?: string | null; // group messages: sender's display name
-  authorId?: string | null; // group messages from the groups bridge: sender JID (for read receipts/quotes)
+  authorId?: string | null;
+  authorPhone?: string | null; // group sender's phone digits, when WhatsApp reveals it // group messages from the groups bridge: sender JID (for read receipts/quotes)
   type: string;
   ack: number;
   error?: string | null;

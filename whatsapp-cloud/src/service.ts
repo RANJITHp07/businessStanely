@@ -811,7 +811,7 @@ class CloudWhatsAppService {
     counterpart: string,
     fromMe: boolean,
     source: CloudMessageDoc["source"],
-    options: { author?: string | null; authorId?: string | null; groupSubject?: string | null } = {},
+    options: { author?: string | null; authorId?: string | null; authorPhone?: string | null; groupSubject?: string | null } = {},
   ) {
     const parsed = parseWaMessage(message);
     if (!parsed || !message.id) return;
@@ -842,6 +842,7 @@ class CloudWhatsAppService {
       fromMe,
       author: options.author ?? null,
       ...(options.authorId ? { authorId: options.authorId } : {}),
+      ...(options.authorPhone ? { authorPhone: options.authorPhone } : {}),
       type: parsed.type,
       ack: fromMe ? (source === "history" ? historyAck(message.history_context?.status) : ACK.sent) : ACK.pending,
       media: parsed.media,
@@ -896,10 +897,11 @@ class CloudWhatsAppService {
 
     if (source !== "history") {
       if (parsed.media?.id) this.queueMediaDownload(doc._id, parsed.media.id);
+      const [message] = await this.toMessagesWithAuthors([doc]);
       publishWhatsAppEvent("message", {
         chatId: toChatId(chatId),
         chat: chat ? this.toChatSummary(chat) : undefined,
-        message: this.toMessage(doc),
+        message,
       });
       if (!existingChat) publishWhatsAppEvent("chats-updated", { chatId: toChatId(chatId) });
     }
@@ -1002,6 +1004,43 @@ class CloudWhatsAppService {
       // No 24-hour window on the linked phone; only Meta has one.
       windowExpiresAt: webDirectEnabled ? null : chat.lastInboundAt ? chat.lastInboundAt + SERVICE_WINDOW_MS : null,
     };
+  }
+
+  // Group senders: the name saved in the phone's contacts, else their phone
+  // number, else (number hidden) their own WhatsApp name. Looked up when
+  // shown, so contacts saved later also apply to older messages.
+  private async toMessagesWithAuthors(docs: CloudMessageDoc[]): Promise<WhatsAppMessage[]> {
+    const senderKeys = (doc: CloudMessageDoc) => {
+      const keys: string[] = [];
+      const authorId = doc.authorId ?? "";
+      const phone =
+        digitsOnly(doc.authorPhone ?? "") ||
+        (authorId.endsWith("@s.whatsapp.net") ? digitsOnly(authorId.split("@")[0]!.split(":")[0] ?? "") : "");
+      if (phone) keys.push(phone);
+      if (authorId.endsWith("@lid")) {
+        const lid = lidKey(authorId);
+        if (lid) keys.push(lid);
+      }
+      return { phone, keys };
+    };
+    const groupDocs = docs.filter((doc) => !doc.fromMe && isGroupKey(doc.chatId) && (doc.authorId || doc.authorPhone));
+    const names = new Map<string, string>();
+    if (groupDocs.length) {
+      const wanted = [...new Set(groupDocs.flatMap((doc) => senderKeys(doc).keys))];
+      if (wanted.length) {
+        const { contacts } = await getCollections();
+        for (const contact of await contacts.find({ _id: { $in: wanted } }, { projection: { name: 1 } }).toArray()) {
+          if (contact.name) names.set(contact._id, contact.name);
+        }
+      }
+    }
+    return docs.map((doc) => {
+      const message = this.toMessage(doc);
+      if (doc.fromMe || !isGroupKey(doc.chatId) || !(doc.authorId || doc.authorPhone)) return message;
+      const { phone, keys } = senderKeys(doc);
+      const saved = keys.map((key) => names.get(key)).find(Boolean);
+      return { ...message, author: saved ?? (phone ? `+${phone}` : message.author ?? "Group member") };
+    });
   }
 
   private toMessage(doc: CloudMessageDoc): WhatsAppMessage {
@@ -1130,7 +1169,7 @@ class CloudWhatsAppService {
       }
     }
 
-    return [...docs].reverse().map((doc) => this.toMessage(doc));
+    return this.toMessagesWithAuthors([...docs].reverse());
   }
 
   private async markRead(messageId: string) {
@@ -1469,6 +1508,7 @@ class CloudWhatsAppService {
     history: boolean;
     author?: string | null;
     authorId?: string | null;
+    authorPhone?: string | null;
     groupSubject?: string | null;
     /** 1:1 only: the sender's WhatsApp profile name. */
     contactName?: string | null;
@@ -1480,6 +1520,7 @@ class CloudWhatsAppService {
     await this.storeMessage(input.message, key, input.fromMe, input.history ? "history" : "web", {
       author: input.fromMe ? null : input.author ?? null,
       authorId: input.authorId ?? null,
+      authorPhone: input.authorPhone ?? null,
       groupSubject: isGroupKey(key) ? input.groupSubject ?? null : input.fromMe ? null : input.contactName ?? null,
     });
     if (input.history) this.historyDirty = true;
@@ -1520,6 +1561,7 @@ class CloudWhatsAppService {
         fromMe: input.fromMe,
         author: input.fromMe ? null : input.author ?? null,
         ...(input.authorId ? { authorId: input.authorId } : {}),
+        ...(input.authorPhone && !input.fromMe ? { authorPhone: input.authorPhone } : {}),
         type: parsed.type,
         ack: input.fromMe ? historyAck(message.history_context?.status) : ACK.pending,
         media: parsed.media,
@@ -1542,7 +1584,25 @@ class CloudWhatsAppService {
     if (!docs.length) return;
     const { chats, messages } = await getCollections();
     await messages.bulkWrite(
-      docs.map((doc) => ({ updateOne: { filter: { _id: doc._id }, update: { $setOnInsert: doc }, upsert: true } })),
+      docs.map((doc) => {
+        // Sender fields also fill in messages stored earlier without them.
+        const { author, authorId, authorPhone, ...rest } = doc;
+        const sender = {
+          ...(author ? { author } : {}),
+          ...(authorId ? { authorId } : {}),
+          ...(authorPhone ? { authorPhone } : {}),
+        };
+        return {
+          updateOne: {
+            filter: { _id: doc._id },
+            update: {
+              $setOnInsert: { ...rest, ...(author ? {} : { author: null }) },
+              ...(Object.keys(sender).length ? { $set: sender } : {}),
+            },
+            upsert: true,
+          },
+        };
+      }),
       { ordered: false },
     );
     await chats.bulkWrite(

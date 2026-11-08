@@ -100,10 +100,20 @@ function queueMediaDownload(msg: WAMessage) {
 
 function authorFor(msg: WAMessage) {
   const key = msg.key as WAMessage["key"] & { participantPn?: string };
-  const authorId = key.participant || null;
+  // Live messages carry the sender in key.participant; history messages in
+  // msg.participant.
+  const authorId = key.participant || msg.participant || null;
+  if (authorId?.endsWith("@lid")) rememberLid(authorId, key.participantPn);
   const phoneJid = key.participantPn || (authorId?.endsWith("@s.whatsapp.net") ? authorId : null);
-  const phone = phoneJid ? `+${phoneJid.split("@")[0]!.split(":")[0]}` : null;
-  return { authorId, author: msg.pushName?.trim() || phone || "Group member" };
+  const authorPhone =
+    phoneDigits(phoneJid) ?? (authorId?.endsWith("@lid") ? lidToPhone.get(authorId.split(":")[0]!.replace(/@lid$/, "") + "@lid") ?? null : null);
+  // `author` is the member's own WhatsApp name; whatsapp-cloud shows the saved
+  // contact name or the phone number instead when it has them.
+  return {
+    authorId,
+    authorPhone,
+    author: msg.pushName?.trim() || (authorPhone ? `+${authorPhone}` : null) || "Group member",
+  };
 }
 
 // WHATSAPP_WEB_DIRECT_CHATS=true: also pass 1:1 chats to whatsapp-cloud (used
@@ -272,7 +282,7 @@ function pushMessage(msg: WAMessage, history: boolean) {
   if (!converted) return;
 
   const fromMe = Boolean(msg.key.fromMe);
-  const { author, authorId } = authorFor(msg);
+  const { author, authorId, authorPhone } = authorFor(msg);
   enqueue({
     kind: "message",
     chatId,
@@ -280,6 +290,7 @@ function pushMessage(msg: WAMessage, history: boolean) {
     history,
     author: fromMe ? null : author,
     authorId: fromMe ? null : authorId,
+    authorPhone: fromMe ? null : authorPhone,
     groupSubject: groupCache.get(chatId)?.subject ?? null,
     message: { ...converted.message, from: authorId ?? undefined },
   });

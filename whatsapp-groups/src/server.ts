@@ -729,7 +729,38 @@ async function withAvatarSlot<T>(task: () => Promise<T>) {
   }
 }
 
-async function avatarFor(chatId: string): Promise<string | null> {
+// One WhatsApp lookup per picture at a time, shared by everyone asking for it
+// (many people opening the panel together ask for the same pictures).
+const avatarLookups = new Map<string, Promise<string | null>>();
+
+function lookupAvatar(jid: string, current: WASocket): Promise<string | null> {
+  const running = avatarLookups.get(jid);
+  if (running) return running;
+  const lookup = withAvatarSlot(() =>
+    Promise.race([
+      current.profilePictureUrl(jid, "image").then(
+        (url) => ({ url: url ?? null, answered: true }),
+        () => ({ url: null, answered: true }), // no picture / hidden: an answer
+      ),
+      new Promise<{ url: null; answered: false }>((resolve) =>
+        setTimeout(() => resolve({ url: null, answered: false }), 8000),
+      ),
+    ]),
+  )
+    .then(({ url, answered }) => {
+      // Only cache real answers; a timeout is retried next time.
+      if (answered) {
+        if (avatarCache.size > 20000) avatarCache.clear();
+        avatarCache.set(jid, { url, at: Date.now() });
+      }
+      return url;
+    })
+    .finally(() => avatarLookups.delete(jid));
+  avatarLookups.set(jid, lookup);
+  return lookup;
+}
+
+async function avatarFor(chatId: string, deadline: Promise<"late">): Promise<string | null> {
   let jid: string;
   try {
     jid = toJid(chatId);
@@ -740,21 +771,17 @@ async function avatarFor(chatId: string): Promise<string | null> {
   if (cached && Date.now() - cached.at < AVATAR_TTL_MS) return cached.url;
   const current = sock;
   if (!current || status !== "ready") return cached?.url ?? null;
-  const url = await withAvatarSlot(() =>
-    Promise.race([
-      current.profilePictureUrl(jid, "image").catch(() => null),
-      new Promise<null>((resolve) => setTimeout(() => resolve(null), 8000)),
-    ]),
-  );
-  if (avatarCache.size > 20000) avatarCache.clear();
-  avatarCache.set(jid, { url: url ?? null, at: Date.now() });
-  return url ?? null;
+  // Answer within the deadline with what is ready; slower lookups finish in
+  // the background and are served (cached) on the next request.
+  const result = await Promise.race([lookupAvatar(jid, current), deadline]);
+  return result === "late" ? cached?.url ?? null : result;
 }
 
 async function avatars(chatIds: unknown) {
   const ids = Array.isArray(chatIds) ? chatIds.map(String).filter(Boolean).slice(0, 100) : [];
   const urls: Record<string, string | null> = {};
-  await Promise.all(ids.map(async (id) => (urls[id] = await avatarFor(id))));
+  const deadline = new Promise<"late">((resolve) => setTimeout(() => resolve("late"), 3000));
+  await Promise.all(ids.map(async (id) => (urls[id] = await avatarFor(id, deadline))));
   return { urls };
 }
 

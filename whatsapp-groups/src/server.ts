@@ -105,9 +105,10 @@ function authorFor(msg: WAMessage) {
 // WHATSAPP_WEB_DIRECT_CHATS=true: also pass 1:1 chats to whatsapp-cloud (used
 // when whatsapp-cloud runs with WHATSAPP_DIRECT_VIA_WEB=true instead of Meta).
 const DIRECT_CHATS = process.env.WHATSAPP_WEB_DIRECT_CHATS?.trim() === "true";
-// With 1:1 chats on, ask for the phone's full history when linking (set
-// WHATSAPP_WEB_FULL_HISTORY=false to get only recent messages).
-const FULL_HISTORY = DIRECT_CHATS && process.env.WHATSAPP_WEB_FULL_HISTORY?.trim() !== "false";
+// Opt-in: ask the phone for its full history when linking. Off by default
+// because WhatsApp drops that link request (428) for this device on our
+// account, which only delays the QR; recent history still comes without it.
+const FULL_HISTORY = DIRECT_CHATS && process.env.WHATSAPP_WEB_FULL_HISTORY?.trim() === "true";
 // Media in history older than this is not downloaded (text still comes).
 const HISTORY_MEDIA_DAYS = Number(process.env.WHATSAPP_WEB_HISTORY_MEDIA_DAYS ?? 7);
 let skippedNoPhone = 0;
@@ -265,8 +266,17 @@ async function refreshGroups(current: WASocket) {
 
 async function connect() {
   const myGeneration = ++generation;
+  // Never run two sockets on the same login: WhatsApp terminates both (428).
+  const previous = sock;
+  sock = null;
+  try {
+    previous?.end(undefined);
+  } catch {
+    // Already closed.
+  }
   status = "connecting";
   const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
+  const freshPairing = !state.creds.me;
   const { version } = await fetchLatestBaileysVersion().catch(() => ({ version: undefined }));
 
   const current = makeWASocket({
@@ -278,7 +288,7 @@ async function connect() {
     // Full history is only sent when the device is linked, and WhatsApp drops
     // the connection (428) if an existing session asks for it. So request it
     // only when there is no saved session yet, i.e. right before a QR scan.
-    syncFullHistory: FULL_HISTORY && !state.creds.me,
+    syncFullHistory: FULL_HISTORY && freshPairing && !fullHistoryDisabled,
     cachedGroupMetadata: async (jid) => groupCache.get(jid),
     getMessage: async (key) => (key.id ? recentMessages.get(key.id)?.message ?? undefined : undefined),
   });
@@ -314,6 +324,12 @@ async function connect() {
         return;
       }
       status = "disconnected";
+      if (freshPairing && code === 428 && FULL_HISTORY && !fullHistoryDisabled && ++freshPairing428 >= 2) {
+        // Safety net: if linking keeps failing with full history requested,
+        // link without it so the QR still appears.
+        fullHistoryDisabled = true;
+        LOG("Linking keeps failing with full history requested; retrying without full history.");
+      }
       const delay = code === DisconnectReason.restartRequired ? 0 : reconnectDelayMs;
       reconnectDelayMs = Math.min(reconnectDelayMs * 2, 60_000);
       LOG(`Connection closed (${code ?? "unknown"}: ${lastError ?? ""}). Reconnecting in ${delay / 1000}s.`);
@@ -403,18 +419,44 @@ async function startLinking() {
     }
     safeConnect();
   }
-  for (let i = 0; i < 20 && !qrDataUrl && (status as string) !== "ready"; i++) {
-    await new Promise((resolve) => setTimeout(resolve, 250));
-  }
+  await waitForQr();
 }
 
 // Removes this linked device from the phone; a new QR is shown afterwards.
+let unlinking = false;
 async function unlink() {
-  if (sock && status === "ready") {
-    await sock.logout().catch(() => undefined);
+  if (unlinking) return; // double click
+  unlinking = true;
+  try {
+    const current = sock;
+    const wasReady = status === "ready";
+    // Ignore this socket's own "logged out" close event; we restart below.
+    generation++;
+    if (reconnectTimer) clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+    sock = null;
+    if (current && wasReady) await current.logout().catch(() => undefined);
+    try {
+      current?.end(undefined);
+    } catch {
+      // Already closed.
+    }
+    await fs.rm(AUTH_DIR, { recursive: true, force: true });
+    status = "connecting";
+    qrDataUrl = null;
+    freshPairing428 = 0;
+    reconnectDelayMs = 2000;
+    safeConnect();
+    await waitForQr();
+  } finally {
+    unlinking = false;
   }
-  await fs.rm(AUTH_DIR, { recursive: true, force: true });
-  await startLinking();
+}
+
+async function waitForQr() {
+  for (let i = 0; i < 40 && !qrDataUrl && (status as string) !== "ready"; i++) {
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
 }
 
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
@@ -428,8 +470,19 @@ function scheduleReconnect(delayMs: number) {
 
 // A failed start (bad session files, network) must never kill the process:
 // retry with backoff and keep the HTTP side answering /status.
+// Only one connect at a time; a request while one is starting is dropped
+// (the one in progress produces the socket).
+let connectInFlight = false;
+let fullHistoryDisabled = false;
+let freshPairing428 = 0;
 function safeConnect() {
-  connect().catch((error) => {
+  if (connectInFlight) return;
+  connectInFlight = true;
+  connect()
+    .finally(() => {
+      connectInFlight = false;
+    })
+    .catch((error) => {
     lastError = error instanceof Error ? error.message : String(error);
     status = "disconnected";
     LOG(`Start failed: ${lastError}. Retrying in ${reconnectDelayMs / 1000}s.`);

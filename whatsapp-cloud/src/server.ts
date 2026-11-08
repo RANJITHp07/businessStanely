@@ -427,7 +427,8 @@ app.get("/media", auth, async (req, res) => {
     const commonHeaders = {
       "Content-Type": media.mimetype,
       "Accept-Ranges": "bytes",
-      "Cache-Control": "private, max-age=3600",
+      // A message's media never changes, so browsers may keep it.
+      "Cache-Control": "private, max-age=31536000, immutable",
     };
 
     const match = req.headers.range?.match(/^bytes=(\d*)-(\d*)$/);

@@ -1004,7 +1004,7 @@ class CloudWhatsAppService {
 
   async getPaginatedChats(search = "", page = 1, pageSize = 50) {
     // Reads come from MongoDB, so they work even while Meta is down.
-    const { chats, contacts } = await getCollections();
+    const { chats } = await getCollections();
     const term = search.trim();
 
     if (!term) {
@@ -1021,6 +1021,14 @@ class CloudWhatsAppService {
       });
     }
 
+    // Search results are cached until chats or contacts change.
+    return this.cached(`search:${term.toLowerCase()}:${page}:${pageSize}`, String(this.chatsVersion), () =>
+      this.searchChats(term, page, pageSize),
+    );
+  }
+
+  private async searchChats(term: string, page: number, pageSize: number) {
+    const { chats, contacts } = await getCollections();
     const limit = page * pageSize;
     const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const digits = digitsOnly(term);
@@ -1494,6 +1502,7 @@ class CloudWhatsAppService {
   async ingestContacts(list: Array<{ phone: string; name: string }>) {
     const { chats, contacts } = await getCollections();
     let changed = false;
+    let contactsChanged = false;
     for (const entry of list) {
       let waId: string;
       try {
@@ -1503,14 +1512,18 @@ class CloudWhatsAppService {
       }
       const name = String(entry.name ?? "").trim();
       if (!name) continue;
-      await contacts.updateOne({ _id: waId }, { $set: { name, updatedAt: new Date() } }, { upsert: true });
+      const saved = await contacts.updateOne(
+        { _id: waId },
+        { $set: { name, updatedAt: new Date() } },
+        { upsert: true },
+      );
       const result = await chats.updateOne({ _id: waId, contactName: { $ne: name } }, { $set: { contactName: name } });
+      if (saved.upsertedCount || saved.modifiedCount) contactsChanged = true;
       if (result.modifiedCount) changed = true;
     }
-    if (changed) {
-      this.bumpChats();
-      publishWhatsAppEvent("chats-updated", { chatId: "contacts" });
-    }
+    // New contacts change search results even when no chat row changed.
+    if (changed || contactsChanged) this.bumpChats();
+    if (changed) publishWhatsAppEvent("chats-updated", { chatId: "contacts" });
   }
 
   // Group list / renames. Only updates names; a chat appears in the list once

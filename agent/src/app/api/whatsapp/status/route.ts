@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { sharedGet } from "@/lib/whatsapp/coalesce";
 import { requireWhatsAppUser } from "@/lib/whatsapp/route-auth";
 
 const WHATSAPP_BACKEND_URL =
@@ -17,15 +18,18 @@ export async function GET(req: NextRequest) {
 
   const url = `${WHATSAPP_BACKEND_URL}/status`;
 
-  const upstream = await fetch(url, {
-    headers: {
+  try {
+    // Concurrent status checks share one upstream call.
+    const upstream = await sharedGet(url, {
       Accept: "application/json",
       "Cache-Control": "no-cache",
       ...(SERVICE_TOKEN ? { "x-whatsapp-service-token": SERVICE_TOKEN } : {}),
-    },
-    signal: req.signal,
-  });
-
-  const data = await upstream.json();
-  return NextResponse.json(data, { status: upstream.status });
+    }, 15_000);
+    return new NextResponse(upstream.body, {
+      status: upstream.status,
+      headers: { "Content-Type": upstream.contentType, "Cache-Control": "no-store" },
+    });
+  } catch {
+    return NextResponse.json({ error: "WhatsApp service is unreachable." }, { status: 502 });
+  }
 }

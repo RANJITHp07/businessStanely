@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { sharedGet } from "@/lib/whatsapp/coalesce";
 import { requireWhatsAppUser } from "@/lib/whatsapp/route-auth";
 
 const WHATSAPP_BACKEND_URL =
@@ -20,31 +21,22 @@ export async function GET(req: NextRequest) {
   const pageSize = req.nextUrl.searchParams.get("pageSize") ?? "15";
   const url = `${WHATSAPP_BACKEND_URL}/chats?search=${encodeURIComponent(search)}&page=${encodeURIComponent(page)}&pageSize=${encodeURIComponent(pageSize)}`;
 
-  // Hard cap the outbound request at 25 s so Next.js never reaches the
-  // ALB / Vercel 30 s timeout and returns a clean 503 instead of a 504.
-  const timeoutController = new AbortController();
-  const timeoutId = setTimeout(() => timeoutController.abort(), 25000);
-
-  // Combine the route's own abort signal with the timeout signal so that
-  // cancelling the browser request also cancels the upstream fetch.
-  req.signal.addEventListener("abort", () => timeoutController.abort());
-
   try {
-    const upstream = await fetch(url, {
-      headers: {
-        Accept: "application/json",
-        "Cache-Control": "no-cache",
-        ...(SERVICE_TOKEN ? { "x-whatsapp-service-token": SERVICE_TOKEN } : {}),
-      },
-      signal: timeoutController.signal,
+    // Concurrent identical requests share one upstream call. Capped at 25 s so
+    // the hosting 30 s timeout never hits; a clean 503 is returned instead.
+    const upstream = await sharedGet(url, {
+      Accept: "application/json",
+      "Cache-Control": "no-cache",
+      ...(SERVICE_TOKEN ? { "x-whatsapp-service-token": SERVICE_TOKEN } : {}),
     });
-
-    const data = await upstream.json();
-    return NextResponse.json(data, { status: upstream.status });
+    return new NextResponse(upstream.body, {
+      status: upstream.status,
+      headers: { "Content-Type": upstream.contentType, "Cache-Control": "no-store" },
+    });
   } catch (err: unknown) {
     const isTimeout =
       err instanceof Error &&
-      (err.name === "AbortError" || err.message.includes("aborted"));
+      (err.name === "AbortError" || err.name === "TimeoutError" || err.message.includes("aborted"));
     return NextResponse.json(
       {
         error: isTimeout
@@ -53,7 +45,5 @@ export async function GET(req: NextRequest) {
       },
       { status: isTimeout ? 503 : 502 },
     );
-  } finally {
-    clearTimeout(timeoutId);
   }
 }

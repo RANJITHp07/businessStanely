@@ -5,9 +5,10 @@
 const cloudUrl = (process.env.WHATSAPP_CLOUD_URL ?? "http://localhost:4002").trim().replace(/\/+$/, "");
 const token = process.env.WHATSAPP_SERVICE_TOKEN?.trim() || "";
 const BATCH_SIZE = 50;
-const MAX_QUEUE = 20000;
+// Full history sync after linking can be tens of thousands of messages.
+const MAX_QUEUE = 100_000;
 
-export type IngestEvent = { kind: "message" | "status" | "media" | "chats" } & Record<string, unknown>;
+export type IngestEvent = { kind: "message" | "status" | "media" | "chats" | "contacts" } & Record<string, unknown>;
 
 const queue: IngestEvent[] = [];
 let flushing = false;

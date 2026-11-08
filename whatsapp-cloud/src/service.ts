@@ -367,7 +367,7 @@ class CloudWhatsAppService {
           wid: linked?.linkedAs ? `+${linked.linkedAs.split(":")[0]!.split("@")[0]}` : null,
           platform: "cloud-api",
         },
-        capabilities: { editMessages: false, deleteMessages: false, logout: false, ...meta.capabilities, templates: false },
+        capabilities: { editMessages: false, deleteMessages: false, ...meta.capabilities, logout: true, templates: false },
         channels: { meta: { status: "disconnected", error: "Not used: chats go through the linked phone." }, groups: linked },
       };
     }
@@ -1009,8 +1009,10 @@ class CloudWhatsAppService {
 
     if (!term) {
       return this.cached(`chats:${page}:${pageSize}`, String(this.chatsVersion), async () => {
+        // With the linked phone, every group is listed (like WhatsApp itself),
+        // even before it has a message here; those sort last.
         const docs = await chats
-          .find({ timestamp: { $ne: null } })
+          .find(webDirectEnabled ? {} : { timestamp: { $ne: null } })
           .sort({ timestamp: -1 })
           .skip((page - 1) * pageSize)
           .limit(pageSize)
@@ -1487,6 +1489,30 @@ class CloudWhatsAppService {
     if (doc) publishWhatsAppEvent("messages-updated", { chatId: toChatId(doc.chatId) });
   }
 
+  // Address-book names from the linked phone (1:1). Saved for search and new
+  // chats, and shown on existing chats.
+  async ingestContacts(list: Array<{ phone: string; name: string }>) {
+    const { chats, contacts } = await getCollections();
+    let changed = false;
+    for (const entry of list) {
+      let waId: string;
+      try {
+        waId = toWaId(String(entry.phone ?? ""));
+      } catch {
+        continue;
+      }
+      const name = String(entry.name ?? "").trim();
+      if (!name) continue;
+      await contacts.updateOne({ _id: waId }, { $set: { name, updatedAt: new Date() } }, { upsert: true });
+      const result = await chats.updateOne({ _id: waId, contactName: { $ne: name } }, { $set: { contactName: name } });
+      if (result.modifiedCount) changed = true;
+    }
+    if (changed) {
+      this.bumpChats();
+      publishWhatsAppEvent("chats-updated", { chatId: "contacts" });
+    }
+  }
+
   // Group list / renames. Only updates names; a chat appears in the list once
   // it has a message (same rule as 1:1 chats).
   async ingestGroupChats(groups: Array<{ id: string; subject?: string | null }>) {
@@ -1529,7 +1555,14 @@ class CloudWhatsAppService {
   // ---- Lifecycle (nothing to tear down: there is no browser session) ----
 
   async logout() {
-    // Deliberately a no-op: disconnecting would require re-onboarding the
+    // Linked phone: remove the linked device; a new QR is shown for re-linking
+    // (which also brings the full history again).
+    if (webDirectEnabled) {
+      await groupsRequest("/unlink", {});
+      await this.refreshGroupsHealth();
+      return;
+    }
+    // Meta: deliberately a no-op; disconnecting would require re-onboarding the
     // number through Meta. Disconnect from Meta Business Suite instead.
   }
 

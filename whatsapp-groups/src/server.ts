@@ -11,6 +11,7 @@ import makeWASocket, {
   makeCacheableSignalKeyStore,
   useMultiFileAuthState,
   type AnyMessageContent,
+  type Contact,
   type GroupMetadata,
   type WAMessage,
   type WASocket,
@@ -104,6 +105,12 @@ function authorFor(msg: WAMessage) {
 // WHATSAPP_WEB_DIRECT_CHATS=true: also pass 1:1 chats to whatsapp-cloud (used
 // when whatsapp-cloud runs with WHATSAPP_DIRECT_VIA_WEB=true instead of Meta).
 const DIRECT_CHATS = process.env.WHATSAPP_WEB_DIRECT_CHATS?.trim() === "true";
+// With 1:1 chats on, ask for the phone's full history when linking (set
+// WHATSAPP_WEB_FULL_HISTORY=false to get only recent messages).
+const FULL_HISTORY = DIRECT_CHATS && process.env.WHATSAPP_WEB_FULL_HISTORY?.trim() !== "false";
+// Media in history older than this is not downloaded (text still comes).
+const HISTORY_MEDIA_DAYS = Number(process.env.WHATSAPP_WEB_HISTORY_MEDIA_DAYS ?? 7);
+let skippedNoPhone = 0;
 
 // WhatsApp now addresses many 1:1 chats by a hidden id ("...@lid") instead of
 // the phone number. Remember the phone number whenever a message reveals it.
@@ -144,10 +151,40 @@ function toJid(chatId: string) {
   return `${digits}@s.whatsapp.net`;
 }
 
+function rememberLid(lid: string | null | undefined, phoneJid: string | null | undefined) {
+  const phone = phoneDigits(phoneJid);
+  if (lid?.endsWith("@lid") && phone) lidToPhone.set(lid, phone);
+}
+
+// Address-book names (and the names people set themselves) for 1:1 chats.
+function pushContacts(contacts: Array<Partial<Contact>>) {
+  if (!DIRECT_CHATS) return;
+  const list: Array<{ phone: string; name: string }> = [];
+  for (const contact of contacts) {
+    const id = contact.id ?? "";
+    rememberLid(contact.lid ?? (id.endsWith("@lid") ? id : null), contact.jid ?? (id.endsWith("@s.whatsapp.net") ? id : null));
+    const phone =
+      phoneDigits(contact.jid) ?? phoneDigits(id) ?? (id.endsWith("@lid") ? lidToPhone.get(id) ?? null : null);
+    const name = (contact.name || contact.notify || contact.verifiedName || "").trim();
+    if (phone && name) list.push({ phone, name });
+  }
+  for (let i = 0; i < list.length; i += 500) {
+    enqueue({ kind: "contacts", contacts: list.slice(i, i + 500) });
+  }
+}
+
+function isRecent(msg: WAMessage) {
+  const seconds = messageTimestampSeconds(msg);
+  return !seconds || Date.now() / 1000 - seconds < HISTORY_MEDIA_DAYS * 86400;
+}
+
 function pushDirectMessage(msg: WAMessage, history: boolean) {
   const phone = directPhone(msg);
   if (!phone) {
-    LOG(`Skipped a 1:1 message from ${msg.key.remoteJid}: phone number not known yet.`);
+    skippedNoPhone++;
+    if (skippedNoPhone === 1 || skippedNoPhone % 500 === 0) {
+      LOG(`Skipped ${skippedNoPhone} 1:1 message(s) whose phone number is hidden (@lid) and not known yet.`);
+    }
     return;
   }
   const converted = convertMessage(msg);
@@ -161,7 +198,11 @@ function pushDirectMessage(msg: WAMessage, history: boolean) {
     contactName: fromMe ? null : msg.pushName?.trim() || null,
     message: { ...converted.message, from: fromMe ? undefined : phone },
   });
-  if (converted.hasMedia && (!converted.maxBytes || converted.maxBytes <= MAX_MEDIA_BYTES)) {
+  if (
+    converted.hasMedia &&
+    (!converted.maxBytes || converted.maxBytes <= MAX_MEDIA_BYTES) &&
+    (!history || isRecent(msg))
+  ) {
     queueMediaDownload(msg);
   }
 }
@@ -189,7 +230,11 @@ function pushMessage(msg: WAMessage, history: boolean) {
     groupSubject: groupCache.get(chatId)?.subject ?? null,
     message: { ...converted.message, from: authorId ?? undefined },
   });
-  if (converted.hasMedia && (!converted.maxBytes || converted.maxBytes <= MAX_MEDIA_BYTES)) {
+  if (
+    converted.hasMedia &&
+    (!converted.maxBytes || converted.maxBytes <= MAX_MEDIA_BYTES) &&
+    (!history || isRecent(msg))
+  ) {
     queueMediaDownload(msg);
   }
 }
@@ -230,7 +275,10 @@ async function connect() {
     logger,
     browser: Browsers.macOS("Stanley Groups"),
     markOnlineOnConnect: false,
-    syncFullHistory: false,
+    // Full history is only sent when the device is linked, and WhatsApp drops
+    // the connection (428) if an existing session asks for it. So request it
+    // only when there is no saved session yet, i.e. right before a QR scan.
+    syncFullHistory: FULL_HISTORY && !state.creds.me,
     cachedGroupMetadata: async (jid) => groupCache.get(jid),
     getMessage: async (key) => (key.id ? recentMessages.get(key.id)?.message ?? undefined : undefined),
   });
@@ -273,7 +321,22 @@ async function connect() {
     }
   });
 
-  current.ev.on("messaging-history.set", ({ messages, chats }) => {
+  current.ev.on("messaging-history.set", ({ messages, chats, contacts, progress }) => {
+    // Learn hidden-id -> phone pairs first, so the messages below can be placed.
+    for (const chat of chats) {
+      const c = chat as typeof chat & { pnJid?: string | null; lidJid?: string | null };
+      rememberLid(c.lidJid ?? (c.id?.endsWith("@lid") ? c.id : null), c.pnJid ?? (c.id?.endsWith("@s.whatsapp.net") ? c.id : null));
+    }
+    pushContacts(contacts);
+    if (DIRECT_CHATS) {
+      // 1:1 chat names from history (the phone's saved name when there is one).
+      pushContacts(
+        chats
+          .filter((c) => c.id && !isJidGroup(c.id) && c.name)
+          .map((c) => ({ id: c.id, name: c.name ?? undefined })),
+      );
+    }
+    LOG(`History: ${chats.length} chats, ${contacts.length} contacts, ${messages.length} messages${progress != null ? ` (${progress}%)` : ""}.`);
     pushGroups(chats.filter((c) => c.id && isJidGroup(c.id)).map((c) => ({ id: c.id, subject: c.name ?? undefined })));
     for (const msg of messages) pushMessage(msg, true);
   });
@@ -293,6 +356,10 @@ async function connect() {
       enqueue({ kind: "status", id: key.id, ack: toAck(update.status) });
     }
   });
+
+  current.ev.on("contacts.upsert", (contacts) => pushContacts(contacts));
+  current.ev.on("contacts.update", (contacts) => pushContacts(contacts));
+  current.ev.on("chats.phoneNumberShare", ({ lid, jid }) => rememberLid(lid, jid));
 
   current.ev.on("groups.upsert", (groups) => {
     for (const group of groups) groupCache.set(group.id, group);

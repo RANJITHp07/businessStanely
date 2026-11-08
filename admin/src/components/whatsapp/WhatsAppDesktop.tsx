@@ -824,7 +824,11 @@ function WhatsAppDesktop() {
                             </button>
                             {canLogout ? <button
                                 type="button"
-                                onClick={logout}
+                                onClick={() => {
+                                    if (window.confirm("Log out WhatsApp? The phone is unlinked; scan the QR again to reconnect (this also re-syncs all chats).")) {
+                                        void logout();
+                                    }
+                                }}
                                 className="rounded-full p-2 text-[var(--wa-muted2)] transition hover:bg-[var(--wa-hover)] hover:text-white"
                                 title="Log out WhatsApp session"
                             >

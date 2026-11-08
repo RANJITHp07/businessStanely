@@ -191,7 +191,8 @@ type GroupIngestEvent =
   | ({ kind: "message" } & Parameters<typeof whatsappService.ingestGroupMessage>[0])
   | ({ kind: "status" } & Parameters<typeof whatsappService.ingestGroupStatus>[0])
   | ({ kind: "media" } & Parameters<typeof whatsappService.ingestGroupMedia>[0])
-  | { kind: "chats"; groups: Parameters<typeof whatsappService.ingestGroupChats>[0] };
+  | { kind: "chats"; groups: Parameters<typeof whatsappService.ingestGroupChats>[0] }
+  | { kind: "contacts"; contacts: Parameters<typeof whatsappService.ingestContacts>[0] };
 
 // Admin "Link groups" dialog: QR and link status of the groups linked device.
 // POST with {"action":"link"} starts a fresh QR; {"action":"unlink"} removes the device.
@@ -233,6 +234,9 @@ app.post("/groups/ingest", auth, async (req, res) => {
           break;
         case "chats":
           await whatsappService.ingestGroupChats(Array.isArray(event.groups) ? event.groups : []);
+          break;
+        case "contacts":
+          await whatsappService.ingestContacts(Array.isArray(event.contacts) ? event.contacts : []);
           break;
         default:
           break;
@@ -464,8 +468,12 @@ app.post("/chat-avatars", auth, async (req, res) => {
 
 // --- Logout (no-op: the number stays connected to the Cloud API) ---
 app.post("/logout", auth, async (_req, res) => {
-  await whatsappService.logout();
-  res.json({ ok: true });
+  try {
+    await whatsappService.logout();
+    res.json({ ok: true });
+  } catch (error) {
+    sendError(res, error, "Failed to log out.");
+  }
 });
 
 // --- SSE stream ---

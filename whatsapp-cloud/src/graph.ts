@@ -94,15 +94,29 @@ export async function exchangeSignupCode(
   appSecret: string,
   code: string,
 ) {
-  const response = await fetch(
-    graphUrl("oauth/access_token", {
-      client_id: appId,
-      client_secret: appSecret,
-      code,
-    }),
-    { signal: AbortSignal.timeout(requestTimeoutMs) },
-  );
-  const data = await parseGraphResponse<{ access_token?: string }>(response);
+  const exchange = async (redirectUri?: string) => {
+    const response = await fetch(
+      graphUrl("oauth/access_token", {
+        client_id: appId,
+        client_secret: appSecret,
+        code,
+        ...(redirectUri !== undefined ? { redirect_uri: redirectUri } : {}),
+      }),
+      { signal: AbortSignal.timeout(requestTimeoutMs) },
+    );
+    return parseGraphResponse<{ access_token?: string }>(response);
+  };
+
+  let data: { access_token?: string };
+  try {
+    data = await exchange();
+  } catch (error) {
+    // Codes from the JavaScript SDK login window are sometimes only accepted
+    // with an explicitly empty redirect_uri.
+    if (!(error instanceof Error) || !/redirect_uri/i.test(error.message)) throw error;
+    console.warn("[WhatsApp Cloud] Code exchange needs redirect_uri; retrying with an empty one.");
+    data = await exchange("");
+  }
   if (!data.access_token) {
     throw new CloudApiError("Meta did not return an access token.", 502);
   }

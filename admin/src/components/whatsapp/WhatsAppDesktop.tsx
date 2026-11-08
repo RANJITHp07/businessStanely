@@ -878,7 +878,7 @@ function WhatsAppDesktop() {
                     </div>
 
                     <div className="no-scrollbar flex-1 overflow-y-auto">
-                        {isChatsLoading || isSearching ? (
+                        {isChatsLoading || (isSearching && chats.length === 0) ? (
                             <div className="flex flex-col items-center justify-center h-full py-10 text-[#00a884]">
                                 <LoaderCircle className="h-8 w-8 animate-spin mb-3" />
                                 <span className="text-base font-medium">{isSearching ? "Searching…" : "Loading chats…"}</span>

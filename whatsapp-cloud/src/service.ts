@@ -1123,18 +1123,54 @@ class CloudWhatsAppService {
         ...(digits.length >= 3 ? [{ _id: new RegExp(digits) }] : []),
       ],
     };
+    const { lids } = await getCollections();
     const chatDocs = await chats.find(chatFilter).sort({ timestamp: -1 }).limit(limit).toArray();
-    const results = chatDocs.map((doc) => this.toChatSummary(doc));
-    const seen = new Set(chatDocs.map((doc) => doc._id));
+    // The same person can be stored under the phone number and under
+    // WhatsApp's hidden id; list them once. Hidden-id chats learn their number
+    // from the id -> number map.
+    const hiddenIds = chatDocs.filter((doc) => isLidKey(doc._id) && !doc.phoneNumber).map((doc) => doc._id);
+    const phoneOf = new Map(
+      hiddenIds.length ? (await lids.find({ _id: { $in: hiddenIds } }).toArray()).map((doc) => [doc._id, doc.phone] as const) : [],
+    );
+    const seen = new Set<string>();
+    const seenNames = new Set<string>(); // names of entries with a known number
+    const hiddenNames = new Set<string>(); // names of hidden-id chats without a number
+    const personKey = (doc: CloudChatDoc) =>
+      isLidKey(doc._id) ? doc.phoneNumber || phoneOf.get(doc._id) || doc._id : doc._id;
+    const results: WhatsAppChatSummary[] = [];
+    // Phone-number chats first, so a hidden-id duplicate is the one dropped.
+    const ordered = [...chatDocs].sort((a, b) => Number(isLidKey(a._id)) - Number(isLidKey(b._id)) || (b.timestamp ?? 0) - (a.timestamp ?? 0));
+    const kept: CloudChatDoc[] = [];
+    for (const doc of ordered) {
+      const key = personKey(doc);
+      const name = (doc.contactName || doc.profileName || "").trim().toLowerCase();
+      if (seen.has(key)) continue;
+      // A hidden-id chat with no known number and the same name as one already
+      // listed is the same person.
+      if (isLidKey(key) && name && seenNames.has(name)) continue;
+      seen.add(key);
+      seen.add(doc._id);
+      if (name) (isLidKey(key) ? hiddenNames : seenNames).add(name);
+      kept.push(doc);
+    }
+    kept.sort((a, b) => (b.timestamp ?? 0) - (a.timestamp ?? 0));
+    results.push(...kept.map((doc) => this.toChatSummary(doc)));
 
     // Saved phone contacts without a conversation yet, so a new chat can be
-    // started from search (it opens with the template picker).
+    // started from search. Hidden-id copies of contacts are skipped: the same
+    // contact is also saved under its number.
     const contactDocs = await contacts
-      .find({ $or: [{ name: nameRegex }, ...(digits.length >= 3 ? [{ _id: new RegExp(digits) }] : [])] })
+      .find({
+        _id: { $not: /@lid$/ },
+        $or: [{ name: nameRegex }, ...(digits.length >= 3 ? [{ _id: new RegExp(digits) }] : [])],
+      })
       .limit(limit)
       .toArray();
     for (const contact of contactDocs) {
-      if (seen.has(contact._id)) continue;
+      // Skip the contact if it is a chat already listed: by number, or by name
+      // when that chat's number is hidden.
+      const name = contact.name.trim().toLowerCase();
+      if (seen.has(contact._id) || hiddenNames.has(name)) continue;
       seen.add(contact._id);
       results.push(this.toChatSummary({ _id: contact._id, contactName: contact.name }));
     }

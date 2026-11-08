@@ -120,6 +120,9 @@ export function useWhatsAppDesktop() {
   const messageLimitRef = useRef(INITIAL_MESSAGE_LIMIT);
   const chatPageRef = useRef(1);
   const chatsCountRef = useRef(0);
+  // Latest loaded chat list, for instant local search matches.
+  const chatsRef = useRef<WhatsAppChatSummary[]>([]);
+  chatsRef.current = chats;
   const eventSourceRef = useRef<EventSource | null>(null);
   const selectedChatIdRef = useRef<string | null>(null);
   const messageRequestIdRef = useRef(0);
@@ -181,6 +184,17 @@ export function useWhatsAppDesktop() {
     }
 
     let cancelled = false;
+    // Show matches from the chats already loaded right away; the server's
+    // results (every chat and contact) replace them when they arrive.
+    const lower = term.toLowerCase();
+    const digits = term.replace(/\D/g, "");
+    setSearchResults(
+      chatsRef.current.filter(
+        (chat) =>
+          chat.name.toLowerCase().includes(lower) ||
+          (digits.length >= 3 && (chat.phoneNumber ?? "").replace(/\D/g, "").includes(digits)),
+      ),
+    );
     setIsSearching(true);
     const handle = setTimeout(async () => {
       try {
@@ -191,11 +205,11 @@ export function useWhatsAppDesktop() {
         setSearchResults(data.chats ?? []);
         resolveAvatarsBatch((data.chats ?? []).map((chat) => chat.id));
       } catch {
-        if (!cancelled) setSearchResults([]);
+        // Keep the local matches if the server can't be reached.
       } finally {
         if (!cancelled) setIsSearching(false);
       }
-    }, 300);
+    }, 200);
 
     return () => {
       cancelled = true;

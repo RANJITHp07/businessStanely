@@ -125,6 +125,17 @@ function isGroupKey(value: string) {
   return value.endsWith("@g.us");
 }
 
+// 1:1 chats from the linked phone whose phone number WhatsApp hides are
+// stored under their hidden id, "<lid>@lid" (direct-via-web mode only).
+function isLidKey(value: string) {
+  return value.endsWith("@lid");
+}
+
+function lidKey(value: string) {
+  const id = digitsOnly(value.split("@")[0]!.split(":")[0] ?? "");
+  return id ? `${id}@lid` : "";
+}
+
 function groupKey(groupId: string) {
   const id = groupId.trim().replace(/@g\.us$/, "");
   return id ? `${id}@g.us` : "";
@@ -144,6 +155,11 @@ function toChatKey(chatId: string) {
     if (!key) throw new CloudApiError("Invalid WhatsApp group.", 400);
     return key;
   }
+  if (isLidKey(raw)) {
+    const key = lidKey(raw);
+    if (!key) throw new CloudApiError("Invalid WhatsApp chat.", 400);
+    return key;
+  }
   return toWaId(raw);
 }
 
@@ -160,7 +176,7 @@ function toWaId(chatId: string) {
 }
 
 function toChatId(key: string) {
-  return isGroupKey(key) ? key : `${key}@c.us`;
+  return isGroupKey(key) || isLidKey(key) ? key : `${key}@c.us`;
 }
 
 function placeholders(text: string | undefined) {
@@ -799,7 +815,7 @@ class CloudWhatsAppService {
     if (!parsed || !message.id) return;
 
     const isGroup = isGroupKey(counterpart);
-    const chatId = isGroup ? counterpart : digitsOnly(counterpart);
+    const chatId = isGroup || isLidKey(counterpart) ? counterpart : digitsOnly(counterpart);
     if (!chatId) return;
     const timestamp = Number(message.timestamp ?? 0) * 1000 || Date.now();
     const { chats, contacts, messages } = await getCollections();
@@ -963,13 +979,14 @@ class CloudWhatsAppService {
 
   private toChatSummary(chat: CloudChatDoc): WhatsAppChatSummary {
     const isGroup = isGroupKey(chat._id);
+    const hiddenNumber = isLidKey(chat._id);
     const name = isGroup
       ? chat.profileName || chat.contactName || "WhatsApp group"
-      : chat.contactName || chat.profileName || `+${chat._id}`;
+      : chat.contactName || chat.profileName || (hiddenNumber ? "WhatsApp contact" : `+${chat._id}`);
     return {
       id: toChatId(chat._id),
       name,
-      phoneNumber: isGroup ? null : `+${chat._id}`,
+      phoneNumber: isGroup || hiddenNumber ? null : `+${chat._id}`,
       lastMessage: chat.lastMessage ?? "",
       timestamp: chat.timestamp ?? null,
       unreadCount: chat.unreadCount ?? 0,
@@ -1452,7 +1469,7 @@ class CloudWhatsAppService {
       key = groupKey(input.chatId);
     } else if (webDirectEnabled) {
       try {
-        key = toWaId(input.chatId ?? "");
+        key = isLidKey(input.chatId ?? "") ? lidKey(input.chatId) : toWaId(input.chatId ?? "");
       } catch {
         return;
       }

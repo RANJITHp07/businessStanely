@@ -9,6 +9,7 @@ import makeWASocket, {
   fetchLatestBaileysVersion,
   isJidGroup,
   makeCacheableSignalKeyStore,
+  proto,
   useMultiFileAuthState,
   type AnyMessageContent,
   type Contact,
@@ -111,7 +112,7 @@ const DIRECT_CHATS = process.env.WHATSAPP_WEB_DIRECT_CHATS?.trim() === "true";
 const FULL_HISTORY = DIRECT_CHATS && process.env.WHATSAPP_WEB_FULL_HISTORY?.trim() === "true";
 // Media in history older than this is not downloaded (text still comes).
 const HISTORY_MEDIA_DAYS = Number(process.env.WHATSAPP_WEB_HISTORY_MEDIA_DAYS ?? 7);
-let skippedNoPhone = 0;
+let hiddenNumberChats = 0;
 
 // WhatsApp now addresses many 1:1 chats by a hidden id ("...@lid") instead of
 // the phone number. Remember the phone number whenever a message reveals it.
@@ -146,6 +147,10 @@ function directPhone(msg: WAMessage): string | null {
 /** Chat id from whatsapp-cloud (group jid, "<digits>@c.us" or digits) to a WhatsApp jid. */
 function toJid(chatId: string) {
   if (isJidGroup(chatId)) return chatId;
+  if (chatId.endsWith("@lid")) {
+    if (!DIRECT_CHATS) throw httpError(400, "Only group chats are sent through this service.");
+    return `${chatId.split("@")[0]!.split(":")[0]}@lid`;
+  }
   if (!DIRECT_CHATS) throw httpError(400, "Only group chats are sent through this service.");
   const digits = chatId.split("@")[0]!.replace(/\D/g, "");
   if (digits.length < 8) throw httpError(400, "Invalid WhatsApp number.");
@@ -181,23 +186,26 @@ function isRecent(msg: WAMessage) {
 
 function pushDirectMessage(msg: WAMessage, history: boolean) {
   const phone = directPhone(msg);
+  // When WhatsApp hides the number, keep the chat under its hidden id
+  // ("<lid>@lid"); replies go back to that id.
+  const lid = !phone ? (msg.key.remoteJid ?? "").split("@")[0]!.split(":")[0] : null;
+  if (!phone && !lid) return;
   if (!phone) {
-    skippedNoPhone++;
-    if (skippedNoPhone === 1 || skippedNoPhone % 500 === 0) {
-      LOG(`Skipped ${skippedNoPhone} 1:1 message(s) whose phone number is hidden (@lid) and not known yet.`);
+    hiddenNumberChats++;
+    if (hiddenNumberChats === 1 || hiddenNumberChats % 500 === 0) {
+      LOG(`${hiddenNumberChats} 1:1 message(s) came with a hidden number (@lid); kept under the hidden id.`);
     }
-    return;
   }
   const converted = convertMessage(msg);
   if (!converted) return;
   const fromMe = Boolean(msg.key.fromMe);
   enqueue({
     kind: "message",
-    chatId: `${phone}@c.us`,
+    chatId: phone ? `${phone}@c.us` : `${lid}@lid`,
     fromMe,
     history,
     contactName: fromMe ? null : msg.pushName?.trim() || null,
-    message: { ...converted.message, from: fromMe ? undefined : phone },
+    message: { ...converted.message, from: fromMe ? undefined : phone ?? undefined },
   });
   if (
     converted.hasMedia &&
@@ -289,6 +297,11 @@ async function connect() {
     // the connection (428) if an existing session asks for it. So request it
     // only when there is no saved session yet, i.e. right before a QR scan.
     syncFullHistory: FULL_HISTORY && freshPairing && !fullHistoryDisabled,
+    // Baileys' default drops ALL history (even the recent chats the phone sends
+    // on linking) unless syncFullHistory is on. Keep recent history; take the
+    // FULL type only when full history was asked for.
+    shouldSyncHistoryMessage: (history) =>
+      history.syncType !== proto.HistorySync.HistorySyncType.FULL || (FULL_HISTORY && !fullHistoryDisabled),
     cachedGroupMetadata: async (jid) => groupCache.get(jid),
     getMessage: async (key) => (key.id ? recentMessages.get(key.id)?.message ?? undefined : undefined),
   });

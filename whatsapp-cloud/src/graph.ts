@@ -115,7 +115,12 @@ export async function exchangeSignupCode(
   // sometimes the page the login started from. A rejected attempt does not use
   // up the code, so try each candidate until one is accepted.
   // The page sends the exact redirect_uri of a redirect-flow login: try it first.
-  const candidates: Array<string | undefined> = [...redirectUris.filter(Boolean), undefined, ""];
+  // Meta often stores the redirect_uri with a trailing slash and then wants
+  // that form at exchange time, so try each address with and without it.
+  const withSlashVariants = redirectUris
+    .filter(Boolean)
+    .flatMap((uri) => (uri.endsWith("/") ? [uri, uri.replace(/\/+$/, "")] : [uri, `${uri}/`]));
+  const candidates: Array<string | undefined> = [...new Set(withSlashVariants), undefined, ""];
   let data: { access_token?: string } | null = null;
   let lastError: unknown = null;
   for (const candidate of candidates) {

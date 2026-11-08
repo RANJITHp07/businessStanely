@@ -961,6 +961,7 @@ export function useWhatsAppDesktop() {
     code: string;
     phoneNumberId: string;
     wabaId: string;
+    redirectUris?: string[];
   }) => {
     const data = await getJson<{
       state: WhatsAppState;

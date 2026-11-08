@@ -93,6 +93,7 @@ export async function exchangeSignupCode(
   appId: string,
   appSecret: string,
   code: string,
+  redirectUris: string[] = [],
 ) {
   const exchange = async (redirectUri?: string) => {
     const response = await fetch(
@@ -107,16 +108,27 @@ export async function exchangeSignupCode(
     return parseGraphResponse<{ access_token?: string }>(response);
   };
 
-  let data: { access_token?: string };
-  try {
-    data = await exchange();
-  } catch (error) {
-    // Codes from the JavaScript SDK login window are sometimes only accepted
-    // with an explicitly empty redirect_uri.
-    if (!(error instanceof Error) || !/redirect_uri/i.test(error.message)) throw error;
-    console.warn("[WhatsApp Cloud] Code exchange needs redirect_uri; retrying with an empty one.");
-    data = await exchange("");
+  // Meta binds the code to the redirect_uri of the login request. For the
+  // JavaScript SDK popup that is usually none, sometimes an empty one, and
+  // sometimes the page the login started from. A rejected attempt does not use
+  // up the code, so try each candidate until one is accepted.
+  const candidates: Array<string | undefined> = [undefined, "", ...redirectUris.filter(Boolean)];
+  let data: { access_token?: string } | null = null;
+  let lastError: unknown = null;
+  for (const candidate of candidates) {
+    try {
+      data = await exchange(candidate);
+      if (candidate !== undefined) {
+        console.log(`[WhatsApp Cloud] Code exchange accepted with redirect_uri "${candidate}".`);
+      }
+      break;
+    } catch (error) {
+      lastError = error;
+      if (!(error instanceof Error) || !/redirect_uri/i.test(error.message)) throw error;
+      console.warn(`[WhatsApp Cloud] Code exchange rejected for redirect_uri ${JSON.stringify(candidate ?? null)}.`);
+    }
   }
+  if (!data) throw lastError;
   if (!data.access_token) {
     throw new CloudApiError("Meta did not return an access token.", 502);
   }

@@ -259,7 +259,7 @@ app.get("/status", auth, (_req, res) => {
 
 // --- Onboarding (Embedded Signup result from the admin panel) ---
 app.post("/onboard", auth, async (req, res) => {
-  const { code, phoneNumberId, wabaId } = req.body ?? {};
+  const { code, phoneNumberId, wabaId, redirectUris } = req.body ?? {};
   // phoneNumberId / wabaId are optional: when Meta does not report them to the
   // browser, the service looks them up from the token.
   if (typeof code !== "string" || !code) {
@@ -269,7 +269,15 @@ app.post("/onboard", auth, async (req, res) => {
   const optionalId = (value: unknown) => (typeof value === "string" && value ? value : undefined);
   try {
     res.json(
-      await whatsappService.completeSignup({ code, phoneNumberId: optionalId(phoneNumberId), wabaId: optionalId(wabaId) }),
+      await whatsappService.completeSignup({
+        code,
+        phoneNumberId: optionalId(phoneNumberId),
+        wabaId: optionalId(wabaId),
+        // Only https URLs; at most a handful.
+        redirectUris: Array.isArray(redirectUris)
+          ? redirectUris.filter((uri): uri is string => typeof uri === "string" && uri.startsWith("https://")).slice(0, 6)
+          : [],
+      }),
     );
   } catch (error) {
     sendError(res, error, "Failed to connect WhatsApp.");

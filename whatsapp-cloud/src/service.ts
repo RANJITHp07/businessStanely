@@ -523,14 +523,14 @@ class CloudWhatsAppService {
 
   // ---- Onboarding (Embedded Signup, WhatsApp Business app coexistence) ----
 
-  async completeSignup(input: { code: string; phoneNumberId?: string; wabaId?: string }) {
+  async completeSignup(input: { code: string; phoneNumberId?: string; wabaId?: string; redirectUris?: string[] }) {
     const appId = process.env.META_APP_ID?.trim();
     const appSecret = process.env.META_APP_SECRET?.trim();
     if (!appId || !appSecret) {
       throw new CloudApiError("META_APP_ID and META_APP_SECRET must be set on the WhatsApp service.", 500);
     }
 
-    const accessToken = await exchangeSignupCode(appId, appSecret, input.code);
+    const accessToken = await exchangeSignupCode(appId, appSecret, input.code, input.redirectUris);
 
     const tokenInfo = await inspectToken(appId, appSecret, accessToken).catch((error: unknown) => {
       console.warn("[WhatsApp Cloud] Could not inspect the signup token:", error);

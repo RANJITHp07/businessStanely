@@ -153,7 +153,7 @@ export function CloudConnectPanel({
     state: WhatsAppState;
     theme: "dark" | "light";
     // Omitted in the agent panel: only admins can connect the number.
-    onComplete?: (input: { code: string; phoneNumberId: string; wabaId: string }) => Promise<unknown>;
+    onComplete?: (input: { code: string; phoneNumberId: string; wabaId: string; redirectUris?: string[] }) => Promise<unknown>;
 }) {
     const [isConnecting, setIsConnecting] = useState(false);
     const [showGroupsLink, setShowGroupsLink] = useState(false);
@@ -171,7 +171,11 @@ export function CloudConnectPanel({
         setIsConnecting(true);
         try {
             const result = await runEmbeddedSignup(state.onboarding);
-            await onComplete(result);
+            // Meta sometimes wants the code exchanged with the address of the page
+            // the login was started from; the server tries these in turn.
+            const page = `${window.location.origin}${window.location.pathname}`;
+            const redirectUris = [...new Set([page, `${page}/`, `${window.location.origin}/`, window.location.origin])];
+            await onComplete({ ...result, redirectUris });
             toast.success("WhatsApp connected. Chats and history will appear as Meta syncs them.");
         } catch (error) {
             toast.error(error instanceof Error ? error.message : "Failed to connect WhatsApp.");

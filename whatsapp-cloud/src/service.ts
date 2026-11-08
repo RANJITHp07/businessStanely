@@ -1,7 +1,7 @@
 
 import { readMedia, storeMedia } from "./media-store.js";
 import { publishWhatsAppEvent } from "./realtime.js";
-import { groupsBridgeEnabled, groupsHealth, groupsRequest, type GroupsHealth } from "./groups-bridge.js";
+import { groupsBridgeEnabled, groupsHealth, groupsRequest, webDirectEnabled, type GroupsHealth } from "./groups-bridge.js";
 import type {
   WhatsAppChatSummary,
   WhatsAppMessage,
@@ -352,6 +352,25 @@ class CloudWhatsAppService {
       groups: groupsBridgeEnabled ? this.groups ?? { status: "unknown", error: null, linkedAs: null } : null,
     };
     const groupsReady = channels.groups?.status === "ready";
+    if (webDirectEnabled) {
+      // Everything runs on the linked device; Meta is not used.
+      const linked = channels.groups;
+      return {
+        ...meta,
+        status: groupsReady ? "ready" : "disconnected",
+        error: groupsReady
+          ? null
+          : linked?.error ?? `WhatsApp is not linked (${linked?.status ?? "unknown"}). Scan the QR to link the phone.`,
+        onboarding: null,
+        clientInfo: {
+          pushname: "WhatsApp",
+          wid: linked?.linkedAs ? `+${linked.linkedAs.split(":")[0]!.split("@")[0]}` : null,
+          platform: "cloud-api",
+        },
+        capabilities: { editMessages: false, deleteMessages: false, logout: false, ...meta.capabilities, templates: false },
+        channels: { meta: { status: "disconnected", error: "Not used: chats go through the linked phone." }, groups: linked },
+      };
+    }
     if (meta.status === "ready") {
       const groupsProblem =
         groupsBridgeEnabled && !groupsReady
@@ -826,7 +845,9 @@ class CloudWhatsAppService {
       const contact = await contacts.findOne({ _id: chatId });
       if (contact) update.contactName = contact.name;
     }
-    if (isGroup && options.groupSubject && options.groupSubject !== existingChat?.profileName) {
+    // groupSubject: the group name, or for a 1:1 chat from the linked device the
+    // sender's profile name.
+    if (options.groupSubject && options.groupSubject !== existingChat?.profileName) {
       update.profileName = options.groupSubject;
     } else if (isGroup && !existingChat?.profileName && !groupsBridgeEnabled) {
       const subject = await this.fetchGroupSubject(chatId);
@@ -1150,8 +1171,9 @@ class CloudWhatsAppService {
     quotedMessageId?: string,
   ) {
     const waId = toChatKey(chatId);
-    // Group sends go to the linked device and do not need Meta.
-    if (isGroupKey(waId) && groupsBridgeEnabled) {
+    // Group sends (and 1:1 sends in direct-via-web mode) go to the linked
+    // device and do not need Meta or the 24-hour window.
+    if (groupsBridgeEnabled && (isGroupKey(waId) || webDirectEnabled)) {
       return this.sendGroupMessage(waId, body, media, quotedMessageId);
     }
     const config = this.requireReady();
@@ -1284,6 +1306,9 @@ class CloudWhatsAppService {
     headerValues?: string[];
     bodyValues?: string[];
   }) {
+    if (webDirectEnabled) {
+      throw new CloudApiError("Templates need the Meta Cloud API. Send a normal message instead.", 422);
+    }
     const config = this.requireReady();
     const waId = toChatKey(input.chatId);
     if (isGroupKey(waId) && groupsBridgeEnabled) {
@@ -1407,14 +1432,26 @@ class CloudWhatsAppService {
     author?: string | null;
     authorId?: string | null;
     groupSubject?: string | null;
+    /** 1:1 only: the sender's WhatsApp profile name. */
+    contactName?: string | null;
     message: WaMessage;
   }) {
-    const key = groupKey(input.chatId);
-    if (!key || !input.message?.id) return;
+    if (!input.message?.id) return;
+    let key = "";
+    if (isGroupKey(input.chatId ?? "")) {
+      key = groupKey(input.chatId);
+    } else if (webDirectEnabled) {
+      try {
+        key = toWaId(input.chatId ?? "");
+      } catch {
+        return;
+      }
+    }
+    if (!key) return;
     await this.storeMessage(input.message, key, input.fromMe, input.history ? "history" : "web", {
       author: input.fromMe ? null : input.author ?? null,
       authorId: input.authorId ?? null,
-      groupSubject: input.groupSubject ?? null,
+      groupSubject: isGroupKey(key) ? input.groupSubject ?? null : input.fromMe ? null : input.contactName ?? null,
     });
     if (input.history) this.historyDirty = true;
   }

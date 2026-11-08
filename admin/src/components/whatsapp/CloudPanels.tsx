@@ -135,6 +135,7 @@ export function CloudConnectPanel({
                         Checking the WhatsApp Cloud API connection…
                     </div>
                 ) : (
+                    state.onboarding ? (
                     <>
                         <p className="text-base leading-7 text-[#d1d7db]">
                             Connect the firm&apos;s WhatsApp Business app number through Meta. The phone keeps working
@@ -165,6 +166,19 @@ export function CloudConnectPanel({
                             </button>
                         ) : null}
                     </>
+                    ) : (
+                        <>
+                            <p className="text-base leading-7 text-[#d1d7db]">
+                                Chats run through the firm&apos;s phone, linked like WhatsApp Web. Link it once by scanning
+                                a QR code with WhatsApp on that phone.
+                            </p>
+                            {state.error ? (
+                                <div className="mt-6 rounded-lg border border-amber-500/30 bg-amber-900/20 px-4 py-3 text-sm text-amber-400">
+                                    {state.error}
+                                </div>
+                            ) : null}
+                        </>
+                    )
                 )}
 
                 {onComplete && state.channels?.groups ? (
@@ -173,7 +187,7 @@ export function CloudConnectPanel({
                         onClick={() => setShowGroupsLink(true)}
                         className="mt-3 w-full rounded-lg border border-[#00a884]/50 px-4 py-3 text-sm font-semibold text-[#00a884] transition hover:bg-[#00a884]/10"
                     >
-                        Link WhatsApp groups (QR)
+                        {state.onboarding ? "Link WhatsApp groups (QR)" : "Link WhatsApp (scan QR)"}
                     </button>
                 ) : null}
             </div>
@@ -239,11 +253,11 @@ export function GroupsLinkDialog({ onClose }: { onClose: () => void }) {
     }, []);
 
     const unlink = async () => {
-        if (!window.confirm("Unlink WhatsApp groups? Group chats stop until a phone scans the QR again.")) return;
+        if (!window.confirm("Unlink the phone? Chats coming through it stop until the QR is scanned again.")) return;
         setBusy(true);
         try {
             setLink(await groupsLinkRequest("POST", "unlink"));
-            toast.success("Groups unlinked.");
+            toast.success("Phone unlinked.");
         } catch (err) {
             toast.error(err instanceof Error ? err.message : "Failed to unlink.");
         } finally {
@@ -261,9 +275,9 @@ export function GroupsLinkDialog({ onClose }: { onClose: () => void }) {
             >
                 <div className="mb-4 flex items-start justify-between gap-4">
                     <div>
-                        <h2 className="text-lg font-semibold">WhatsApp groups</h2>
+                        <h2 className="text-lg font-semibold">Linked phone</h2>
                         <p className="mt-1 text-sm text-[var(--wa-muted2)]">
-                            Groups come through WhatsApp Web, linked to a phone like a laptop would be.
+                            Chats come through WhatsApp Web, linked to the phone like a laptop would be.
                         </p>
                     </div>
                     <button type="button" onClick={onClose} className="text-sm text-[var(--wa-muted)] hover:text-[var(--wa-text)]">
@@ -287,7 +301,7 @@ export function GroupsLinkDialog({ onClose }: { onClose: () => void }) {
                             disabled={busy}
                             className="w-full rounded-lg border border-red-500/40 px-4 py-2 text-sm text-red-400 hover:bg-red-900/20 disabled:opacity-50"
                         >
-                            {busy ? "Unlinking…" : "Unlink groups"}
+                            {busy ? "Unlinking…" : "Unlink phone"}
                         </button>
                     </div>
                 ) : (

@@ -11,6 +11,11 @@ const TIMEOUT_MS = 60 * 1000;
 
 export const groupsBridgeEnabled = Boolean(baseUrl);
 
+// WHATSAPP_DIRECT_VIA_WEB=true: 1:1 chats also go through the linked device
+// (Baileys) instead of the Meta Cloud API. Meta is then ignored entirely; turn
+// it off again to use Meta for 1:1.
+export const webDirectEnabled = groupsBridgeEnabled && process.env.WHATSAPP_DIRECT_VIA_WEB?.trim() === "true";
+
 export async function groupsRequest<T>(path: string, body: unknown): Promise<T> {
   if (!baseUrl) throw new CloudApiError("WhatsApp groups are not enabled (WHATSAPP_GROUPS_URL is not set).", 503);
   let response: Response;

@@ -101,10 +101,79 @@ function authorFor(msg: WAMessage) {
   return { authorId, author: msg.pushName?.trim() || phone || "Group member" };
 }
 
+// WHATSAPP_WEB_DIRECT_CHATS=true: also pass 1:1 chats to whatsapp-cloud (used
+// when whatsapp-cloud runs with WHATSAPP_DIRECT_VIA_WEB=true instead of Meta).
+const DIRECT_CHATS = process.env.WHATSAPP_WEB_DIRECT_CHATS?.trim() === "true";
+
+// WhatsApp now addresses many 1:1 chats by a hidden id ("...@lid") instead of
+// the phone number. Remember the phone number whenever a message reveals it.
+const lidToPhone = new Map<string, string>();
+
+function isDirectJid(jid: string) {
+  return jid.endsWith("@s.whatsapp.net") || jid.endsWith("@lid");
+}
+
+function phoneDigits(jid: string | null | undefined) {
+  if (!jid || !jid.endsWith("@s.whatsapp.net")) return null;
+  return jid.split("@")[0]!.split(":")[0]!.replace(/\D/g, "") || null;
+}
+
+/** Phone digits of a 1:1 chat, or null when only the hidden id is known. */
+function directPhone(msg: WAMessage): string | null {
+  const jid = msg.key.remoteJid ?? "";
+  const direct = phoneDigits(jid);
+  if (direct) return direct;
+  if (jid.endsWith("@lid")) {
+    const key = msg.key as WAMessage["key"] & { senderPn?: string; remoteJidAlt?: string };
+    const phone = phoneDigits(key.senderPn) ?? phoneDigits(key.remoteJidAlt);
+    if (phone) {
+      lidToPhone.set(jid, phone);
+      return phone;
+    }
+    return lidToPhone.get(jid) ?? null;
+  }
+  return null;
+}
+
+/** Chat id from whatsapp-cloud (group jid, "<digits>@c.us" or digits) to a WhatsApp jid. */
+function toJid(chatId: string) {
+  if (isJidGroup(chatId)) return chatId;
+  if (!DIRECT_CHATS) throw httpError(400, "Only group chats are sent through this service.");
+  const digits = chatId.split("@")[0]!.replace(/\D/g, "");
+  if (digits.length < 8) throw httpError(400, "Invalid WhatsApp number.");
+  return `${digits}@s.whatsapp.net`;
+}
+
+function pushDirectMessage(msg: WAMessage, history: boolean) {
+  const phone = directPhone(msg);
+  if (!phone) {
+    LOG(`Skipped a 1:1 message from ${msg.key.remoteJid}: phone number not known yet.`);
+    return;
+  }
+  const converted = convertMessage(msg);
+  if (!converted) return;
+  const fromMe = Boolean(msg.key.fromMe);
+  enqueue({
+    kind: "message",
+    chatId: `${phone}@c.us`,
+    fromMe,
+    history,
+    contactName: fromMe ? null : msg.pushName?.trim() || null,
+    message: { ...converted.message, from: fromMe ? undefined : phone },
+  });
+  if (converted.hasMedia && (!converted.maxBytes || converted.maxBytes <= MAX_MEDIA_BYTES)) {
+    queueMediaDownload(msg);
+  }
+}
+
 function pushMessage(msg: WAMessage, history: boolean) {
   const chatId = msg.key.remoteJid;
-  if (!chatId || !isJidGroup(chatId) || !msg.key.id) return;
+  if (!chatId || !msg.key.id) return;
   if (sentByApi.has(msg.key.id)) return;
+  if (!isJidGroup(chatId)) {
+    if (DIRECT_CHATS && isDirectJid(chatId)) pushDirectMessage(msg, history);
+    return;
+  }
   const converted = convertMessage(msg);
   if (!converted) return;
 
@@ -219,7 +288,8 @@ async function connect() {
 
   current.ev.on("messages.update", (updates) => {
     for (const { key, update } of updates) {
-      if (!key.id || !key.remoteJid || !isJidGroup(key.remoteJid) || typeof update.status !== "number") continue;
+      if (!key.id || !key.remoteJid || typeof update.status !== "number") continue;
+      if (!isJidGroup(key.remoteJid) && !(DIRECT_CHATS && isDirectJid(key.remoteJid))) continue;
       enqueue({ kind: "status", id: key.id, ack: toAck(update.status) });
     }
   });
@@ -324,8 +394,7 @@ function contentFor(input: SendInput): { content: AnyMessageContent; type: strin
 }
 
 async function send(input: SendInput) {
-  const chatId = input.chatId ?? "";
-  if (!isJidGroup(chatId)) throw httpError(400, "Only group chats are sent through this service.");
+  const chatId = toJid(input.chatId ?? "");
   if (!sock || status !== "ready") throw httpError(503, "WhatsApp groups are not connected. Scan the QR on the groups service.");
   const current = sock;
   const { content, type } = contentFor(input);
@@ -355,8 +424,14 @@ async function send(input: SendInput) {
 
 async function markRead(input: { chatId?: string; messageId?: string; participant?: string | null }) {
   if (!sock || status !== "ready" || !input.chatId || !input.messageId) return;
+  const remoteJid = toJid(input.chatId);
   await sock.readMessages([
-    { remoteJid: input.chatId, id: input.messageId, participant: input.participant ?? undefined, fromMe: false },
+    {
+      remoteJid,
+      id: input.messageId,
+      participant: isJidGroup(remoteJid) ? input.participant ?? undefined : undefined,
+      fromMe: false,
+    },
   ]);
 }
 

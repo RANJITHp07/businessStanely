@@ -809,7 +809,7 @@ function WhatsAppDesktop() {
                                     type="button"
                                     onClick={() => setShowGroupsLink(true)}
                                     className={`rounded-full p-2 transition hover:bg-[var(--wa-hover)] ${groupsDown ? "text-amber-500" : "text-[var(--wa-muted2)] hover:text-white"}`}
-                                    title={groupsDown ? "WhatsApp groups not linked: scan the QR" : "WhatsApp groups link"}
+                                    title={groupsDown ? "Phone not linked: scan the QR" : "Linked phone (WhatsApp Web)"}
                                 >
                                     <Users className="h-5 w-5" />
                                 </button>
@@ -851,7 +851,7 @@ function WhatsAppDesktop() {
                                         onClick={() => setShowGroupsLink(true)}
                                         className="mt-1 block font-medium text-[#00a884] hover:underline"
                                     >
-                                        Link groups (scan QR)
+                                        Link phone (scan QR)
                                     </button>
                                 ) : null}
                         </div>

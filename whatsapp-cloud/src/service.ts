@@ -1558,10 +1558,12 @@ class CloudWhatsAppService {
     for (const entry of list) {
       let waId: string;
       try {
-        waId = toWaId(String(entry.phone ?? ""));
+        // "<lid>@lid" for contacts whose number WhatsApp hides.
+        waId = toChatKey(String(entry.phone ?? ""));
       } catch {
         continue;
       }
+      if (isGroupKey(waId)) continue;
       const name = String(entry.name ?? "").trim();
       if (!name) continue;
       const saved = await contacts.updateOne(

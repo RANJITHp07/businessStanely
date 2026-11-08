@@ -169,11 +169,14 @@ function pushContacts(contacts: Array<Partial<Contact>>) {
   const list: Array<{ phone: string; name: string }> = [];
   for (const contact of contacts) {
     const id = contact.id ?? "";
-    rememberLid(contact.lid ?? (id.endsWith("@lid") ? id : null), contact.jid ?? (id.endsWith("@s.whatsapp.net") ? id : null));
-    const phone =
-      phoneDigits(contact.jid) ?? phoneDigits(id) ?? (id.endsWith("@lid") ? lidToPhone.get(id) ?? null : null);
+    const lidJid = contact.lid ?? (id.endsWith("@lid") ? id : null);
+    rememberLid(lidJid, contact.jid ?? (id.endsWith("@s.whatsapp.net") ? id : null));
+    const phone = phoneDigits(contact.jid) ?? phoneDigits(id) ?? (lidJid ? lidToPhone.get(lidJid) ?? null : null);
     const name = (contact.name || contact.notify || contact.verifiedName || "").trim();
-    if (phone && name) list.push({ phone, name });
+    if (!name) continue;
+    // Hidden-number contacts are kept under their hidden id, like their chats.
+    if (phone) list.push({ phone, name });
+    else if (lidJid) list.push({ phone: `${lidJid.split("@")[0]!.split(":")[0]}@lid`, name });
   }
   for (let i = 0; i < list.length; i += 500) {
     enqueue({ kind: "contacts", contacts: list.slice(i, i + 500) });

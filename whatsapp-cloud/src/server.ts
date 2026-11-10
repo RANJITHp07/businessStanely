@@ -190,6 +190,7 @@ app.post("/webhook", (req, res) => {
 type GroupIngestEvent =
   | ({ kind: "message" } & Parameters<typeof whatsappService.ingestGroupMessage>[0])
   | ({ kind: "status" } & Parameters<typeof whatsappService.ingestGroupStatus>[0])
+  | ({ kind: "revoke" } & Parameters<typeof whatsappService.ingestGroupRevoke>[0])
   | ({ kind: "media" } & Parameters<typeof whatsappService.ingestGroupMedia>[0])
   | { kind: "chats"; groups: Parameters<typeof whatsappService.ingestGroupChats>[0] }
   | { kind: "contacts"; contacts: Parameters<typeof whatsappService.ingestContacts>[0] }
@@ -249,6 +250,9 @@ app.post("/groups/ingest", auth, async (req, res) => {
           break;
         case "status":
           await whatsappService.ingestGroupStatus(event);
+          break;
+        case "revoke":
+          await whatsappService.ingestGroupRevoke(event);
           break;
         case "media":
           await whatsappService.ingestGroupMedia(event);
@@ -363,7 +367,7 @@ app.patch("/messages", auth, async (req, res) => {
 
 app.delete("/messages", auth, async (req, res) => {
   try {
-    await whatsappService.deleteMessage(String(req.body?.messageId ?? ""));
+    res.json(await whatsappService.deleteMessage(String(req.body?.messageId ?? "")));
   } catch (error) {
     sendError(res, error, "Failed to delete message.");
   }

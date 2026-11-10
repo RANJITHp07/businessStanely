@@ -13,6 +13,7 @@ import makeWASocket, {
   makeCacheableSignalKeyStore,
   proto,
   useMultiFileAuthState,
+  WAMessageStubType,
   type AnyMessageContent,
   type Chat,
   type Contact,
@@ -474,9 +475,24 @@ async function connect() {
 
   current.ev.on("messages.update", (updates) => {
     for (const { key, update } of updates) {
-      if (!key.id || !key.remoteJid || typeof update.status !== "number") continue;
+      if (!key.id || !key.remoteJid) continue;
       if (!isJidGroup(key.remoteJid) && !(DIRECT_CHATS && isDirectJid(key.remoteJid))) continue;
-      enqueue({ kind: "status", id: key.id, ack: toAck(update.status) });
+      // "Delete for everyone", from the phone or by the other person.
+      if (update.messageStubType === WAMessageStubType.REVOKE) {
+        enqueue({ kind: "revoke", id: key.id, forEveryone: true });
+        continue;
+      }
+      if (typeof update.status === "number") enqueue({ kind: "status", id: key.id, ack: toAck(update.status) });
+    }
+  });
+
+  // "Delete for me" on the phone (synced through app state).
+  current.ev.on("messages.delete", (item) => {
+    if (!("keys" in item)) return;
+    for (const key of item.keys) {
+      if (!key.id || !key.remoteJid) continue;
+      if (!isJidGroup(key.remoteJid) && !(DIRECT_CHATS && isDirectJid(key.remoteJid))) continue;
+      enqueue({ kind: "revoke", id: key.id, forEveryone: false });
     }
   });
 
@@ -674,6 +690,15 @@ async function send(input: SendInput) {
     await current.sendMessage(chatId, { text: input.body.trim() });
   }
   return { id: sent.key.id, timestamp: messageTimestampSeconds(sent) * 1000, type };
+}
+
+// "Delete for everyone" of one of our own messages, asked for from the panel.
+async function deleteForEveryone(input: { chatId?: string; messageId?: string }) {
+  if (!input.messageId) throw httpError(400, "messageId is required.");
+  const chatId = toJid(input.chatId ?? "");
+  if (!sock || status !== "ready") throw httpError(503, "WhatsApp is not connected. Link the phone again.");
+  await sock.sendMessage(chatId, { delete: { remoteJid: chatId, id: input.messageId, fromMe: true } });
+  recentMessages.delete(input.messageId);
 }
 
 async function markRead(input: { chatId?: string; messageId?: string; participant?: string | null }) {
@@ -893,6 +918,10 @@ const server = http.createServer(async (req, res) => {
       return;
     }
     if (req.method === "POST" && url.pathname === "/send") return json(res, 200, await send(await readJson(req)));
+    if (req.method === "POST" && url.pathname === "/delete") {
+      await deleteForEveryone(await readJson(req));
+      return json(res, 200, { ok: true });
+    }
     if (req.method === "POST" && url.pathname === "/read") {
       await markRead(await readJson(req));
       return json(res, 200, { ok: true });

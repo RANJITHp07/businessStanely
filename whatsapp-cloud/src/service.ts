@@ -202,6 +202,10 @@ function sendTypeForMimetype(mimetype: string) {
   return "document";
 }
 
+const DELETED_BODY = "🚫 This message was deleted";
+// WhatsApp allows "delete for everyone" for about 2 days after sending.
+const DELETE_WINDOW_MS = 48 * 60 * 60 * 1000;
+
 function mediaPreview(type: string, body: string, filename?: string | null) {
   if (body) return body;
   switch (type) {
@@ -383,7 +387,7 @@ class CloudWhatsAppService {
           wid: linked?.linkedAs ? `+${linked.linkedAs.split(":")[0]!.split("@")[0]}` : null,
           platform: "cloud-api",
         },
-        capabilities: { editMessages: false, deleteMessages: false, ...meta.capabilities, logout: true, templates: false },
+        capabilities: { editMessages: false, ...meta.capabilities, deleteMessages: true, logout: true, templates: false },
         channels: { meta: { status: "disconnected", error: "Not used: chats go through the linked phone." }, groups: linked },
       };
     }
@@ -392,13 +396,20 @@ class CloudWhatsAppService {
         groupsBridgeEnabled && !groupsReady
           ? `Group chats are not working (${channels.groups?.status}). ${channels.groups?.error ?? "Link the groups device again."}`
           : null;
-      return { ...meta, error: meta.error ?? groupsProblem, channels };
+      return {
+        ...meta,
+        error: meta.error ?? groupsProblem,
+        channels,
+        // Group messages can be deleted through the linked phone.
+        capabilities: { editMessages: false, templates: true, logout: false, ...meta.capabilities, deleteMessages: groupsBridgeEnabled },
+      };
     }
     if (groupsReady) {
       return {
         ...meta,
         status: "ready",
         error: `1:1 chats (Meta Cloud API) are not working: ${meta.error ?? meta.status}`,
+        capabilities: { editMessages: false, templates: true, logout: false, ...meta.capabilities, deleteMessages: true },
         clientInfo: {
           pushname: meta.clientInfo.pushname ?? "WhatsApp groups",
           wid: meta.clientInfo.wid ?? channels.groups?.linkedAs ?? "groups",
@@ -1815,6 +1826,34 @@ class CloudWhatsAppService {
     }
   }
 
+  // A message deleted on the phone (or by the other person). "For everyone"
+  // keeps a placeholder like WhatsApp does; "for me" removes it.
+  async ingestGroupRevoke(input: { id: string; forEveryone?: boolean }) {
+    if (!input.id) return;
+    const { chats, messages } = await getCollections();
+    const doc = await messages.findOne({ _id: input.id }, { projection: { chatId: 1 } });
+    if (!doc) return;
+    if (input.forEveryone) {
+      await messages.updateOne(
+        { _id: input.id },
+        { $set: { body: DELETED_BODY, type: "chat", media: null, mentions: null, quotedMessageId: null, quotedMessageBody: null, quotedMessageAuthor: null } },
+      );
+      await messages.updateMany({ quotedMessageId: input.id }, { $set: { quotedMessageBody: DELETED_BODY } });
+    } else {
+      await messages.deleteOne({ _id: input.id });
+    }
+    // The chat list preview follows the newest message left in the chat.
+    const latest = await messages.find({ chatId: doc.chatId }).sort({ timestamp: -1 }).limit(1).next();
+    await chats.updateOne(
+      { _id: doc.chatId },
+      { $set: { lastMessage: latest ? mediaPreview(latest.type, latest.body, latest.media?.filename) : "" } },
+    );
+    this.bumpMessages(doc.chatId);
+    this.bumpChats();
+    publishWhatsAppEvent("messages-updated", { chatId: toChatId(doc.chatId) });
+    publishWhatsAppEvent("chats-updated", { chatId: toChatId(doc.chatId) });
+  }
+
   async ingestGroupMedia(input: { id: string; data: string; mimetype: string }) {
     if (!input.id || !input.data) return;
     await this.saveMediaFile(input.id, Buffer.from(input.data, "base64"), input.mimetype || "application/octet-stream");
@@ -1955,8 +1994,23 @@ class CloudWhatsAppService {
     throw new CloudApiError("The WhatsApp Cloud API cannot edit sent messages. Edit it from the phone.", 422);
   }
 
-  async deleteMessage(_messageId: string, _everyone = true): Promise<Record<string, unknown>> {
-    throw new CloudApiError("The WhatsApp Cloud API cannot delete sent messages. Delete it from the phone.", 422);
+  // "Delete for everyone" from the panel, through the linked phone (Baileys).
+  // Only chats that go through the linked device; Meta cannot delete.
+  async deleteMessage(messageId: string, _everyone = true): Promise<Record<string, unknown>> {
+    if (!messageId) throw new CloudApiError("messageId is required.", 400);
+    const { messages } = await getCollections();
+    const doc = await messages.findOne({ _id: messageId });
+    if (!doc) throw new CloudApiError("Message not found.", 404);
+    if (!groupsBridgeEnabled || (!isGroupKey(doc.chatId) && !webDirectEnabled)) {
+      throw new CloudApiError("The WhatsApp Cloud API cannot delete sent messages. Delete it from the phone.", 422);
+    }
+    if (!doc.fromMe) throw new CloudApiError("Only your own messages can be deleted.", 422);
+    if (Date.now() - doc.timestamp > DELETE_WINDOW_MS) {
+      throw new CloudApiError("WhatsApp only allows deleting for everyone within 2 days of sending.", 422);
+    }
+    await groupsRequest("/delete", { chatId: doc.chatId, messageId: doc._id, fromMe: true });
+    await this.ingestGroupRevoke({ id: doc._id, forEveryone: true });
+    return { ok: true };
   }
 
   // ---- Avatars (Cloud API exposes only the business's own picture) ----

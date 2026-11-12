@@ -415,6 +415,8 @@ export function useWhatsAppDesktop() {
     let source: EventSource | null = null;
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
     let backoffMs = 1000;
+    // True after the first stream connection; a later open is a reconnect.
+    let hasConnectedBefore = false;
     let chatsRefreshTimer: ReturnType<typeof setTimeout> | null = null;
     let chatsRefreshInFlight = false;
     let chatsRefreshQueued = false;
@@ -478,6 +480,19 @@ export function useWhatsAppDesktop() {
 
       source.onopen = () => {
         backoffMs = 1000;
+        // Events sent while the stream was down are lost, so after a
+        // reconnect re-read the chat list (a chat that got a message moves to
+        // the top) and the open chat's messages.
+        if (hasConnectedBefore && stateRef.current.status === "ready") {
+          triggerChatsRefresh();
+          const openChatId = selectedChatIdRef.current;
+          if (openChatId) {
+            loadMessages(openChatId, messageLimitRef.current).catch(() => {
+              // Stale messages are better than a crash; the next event retries.
+            });
+          }
+        }
+        hasConnectedBefore = true;
       };
 
       source.onerror = () => {

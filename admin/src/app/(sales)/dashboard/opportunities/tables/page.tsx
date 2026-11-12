@@ -243,7 +243,7 @@ export function ProspectsTable({ label, prospects, statusFilter, assignedId }: {
                     {prospects.length > 0 && (
                         <div className="border-t border-slate-100 p-4 bg-slate-50/30">
                             <a
-                                href={`/dashboard/opportunities/table?status=${statusFilter}${assignedId ? `&assignedId=${assignedId}` : ""}`}
+                                href={`/dashboard/opportunities/table?status=${encodeURIComponent(statusFilter)}${assignedId ? `&assignedId=${assignedId}` : ""}`}
                                 className="flex items-center justify-center gap-2 text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors"
                             >
                                 View All {label}

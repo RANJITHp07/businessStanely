@@ -11,6 +11,18 @@ import {
 } from "@/lib/audit";
 import { withActor } from "@/lib/auditContext";
 
+const isClosedStatus = (status?: string | null) =>
+  status === "Closed as Won" || status === "Closed as Loss";
+
+/** closedAt for a status change: stamped on entering a closed status, cleared on reopening. */
+const closedAtFor = (
+  nextStatus: string | undefined,
+  previousStatus: string | null | undefined,
+) => {
+  if (!nextStatus || nextStatus === previousStatus) return undefined;
+  return isClosedStatus(nextStatus) ? new Date() : null;
+};
+
 // GET: Get a single opportunity by ID
 export async function GET(
   req: NextRequest,
@@ -104,6 +116,7 @@ export async function PUT(
       amount,
       nextFollowUp: nextFollowUp ? new Date(nextFollowUp) : undefined,
       status,
+      closedAt: closedAtFor(status, before.status),
     };
 
     const opportunity = await withActor(actor, () =>

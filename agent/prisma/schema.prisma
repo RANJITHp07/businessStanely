@@ -50,6 +50,9 @@ model Opportunity {
   status        String   @default("Proposal Issued") // "Proposal Issued", "Closed as Won", "Closed as Loss"
   prospectId    String   @db.ObjectId
   prospect      Prospect @relation("ProspectOpportunities", fields: [prospectId], references: [id])
+  /// When the status last became "Closed as Won" or "Closed as Loss"; null
+  /// while open. Rows closed before this field existed fall back to updatedAt.
+  closedAt     DateTime?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   comments      Comment[] // Comments/interactions for this opportunity

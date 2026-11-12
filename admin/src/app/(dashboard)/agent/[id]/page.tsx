@@ -2270,13 +2270,13 @@ export default function AgentDetails() {
                   <ProspectsTable
                     label="Closed as Won Prospects"
                     prospects={agentOpportunities.filter((prospect) => prospect.status == "Closed as Won").slice(0, 5)}
-                    statusFilter="Closed as Won Prospects"
+                    statusFilter="Closed as Won"
                     assignedId={id}
                   />
                   <ProspectsTable
                     label="Closed as Loss Prospects"
                     prospects={agentOpportunities.filter((prospect) => prospect.status == "Closed as Loss").slice(0, 5)}
-                    statusFilter="Closed as Loss Prospects"
+                    statusFilter="Closed as Loss"
                     assignedId={id}
                   />
                 </div>

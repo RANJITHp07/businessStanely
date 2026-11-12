@@ -63,6 +63,8 @@ type OpportunityRow = {
     description?: string
     nextFollowUp?: string
     status: string
+    closedAt?: string | null
+    updatedAt?: string
     comments?: { authorId?: string; createdAt: string }[]
     prospect?: {
         id?: string
@@ -75,6 +77,19 @@ type OpportunityRow = {
 
 const statuses = ["Proposal Issued", "Closed as Won", "Closed as Loss", "New Opportunity"]
 const engagementStatuses = ["Follow Up", "Missed Out"]
+
+const isClosedStatus = (status: string) => status === "Closed as Won" || status === "Closed as Loss"
+
+/** Local YYYY-MM-DD of the day the opportunity was closed, or null if open. */
+const closedDay = (row: { status: string; closedAt?: string | null; updatedAt?: string }) => {
+    if (!isClosedStatus(row.status)) return null
+    // Rows closed before closedAt existed fall back to their last update.
+    const raw = row.closedAt || row.updatedAt
+    if (!raw) return null
+    const d = new Date(raw)
+    if (Number.isNaN(d.getTime())) return null
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+}
 
 export default function ProspectsTable() {
     const router = useRouter()
@@ -91,6 +106,9 @@ export default function ProspectsTable() {
     const [dateType, setDateType] = useState<string>("")
     const [startDate, setStartDate] = useState("")
     const [endDate, setEndDate] = useState("")
+    // Closed-date range (YYYY-MM-DD) for Closed as Won / Closed as Loss rows.
+    const [closedFrom, setClosedFrom] = useState("")
+    const [closedTo, setClosedTo] = useState("")
     const [assigneeFilter, setAssigneeFilter] = useState<string>("all")
     const [transferOpen, setTransferOpen] = useState(false)
     const [refreshKey, setRefreshKey] = useState(0)
@@ -187,14 +205,32 @@ export default function ProspectsTable() {
             assigneeFilter === "all" ||
             (assigneeFilter === "unassigned" ? !assignedAgentId : assignedAgentId === assigneeFilter);
 
-        return matchesSearch && matchesStatus && matchesEngagement && matchesAssignee;
+        // With a closed-date range set, only closed rows inside it are shown.
+        let matchesClosedDate = true
+        if (closedFrom || closedTo) {
+            const day = closedDay(prospect)
+            matchesClosedDate =
+                !!day && (!closedFrom || day >= closedFrom) && (!closedTo || day <= closedTo)
+        }
+
+        return matchesSearch && matchesStatus && matchesEngagement && matchesAssignee && matchesClosedDate;
     });
+
+    const resetFilters = () => {
+        setSearchTerm("")
+        setSelectedStatuses([])
+        setSelectedEngagementStatus([])
+        setAssigneeFilter("all")
+        setClosedFrom("")
+        setClosedTo("")
+        setCurrentPage(1)
+    }
 
     // A selection hidden by a new filter would still be transferred, so any
     // filter change starts the selection over.
     useEffect(() => {
         clearSelection()
-    }, [searchTerm, selectedStatuses, selectedEngagementStatus, assigneeFilter, clearSelection])
+    }, [searchTerm, selectedStatuses, selectedEngagementStatus, assigneeFilter, closedFrom, closedTo, clearSelection])
 
     const filteredIds = filteredProspects.map((p) => p.id)
     const selectedOpportunities = filteredProspects.filter((p) => selected.has(p.id))
@@ -430,94 +466,42 @@ export default function ProspectsTable() {
                                     </div> */}
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                    {/* Start Date */}
-                                    {/* <div className="space-y-2">
-                                        <Label className="text-sm font-medium">Start Date</Label>
-                                        <Popover>
-                                            <PopoverTrigger asChild>
-                                                <Button
-                                                    variant="outline"
-                                                    className={cn(
-                                                        "w-full justify-start text-left font-normal",
-                                                        !startDate && "text-muted-foreground"
-                                                    )}
-                                                >
-                                                    <CalendarIcon className="mr-2 h-4 w-4" />
-                                                    {startDate
-                                                        ? new Date(startDate).toLocaleDateString("en-GB", {
-                                                            day: "2-digit",
-                                                            month: "2-digit",
-                                                            year: "numeric",
-                                                        })
-                                                        : "Pick a date"}
-                                                </Button>
-                                            </PopoverTrigger>
-                                            <PopoverContent className="w-auto p-0" align="start">
-                                                <CalendarComponent
-                                                    mode="single"
-                                                    selected={startDate ? new Date(startDate) : undefined}
-                                                    onSelect={(date: Date) => {
-                                                        setStartDate(date.toISOString().split("T")[0]);
-                                                        setCurrentPage(1);
-                                                    }}
-                                                    disabled={(date: Date) => {
-                                                        const today = new Date();
-                                                        today.setHours(0, 0, 0, 0);
-                                                        return date < today;
-                                                    }}
-                                                    required={false}
-                                                />
-                                            </PopoverContent>
-                                        </Popover>
-                                    </div> */}
-
-                                    {/* End Date */}
-                                    {/* <div className="space-y-2">
-                                        <Label className="text-sm font-medium">End Date</Label>
-                                        <Popover>
-                                            <PopoverTrigger asChild>
-                                                <Button
-                                                    variant="outline"
-                                                    className={cn(
-                                                        "w-full justify-start text-left font-normal",
-                                                        !endDate && "text-muted-foreground"
-                                                    )}
-                                                >
-                                                    <CalendarIcon className="mr-2 h-4 w-4" />
-                                                    {endDate
-                                                        ? new Date(endDate).toLocaleDateString("en-GB", {
-                                                            day: "2-digit",
-                                                            month: "2-digit",
-                                                            year: "numeric",
-                                                        })
-                                                        : "Pick a date"}
-                                                </Button>
-                                            </PopoverTrigger>
-                                            <PopoverContent className="w-auto p-0" align="start">
-                                                <CalendarComponent
-                                                    mode="single"
-                                                    selected={endDate ? new Date(endDate) : undefined}
-                                                    onSelect={(date: Date) => {
-                                                        setEndDate(date.toISOString().split("T")[0]);
-                                                        setCurrentPage(1);
-                                                    }}
-                                                    disabled={(date: Date) => {
-                                                        if (!startDate) return false; // no startDate selected yet
-                                                        const start = new Date(startDate);
-                                                        start.setHours(0, 0, 0, 0); // reset to midnight
-                                                        return date < start; // disable all before startDate
-                                                    }} required={false}
-                                                />
-                                            </PopoverContent>
-                                        </Popover>
-                                    </div> */}
+                                    {/* Closed date range (Closed as Won / Closed as Loss) */}
+                                    <div className="space-y-2">
+                                        <Label htmlFor="closed-from" className="text-sm font-medium">Closed From</Label>
+                                        <Input
+                                            id="closed-from"
+                                            type="date"
+                                            className="bg-white"
+                                            value={closedFrom}
+                                            max={closedTo || undefined}
+                                            onChange={(e) => {
+                                                setClosedFrom(e.target.value)
+                                                setCurrentPage(1)
+                                            }}
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="closed-to" className="text-sm font-medium">Closed To</Label>
+                                        <Input
+                                            id="closed-to"
+                                            type="date"
+                                            className="bg-white"
+                                            value={closedTo}
+                                            min={closedFrom || undefined}
+                                            onChange={(e) => {
+                                                setClosedTo(e.target.value)
+                                                setCurrentPage(1)
+                                            }}
+                                        />
+                                    </div>
 
                                     {/* Reset Filters */}
                                     <div className="flex items-end">
                                         <Button
                                             variant="outline"
                                             className="w-full gap-2 bg-white hover:bg-slate-50"
-                                        // onClick={resetFilters}
+                                            onClick={resetFilters}
                                         >
                                             <X className="h-4 w-4" />
                                             Reset Filters
@@ -583,13 +567,14 @@ export default function ProspectsTable() {
                                             <TableHead>Assigned To</TableHead>
                                             <TableHead>Created By</TableHead>
                                             <TableHead>Status</TableHead>
+                                            <TableHead>Closed On</TableHead>
                                             <TableHead className="text-right">Actions</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
                                         {currentProspects.length === 0 ? (
                                             <TableRow>
-                                                <TableCell colSpan={8} className="text-center py-8">
+                                                <TableCell colSpan={9} className="text-center py-8">
                                                     No prospects found
                                                 </TableCell>
                                             </TableRow>
@@ -638,6 +623,14 @@ export default function ProspectsTable() {
                                                         >
                                                             {prospect.status}
                                                         </Badge>
+                                                    </TableCell>
+                                                    <TableCell onClick={() => router.push(`/dashboard/opportunities/${prospect.id}`)}>
+                                                        {(() => {
+                                                            const day = closedDay(prospect)
+                                                            return day
+                                                                ? new Date(`${day}T00:00:00`).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
+                                                                : "—"
+                                                        })()}
                                                     </TableCell>
                                                     <TableCell className="text-right">
                                                         <DropdownMenu>

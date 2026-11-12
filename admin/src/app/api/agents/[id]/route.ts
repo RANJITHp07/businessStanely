@@ -131,6 +131,18 @@ export async function PUT(
       subordinates,
       advisorSubordinates,
       photo,
+      // Login secrets change only through /api/agents/[id]/credentials, which
+      // hashes the password; never write them raw from the edit form.
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      password: _password,
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      resetOtp: _resetOtp,
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      otpExpiry: _otpExpiry,
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      isOtpVerified: _isOtpVerified,
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      currentSessionToken: _currentSessionToken,
       ...agentData
     } = body;
 

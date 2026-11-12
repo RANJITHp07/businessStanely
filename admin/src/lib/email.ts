@@ -471,3 +471,113 @@ export async function sendAgentInviteEmail({
     };
   }
 }
+
+interface SendAgentCredentialsUpdatedEmailProps {
+  to: string;
+  userName: string;
+  /** Present only when an admin set a new password. */
+  password?: string;
+  /** Present only when the login email changed. */
+  previousEmail?: string;
+}
+
+/**
+ * Tells an agent that an admin changed their login email and/or password.
+ * Sent to the (new) login email so the agent learns the address they must
+ * now sign in with.
+ */
+export async function sendAgentCredentialsUpdatedEmail({
+  to,
+  userName,
+  password,
+  previousEmail,
+}: SendAgentCredentialsUpdatedEmailProps) {
+  try {
+    const transporter = createTransporter();
+    const agentLoginUrl = getPortalLoginUrl(
+      process.env.AGENT_PORTAL_URL,
+      process.env.NEXTAUTH_URL,
+      "https://agent.legalstanley.com",
+    );
+
+    const changes = [
+      previousEmail ? "login email" : null,
+      password ? "password" : null,
+    ]
+      .filter(Boolean)
+      .join(" and ");
+
+    const mailOptions = {
+      from: `"${process.env.COMPANY_NAME || "LegalStanley"}" <${
+        process.env.EMAIL_USER
+      }>`,
+      to,
+      subject: "LegalStanley - Your agent login details were updated",
+      html: `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <title>Login details updated</title>
+        </head>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+            <h1 style="color: white; margin: 0; font-size: 26px;">Login details updated</h1>
+          </div>
+
+          <div style="background: #f8f9fa; padding: 30px; border-radius: 0 0 10px 10px; border: 1px solid #e9ecef;">
+            <p style="font-size: 16px; margin-bottom: 20px;">Hello ${userName},</p>
+
+            <p style="font-size: 16px; margin-bottom: 20px;">
+              An administrator has changed the ${changes} for your LegalStanley agent account. Please use the details below to log in:
+            </p>
+
+            <div style="background: #ffffff; padding: 20px; border-radius: 5px; border: 1px solid #dee2e6; margin-bottom: 20px;">
+              <p style="margin: 5px 0;"><strong>Email:</strong> ${to}</p>
+              ${password ? `<p style="margin: 5px 0;"><strong>Password:</strong> ${password}</p>` : ""}
+              ${previousEmail ? `<p style="margin: 5px 0; color: #6c757d;">Your previous login email (${previousEmail}) no longer works.</p>` : ""}
+            </div>
+
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${agentLoginUrl}" style="background: #4c51bf; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; font-weight: bold;">
+                Login to Agent Portal
+              </a>
+            </div>
+
+            <p style="font-size: 14px; color: #6c757d; margin-top: 30px;">
+              You have been signed out of any open sessions.${password ? " For security, please change your password after logging in." : ""} If you did not expect this change, contact your administrator.
+            </p>
+          </div>
+
+          <div style="text-align: center; padding: 20px; color: #6c757d; font-size: 12px;">
+            <p style="margin: 0;">© ${new Date().getFullYear()} LegalStanley. All rights reserved.</p>
+          </div>
+        </body>
+        </html>
+      `,
+      text: `
+        Hello ${userName},
+
+        An administrator has changed the ${changes} for your LegalStanley agent account.
+
+        Email: ${to}${password ? `\n        Password: ${password}` : ""}${previousEmail ? `\n        Your previous login email (${previousEmail}) no longer works.` : ""}
+
+        Login now: ${agentLoginUrl}
+
+        You have been signed out of any open sessions.${password ? " For security, please change your password after logging in." : ""} If you did not expect this change, contact your administrator.
+
+        © ${new Date().getFullYear()} LegalStanley. All rights reserved.
+      `,
+    };
+
+    const result = await transporter.sendMail(mailOptions);
+    return { success: true, messageId: result.messageId };
+  } catch (error) {
+    console.error("Error sending agent credentials email:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Unknown error",
+    };
+  }
+}

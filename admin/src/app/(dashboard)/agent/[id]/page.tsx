@@ -74,6 +74,7 @@ import {
   UserCheck,
   CalendarDays,
   ArrowRight,
+  KeyRound,
 } from "lucide-react";
 import { Agent, Client, Task } from "@/types";
 import Link from "next/link";
@@ -82,6 +83,7 @@ import { fetchWithAuth } from "@/lib/fetchWithAuth";
 import { hasAdvisorRole, hasExecutionRole } from "@/lib/agentRole";
 import { cn } from "@/lib/utils";
 import RestoreAgentDialog from "@/app/(dashboard)/agent/_component/restoreAgentDialog";
+import AgentCredentialsDialog from "@/app/(dashboard)/agent/_component/agentCredentialsDialog";
 
 // These live in dashboard pages that also pull in recharts, so they load only
 // when a Leads or Opportunity tab opens.
@@ -374,6 +376,7 @@ export default function AgentDetails() {
     at: string;
   } | null>(null);
   const [restoreDialogOpen, setRestoreDialogOpen] = useState(false);
+  const [credentialsDialogOpen, setCredentialsDialogOpen] = useState(false);
   // The agent's standard tasks: the newest three of each section plus totals.
   const [agentTaskSections, setAgentTaskSections] = useState<Record<string, Task[]>>({});
   const [standardSectionCounts, setStandardSectionCounts] = useState<SectionCounts>(EMPTY_SECTION_COUNTS);
@@ -1172,6 +1175,14 @@ export default function AgentDetails() {
                 <FileText className="h-4 w-4 mr-2" />
                 Open Diary
               </Button>
+              <Button
+                variant="outline"
+                className="mt-5 md:mt-0 cursor-pointer"
+                onClick={() => setCredentialsDialogOpen(true)}
+              >
+                <KeyRound className="h-4 w-4 mr-2" />
+                Login Details
+              </Button>
               <Link href={`/agent/${agent?.id}/edit`}>
                 <Button className="mt-[20px] md:mt-0 w-fit bg-[#003459] hover:bg-[#003459] text-white rounded-lg px-4 py-2 flex items-center gap-2 cursor-pointer shadow-none hover:shadow-md transition-shadow duration-300">
                   <Edit className="h-4 w-4" />
@@ -1208,6 +1219,15 @@ export default function AgentDetails() {
             </Button>
           </div>
         )}
+
+        <AgentCredentialsDialog
+          agent={agent}
+          open={credentialsDialogOpen}
+          onOpenChange={setCredentialsDialogOpen}
+          onUpdated={(email) =>
+            setAgent((prev) => (prev ? { ...prev, email } : prev))
+          }
+        />
 
         <RestoreAgentDialog
           agent={agent}

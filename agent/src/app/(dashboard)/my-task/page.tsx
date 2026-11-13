@@ -31,11 +31,13 @@ import {
 } from "@/components/ui/tooltip";
 import { Progress } from "@/components/ui/progress";
 import Link from "next/link";
+import { taskSection } from "@/lib/taskFollowUp";
 import {
   DailyTrackCell,
   DailyTrackDueNotice,
   needsDailyTrack,
   useDailyTrack,
+  type DailyTrackTaskPatch,
 } from "@/components/DailyTrackCell";
 
 function formatDate(dateString?: string) {
@@ -156,7 +158,7 @@ export function StatCard({
   );
 }
 
-export function SectionTable({ label, tasks, retainershipTasks, trigger, triggerScope, assignedByMe }: { label: string; tasks: Task[], retainershipTasks?: boolean, trigger?: boolean, triggerScope?: string, assignedByMe?: boolean }) {
+export function SectionTable({ label, tasks, retainershipTasks, trigger, triggerScope, assignedByMe, onTaskChanged }: { label: string; tasks: Task[], retainershipTasks?: boolean, trigger?: boolean, triggerScope?: string, assignedByMe?: boolean, onTaskChanged?: (taskId: string, patch: DailyTrackTaskPatch) => void }) {
   const labelColor = (() => {
     const l = label.toLowerCase();
     if (l.includes("progress")) return "text-sky-600";
@@ -307,6 +309,7 @@ export function SectionTable({ label, tasks, retainershipTasks, trigger, trigger
                                     taskId={t.id}
                                     entry={dailyTrack[t.id]}
                                     onSaved={setDailyTrack}
+                                    onTaskChanged={onTaskChanged}
                                   />
                                 ) : null}
                               </TableCell>
@@ -494,6 +497,7 @@ export function SectionTable({ label, tasks, retainershipTasks, trigger, trigger
                               taskId={t.id}
                               entry={dailyTrack[t.id]}
                               onSaved={setDailyTrack}
+                              onTaskChanged={onTaskChanged}
                             />
                           ) : null}
                           <div className="flex flex-col flex-1 min-w-0">
@@ -726,6 +730,23 @@ export default function MyTasksPage() {
 
   const pct = (n: number) => (total ? Math.round((n / total) * 100) : 0);
 
+  // A follow-up's day track restarts its wait, so the row leaves In Progress
+  // for the Followups group straight away instead of on the next reload.
+  const moveToFollowUps = (taskId: string, patch: DailyTrackTaskPatch) => {
+    setSections((prev) => {
+      const inprogress = prev.inprogress ?? [];
+      const task = inprogress.find((t) => t.id === taskId);
+      if (!task) return prev;
+      const moved = { ...task, ...patch };
+      if (taskSection(moved) !== "followup") return prev;
+      return {
+        ...prev,
+        inprogress: inprogress.filter((t) => t.id !== taskId),
+        followup: [moved, ...(prev.followup ?? []).filter((t) => t.id !== taskId)],
+      };
+    });
+  };
+
   const tasksNew = sections.todo ?? [];
   const tasksInProgress = sections.inprogress ?? [];
   const tasksCompleted = sections.completed ?? [];
@@ -794,7 +815,7 @@ export default function MyTasksPage() {
       ) : (
         <div className="space-y-[40px]">
           <SectionTable label="New Task" tasks={tasksNew} />
-          <SectionTable label="In Progress" tasks={tasksInProgress} />
+          <SectionTable label="In Progress" tasks={tasksInProgress} onTaskChanged={moveToFollowUps} />
           <SectionTable label="Followups" tasks={sections.followup ?? []} />
           <SectionTable label="Hold" tasks={tasksHold} />
           {futureTasks.length > 0 && (

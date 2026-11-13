@@ -5,7 +5,7 @@ import { fetchWithAuth } from "@/lib/fetchWithAuth";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Loader2 } from "lucide-react";
-import type { DailyTrackEntry } from "@/components/DailyTrackCell";
+import type { DailyTrackEntry, DailyTrackTaskPatch } from "@/components/DailyTrackCell";
 
 /**
  * Today's day track note box on the task detail page. `todayNote` is the
@@ -19,7 +19,7 @@ export function DailyTrackForm({
 }: {
   taskId: string;
   todayNote?: string;
-  onSaved: (entry: DailyTrackEntry) => void;
+  onSaved: (entry: DailyTrackEntry, task?: DailyTrackTaskPatch) => void;
 }) {
   const [note, setNote] = useState(todayNote ?? "");
   const [saving, setSaving] = useState(false);
@@ -47,7 +47,7 @@ export function DailyTrackForm({
         setError(data.error || "Could not save the day track.");
         return;
       }
-      onSaved(data.entry);
+      onSaved(data.entry, data.task);
     } catch {
       setError("Could not save the day track.");
     } finally {

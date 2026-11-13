@@ -68,7 +68,12 @@ import {
   istDateKey,
   isDailyTrackContent,
 } from "@/lib/dailyTrack";
-import { DailyTrackDueNotice, needsDailyTrack, type DailyTrackEntry } from "@/components/DailyTrackCell";
+import {
+  DailyTrackDueNotice,
+  needsDailyTrack,
+  type DailyTrackEntry,
+  type DailyTrackTaskPatch,
+} from "@/components/DailyTrackCell";
 import { DailyTrackForm } from "@/components/DailyTrackForm";
 import { DailyTrackList } from "@/components/DailyTrackList";
 
@@ -438,9 +443,12 @@ export default function TaskDetails() {
       c.agent?.id === agent?.id &&
       istDateKey(new Date(c.createdAt)) === todayKey,
   );
-  const canAddDailyTrack = task ? needsDailyTrack(task, agent?.id) : false;
+  // Today's note stays editable after a follow-up's save has moved its due day on.
+  const canAddDailyTrack = task
+    ? needsDailyTrack(task, agent?.id) || !!todayDailyTrack
+    : false;
 
-  const handleDailyTrackSaved = (entry: DailyTrackEntry) => {
+  const handleDailyTrackSaved = (entry: DailyTrackEntry, patch?: DailyTrackTaskPatch) => {
     const content = `${DAILY_TRACK_PREFIX} ${entry.note}`;
     setTask((prev) => {
       if (!prev) return prev;
@@ -448,6 +456,7 @@ export default function TaskDetails() {
       if (comments.some((c) => c.id === entry.id)) {
         return {
           ...prev,
+          ...patch,
           comments: comments.map((c) =>
             c.id === entry.id ? { ...c, content, updatedAt: entry.updatedAt } : c,
           ),
@@ -461,7 +470,7 @@ export default function TaskDetails() {
         updatedAt: entry.updatedAt,
         agent: agent ? { id: agent.id, name: agent.name } : undefined,
       };
-      return { ...prev, comments: [created, ...comments] };
+      return { ...prev, ...patch, comments: [created, ...comments] };
     });
   };
 

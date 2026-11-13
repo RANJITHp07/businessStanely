@@ -3,8 +3,10 @@
 // (Task.followUpDuration), and its stored status stays In Progress. The Instance
 // only changes when someone changes it. Task.followUpUntil is the next day the
 // task is due: for that IST day it is listed under In Progress and needs a day
-// track. The next day it returns to the group until 48hr/1w later, whether or not
-// the note was written. Setting an Instance again restarts the cycle.
+// track. Saving the day track restarts the wait from that moment, so the task
+// returns to the group at once. If no note is written, the next day it returns
+// to the group anyway until 48hr/1w later. Setting an Instance again restarts
+// the cycle.
 //
 // Keep this file identical in `agent/src/lib` and `admin/src/lib`.
 
@@ -102,6 +104,19 @@ export function followUpTimer(
   if (!isFollowUpTask(next)) return {};
   if (isFollowUpTask(current) && next.followUpDuration === current.followUpDuration) return {};
   return { followUpUntil: new Date(now + FOLLOW_UP_WAIT_MS[next.followUpDuration || ""]) };
+}
+
+/**
+ * The new followUpUntil once a day track is saved on an Instance task: the wait
+ * starts over from now, so the task leaves In Progress and is due again 48hr/1w
+ * later. Empty for tasks outside the Instance.
+ */
+export function followUpRestart(
+  task: GroupableTask,
+  now = Date.now(),
+): { followUpUntil?: Date } {
+  if (!isFollowUpTask(task)) return {};
+  return { followUpUntil: new Date(now + FOLLOW_UP_WAIT_MS[task.followUpDuration || ""]) };
 }
 
 /** The section a task is listed under: "followup", or its status bucket. */

@@ -236,11 +236,13 @@ export default function TasksTable() {
     const matchesPriority =
       selectedPriorities.length === 0 ||
       selectedPriorities.map((p) => p.toLowerCase()).includes((task.priority || "").toLowerCase());
+    // "Followups" is a group, not a stored status: its tasks stay In Progress,
+    // so "In Progress" alone leaves them out, the same split the server makes.
+    const inGroup = isInFollowUpGroup(task);
     const matchesStatus =
       selectedStatuses.length === 0 ||
-      selectedStatuses.includes(task.status) ||
-      // "Followups" is a group, not a stored status: its tasks stay In Progress.
-      (selectedStatuses.includes(FOLLOW_UP_GROUP) && isInFollowUpGroup(task));
+      (selectedStatuses.includes(task.status) && !inGroup) ||
+      (selectedStatuses.includes(FOLLOW_UP_GROUP) && inGroup);
     const matchesFollowUp = selectedFollowUpDurations.length === 0 || (task.followUpDuration && selectedFollowUpDurations.includes(task.followUpDuration));
     const matchesStatusCheck = selectedStatusCheckDurations.length === 0 || (task.statusCheckDuration && selectedStatusCheckDurations.includes(task.statusCheckDuration));
 
@@ -903,6 +905,11 @@ export default function TasksTable() {
                                     taskId={task.id}
                                     entry={dailyTrack[task.id]}
                                     onSaved={setDailyTrack}
+                                    onTaskChanged={(taskId, patch) =>
+                                      setTasks((prev) =>
+                                        prev?.map((t) => (t.id === taskId ? { ...t, ...patch } : t)) ?? prev,
+                                      )
+                                    }
                                   />
                                 ) : null}
                               </TableCell>

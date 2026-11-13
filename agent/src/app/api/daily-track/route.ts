@@ -9,7 +9,7 @@ import {
   istDayRange,
   stripDailyTrackPrefix,
 } from "@/lib/dailyTrack";
-import { needsDayTrackOn } from "@/lib/taskFollowUp";
+import { followUpRestart, needsDayTrackOn } from "@/lib/taskFollowUp";
 
 /** Today's (IST) day track notes written by the signed-in agent, keyed by task. */
 export async function GET(req: NextRequest) {
@@ -57,7 +57,9 @@ export async function GET(req: NextRequest) {
 
 /**
  * Saves today's day track note on a task. One note per task per IST day: a
- * second save the same day rewrites that note instead of adding another.
+ * second save the same day rewrites that note instead of adding another. On a
+ * 48hr/1w follow-up the first save also restarts the wait (Task.followUpUntil),
+ * so the task moves from In Progress back to the Followups group at once.
  */
 export async function POST(req: NextRequest) {
   try {
@@ -78,7 +80,14 @@ export async function POST(req: NextRequest) {
 
     const task = await prisma.task.findUnique({
       where: { id: taskId },
-      select: { assignedToId: true, status: true, followUpDuration: true, followUpUntil: true, active: true },
+      select: {
+        assignedToId: true,
+        status: true,
+        followUpDuration: true,
+        followUpUntil: true,
+        active: true,
+        updatedAt: true,
+      },
     });
     if (!task) {
       return NextResponse.json({ error: "Task not found" }, { status: 404 });
@@ -95,13 +104,6 @@ export async function POST(req: NextRequest) {
         { status: 400 },
       );
     }
-    if (!needsDayTrackOn(task)) {
-      return NextResponse.json(
-        { error: "This follow-up task does not need a day track today" },
-        { status: 400 },
-      );
-    }
-
     const { start, end } = istDayRange(istDateKey())!;
     const content = `${DAILY_TRACK_PREFIX} ${note}`;
 
@@ -115,6 +117,15 @@ export async function POST(req: NextRequest) {
       },
       select: { id: true },
     });
+
+    // Today's note can always be rewritten: on a follow-up the first save has
+    // already moved the task back to the group, so it no longer "needs" one.
+    if (!existing && !needsDayTrackOn(task)) {
+      return NextResponse.json(
+        { error: "This follow-up task does not need a day track today" },
+        { status: 400 },
+      );
+    }
 
     const saved = existing
       ? await prisma.comment.update({
@@ -132,6 +143,19 @@ export async function POST(req: NextRequest) {
           select: { id: true, taskId: true, content: true, updatedAt: true },
         });
 
+    // First note of the day on a follow-up: start the 48hr/1w wait over, so
+    // the task returns to the Followups group now rather than tomorrow.
+    // updatedAt is kept: moving the cycle on is not an edit to the task.
+    let followUpUntil = task.followUpUntil;
+    const restart = existing ? {} : followUpRestart(task);
+    if (restart.followUpUntil) {
+      await prisma.task.update({
+        where: { id: taskId },
+        data: { followUpUntil: restart.followUpUntil, updatedAt: task.updatedAt },
+      });
+      followUpUntil = restart.followUpUntil;
+    }
+
     return NextResponse.json(
       {
         taskId,
@@ -140,6 +164,7 @@ export async function POST(req: NextRequest) {
           note: stripDailyTrackPrefix(saved.content),
           updatedAt: saved.updatedAt,
         },
+        task: { followUpUntil },
       },
       { status: existing ? 200 : 201 },
     );

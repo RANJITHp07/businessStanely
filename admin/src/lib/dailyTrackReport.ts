@@ -79,16 +79,13 @@ export async function buildDailyTrackReport(dateKey: string, agentId?: string) {
     orderBy: { updatedAt: "desc" },
   });
 
-  const liveTasks = tasks.filter(
-    (t) =>
-      t.assignedTo &&
-      t.assignedTo.status?.toLowerCase() !== "inactive" &&
-      needsDayTrackOn(t, dateKey),
+  const assignedTasks = tasks.filter(
+    (t) => t.assignedTo && t.assignedTo.status?.toLowerCase() !== "inactive",
   );
 
   const comments = await prisma.comment.findMany({
     where: {
-      taskId: { in: liveTasks.map((t) => t.id) },
+      taskId: { in: assignedTasks.map((t) => t.id) },
       content: { startsWith: DAILY_TRACK_MATCH },
       createdAt: { gte: range.start, lt: range.end },
     },
@@ -103,6 +100,12 @@ export async function buildDailyTrackReport(dateKey: string, agentId?: string) {
   // Only the assignee's own note counts; a superior commenting does not
   // discharge the agent's day track.
   const notes = new Map(comments.map((c) => [`${c.taskId}:${c.authorId}`, c]));
+
+  // A follow-up's day track restarts its wait, so after the note is saved the
+  // task no longer "needs" one that day; the note itself proves it was due.
+  const liveTasks = assignedTasks.filter(
+    (t) => needsDayTrackOn(t, dateKey) || notes.has(`${t.id}:${t.assignedTo!.id}`),
+  );
 
   const agents = new Map<string, DailyTrackAgent>();
   const rows: DailyTrackTask[] = liveTasks.map((t) => {

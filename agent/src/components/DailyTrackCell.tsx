@@ -24,6 +24,12 @@ export interface DailyTrackEntry {
 export type DailyTrackEntries = Record<string, DailyTrackEntry>;
 
 /**
+ * Task fields the save changed. A follow-up's first note of the day restarts
+ * its wait, so followUpUntil moves and the row belongs to the Followups group.
+ */
+export type DailyTrackTaskPatch = { followUpUntil?: string | null };
+
+/**
  * Today's day track notes for the signed-in agent. Pass `enabled: false` from
  * tables that never show the checkbox so they skip the request.
  */
@@ -96,15 +102,19 @@ export function DailyTrackDueNotice({
  * Checkbox at the start of an In Progress row. Clicking it opens a small note
  * box anchored to the cell, like a spreadsheet comment; saving ticks the box
  * for the rest of the day. Clicking a ticked box reopens today's note to edit.
+ * `onTaskChanged` receives the task fields the save moved, so the table can
+ * re-section a follow-up without a reload.
  */
 export function DailyTrackCell({
   taskId,
   entry,
   onSaved,
+  onTaskChanged,
 }: {
   taskId: string;
   entry?: DailyTrackEntry;
   onSaved: (taskId: string, entry: DailyTrackEntry) => void;
+  onTaskChanged?: (taskId: string, patch: DailyTrackTaskPatch) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [note, setNote] = useState("");
@@ -138,6 +148,7 @@ export function DailyTrackCell({
         return;
       }
       onSaved(taskId, data.entry);
+      if (data.task) onTaskChanged?.(taskId, data.task);
       setOpen(false);
     } catch {
       setError("Could not save the day track.");

@@ -34,6 +34,10 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 
 
+/** Opportunity amount in rupees, or a dash when none was entered. */
+const formatAmount = (amount?: number | null) =>
+    amount === null || amount === undefined ? "—" : `₹${Number(amount).toLocaleString("en-IN")}`
+
 function getStatusBadge(status: string) {
     const s = status.toLowerCase()
     if (s === "closed as won")
@@ -67,7 +71,10 @@ const formatDate = (dateString: string | undefined) => {
     })
 }
 
-export function ProspectsTable({ label, prospects, statusFilter, assignedId }: { label: string; prospects: any[]; statusFilter: string, assignedId?: string }) {
+export function ProspectsTable({ label, prospects: allProspects, statusFilter, assignedId }: { label: string; prospects: any[]; statusFilter: string, assignedId?: string }) {
+    // The full list comes in so the label can show the real total; the table lists the newest 5.
+    const total = allProspects.length
+    const prospects = allProspects.slice(0, 5)
 
     const router = useRouter()
 
@@ -96,7 +103,7 @@ export function ProspectsTable({ label, prospects, statusFilter, assignedId }: {
         <div className="flex items-center gap-4 min-w-0 ">
             {/* Rotated label column shown on lg+ */}
             <div
-                className={`w-[96px] h-auto hidden lg:flex items-center justify-center self-stretch flex-shrink-0 ${bgClass} rounded-xl py-6 px-2 shadow-sm border ${borderClass}`}
+                className={`w-[96px] h-auto hidden lg:flex flex-col items-center justify-center gap-3 self-stretch flex-shrink-0 ${bgClass} rounded-xl py-6 px-2 shadow-sm border ${borderClass}`}
             >
                 <span
                     className={`font-semibold text-sm tracking-wide whitespace-nowrap ${labelColor}`}
@@ -107,13 +114,14 @@ export function ProspectsTable({ label, prospects, statusFilter, assignedId }: {
                 >
                     {label}
                 </span>
+                <span className={`rounded-full bg-white px-2.5 py-0.5 text-xs font-bold ring-1 ring-slate-200 ${labelColor}`} title={`${total} in total`}>{total}</span>
             </div>
 
             {/* Table content */}
             <Card className="flex-1 border py-0 border-slate-200 bg-slate-50 rounded-xl shadow-sm overflow-hidden">
                 {/* Mobile: Show label on top */}
                 <div className={`lg:hidden ${bgClass} px-4 py-3 border-b ${borderClass}`}>
-                    <h3 className={`font-semibold text-sm ${labelColor}`}>{label}</h3>
+                    <h3 className={`flex items-center gap-2 font-semibold text-sm ${labelColor}`}>{label}<span className={`rounded-full bg-white px-2.5 py-0.5 text-xs font-bold ring-1 ring-slate-200 ${labelColor}`} title={`${total} in total`}>{total}</span></h3>
                 </div>
 
                 <CardContent className="p-0">
@@ -132,7 +140,7 @@ export function ProspectsTable({ label, prospects, statusFilter, assignedId }: {
                                                 Name
                                             </th>
                                             <th className="text-left py-3 px-4 text-xs font-semibold  uppercase tracking-wide">
-                                                Phone Number
+                                                Price
                                             </th>
                                             <th className="text-left py-3 px-4 text-xs font-semibold  uppercase tracking-wide">
                                                 Status
@@ -163,7 +171,7 @@ export function ProspectsTable({ label, prospects, statusFilter, assignedId }: {
                                                     </div>
                                                 </td>
                                                 <td className="py-3 px-4">
-                                                    <p className="text-sm text-slate-700">{prospect?.phoneNumber}</p>
+                                                    <p className="text-sm font-medium text-slate-700">{formatAmount(prospect?.amount)}</p>
                                                 </td>
                                                 <td className="py-3 px-4">{getStatusBadge(prospect.status)}</td>
                                                 <td className="py-3 px-4">
@@ -260,7 +268,7 @@ export function ProspectsTable({ label, prospects, statusFilter, assignedId }: {
 
 function SegregationTable({
     label,
-    leads,
+    leads: allLeads,
     statusFilter,
     dateLabel,
 }: {
@@ -269,6 +277,9 @@ function SegregationTable({
     statusFilter: string
     dateLabel: string
 }) {
+    // The full list comes in so the label can show the real total; the table lists the first 5.
+    const total = allLeads.length
+    const leads = allLeads.slice(0, 5)
     const router = useRouter()
     const labelColor = (() => {
         const l = label.toLowerCase()
@@ -297,7 +308,7 @@ function SegregationTable({
         <div className="flex items-center gap-4 min-w-0">
             {/* Rotated label column shown on lg+ */}
             <div
-                className={`w-[96px] h-auto hidden lg:flex items-center justify-center self-stretch flex-shrink-0 ${bgClass} rounded-xl py-6 px-2 shadow-sm border ${borderClass}`}
+                className={`w-[96px] h-auto hidden lg:flex flex-col items-center justify-center gap-3 self-stretch flex-shrink-0 ${bgClass} rounded-xl py-6 px-2 shadow-sm border ${borderClass}`}
             >
                 <span
                     className={`font-semibold text-sm tracking-wide whitespace-nowrap ${labelColor}`}
@@ -308,13 +319,14 @@ function SegregationTable({
                 >
                     {label}
                 </span>
+                <span className={`rounded-full bg-white px-2.5 py-0.5 text-xs font-bold ring-1 ring-slate-200 ${labelColor}`} title={`${total} in total`}>{total}</span>
             </div>
 
             {/* Table content */}
             <Card className="flex-1 py-0 border border-slate-200 bg-slate-50 rounded-xl shadow-sm overflow-hidden">
                 {/* Mobile: Show label on top */}
                 <div className={`lg:hidden ${bgClass} px-4 py-3 border-b ${borderClass}`}>
-                    <h3 className={`font-semibold text-sm ${labelColor}`}>{label}</h3>
+                    <h3 className={`flex items-center gap-2 font-semibold text-sm ${labelColor}`}>{label}<span className={`rounded-full bg-white px-2.5 py-0.5 text-xs font-bold ring-1 ring-slate-200 ${labelColor}`} title={`${total} in total`}>{total}</span></h3>
                 </div>
 
                 <CardContent className="p-0">
@@ -333,7 +345,7 @@ function SegregationTable({
                                                 Name
                                             </th>
                                             <th className="text-left py-3 px-4 text-xs font-semibold uppercase tracking-wide">
-                                                Phone Number
+                                                Price
                                             </th>
                                             <th className="text-left py-3 px-4 text-xs font-semibold uppercase tracking-wide">
                                                 Status
@@ -370,8 +382,8 @@ function SegregationTable({
                                                     </div>
                                                 </td>
                                                 <td className="py-3 px-4">
-                                                    <p className="text-sm text-slate-700">
-                                                        {lead.phoneNumber}
+                                                    <p className="text-sm font-medium text-slate-700">
+                                                        {formatAmount(lead.amount)}
                                                     </p>
                                                 </td>
                                                 <td className="py-3 px-4">{getStatusBadge(lead.status)}</td>
@@ -813,17 +825,17 @@ export default function ProspectDashboard() {
                         <h2 className="text-xl font-bold text-slate-800">Active Opportunities</h2>
                     </div>
 
-                    <ProspectsTable label="New Opportunity" prospects={prospects.filter((prospect) => prospect.status == "New Opportunity").slice(0, 5)} statusFilter="New Opportunity" />
+                    <ProspectsTable label="New Opportunity" prospects={prospects.filter((prospect) => prospect.status == "New Opportunity")} statusFilter="New Opportunity" />
 
-                    <ProspectsTable label="Proposal Issued" prospects={prospects.filter((prospect) => prospect.status == "Proposal Issued").slice(0, 5)} statusFilter="Proposal Issued" />
+                    <ProspectsTable label="Proposal Issued" prospects={prospects.filter((prospect) => prospect.status == "Proposal Issued")} statusFilter="Proposal Issued" />
                     <ProspectsTable
                         label="Closed as Won"
-                        prospects={prospects.filter((prospect) => prospect.status == "Closed as Won").slice(0, 5)}
+                        prospects={prospects.filter((prospect) => prospect.status == "Closed as Won")}
                         statusFilter="Closed as Won"
                     />
                     <ProspectsTable
                         label="Closed as Loss"
-                        prospects={prospects.filter((prospect) => prospect.status == "Closed as Loss").slice(0, 5)}
+                        prospects={prospects.filter((prospect) => prospect.status == "Closed as Loss")}
                         statusFilter="Closed as Loss"
                     />
                 </div>
@@ -858,7 +870,7 @@ export default function ProspectDashboard() {
                                 return nextFollowUpDate > lastCommentDate;
                             })
                             .sort((a, b) => new Date(b.nextFollowUp).getTime() - new Date(a.nextFollowUp).getTime()) // latest first
-                            .slice(0, 5)}
+                            }
                         statusFilter="Follow Up"
                         dateLabel="Contacted Date"
                     />
@@ -884,7 +896,7 @@ export default function ProspectDashboard() {
                                 return nextFollowUpDate < lastCommentDate;
                             })
                             .sort((a, b) => new Date(b.nextFollowUp).getTime() - new Date(a.nextFollowUp).getTime()) // latest first
-                            .slice(0, 5)}
+                            }
                         statusFilter="Missed Out"
                         dateLabel="Missed Date"
                     />

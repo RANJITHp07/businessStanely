@@ -1,5 +1,6 @@
 "use client"
 import { prospectCreatorName } from "@/lib/prospectCreator"
+import { inLeadSegregation } from "@/lib/leadSegregation"
 import { useState, useEffect } from "react"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Calendar as CalendarComponent } from "@/components/ui/calendar"
@@ -166,9 +167,10 @@ export default function ProspectsTable() {
             engagementStatus = (followUpDate > lastCommentDate) ? "Follow Up" : "Missed Out";
         }
 
+        // Segregation only covers New and In Progress leads.
         const matchesEngagement =
             selectedEngagementStatus.length === 0 ||
-            selectedEngagementStatus.includes(engagementStatus);
+            (inLeadSegregation(prospect.status) && selectedEngagementStatus.includes(engagementStatus));
 
         const matchesAssignee =
             assigneeFilter === "all" ||

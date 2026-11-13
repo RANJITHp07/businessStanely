@@ -60,6 +60,7 @@ type OpportunityRow = {
     id: string
     name: string
     phoneNumber?: string
+    amount?: number | null
     description?: string
     nextFollowUp?: string
     status: string
@@ -235,6 +236,10 @@ export default function ProspectsTable() {
     const filteredIds = filteredProspects.map((p) => p.id)
     const selectedOpportunities = filteredProspects.filter((p) => selected.has(p.id))
 
+    const filteredAmount = filteredProspects.reduce(
+        (sum: number, opportunity: any) => sum + (Number(opportunity.amount) || 0),
+        0,
+    )
     const totalPages = Math.ceil(filteredProspects.length / itemsPerPage)
 
     useEffect(() => {
@@ -517,7 +522,14 @@ export default function ProspectsTable() {
 
             <Card>
                 <CardHeader className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                    <CardTitle>Opportunities ({filteredProspects.length})</CardTitle>
+                    <CardTitle className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                        <span>Opportunities ({filteredProspects.length})</span>
+                        {/* Sum of the amounts in the current filter, e.g. how much the
+                            Missed Out opportunities are worth. Blank amounts count as 0. */}
+                        <span className="text-base font-semibold text-emerald-700">
+                            Total: ₹{filteredAmount.toLocaleString("en-IN")}
+                        </span>
+                    </CardTitle>
                     {selectedOpportunities.length > 0 && (
                         <div className="flex flex-wrap items-center gap-2 text-sm">
                             <span className="font-medium">{selectedOpportunities.length} selected</span>
@@ -561,7 +573,7 @@ export default function ProspectsTable() {
                                                 />
                                             </TableHead>
                                             <TableHead>Name</TableHead>
-                                            <TableHead>Phone Number</TableHead>
+                                            <TableHead>Price</TableHead>
                                             {/* <TableHead>Description</TableHead> */}
                                             <TableHead>Next Follow Up</TableHead>
                                             <TableHead>Assigned To</TableHead>
@@ -589,7 +601,7 @@ export default function ProspectsTable() {
                                                         />
                                                     </TableCell>
                                                     <TableCell className="font-medium max-w-[150px] truncate" onClick={() => router.push(`/dashboard/opportunities/${prospect.id}`)}>{prospect.prospect?.name || "N/A"}</TableCell>
-                                                    <TableCell> {prospect.phoneNumber}</TableCell>
+                                                    <TableCell className="font-medium">{prospect.amount === null || prospect.amount === undefined ? "—" : `₹${Number(prospect.amount).toLocaleString("en-IN")}`}</TableCell>
                                                     {/* <TableCell className="max-w-[300px] truncate" onClick={() => router.push(`/dashboard/opportunities/${prospect.id}`)}>{prospect.description || "N/A"}</TableCell> */}
                                                     <TableCell onClick={() => router.push(`/dashboard/opportunities/${prospect.id}`)}>
                                                         <div className="flex items-center gap-2">

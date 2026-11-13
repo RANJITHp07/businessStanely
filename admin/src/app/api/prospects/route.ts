@@ -1,4 +1,5 @@
 import { AGENT_SECRET_FIELDS } from "@/lib/agentSecretFields";
+import { LEAD_SEGREGATION_STATUSES } from "@/lib/leadSegregation";
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
@@ -87,7 +88,8 @@ function getAssignedAdvisorType(assignedAgent: {
  */
 async function buildEngagementCounts(where: Prisma.ProspectWhereInput) {
   const prospects = await prisma.prospect.findMany({
-    where,
+    // Only New and In Progress leads are segregated.
+    where: { AND: [where, { status: { in: LEAD_SEGREGATION_STATUSES } }] },
     select: {
       nextFollowUp: true,
       assignedAgentId: true,

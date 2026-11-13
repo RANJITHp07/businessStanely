@@ -35,6 +35,9 @@ export interface Agent {
   enquiryAutoAssign?: boolean;
   canCreateTask?: boolean;
   hiddenSidebarItems?: string[];
+  /** Lead Maker only: advisors its leads go to, and how many each takes in a row. */
+  clientAdvisorIds?: string[];
+  leadsPerAdvisor?: number | null;
   status: string;
 }
 export interface Task {

@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import prisma from "@/lib/prisma";
+import { cleanLeadRouting } from "@/lib/leadRouting";
 import { AGENT_SECRET_FIELDS } from "@/lib/agentSecretFields";
 import { uploadToS3 } from "@/lib/aws";
 import { sendAgentInviteEmail } from "@/lib/email";
@@ -161,8 +162,20 @@ export async function POST(req: NextRequest) {
         ? (resolvedAdvisorType as string)
         : (resolvedExecutionType as string);
 
+    const { clientAdvisorIds, leadsPerAdvisor } = agentData;
+    delete agentData.clientAdvisorIds;
+    delete agentData.leadsPerAdvisor;
+    const leadRouting = await cleanLeadRouting(
+      { clientAdvisorIds, leadsPerAdvisor },
+      resolvedAdvisorType === "Lead Maker",
+    );
+    if (!leadRouting.ok) {
+      return NextResponse.json({ error: leadRouting.error }, { status: 400 });
+    }
+
     const data: Prisma.AgentCreateInput = {
       ...agentData,
+      ...leadRouting.data,
       agentRole: finalAgentRole,
       agentType: finalAgentType,
       executionAgentType: resolvedExecutionType,

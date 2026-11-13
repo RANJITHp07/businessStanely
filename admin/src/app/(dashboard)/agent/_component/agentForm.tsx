@@ -205,6 +205,8 @@ export default function AgentForm({ agent }: AgentFormProps) {
     enquiryAutoAssign?: boolean
     canCreateTask?: boolean
     hiddenSidebarItems: string[]
+    clientAdvisorIds: string[]
+    leadsPerAdvisor: string
   };
   const searchParams = useSearchParams();
   const agentRole = searchParams.get("agentRole");
@@ -233,6 +235,9 @@ export default function AgentForm({ agent }: AgentFormProps) {
     // when the edit form reloads.
     canCreateTask: agent?.canCreateTask ?? true,
     hiddenSidebarItems: agent?.hiddenSidebarItems ?? [],
+    clientAdvisorIds: agent?.clientAdvisorIds ?? [],
+    // Kept as text while editing; blank means "use the global setting".
+    leadsPerAdvisor: agent?.leadsPerAdvisor ? String(agent.leadsPerAdvisor) : "",
   });
   const [agentSearch, setAgentSearch] = useState("");
   const [advisorAgentSearch, setAdvisorAgentSearch] = useState("");
@@ -295,6 +300,16 @@ export default function AgentForm({ agent }: AgentFormProps) {
         : "";
 
   const managementAgentType = selectedAdvisorType || selectedExecutionType || "";
+
+  /* Advisors a Lead Maker can route its leads to. Ones already ticked stay
+     listed even if their type changed since, so they can be unticked. */
+  const clientAdvisors = allAgents.filter(
+    (a) =>
+      a.id !== agent?.id &&
+      (a.agentType === "Client Advisor" ||
+        a.advisorAgentType === "Client Advisor" ||
+        formData.clientAdvisorIds.includes(a.id)),
+  );
 
   const handleAgentRoleChange = (role: string) => {
     setFormData((prev) => {
@@ -457,6 +472,13 @@ export default function AgentForm({ agent }: AgentFormProps) {
         },
         body: JSON.stringify({
           ...formData,
+          // Only a Lead Maker routes leads to chosen advisors.
+          ...(selectedAdvisorType === "Lead Maker"
+            ? {
+                clientAdvisorIds: formData.clientAdvisorIds,
+                leadsPerAdvisor: formData.leadsPerAdvisor ? Number(formData.leadsPerAdvisor) : null,
+              }
+            : { clientAdvisorIds: undefined, leadsPerAdvisor: undefined }),
           agentType: payloadAgentType,
           specializations: selectedSpecializations,
           subordinates: selectedSubordinates,
@@ -775,6 +797,71 @@ export default function AgentForm({ agent }: AgentFormProps) {
                 )}
               </div>
             </div>
+
+            {hasAdvisorRole(formData.agentRole) && selectedAdvisorType === "Lead Maker" && (
+              <div className="space-y-4 rounded-lg border p-4">
+                <div>
+                  <Label>Client Advisors for this Lead Maker&apos;s leads</Label>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Leads from this Lead Maker go only to the advisors ticked here, in turn.
+                    Ticked advisors stop getting leads from the global rotation. If none of
+                    them is active with auto-assign on, leads use the global rotation. Leave
+                    all unticked to use the global rotation.
+                  </p>
+                </div>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-3">
+                  {clientAdvisors.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No Client Advisors found.</p>
+                  ) : (
+                    clientAdvisors.map((advisor) => {
+                      const checked = formData.clientAdvisorIds.includes(advisor.id);
+                      const unavailable = advisor.status !== "active" || advisor.autoAssign === false;
+                      return (
+                        <label
+                          key={advisor.id}
+                          className="flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm hover:bg-muted/40"
+                        >
+                          <Checkbox
+                            checked={checked}
+                            onCheckedChange={() =>
+                              setFormData((prev) => ({
+                                ...prev,
+                                clientAdvisorIds: checked
+                                  ? prev.clientAdvisorIds.filter((id) => id !== advisor.id)
+                                  : [...prev.clientAdvisorIds, advisor.id],
+                              }))
+                            }
+                          />
+                          <span className="truncate">{advisor.name}</span>
+                          {unavailable && (
+                            <Badge variant="outline" className="ml-auto text-[10px]">
+                              {advisor.status !== "active" ? "Inactive" : "Auto-assign off"}
+                            </Badge>
+                          )}
+                        </label>
+                      );
+                    })
+                  )}
+                </div>
+                <div className="max-w-xs space-y-1">
+                  <Label htmlFor="leads-per-advisor">Leads per advisor</Label>
+                  <Input
+                    id="leads-per-advisor"
+                    type="number"
+                    min={1}
+                    placeholder="Global setting"
+                    value={formData.leadsPerAdvisor}
+                    onChange={(e) =>
+                      setFormData((prev) => ({ ...prev, leadsPerAdvisor: e.target.value }))
+                    }
+                    disabled={formData.clientAdvisorIds.length === 0}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    How many leads in a row each ticked advisor gets before the next one. Blank uses the global setting.
+                  </p>
+                </div>
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="bar-id">Employee ID *</Label>

@@ -8,6 +8,7 @@ import {
   PROSPECT_SUMMARY_SELECT,
   buildProspectCounts,
 } from "@/lib/prospectSummary";
+import { pickLeadAssignee } from "@/lib/assignLead";
 
 // GET: List all prospects (optionally filter by assignedAgentId)
 function getAssignedAdvisorType(assignedAgent: {
@@ -174,84 +175,13 @@ export async function POST(req: NextRequest) {
     let finalAssignedAgentId = assignedAgentId;
 
     if (!assignedAgentId) {
-      const assignmentSetting =
-        await prisma.prospectAssignmentSetting.findFirst();
-      const prospectsPerAgent = assignmentSetting?.prospectsPerAgent ?? 1;
-
-      // 1️⃣ Fetch clientAdvisorIds linked to this Lead Maker
-      const leadMaker = await prisma.agent.findUnique({
-        where: { id: agent.id },
-        select: { clientAdvisorIds: true },
-      });
-
-      let eligibleAgents;
-
-      if (leadMaker?.clientAdvisorIds?.length) {
-        // 2️⃣ Use mapped advisors
-        eligibleAgents = await prisma.agent.findMany({
-          where: {
-            id: { in: leadMaker.clientAdvisorIds },
-            status: "active",
-            autoAssign: true,
-          },
-          orderBy: { createdAt: "asc" },
-          select: { id: true },
-        });
-      }
-
-      // 3️⃣ Fallback: pick from all active client advisors
-      if (!eligibleAgents?.length) {
-        eligibleAgents = await prisma.agent.findMany({
-          where: {
-            agentType: "Client Advisor",
-            status: "active",
-            autoAssign: true,
-          },
-          orderBy: { createdAt: "asc" },
-          select: { id: true },
-        });
-      }
-
-      if (!eligibleAgents.length) {
+      // The Lead Maker's own advisors first, else the global rotation.
+      finalAssignedAgentId = await pickLeadAssignee(agent.id);
+      if (!finalAssignedAgentId) {
         return NextResponse.json(
           { error: "No eligible client advisors available for assignment." },
           { status: 400 },
         );
-      }
-
-      // 4️⃣ Round-robin assignment
-      const lastProspect = await prisma.prospect.findFirst({
-        where: { assignedAgentId: { in: eligibleAgents.map((a) => a.id) } },
-        orderBy: { createdAt: "desc" },
-        select: { assignedAgentId: true },
-      });
-
-      if (!lastProspect) {
-        finalAssignedAgentId = eligibleAgents[0].id;
-      } else {
-        const lastBatch = await prisma.prospect.findMany({
-          where: { assignedAgentId: { in: eligibleAgents.map((a) => a.id) } },
-          orderBy: { createdAt: "desc" },
-          take: prospectsPerAgent,
-          select: { assignedAgentId: true },
-        });
-
-        let consecutiveCount = 0;
-        for (const p of lastBatch) {
-          if (p.assignedAgentId === lastProspect.assignedAgentId)
-            consecutiveCount++;
-          else break;
-        }
-
-        if (consecutiveCount < prospectsPerAgent) {
-          finalAssignedAgentId = lastProspect.assignedAgentId;
-        } else {
-          const lastIndex = eligibleAgents.findIndex(
-            (a) => a.id === lastProspect.assignedAgentId,
-          );
-          const nextIndex = (lastIndex + 1) % eligibleAgents.length;
-          finalAssignedAgentId = eligibleAgents[nextIndex].id;
-        }
       }
     }
 

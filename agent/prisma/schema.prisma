@@ -259,7 +259,15 @@ model Agent {
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
 
+  /// Lead Maker only: the Client Advisors this Lead Maker's leads go to, in
+  /// rotation. Advisors listed here are left out of the global rotation.
+  /// If none of them is active with autoAssign on, the lead uses the global
+  /// rotation instead. The global rotation uses reserved advisors only when
+  /// nobody else is available. See agent/src/lib/assignLead.ts.
   clientAdvisorIds String[] @db.ObjectId
+  /// Lead Maker only: leads each chosen advisor takes in a row before the
+  /// rotation moves on. Null uses the global prospectsPerAgent setting.
+  leadsPerAdvisor  Int?
 
   // OTP fields for password reset
   resetOtp      String?

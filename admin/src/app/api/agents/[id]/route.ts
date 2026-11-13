@@ -1,6 +1,7 @@
 import { sanitizeHiddenSidebarItems } from "@/lib/sidebarAccess";
 import { NextRequest, NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { cleanLeadRouting } from "@/lib/leadRouting";
 import { AGENT_SECRET_FIELDS } from "@/lib/agentSecretFields";
 import { uploadToS3, deleteFromS3 } from "@/lib/aws";
 import {
@@ -271,6 +272,16 @@ export async function PUT(
     if ("subordinates" in agentData) {
       delete agentData.subordinates;
     }
+    const { clientAdvisorIds, leadsPerAdvisor } = agentData;
+    delete agentData.clientAdvisorIds;
+    delete agentData.leadsPerAdvisor;
+    const leadRouting = await cleanLeadRouting(
+      { clientAdvisorIds, leadsPerAdvisor },
+      finalAdvisorType === "Lead Maker",
+    );
+    if (!leadRouting.ok) {
+      return NextResponse.json({ error: leadRouting.error }, { status: 400 });
+    }
     if ("hiddenSidebarItems" in agentData) {
       agentData.hiddenSidebarItems = sanitizeHiddenSidebarItems(
         agentData.hiddenSidebarItems,
@@ -281,6 +292,7 @@ export async function PUT(
       omit: AGENT_SECRET_FIELDS,
       data: {
         ...agentData,
+        ...leadRouting.data,
         agentType: finalAgentType,
         executionAgentType: finalExecutionType,
         advisorAgentType: finalAdvisorType,

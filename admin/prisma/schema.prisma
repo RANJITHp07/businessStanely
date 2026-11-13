@@ -328,7 +328,15 @@ model Agent {
   otpExpiry     DateTime?
   isOtpVerified Boolean   @default(false)
 
+  /// Lead Maker only: the Client Advisors this Lead Maker's leads go to, in
+  /// rotation. Advisors listed here are left out of the global rotation.
+  /// If none of them is active with autoAssign on, the lead uses the global
+  /// rotation instead. The global rotation uses reserved advisors only when
+  /// nobody else is available. See agent/src/lib/assignLead.ts.
   clientAdvisorIds String[] @db.ObjectId
+  /// Lead Maker only: leads each chosen advisor takes in a row before the
+  /// rotation moves on. Null uses the global prospectsPerAgent setting.
+  leadsPerAdvisor  Int?
 
   // Team Management (multiple superiors via join table)
   // For Advisor Agent, agentType can be: "Lead Maker", "Client Advisor", "Client Manager"

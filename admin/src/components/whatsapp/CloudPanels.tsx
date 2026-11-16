@@ -125,7 +125,7 @@ export function CloudConnectPanel({
                 </div>
 
                 {!onComplete && state.status !== "initializing" && state.status !== "idle" ? (
-                    <p className="text-base leading-7 text-[#d1d7db]">
+                    <p className="text-base leading-7 text-[var(--wa-muted2)]">
                         WhatsApp is not connected right now. Ask an admin to connect it from the admin panel.
                         {state.error ? <span className="mt-4 block text-sm text-red-400">{state.error}</span> : null}
                     </p>
@@ -137,7 +137,7 @@ export function CloudConnectPanel({
                 ) : (
                     state.onboarding ? (
                     <>
-                        <p className="text-base leading-7 text-[#d1d7db]">
+                        <p className="text-base leading-7 text-[var(--wa-muted2)]">
                             Connect the firm&apos;s WhatsApp Business app number through Meta. The phone keeps working
                             as before, and messages sent from either place show up in both.
                         </p>
@@ -168,7 +168,7 @@ export function CloudConnectPanel({
                     </>
                     ) : (
                         <>
-                            <p className="text-base leading-7 text-[#d1d7db]">
+                            <p className="text-base leading-7 text-[var(--wa-muted2)]">
                                 Chats run through the firm&apos;s phone, linked like WhatsApp Web. Link it once by scanning
                                 a QR code with WhatsApp on that phone.
                             </p>

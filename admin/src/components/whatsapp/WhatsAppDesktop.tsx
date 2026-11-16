@@ -29,12 +29,12 @@ import {
 const WHATSAPP_THEME_KEY = "wa-theme";
 
 function readStoredTheme(): "dark" | "light" {
-    if (typeof window === "undefined") return "dark";
+    if (typeof window === "undefined") return "light";
     try {
         const saved = window.localStorage.getItem(WHATSAPP_THEME_KEY);
-        return saved === "light" ? "light" : "dark";
+        return saved === "dark" ? "dark" : "light";
     } catch {
-        return "dark";
+        return "light";
     }
 }
 
@@ -486,7 +486,7 @@ function WhatsAppDesktop() {
     const suppressNextScrollRef = useRef(false);
     const [myProfilePicUrl, setMyProfilePicUrl] = useState<string | null>(null);
     const [myProfilePicLoadFailed, setMyProfilePicLoadFailed] = useState(false);
-    const [theme, setTheme] = useState<"dark" | "light">("dark");
+    const [theme, setTheme] = useState<"dark" | "light">("light");
 
     // Load the saved theme on mount (kept in localStorage so it persists).
     useEffect(() => {
@@ -720,7 +720,7 @@ function WhatsAppDesktop() {
                                     <h1 className="text-3xl font-semibold">WhatsApp Desktop</h1>
                                 </div>
                             </div>
-                            <p className="max-w-xl text-base leading-7 text-[#d1d7db]">
+                            <p className="max-w-xl text-base leading-7 text-[var(--wa-muted2)]">
                                 Scan the QR code with the WhatsApp app on your phone. This session stays persisted on the server,
                                 so you only need to scan again after you explicitly log out or WhatsApp invalidates the device.
                             </p>

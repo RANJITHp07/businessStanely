@@ -1,4 +1,4 @@
-/* WhatsApp UI theme tokens. Dark is the default; `[data-wa-theme="light"]`
+/* WhatsApp UI theme tokens. Dark tokens live on .wa-root; `[data-wa-theme="light"]`
    overrides them. The component references these via Tailwind arbitrary values
    (e.g. bg-[var(--wa-panel)]), so a single attribute flip re-themes the UI. */
 .wa-root {

@@ -997,15 +997,21 @@ export default function TasksTable() {
                                       View Details
                                     </Link>
                                   </DropdownMenuItem>
+                                  {/* Upcoming/Future rows are recurring tasks waiting
+                                      for their trigger date, so they are usually
+                                      inactive. They must still be editable (e.g. to
+                                      change the next trigger date or schedule). */}
+                                  {(task.active || triggerView) && (
+                                    <DropdownMenuItem asChild>
+                                      <Link href={`/task/${task.id}/edit`}>
+                                        <Edit className="mr-2 h-4 w-4" />
+                                        Edit Task
+                                      </Link>
+                                    </DropdownMenuItem>
+                                  )}
                                   {
                                     task.active &&
                                     <>
-                                      <DropdownMenuItem asChild>
-                                        <Link href={`/task/${task.id}/edit`}>
-                                          <Edit className="mr-2 h-4 w-4" />
-                                          Edit Task
-                                        </Link>
-                                      </DropdownMenuItem>
                                       <DropdownMenuItem onClick={() => setTaskToConvert(task)}>
                                         <ArrowLeftRight className="mr-2 h-4 w-4" />
                                         {task.legislationId || task.retainershipId

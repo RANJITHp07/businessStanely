@@ -161,6 +161,14 @@ export default function TaskDetails() {
   // A soft-deleted task is shown for reference only: every control that would
   // write to it is disabled, since the row is hidden everywhere else.
   const isDeleted = Boolean((taskData as (Task & { deletedAt?: string | null }) | null)?.deletedAt);
+  // A recurring task waiting for its next trigger date (the Upcoming Tasks
+  // list) is inactive between occurrences but must stay editable.
+  const isUpcomingRecurring = Boolean(
+    taskData?.triggerDate &&
+      taskData?.recurring &&
+      Number(taskData.recurring) !== 0 &&
+      taskData?.recurringType,
+  );
 
   useEffect(() => {
     const fetchTask = async () => {
@@ -897,15 +905,17 @@ export default function TaskDetails() {
               Comprehensive view of task progress and activity
             </p>
           </div>
-          {taskData.active && !isDeleted && < div className="flex flex-wrap justify-end gap-2">
-            <Button
-              variant="outline"
-              className="mt-[20px] md:mt-0 w-fit rounded-lg px-4 py-2 flex items-center gap-2"
-              onClick={() => setIsConvertOpen(true)}
-            >
-              <ArrowLeftRight className="h-4 w-4" />
-              {isLegislationTask ? "Convert to Normal Task" : "Convert to Legislation Task"}
-            </Button>
+          {(taskData.active || isUpcomingRecurring) && !isDeleted && < div className="flex flex-wrap justify-end gap-2">
+            {taskData.active && (
+              <Button
+                variant="outline"
+                className="mt-[20px] md:mt-0 w-fit rounded-lg px-4 py-2 flex items-center gap-2"
+                onClick={() => setIsConvertOpen(true)}
+              >
+                <ArrowLeftRight className="h-4 w-4" />
+                {isLegislationTask ? "Convert to Normal Task" : "Convert to Legislation Task"}
+              </Button>
+            )}
             <Button className="mt-[20px] md:mt-0 w-fit f bg-[#003459] hover:bg-[#003459] text-white rounded-lg px-4 py-2 flex items-center gap-2 cursor-pointer shadow-none hover:shadow-md transition-shadow duration-300">
               <a href={`/task/${id}/edit`} className="flex items-center gap-1">
                 <Edit className="h-4 w-4" />

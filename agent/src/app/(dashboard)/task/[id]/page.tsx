@@ -854,7 +854,7 @@ export default function TaskDetails() {
 
   // Dropdown options for durations
   const durationOptions = [
-    { value: "Working", label: "Working" },
+    { value: "Working", label: "Normal" },
     { value: "24hr", label: "24 Hours" },
     { value: "48hr", label: "48 Hours" },
     { value: "1w", label: "1 Week" },
@@ -1155,7 +1155,7 @@ export default function TaskDetails() {
               </div>
 
               {/* Follow-up and Status Check Dropdowns */}
-              <div className="flex flex-col md:flex-row md:items-center gap-4 md:gap-6 p-0 md:p-4 bg-muted/30 rounded-lg">
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 items-center gap-4 md:gap-6 p-0 md:p-4 bg-muted/30 rounded-lg">
                 <div className="flex items-center space-x-2">
                   <Label htmlFor="follow-up-duration" className="text-sm font-medium cursor-pointer">
                     Instance
@@ -1184,7 +1184,7 @@ export default function TaskDetails() {
                     disabled
                   >
                     <SelectTrigger id="status-check-duration" className="w-28">
-                      <SelectValue placeholder="Working" />
+                      <SelectValue placeholder="Normal" />
                     </SelectTrigger>
                     <SelectContent>
                       {durationOptions.map(opt => (
@@ -1192,6 +1192,46 @@ export default function TaskDetails() {
                       ))}
                     </SelectContent>
                   </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="status">Status</Label>
+                  <Select
+                    value={task.status}
+                    onValueChange={handleStatusChange}
+                  >
+                    <SelectTrigger id="status" className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem
+                        value="To Do"
+                        disabled={task.status !== "To Do"}
+                      >
+                        To Do
+                      </SelectItem>
+                      <SelectItem value="In Progress">In Progress</SelectItem>
+                      <SelectItem value="Hold">Hold</SelectItem>
+                      <SelectItem value="Abandoned">Abandoned</SelectItem>
+                      <SelectItem value="Completed">Completed</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2 w-full">
+                  <Label htmlFor="progress">Progress ({task.progress}%)</Label>
+                  <Input
+                    id="progress"
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    min="0"
+                    max="100"
+                    value={progressInput}
+                    placeholder={String(task.progress ?? 0)}
+                    onChange={handleProgressInputChange}
+                    onBlur={handleProgressInputBlur}
+                    onKeyDown={handleProgressInputKeyDown}
+                    className="w-full"
+                  />
                 </div>
                 <div className="space-y-2 relative">
                   <div className="flex items-center gap-3">
@@ -1253,59 +1293,6 @@ export default function TaskDetails() {
                 </div>
                 <div className="text-xs text-muted-foreground md:ml-auto">
                   Last updated: {formatDateTime(task.updatedAt)}
-                </div>
-              </div>
-              <div className="flex flex-wrap items-center gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="status">Status</Label>
-                  <Select
-                    value={task.status}
-                    onValueChange={handleStatusChange}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem
-                        value="To Do"
-                        disabled={task.status !== "To Do"}
-                      >
-                        To Do
-                      </SelectItem>
-                      <SelectItem value="In Progress">
-                        In Progress
-                      </SelectItem>
-                      <SelectItem value="Hold">Hold</SelectItem>
-                      <SelectItem value="Abandoned">Abandoned</SelectItem>
-                      <SelectItem value="Completed">Completed</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <div className="space-y-2 items-center w-full max-w-96">
-                    <Label htmlFor="progress">
-                      Progress ({task.progress}%)
-                    </Label>
-                    <Input
-                      type="text"
-                      inputMode="numeric"
-                      pattern="[0-9]*"
-                      min="0"
-                      max="100"
-                      value={progressInput || "0"}
-                      placeholder=""
-                      onChange={handleProgressInputChange}
-                      onBlur={handleProgressInputBlur}
-                      onKeyDown={handleProgressInputKeyDown}
-                      className="w-full"
-                    />
-                    {/* <div className="w-96 flex flex-col gap-2">
-                      <Label htmlFor="progress">
-                        Progress ({task.progress}%)
-                      </Label>
-                      <Progress value={task.progress} className="w-ful" />
-                    </div> */}
-                  </div>
                 </div>
               </div>
             </div>

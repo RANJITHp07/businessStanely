@@ -182,6 +182,7 @@ export default function TaskDetails() {
           if (response.ok) {
             const data = await response.json();
             setTaskData(data.task);
+            setProgressInput(String(data.task.progress ?? 0));
             if (data.task && data.task.comments) {
               setComments(data.task.comments);
               setCommentsLoading(false);
@@ -644,7 +645,7 @@ export default function TaskDetails() {
 
   // Dropdown options for durations
   const durationOptions = [
-    { value: "Working", label: "Working" },
+    { value: "Working", label: "Normal" },
     { value: "24hr", label: "24 Hours" },
     { value: "48hr", label: "48 Hours" },
     { value: "1w", label: "1 Week" },
@@ -995,8 +996,8 @@ export default function TaskDetails() {
               </div>
 
               {/* Follow-up and Status Check Dropdowns (read-only) */}
-              <div className="flex gap-2">
-                <div className="space-y-2 w-1/4">
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+                <div className="space-y-2">
                   <Label htmlFor="follow-up-duration" className="text-sm font-medium cursor-pointer">
                     Instance
                   </Label>
@@ -1015,7 +1016,7 @@ export default function TaskDetails() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-2 w-1/4">
+                <div className="space-y-2">
                   <Label htmlFor="status-check-duration" className="text-sm font-medium cursor-pointer">
                     Client update
                   </Label>
@@ -1025,7 +1026,7 @@ export default function TaskDetails() {
                     disabled={isDeleted}
                   >
                     <SelectTrigger id="status-check-duration" className="w-full">
-                      <SelectValue placeholder="Working" />
+                      <SelectValue placeholder="Normal" />
                     </SelectTrigger>
                     <SelectContent>
                       {durationOptions.map(opt => (
@@ -1033,6 +1034,49 @@ export default function TaskDetails() {
                       ))}
                     </SelectContent>
                   </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="status">Status</Label>
+                  <Select
+                    value={taskData.status}
+                    onValueChange={handleStatusChange}
+                    disabled={isDeleted}
+                  >
+                    <SelectTrigger id="status" className="w-full">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="To Do">To Do</SelectItem>
+                      <SelectItem value="In Progress">In Progress</SelectItem>
+                      <SelectItem value="Hold">Hold</SelectItem>
+                      <SelectItem value="Completed">Completed</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="progress">Progress ({taskData.progress}%)</Label>
+                  <Input
+                    id="progress"
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    min="0"
+                    max="100"
+                    value={progressInput}
+                    placeholder={String(taskData.progress ?? 0)}
+                    disabled={isDeleted}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (/^\d{0,3}$/.test(val) && parseInt(val) <= 100) {
+                        setProgressInput(val);
+                        setTaskData({
+                          ...taskData,
+                          progress: parseInt(val) || 0,
+                        });
+                      }
+                    }}
+                    className="w-full"
+                  />
                 </div>
               </div>
 
@@ -1262,65 +1306,6 @@ export default function TaskDetails() {
         <TabsContent value="details" className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2 space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Task Management</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  {/* Status and Progress */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="status">Status</Label>
-                      <Select
-                        value={taskData.status}
-                        onValueChange={handleStatusChange}
-                        disabled={isDeleted}
-                      >
-                        <SelectTrigger className="w-full">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="To Do">To Do</SelectItem>
-                          <SelectItem value="In Progress">
-                            In Progress
-                          </SelectItem>
-                          <SelectItem value="Hold">Hold</SelectItem>
-                          <SelectItem value="Completed">Completed</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="progress">
-                        Progress ({taskData.progress}%)
-                      </Label>
-                      <div className="space-y-2">
-                        <Progress value={taskData.progress} className="w-full" />
-                        <Input
-                          type="text"
-                          inputMode="numeric"
-                          pattern="[0-9]*"
-                          min="0"
-                          max="100"
-                          value={progressInput}
-                          placeholder=""
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            if (/^\d{0,3}$/.test(val) && parseInt(val) <= 100) {
-                              setProgressInput(val);
-                              setTaskData({
-                                ...taskData,
-                                progress: parseInt(val) || 0,
-                              });
-                            }
-                          }}
-                          className="w-full"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
               <Card>
                 <CardHeader>
                   <CardTitle>Task Information</CardTitle>

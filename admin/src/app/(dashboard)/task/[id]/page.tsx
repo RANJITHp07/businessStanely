@@ -52,6 +52,8 @@ import { isAudioAttachment } from "@/lib/audioAttachment";
 import ConvertTaskDialog from "../_components/convertTaskDialog";
 import { isDailyTrackContent } from "@/lib/dailyTrack";
 import { DailyTrackList } from "@/components/DailyTrackList";
+import { CommentEditor } from "@/components/CommentEditor";
+import { FormattedComment } from "@/components/FormattedComment";
 
 export default function TaskDetails() {
   const MANAGEMENT_BASE_URL = "https://management.legalstanley.com";
@@ -1735,11 +1737,11 @@ export default function TaskDetails() {
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex-1 space-y-2">
-                    <Textarea
+                    <CommentEditor
                       placeholder="Add a comment..."
                       value={newComment}
                       disabled={!taskData.active || isDeleted}
-                      onChange={(e) => setNewComment(e.target.value)}
+                      onChange={setNewComment}
                       rows={3}
                     />
                     <div className="mt-3 space-y-1">
@@ -1987,7 +1989,7 @@ export default function TaskDetails() {
                             </div>
                           )}
 
-                          <p className="text-sm">{getDisplayInteractionContent(comment.content)}</p>
+                          <FormattedComment content={getDisplayInteractionContent(comment.content)} />
                           {(() => {
                             const atts = (comment as any).attachments as { name: string; url: string; size: number; type: string }[] | null;
                             if (atts && atts.length > 0) {

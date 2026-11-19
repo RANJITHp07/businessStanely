@@ -34,6 +34,8 @@ import { Progress } from "@/components/ui/progress"
 import { uploadFileToS3Direct } from "@/lib/directUpload"
 import { cn } from "@/lib/utils"
 import { isAudioAttachment } from "@/lib/audioAttachment"
+import { CommentEditor } from "@/components/CommentEditor";
+import { FormattedComment } from "@/components/FormattedComment";
 
 
 interface Prospect {
@@ -457,7 +459,7 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
                                                     </div>
                                                 </div>
                                             </div>
-                                            <p className="text-sm leading-relaxed">{comment.content}</p>
+                                            <FormattedComment content={comment.content} />
                                             {comment.attachments && comment.attachments.length > 0 && (
                                                 <div className="flex flex-wrap gap-2 pt-2">
                                                     {comment.attachments.map((att, idx) => {
@@ -528,11 +530,11 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
 
                             <div className="space-y-4">
                                 <Label htmlFor="new-interaction">Add Interaction</Label>
-                                <Textarea
+                                <CommentEditor
                                     id="new-interaction"
                                     placeholder="Add a note or comment about this prospect..."
                                     value={newComment}
-                                    onChange={(e) => setNewComment(e.target.value)}
+                                    onChange={setNewComment}
                                     rows={4}
                                 />
 

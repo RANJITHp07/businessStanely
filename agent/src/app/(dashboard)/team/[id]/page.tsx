@@ -50,10 +50,14 @@ import { Agent, Prospect, Task } from "@/types";
 import Link from "next/link";
 import { hasAdvisorRole, hasExecutionRole } from "@/lib/agentRole";
 import { taskSection } from "@/lib/taskFollowUp";
+import { CommentEditor } from "@/components/CommentEditor";
+import { FormattedComment } from "@/components/FormattedComment";
 
 interface AgentActivity {
-  taskId: string;
-  taskTitle: string;
+  /** True for an "Add Time Entry" record rather than a task comment. */
+  isTimeEntry?: boolean;
+  taskId?: string;
+  taskTitle?: string;
   content: string;
   createdAt: string;
   startTime: string | null;
@@ -1552,7 +1556,7 @@ export default function AgentDetails() {
             <CardHeader>
               <CardTitle>Agent Activities</CardTitle>
               <CardDescription>
-                Comments made by this agent on their tasks
+                Comments and time entries logged by this agent
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -1585,7 +1589,14 @@ export default function AgentDetails() {
                               {acts.map((activity, idx) => (
                                 <TableRow key={idx}>
                                   <TableCell className="break-words whitespace-pre-line align-top" style={{ wordBreak: 'break-word', whiteSpace: 'pre-line', width: '33%', minWidth: 120, maxWidth: 240 }}>
-                                    {activity.taskTitle ? (
+                                    {activity.isTimeEntry ? (
+                                      <>
+                                        <Badge variant="outline" className="mb-1 text-[10px]">Time Entry</Badge>
+                                        <span className="break-words whitespace-pre-line block">
+                                          {activity.taskTitle || "Untitled"}
+                                        </span>
+                                      </>
+                                    ) : activity.taskTitle ? (
                                       <Link href={`/task/${activity.taskId}`} className="text-blue-600 hover:underline break-words whitespace-pre-line block" style={{ wordBreak: 'break-word', whiteSpace: 'pre-line' }}>
                                         {activity.taskTitle}
                                       </Link>
@@ -1594,7 +1605,7 @@ export default function AgentDetails() {
                                     )}
                                   </TableCell>
                                   <TableCell style={{ wordBreak: 'break-word', whiteSpace: 'pre-line', maxWidth: 320 }}>
-                                    {activity.content}
+                                    <FormattedComment content={activity.content} />
                                   </TableCell>
                                   <TableCell className="align-top">
                                     <ActivityTimeCell activity={activity} />

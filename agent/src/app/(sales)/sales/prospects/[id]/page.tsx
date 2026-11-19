@@ -37,6 +37,8 @@ import { normalizePhoneNumber } from "@/lib/normalizePhoneNumber"
 import { uploadFileToS3Direct } from "@/lib/directUpload"
 import { hasAdvisorRole } from "@/lib/agentRole"
 import { isLeadMaker } from "@/lib/agentType"
+import { CommentEditor } from "@/components/CommentEditor";
+import { FormattedComment } from "@/components/FormattedComment";
 
 interface Prospect {
     id: string;
@@ -467,7 +469,7 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
                                                     </div>
                                                 </div>
                                             </div>
-                                            <p className="text-sm leading-relaxed">{comment.content}</p>
+                                            <FormattedComment content={comment.content} />
                                             {comment.attachments && comment.attachments.length > 0 && (
                                                 <div className="mt-2 flex flex-wrap gap-2">
                                                     {comment.attachments.map((att, idx) => {
@@ -558,11 +560,11 @@ export default function ProspectDetailPage({ params }: { params: Promise<{ id: s
 
                             <div className="space-y-4">
                                 <Label htmlFor="new-interaction">Add Interaction</Label>
-                                <Textarea
+                                <CommentEditor
                                     id="new-interaction"
                                     placeholder="Add a note or comment about this prospect..."
                                     value={newComment}
-                                    onChange={(e) => setNewComment(e.target.value)}
+                                    onChange={setNewComment}
                                     rows={4}
                                 />
 

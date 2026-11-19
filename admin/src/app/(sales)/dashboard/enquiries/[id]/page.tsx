@@ -56,6 +56,8 @@ import { fetchWithAuth } from "@/lib/fetchWithAuth"
 const AUTO_ASSIGN = "__auto__"
 import { uploadFileToS3Direct } from "@/lib/directUpload"
 import { isAudioAttachment } from "@/lib/audioAttachment"
+import { CommentEditor } from "@/components/CommentEditor";
+import { FormattedComment } from "@/components/FormattedComment";
 
 /* Detail view for a single website enquiry, built to match the lead detail
    screen: contact block, the submission itself, and an interaction feed an
@@ -613,7 +615,7 @@ export default function EnquiryDetailPage({ params }: { params: Promise<{ id: st
                                             </div>
 
                                             {comment.content && (
-                                                <p className="text-sm leading-relaxed whitespace-pre-wrap">{comment.content}</p>
+                                                <FormattedComment content={comment.content} />
                                             )}
 
                                             {comment.attachments && comment.attachments.length > 0 && (
@@ -685,11 +687,11 @@ export default function EnquiryDetailPage({ params }: { params: Promise<{ id: st
 
                             <div className="space-y-4">
                                 <Label htmlFor="new-interaction">Add Interaction</Label>
-                                <Textarea
+                                <CommentEditor
                                     id="new-interaction"
                                     placeholder="Write a message to the client, or tick Keep internal for a private note..."
                                     value={newComment}
-                                    onChange={(e) => setNewComment(e.target.value)}
+                                    onChange={setNewComment}
                                     rows={4}
                                 />
 

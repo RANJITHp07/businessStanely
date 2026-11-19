@@ -84,6 +84,8 @@ import { hasAdvisorRole, hasExecutionRole } from "@/lib/agentRole";
 import { cn } from "@/lib/utils";
 import RestoreAgentDialog from "@/app/(dashboard)/agent/_component/restoreAgentDialog";
 import AgentCredentialsDialog from "@/app/(dashboard)/agent/_component/agentCredentialsDialog";
+import { CommentEditor } from "@/components/CommentEditor";
+import { FormattedComment } from "@/components/FormattedComment";
 
 // These live in dashboard pages that also pull in recharts, so they load only
 // when a Leads or Opportunity tab opens.
@@ -94,7 +96,7 @@ const ProspectsTable = dynamic(() =>
   import("@/app/(sales)/dashboard/opportunities/tables/page").then((m) => m.ProspectsTable),
 );
 
-type ActivityEntityType = "task" | "prospect" | "opportunity" | "enquiry";
+type ActivityEntityType = "task" | "prospect" | "opportunity" | "enquiry" | "timeEntry";
 
 interface AgentActivity {
   entityType: ActivityEntityType | null;
@@ -264,6 +266,7 @@ const ACTIVITY_TYPE_LABELS: Record<ActivityEntityType, string> = {
   prospect: "Lead",
   opportunity: "Opportunity",
   enquiry: "Enquiry",
+  timeEntry: "Time Entry",
 };
 
 // Only comments logged with a work session have start and end times.
@@ -2387,7 +2390,7 @@ export default function AgentDetails() {
             <CardHeader>
               <CardTitle>Agent Activities</CardTitle>
               <CardDescription>
-                Comments made by this agent on their tasks
+                Comments and time entries logged by this agent
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -2437,12 +2440,16 @@ export default function AgentDetails() {
                                       >
                                         {activity.entityTitle || "Untitled"}
                                       </Link>
+                                    ) : activity.entityType === "timeEntry" ? (
+                                      <span className="break-words whitespace-pre-line block">
+                                        {activity.entityTitle || "Untitled"}
+                                      </span>
                                     ) : (
                                       <span className="text-muted-foreground">Unknown</span>
                                     )}
                                   </TableCell>
                                   <TableCell style={{ wordBreak: 'break-word', whiteSpace: 'pre-line', maxWidth: 200 }}>
-                                    {activity.content}
+                                    <FormattedComment content={activity.content} />
                                   </TableCell>
                                   <TableCell className="align-top">
                                     <ActivityTimeCell activity={activity} />

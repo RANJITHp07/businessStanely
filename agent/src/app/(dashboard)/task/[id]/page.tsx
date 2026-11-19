@@ -76,6 +76,8 @@ import {
 } from "@/components/DailyTrackCell";
 import { DailyTrackForm } from "@/components/DailyTrackForm";
 import { DailyTrackList } from "@/components/DailyTrackList";
+import { CommentEditor } from "@/components/CommentEditor";
+import { FormattedComment } from "@/components/FormattedComment";
 
 // Task interface based on the API response
 interface Task {
@@ -1605,10 +1607,10 @@ export default function TaskDetails() {
                     <AvatarFallback className="text-xs">A</AvatarFallback>
                   </Avatar>
                   <div className="flex-1 space-y-2">
-                    <Textarea
+                    <CommentEditor
                       placeholder="Add a comment..."
                       value={newComment}
-                      onChange={(e) => setNewComment(e.target.value)}
+                      onChange={setNewComment}
                       rows={3}
                     />
                     <div className="mt-3 space-y-1">
@@ -1854,7 +1856,7 @@ export default function TaskDetails() {
                             </div>
                           )}
 
-                          <p className="text-sm">{getDisplayInteractionContent(comment.content)}</p>
+                          <FormattedComment content={getDisplayInteractionContent(comment.content)} />
                           {(() => {
                             const commentAttachments = getCommentAttachments(comment);
 

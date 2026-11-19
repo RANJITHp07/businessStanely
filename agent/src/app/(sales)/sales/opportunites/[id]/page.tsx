@@ -36,6 +36,8 @@ import { Progress } from "@/components/ui/progress"
 import { Checkbox } from "@/components/ui/checkbox"
 import { hasAdvisorRole } from "@/lib/agentRole"
 import { isLeadMaker } from "@/lib/agentType"
+import { CommentEditor } from "@/components/CommentEditor";
+import { FormattedComment } from "@/components/FormattedComment";
 
 interface oppurtunities {
     id: string
@@ -499,7 +501,7 @@ export default function OppurtunitiesDetailPage() {
                                                     </div>
                                                 </div>
                                             </div>
-                                            <p className="text-sm leading-relaxed">{comment.content}</p>
+                                            <FormattedComment content={comment.content} />
                                             {(comment.commentDate || comment.startTime || comment.endTime) && (
                                                 <div className="bg-gradient-to-r from-blue-50 to-blue-100 border border-blue-200 p-3 rounded-lg mt-3 mb-3">
                                                     <div className="flex flex-wrap items-center gap-6 text-blue-900">
@@ -606,11 +608,11 @@ export default function OppurtunitiesDetailPage() {
 
                             <div className="space-y-4">
                                 <Label htmlFor="new-interaction">Add Interaction</Label>
-                                <Textarea
+                                <CommentEditor
                                     id="new-interaction"
                                     placeholder="Add a note or comment about this oppurtunities..."
                                     value={newComment}
-                                    onChange={(e) => setNewComment(e.target.value)}
+                                    onChange={setNewComment}
                                     rows={4}
                                 />
 

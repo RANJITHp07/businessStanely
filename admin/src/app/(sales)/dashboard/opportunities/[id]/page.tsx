@@ -29,6 +29,8 @@ import Link from "next/link"
 import { Separator } from "@/components/ui/separator"
 import { cn } from "@/lib/utils"
 import { isAudioAttachment } from "@/lib/audioAttachment"
+import { CommentEditor } from "@/components/CommentEditor";
+import { FormattedComment } from "@/components/FormattedComment";
 
 interface oppurtunities {
     id: string
@@ -377,7 +379,7 @@ export default function OppurtunitiesDetailPage() {
                                                     </div>
                                                 </div>
                                             </div>
-                                            <p className="text-sm leading-relaxed">{comment.content}</p>
+                                            <FormattedComment content={comment.content} />
                                             {comment.attachments && comment.attachments.length > 0 && (
                                                 <div className="flex flex-wrap gap-2 pt-2">
                                                     {comment.attachments.map((att, idx) => {
@@ -448,11 +450,11 @@ export default function OppurtunitiesDetailPage() {
 
                             <div className="space-y-4">
                                 <Label htmlFor="new-interaction">Add Interaction</Label>
-                                <Textarea
+                                <CommentEditor
                                     id="new-interaction"
                                     placeholder="Add a note or comment about this oppurtunities..."
                                     value={newComment}
-                                    onChange={(e) => setNewComment(e.target.value)}
+                                    onChange={setNewComment}
                                     rows={4}
                                 />
 

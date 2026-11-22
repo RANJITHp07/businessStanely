@@ -152,8 +152,10 @@ export function SectionTable({
   label,
   tasks,
   viewMoreHref,
+  count,
 }: {
   label: string;
+  count?: number;
   tasks: Task[];
   // Defaults to the task list filtered by this section's status.
   viewMoreHref?: string;
@@ -161,6 +163,7 @@ export function SectionTable({
   const listHref =
     viewMoreHref ??
     `/task?status=${encodeURIComponent(sectionLabelToStatus(label))}`;
+  const heading = count === undefined ? label : `${label} (${count})`;
   const labelColor = (() => {
     const l = label.toLowerCase();
     if (l.includes("progress")) return "text-sky-600";
@@ -177,7 +180,7 @@ export function SectionTable({
           <span
             className={`block rotate-[-90deg] origin-center ${label.toLowerCase().includes("followup") ? "w-[230px] text-center whitespace-normal leading-tight" : "whitespace-nowrap"} tracking-widest font-semibold select-none text-[24px] ${labelColor}`}
           >
-            {label}
+            {heading}
           </span>
         </div>
 
@@ -188,7 +191,7 @@ export function SectionTable({
               <div
                 className={`md:hidden flex items-center justify-center px-4 py-4 rounded-lg shadow-sm border border-gray-100 font-semibold ${labelColor} text-2xl tracking-widest`}
               >
-                {label}
+                {heading}
               </div>
 
               {/* Desktop table */}
@@ -544,6 +547,7 @@ const SECTION_LIMIT = 3;
 
 export default function MyTasksPage() {
   const [sections, setSections] = useState<Record<string, Task[]>>({});
+  const [sectionCounts, setSectionCounts] = useState<Record<string, number>>({});
   const [counts, setCounts] = useState({
     total: 0,
     completed: 0,
@@ -551,6 +555,7 @@ export default function MyTasksPage() {
     todo: 0,
   });
   const [futureTasks, setFutureTasks] = useState<Task[]>([]);
+  const [futureTotal, setFutureTotal] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -564,9 +569,11 @@ export default function MyTasksPage() {
         if (!res.ok) throw new Error("Failed to fetch future tasks");
         const data = await res.json();
         setFutureTasks(data.tasks ?? []);
+        setFutureTotal(data.total ?? data.tasks?.length ?? 0);
       } catch (e) {
         console.error(e);
         setFutureTasks([]);
+        setFutureTotal(0);
       }
     };
 
@@ -578,6 +585,7 @@ export default function MyTasksPage() {
         if (!res.ok) throw new Error("Failed to fetch tasks");
         const data = await res.json();
         setSections(data.sections ?? {});
+        setSectionCounts(data.sectionCounts ?? {});
         setCounts(
           data.counts ?? {
             total: 0,
@@ -666,16 +674,17 @@ export default function MyTasksPage() {
         </div>
       ) : (
         <div className="space-y-[40px]">
-          <SectionTable label="New Task" tasks={tasksNew} />
-          <SectionTable label="In Progress" tasks={tasksInProgress} />
-          <SectionTable label="Followups" tasks={sections.followup ?? []} />
-          <SectionTable label="Hold" tasks={tasksHold} />
+          <SectionTable label="New Task" count={sectionCounts.todo} tasks={tasksNew} />
+          <SectionTable label="In Progress" count={sectionCounts.inprogress} tasks={tasksInProgress} />
+          <SectionTable label="Followups" count={sectionCounts.followup} tasks={sections.followup ?? []} />
+          <SectionTable label="Hold" count={sectionCounts.hold} tasks={tasksHold} />
           <SectionTable
             label="Future Tasks"
+            count={futureTotal}
             tasks={futureTasks}
             viewMoreHref="/task?trigger=standard"
           />
-          <SectionTable label="Completed" tasks={tasksCompleted} />
+          <SectionTable label="Completed" count={sectionCounts.completed} tasks={tasksCompleted} />
         </div>
       )}
     </section>

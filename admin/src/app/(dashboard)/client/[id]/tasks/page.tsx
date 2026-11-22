@@ -204,13 +204,16 @@ function StatCard({
 
 function SectionTable({
   label,
+  count,
   tasks,
   viewMoreHref,
 }: {
   label: string;
+  count?: number;
   tasks: Task[];
   viewMoreHref: string;
 }) {
+  const heading = count === undefined ? label : `${label} (${count})`;
   const labelColor = (() => {
     const l = label.toLowerCase();
     if (l.includes("progress")) return "text-sky-600";
@@ -227,7 +230,7 @@ function SectionTable({
           <span
             className={`block rotate-[-90deg] origin-center ${label.toLowerCase().includes("followup") ? "w-[230px] text-center whitespace-normal leading-tight" : "whitespace-nowrap"} tracking-widest font-semibold select-none text-[24px] ${labelColor}`}
           >
-            {label}
+            {heading}
           </span>
         </div>
 
@@ -237,7 +240,7 @@ function SectionTable({
               <div
                 className={`md:hidden flex items-center justify-center px-4 py-4 rounded-lg shadow-sm border border-gray-100 font-semibold ${labelColor} text-2xl tracking-widest`}
               >
-                {label}
+                {heading}
               </div>
 
               <div className="rounded-md overflow-hidden hidden md:block bg-white shadow-sm">
@@ -471,13 +474,16 @@ function SectionTable({
 
 function TaskSections({
   tasks,
+  sectionCounts,
   taskListHref,
   future,
 }: {
   tasks: Task[];
+  // Exact size of each section; `tasks` only holds the newest few rows.
+  sectionCounts: Record<string, number>;
   taskListHref: (status: string) => string;
   // Optional "Future Tasks" section, shown under Completed.
-  future?: { tasks: Task[]; viewMoreHref: string };
+  future?: { tasks: Task[]; total: number; viewMoreHref: string };
 }) {
   const tasksNew = tasks.filter((t) => taskSection(t) === "todo");
   const tasksInProgress = tasks.filter((t) => taskSection(t) === "inprogress");
@@ -486,27 +492,31 @@ function TaskSections({
 
   return (
     <div className="space-y-[40px]">
-      <SectionTable label="New Task" tasks={tasksNew.slice(0, 3)} viewMoreHref={taskListHref("New Task")} />
+      <SectionTable label="New Task" count={sectionCounts.todo ?? 0} tasks={tasksNew.slice(0, 3)} viewMoreHref={taskListHref("New Task")} />
       <SectionTable
         label="In Progress"
+        count={sectionCounts.inprogress ?? 0}
         tasks={tasksInProgress.slice(0, 3)}
         viewMoreHref={taskListHref("In Progress")}
       />
       <SectionTable
         label="Followups"
+        count={sectionCounts.followup ?? 0}
         tasks={tasks.filter((t) => taskSection(t) === "followup").slice(0, 3)}
         viewMoreHref={taskListHref("Followups")}
       />
-      <SectionTable label="Hold" tasks={tasksHold.slice(0, 3)} viewMoreHref={taskListHref("Hold")} />
+      <SectionTable label="Hold" count={sectionCounts.hold ?? 0} tasks={tasksHold.slice(0, 3)} viewMoreHref={taskListHref("Hold")} />
       {future && (
         <SectionTable
           label="Future Tasks"
+          count={future.total}
           tasks={future.tasks.slice(0, 3)}
           viewMoreHref={future.viewMoreHref}
         />
       )}
       <SectionTable
         label="Completed"
+        count={sectionCounts.completed ?? 0}
         tasks={tasksCompleted.slice(0, 3)}
         viewMoreHref={taskListHref("Completed")}
       />
@@ -517,6 +527,7 @@ function TaskSections({
 const EMPTY_SUMMARY = {
   /** The newest rows of each section, which is all the page lists. */
   tasks: [] as Task[],
+  sectionCounts: {} as Record<string, number>,
   total: 0,
   completed: 0,
   inprogress: 0,
@@ -527,13 +538,14 @@ const EMPTY_SUMMARY = {
 function parseTaskSummary(data: {
   sections?: Record<string, Task[]>;
   counts?: { total?: number; completed?: number };
-  sectionCounts?: { inprogress?: number; todo?: number };
+  sectionCounts?: Record<string, number>;
   overdue?: number;
 }) {
   return {
     tasks: Object.values(data.sections ?? {}).flat(),
     total: data.counts?.total ?? 0,
     completed: data.counts?.completed ?? 0,
+    sectionCounts: data.sectionCounts ?? {},
     inprogress: data.sectionCounts?.inprogress ?? 0,
     todo: data.sectionCounts?.todo ?? 0,
     overdue: data.overdue ?? 0,
@@ -550,6 +562,7 @@ export default function ClientTasksPage() {
   const [triggerTasks, setTriggerTasks] = useState<Task[]>([]);
   const [triggerTotal, setTriggerTotal] = useState(0);
   const [standardFutureTasks, setStandardFutureTasks] = useState<Task[]>([]);
+  const [standardFutureTotal, setStandardFutureTotal] = useState(0);
   const [legislations, setLegislations] = useState<ClientLegislation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -601,7 +614,12 @@ export default function ClientTasksPage() {
       }
 
       if (standardFutureResult.status === "fulfilled" && standardFutureResult.value.ok) {
-        setStandardFutureTasks(parseTaskResponse(await standardFutureResult.value.json()));
+        const futureData = await standardFutureResult.value.json();
+        const futureRows = parseTaskResponse(futureData);
+        setStandardFutureTasks(futureRows);
+        setStandardFutureTotal(
+          Array.isArray(futureData) ? futureRows.length : (futureData.total ?? futureRows.length),
+        );
       } else if (standardFutureResult.status === "rejected") {
         console.error("Error fetching future tasks:", standardFutureResult.reason);
       }
@@ -814,11 +832,13 @@ export default function ClientTasksPage() {
           ) : (
             <TaskSections
               tasks={taskSummary.tasks}
+              sectionCounts={taskSummary.sectionCounts}
               taskListHref={(label) =>
                 `/task?clientId=${id}&status=${encodeURIComponent(sectionLabelToStatus(label))}`
               }
               future={{
                 tasks: standardFutureTasks,
+                total: standardFutureTotal,
                 viewMoreHref: `/task?clientId=${id}&trigger=standard`,
               }}
             />
@@ -835,6 +855,7 @@ export default function ClientTasksPage() {
           ) : (
             <TaskSections
               tasks={retainershipSummary.tasks}
+              sectionCounts={retainershipSummary.sectionCounts}
               taskListHref={(label) =>
                 `/task?clientId=${id}&retainershipTasks=true&status=${encodeURIComponent(sectionLabelToStatus(label))}`
               }
@@ -853,6 +874,7 @@ export default function ClientTasksPage() {
             <div className="space-y-[40px]">
               <SectionTable
                 label="Upcoming Tasks"
+                count={triggerTotal}
                 tasks={triggerTasks.slice(0, 3)}
                 viewMoreHref={`/task?clientId=${id}&trigger=true`}
               />

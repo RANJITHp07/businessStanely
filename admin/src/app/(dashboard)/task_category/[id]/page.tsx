@@ -311,6 +311,7 @@ export default function CategoryDetail({ params }: { params: Promise<{ id: strin
                                     <SectionTable
                                         key={section.key}
                                         label={section.label}
+                                        count={tasks.filter((task) => taskSection(task) === section.key).length}
                                         tasks={tasks.filter((task) => taskSection(task) === section.key).slice(0, 3)}
                                         viewMoreHref={`/task?categoryId=${resolvedParams.id}&status=${encodeURIComponent(section.status)}`}
                                     />

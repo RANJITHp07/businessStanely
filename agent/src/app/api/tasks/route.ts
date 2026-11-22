@@ -425,22 +425,19 @@ export async function GET(req: NextRequest) {
         select: { ...SUMMARY_ROW_SELECT, triggerDate: true, nextDueDate: true },
         orderBy: { createdAt: "desc" },
       });
-      const { counts, sectionById } = summarizeTaskRows(rows, limit);
+      const { counts, sectionCounts, sectionById } = summarizeTaskRows(rows, limit);
 
       // The retainership page's Future section. A task can also sit in a status
       // section, so these are tracked apart from `sectionById`.
       const now = new Date();
-      const futureIds = new Set(
+      const futureRows =
         retainershipTasks === "true" && !assignedToIds?.length
-          ? rows
-              .filter((row) => {
-                const when = row.triggerDate ?? row.nextDueDate;
-                return when ? when > now : false;
-              })
-              .slice(0, limit)
-              .map((row) => row.id)
-          : [],
-      );
+          ? rows.filter((row) => {
+              const when = row.triggerDate ?? row.nextDueDate;
+              return when ? when > now : false;
+            })
+          : [];
+      const futureIds = new Set(futureRows.slice(0, limit).map((row) => row.id));
 
       const tasks = await prisma.task.findMany({
         where: {
@@ -453,6 +450,9 @@ export async function GET(req: NextRequest) {
 
       return NextResponse.json({
         counts,
+        // Exact size of each section, not just the capped rows returned.
+        sectionCounts,
+        futureTotal: futureRows.length,
         future: tasks
           .filter((task) => futureIds.has(task.id))
           .map((task) => toRow(formatSummaryTask(task))),

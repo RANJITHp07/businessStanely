@@ -10,6 +10,7 @@ const SECTION_LIMIT = 3;
 
 export default function AssignedTasksPage() {
   const [sections, setSections] = useState<Record<string, Task[]>>({});
+  const [sectionCounts, setSectionCounts] = useState<Record<string, number>>({});
   const [counts, setCounts] = useState({
     total: 0,
     completed: 0,
@@ -34,6 +35,7 @@ export default function AssignedTasksPage() {
         if (!res.ok) throw new Error("Failed to fetch assigned tasks");
         const data = await res.json();
         setSections(data.sections ?? {});
+        setSectionCounts(data.sectionCounts ?? {});
         setCounts(
           data.counts ?? {
             total: 0,
@@ -106,11 +108,11 @@ export default function AssignedTasksPage() {
         </div>
       ) : (
         <div className="space-y-[40px]">
-          <SectionTable label="New Task" tasks={sections.todo ?? []} assignedByMe />
-          <SectionTable label="In Progress" tasks={sections.inprogress ?? []} assignedByMe />
-          <SectionTable label="Followups" tasks={sections.followup ?? []} assignedByMe />
-          <SectionTable label="Hold" tasks={sections.hold ?? []} assignedByMe />
-          <SectionTable label="Completed" tasks={sections.completed ?? []} assignedByMe />
+          <SectionTable label="New Task" count={sectionCounts.todo} tasks={sections.todo ?? []} assignedByMe />
+          <SectionTable label="In Progress" count={sectionCounts.inprogress} tasks={sections.inprogress ?? []} assignedByMe />
+          <SectionTable label="Followups" count={sectionCounts.followup} tasks={sections.followup ?? []} assignedByMe />
+          <SectionTable label="Hold" count={sectionCounts.hold} tasks={sections.hold ?? []} assignedByMe />
+          <SectionTable label="Completed" count={sectionCounts.completed} tasks={sections.completed ?? []} assignedByMe />
         </div>
       )}
     </section>

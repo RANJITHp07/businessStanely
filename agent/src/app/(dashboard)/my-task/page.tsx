@@ -158,7 +158,8 @@ export function StatCard({
   );
 }
 
-export function SectionTable({ label, tasks, retainershipTasks, trigger, triggerScope, assignedByMe, onTaskChanged }: { label: string; tasks: Task[], retainershipTasks?: boolean, trigger?: boolean, triggerScope?: string, assignedByMe?: boolean, onTaskChanged?: (taskId: string, patch: DailyTrackTaskPatch) => void }) {
+export function SectionTable({ label, tasks, retainershipTasks, trigger, triggerScope, assignedByMe, onTaskChanged, count }: { label: string; count?: number; tasks: Task[], retainershipTasks?: boolean, trigger?: boolean, triggerScope?: string, assignedByMe?: boolean, onTaskChanged?: (taskId: string, patch: DailyTrackTaskPatch) => void }) {
+  const heading = count === undefined ? label : `${label} (${count})`;
   const labelColor = (() => {
     const l = label.toLowerCase();
     if (l.includes("progress")) return "text-sky-600";
@@ -185,7 +186,7 @@ export function SectionTable({ label, tasks, retainershipTasks, trigger, trigger
           <span
             className={`block rotate-[-90deg] origin-center ${label.toLowerCase().includes("followup") ? "w-[230px] text-center whitespace-normal leading-tight" : "whitespace-nowrap"} tracking-widest font-semibold select-none text-[24px] ${labelColor}`}
           >
-            {label}
+            {heading}
           </span>
         </div>
 
@@ -196,7 +197,7 @@ export function SectionTable({ label, tasks, retainershipTasks, trigger, trigger
               <div
                 className={`md:hidden flex items-center justify-center px-4 py-4 rounded-lg shadow-sm border border-gray-100 font-semibold ${labelColor} text-2xl tracking-widest`}
               >
-                {label}
+                {heading}
               </div>
 
               {/* Desktop table */}
@@ -652,6 +653,7 @@ const SECTION_LIMIT = 3;
 
 export default function MyTasksPage() {
   const [sections, setSections] = useState<Record<string, Task[]>>({});
+  const [sectionCounts, setSectionCounts] = useState<Record<string, number>>({});
   const [counts, setCounts] = useState({
     total: 0,
     completed: 0,
@@ -660,6 +662,7 @@ export default function MyTasksPage() {
   });
   const [loading, setLoading] = useState(true);
   const [futureTasks, setFutureTasks] = useState<Task[]>([]);
+  const [futureTotal, setFutureTotal] = useState(0);
   const { agent, isLoading: authLoading } = useAuth();
   // Read the permission from the live profile rather than the localStorage copy
   // in useAuth, so an admin revoking it takes effect without a re-login.
@@ -684,9 +687,11 @@ export default function MyTasksPage() {
         );
         const data = res.ok ? await res.json() : null;
         setFutureTasks(data?.tasks ?? []);
+        setFutureTotal(data?.total ?? data?.tasks?.length ?? 0);
       } catch (e) {
         console.error(e);
         setFutureTasks([]);
+        setFutureTotal(0);
       }
     };
 
@@ -706,6 +711,7 @@ export default function MyTasksPage() {
         if (!res.ok) throw new Error("Failed to fetch tasks");
         const data = await res.json();
         setSections(data.sections ?? {});
+        setSectionCounts(data.sectionCounts ?? {});
         setCounts(
           data.counts ?? {
             total: 0,
@@ -733,18 +739,20 @@ export default function MyTasksPage() {
   // A follow-up's day track restarts its wait, so the row leaves In Progress
   // for the Followups group straight away instead of on the next reload.
   const moveToFollowUps = (taskId: string, patch: DailyTrackTaskPatch) => {
-    setSections((prev) => {
-      const inprogress = prev.inprogress ?? [];
-      const task = inprogress.find((t) => t.id === taskId);
-      if (!task) return prev;
-      const moved = { ...task, ...patch };
-      if (taskSection(moved) !== "followup") return prev;
-      return {
-        ...prev,
-        inprogress: inprogress.filter((t) => t.id !== taskId),
-        followup: [moved, ...(prev.followup ?? []).filter((t) => t.id !== taskId)],
-      };
-    });
+    const task = (sections.inprogress ?? []).find((t) => t.id === taskId);
+    if (!task) return;
+    const moved = { ...task, ...patch };
+    if (taskSection(moved) !== "followup") return;
+    setSections((prev) => ({
+      ...prev,
+      inprogress: (prev.inprogress ?? []).filter((t) => t.id !== taskId),
+      followup: [moved, ...(prev.followup ?? []).filter((t) => t.id !== taskId)],
+    }));
+    setSectionCounts((c) => ({
+      ...c,
+      inprogress: Math.max(0, (c.inprogress ?? 0) - 1),
+      followup: (c.followup ?? 0) + 1,
+    }));
   };
 
   const tasksNew = sections.todo ?? [];
@@ -814,19 +822,20 @@ export default function MyTasksPage() {
         </div>
       ) : (
         <div className="space-y-[40px]">
-          <SectionTable label="New Task" tasks={tasksNew} />
-          <SectionTable label="In Progress" tasks={tasksInProgress} onTaskChanged={moveToFollowUps} />
-          <SectionTable label="Followups" tasks={sections.followup ?? []} />
-          <SectionTable label="Hold" tasks={tasksHold} />
+          <SectionTable label="New Task" count={sectionCounts.todo} tasks={tasksNew} />
+          <SectionTable label="In Progress" count={sectionCounts.inprogress} tasks={tasksInProgress} onTaskChanged={moveToFollowUps} />
+          <SectionTable label="Followups" count={sectionCounts.followup} tasks={sections.followup ?? []} />
+          <SectionTable label="Hold" count={sectionCounts.hold} tasks={tasksHold} />
           {futureTasks.length > 0 && (
             <SectionTable
               label="Future Tasks"
+              count={futureTotal}
               tasks={futureTasks.slice(0, SECTION_LIMIT)}
               trigger={true}
               triggerScope="standard"
             />
           )}
-          <SectionTable label="Completed" tasks={tasksCompleted} />
+          <SectionTable label="Completed" count={sectionCounts.completed} tasks={tasksCompleted} />
         </div>
       )}
     </section>

@@ -252,7 +252,9 @@ export default function TasksTable() {
     if (!taskToDelete) return
 
     try {
-      const response = await fetchWithAuth(`/api/tasks/${taskToDelete.id}`, {
+      // Upcoming/Future rows are already inactive (or completed), so
+      // deactivating them would change nothing; remove them for real.
+      const response = await fetchWithAuth(`/api/tasks/${taskToDelete.id}${triggerView ? "?remove=true" : ""}`, {
         method: 'DELETE',
       });
 
@@ -1009,15 +1011,16 @@ export default function TasksTable() {
                                       </Link>
                                     </DropdownMenuItem>
                                   )}
-                                  {
-                                    task.active &&
+                                  {task.active && (
+                                    <DropdownMenuItem onClick={() => setTaskToConvert(task)}>
+                                      <ArrowLeftRight className="mr-2 h-4 w-4" />
+                                      {task.legislationId || task.retainershipId
+                                        ? "Convert to Normal Task"
+                                        : "Convert to Legislation Task"}
+                                    </DropdownMenuItem>
+                                  )}
+                                  {(task.active || triggerView) && (
                                     <>
-                                      <DropdownMenuItem onClick={() => setTaskToConvert(task)}>
-                                        <ArrowLeftRight className="mr-2 h-4 w-4" />
-                                        {task.legislationId || task.retainershipId
-                                          ? "Convert to Normal Task"
-                                          : "Convert to Legislation Task"}
-                                      </DropdownMenuItem>
                                       <DropdownMenuSeparator />
                                       <DropdownMenuItem
                                         className="text-destructive"
@@ -1027,7 +1030,7 @@ export default function TasksTable() {
                                         Delete Task
                                       </DropdownMenuItem>
                                     </>
-                                  }
+                                  )}
 
                                 </DropdownMenuContent>
                               </DropdownMenu>

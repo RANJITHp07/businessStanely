@@ -343,6 +343,12 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
+    if (req.nextUrl.searchParams.get("remove") === "true") {
+      // Upcoming/Future recurring rows are already inactive, so deactivating
+      // is a no-op. The soft-delete extension turns this into a soft delete.
+      await prisma.task.delete({ where: { id } });
+      return new NextResponse(null, { status: 204 });
+    }
     await prisma.task.update({
       where: { id },
       data: { active: false },

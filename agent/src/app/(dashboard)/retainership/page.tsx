@@ -90,15 +90,20 @@ interface DashboardRetainership {
 interface TaskSummary {
     total: number;
     sections: Record<string, Task[]>;
+    // Exact size of each section; `sections` only holds the newest few rows.
+    sectionCounts: Record<string, number>;
     future: Task[];
+    futureTotal: number;
 }
 
-const EMPTY_TASK_SUMMARY: TaskSummary = { total: 0, sections: {}, future: [] };
+const EMPTY_TASK_SUMMARY: TaskSummary = { total: 0, sections: {}, sectionCounts: {}, future: [], futureTotal: 0 };
 
-const toTaskSummary = (data: { counts?: { total?: number }; sections?: Record<string, Task[]>; future?: Task[] }): TaskSummary => ({
+const toTaskSummary = (data: { counts?: { total?: number }; sections?: Record<string, Task[]>; sectionCounts?: Record<string, number>; future?: Task[]; futureTotal?: number }): TaskSummary => ({
     total: data.counts?.total ?? 0,
     sections: data.sections ?? {},
+    sectionCounts: data.sectionCounts ?? {},
     future: data.future ?? [],
+    futureTotal: data.futureTotal ?? 0,
 });
 
 export default function RetainershipTable() {
@@ -667,31 +672,37 @@ export default function RetainershipTable() {
                             <div className="space-y-3">
                                 <SectionTable
                                     label="New Task"
+                                    count={myRetainerships.sectionCounts.todo ?? 0}
                                     tasks={myRetainerships.sections.todo || []}
                                     retainershipTasks={true}
                                 />
                                 <SectionTable
                                     label="In Progress"
+                                    count={myRetainerships.sectionCounts.inprogress ?? 0}
                                     tasks={myRetainerships.sections.inprogress || []}
                                     retainershipTasks={true}
                                 />
                                 <SectionTable
                                     label="Followups"
+                                    count={myRetainerships.sectionCounts.followup ?? 0}
                                     tasks={myRetainerships.sections.followup || []}
                                     retainershipTasks={true}
                                 />
                                 <SectionTable
                                     label="Hold"
+                                    count={myRetainerships.sectionCounts.hold ?? 0}
                                     tasks={myRetainerships.sections.hold || []}
                                     retainershipTasks={true}
                                 />
                                 <SectionTable
                                     label="Future"
+                                    count={myRetainerships.futureTotal}
                                     tasks={myRetainerships.future}
                                     retainershipTasks={true}
                                 />
                                 <SectionTable
                                     label="Completed"
+                                    count={myRetainerships.sectionCounts.completed ?? 0}
                                     tasks={myRetainerships.sections.completed || []}
                                     retainershipTasks={true}
                                 />
@@ -712,26 +723,31 @@ export default function RetainershipTable() {
                             <div className="space-y-3">
                                 <SectionTable
                                     label="New Task"
+                                    count={teamRetainerships.sectionCounts.todo ?? 0}
                                     tasks={teamRetainerships.sections.todo || []}
                                     retainershipTasks={true}
                                 />
                                 <SectionTable
                                     label="In Progress"
+                                    count={teamRetainerships.sectionCounts.inprogress ?? 0}
                                     tasks={teamRetainerships.sections.inprogress || []}
                                     retainershipTasks={true}
                                 />
                                 <SectionTable
                                     label="Followups"
+                                    count={teamRetainerships.sectionCounts.followup ?? 0}
                                     tasks={teamRetainerships.sections.followup || []}
                                     retainershipTasks={true}
                                 />
                                 <SectionTable
                                     label="Hold"
+                                    count={teamRetainerships.sectionCounts.hold ?? 0}
                                     tasks={teamRetainerships.sections.hold || []}
                                     retainershipTasks={true}
                                 />
                                 <SectionTable
                                     label="Completed"
+                                    count={teamRetainerships.sectionCounts.completed ?? 0}
                                     tasks={teamRetainerships.sections.completed || []}
                                     retainershipTasks={true}
                                 />
@@ -754,6 +770,7 @@ export default function RetainershipTable() {
                         <div className="space-y-[40px]">
                             <SectionTable
                                 label="Upcoming Tasks"
+                                count={triggerTotal}
                                 tasks={triggerTask}
                                 trigger={true}
                             />

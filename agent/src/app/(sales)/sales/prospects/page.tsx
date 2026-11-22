@@ -108,8 +108,9 @@ function StatCard({
     )
 }
 
-function SectionTable({ label, prospects }: { label: string; prospects: Prospect[] }) {
+function SectionTable({ label, prospects, count }: { label: string; prospects: Prospect[]; count?: number }) {
     const router = useRouter()
+    const heading = count === undefined ? label : `${label} (${count})`
     const labelColor = (() => {
         const l = label.toLowerCase()
         if (l.includes("progress")) return "text-sky-600"
@@ -125,7 +126,7 @@ function SectionTable({ label, prospects }: { label: string; prospects: Prospect
                     <span
                         className={`text-[24px] tracking-widest font-semibold select-none whitespace-nowrap [writing-mode:vertical-rl] rotate-180 ${labelColor}`}
                     >
-                        {label}
+                        {heading}
                     </span>
                 </div>
 
@@ -135,7 +136,7 @@ function SectionTable({ label, prospects }: { label: string; prospects: Prospect
                             <div
                                 className={`md:hidden flex items-center justify-center px-4 py-4 rounded-lg shadow-sm border border-gray-100 font-semibold ${labelColor} text-2xl tracking-widest`}
                             >
-                                {label}
+                                {heading}
                             </div>
 
                             <div className="rounded-md overflow-hidden hidden md:block bg-white shadow-sm">
@@ -295,6 +296,7 @@ export default function ProspectsPage() {
     const router = useRouter()
     const [sections, setSections] = useState<Record<string, Prospect[]>>({})
     const [counts, setCounts] = useState({ total: 0, new: 0, inProgress: 0 })
+    const [statusCounts, setStatusCounts] = useState<Record<string, number>>({})
     const [loading, setLoading] = useState(true)
 
     useEffect(() => {
@@ -303,6 +305,7 @@ export default function ProspectsPage() {
             .then(res => res.json())
             .then(data => {
                 setSections(data.sections ?? {})
+                setStatusCounts(data.statusCounts ?? {})
                 setCounts(data.counts ?? { total: 0, new: 0, inProgress: 0 })
                 setLoading(false)
             })
@@ -362,11 +365,11 @@ export default function ProspectsPage() {
                     </div>
 
                     <div className="space-y-8">
-                        <SectionTable label="New Prospects" prospects={newProspects} />
-                        <SectionTable label="In Progress" prospects={inProgressProspects} />
-                        <SectionTable label="Relevant but not Now" prospects={inRelevantNotNowProspects} />
-                        <SectionTable label="Career" prospects={inCarrerProspects} />
-                        <SectionTable label="Not Relevant" prospects={inRelevantNotProspects} />
+                        <SectionTable label="New Prospects" count={statusCounts["New"] ?? 0} prospects={newProspects} />
+                        <SectionTable label="In Progress" count={statusCounts["In Progress"] ?? 0} prospects={inProgressProspects} />
+                        <SectionTable label="Relevant but not Now" count={statusCounts["Relevant but not Now"] ?? 0} prospects={inRelevantNotNowProspects} />
+                        <SectionTable label="Career" count={statusCounts["Career"] ?? 0} prospects={inCarrerProspects} />
+                        <SectionTable label="Not Relevant" count={statusCounts["Not Relevant"] ?? 0} prospects={inRelevantNotProspects} />
                     </div>
                 </>
             )}

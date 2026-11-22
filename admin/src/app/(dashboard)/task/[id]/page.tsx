@@ -651,7 +651,7 @@ export default function TaskDetails() {
     { value: "1w", label: "1 Week" },
   ];
   const instanceOptions = [
-    { value: "Working", label: "Working" },
+    { value: "Working", label: "Normal" },
     { value: "24hr", label: "24 Hours Duration" },
     { value: "48hr", label: "48 Hours Duration" },
     { value: "1w", label: "1 Week Duration" },
@@ -1007,7 +1007,7 @@ export default function TaskDetails() {
                     disabled={isDeleted}
                   >
                     <SelectTrigger id="follow-up-duration" className="w-full">
-                      <SelectValue placeholder="Working" />
+                      <SelectValue placeholder="Normal" />
                     </SelectTrigger>
                     <SelectContent>
                       {instanceOptions.map(opt => (
@@ -1660,7 +1660,7 @@ export default function TaskDetails() {
                       disabled={isDeleted}
                     >
                       <SelectTrigger id="follow-up-duration" className="w-full">
-                        <SelectValue placeholder="Working" />
+                        <SelectValue placeholder="Normal" />
                       </SelectTrigger>
                       <SelectContent>
                         {instanceOptions.map(opt => (
@@ -1679,7 +1679,7 @@ export default function TaskDetails() {
                       disabled={isDeleted}
                     >
                       <SelectTrigger id="status-check-duration" className="w-full">
-                        <SelectValue placeholder="Working" />
+                        <SelectValue placeholder="Normal" />
                       </SelectTrigger>
                       <SelectContent>
                         {durationOptions.map(opt => (

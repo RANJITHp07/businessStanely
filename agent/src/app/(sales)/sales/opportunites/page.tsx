@@ -129,8 +129,9 @@ function StatCard({
     )
 }
 
-function SectionTable({ label, opportunities }: { label: string; opportunities: any[] }) {
+function SectionTable({ label, opportunities, count }: { label: string; opportunities: any[]; count?: number }) {
     const router = useRouter()
+    const heading = count === undefined ? label : `${label} (${count})`
     const labelColor = (() => {
         const l = label.toLowerCase()
         if (l.includes("won")) return "text-green-600"
@@ -154,7 +155,7 @@ function SectionTable({ label, opportunities }: { label: string; opportunities: 
                     <span
                         className={`block rotate-[-90deg] origin-center whitespace-nowrap tracking-widest font-semibold select-none text-[24px] ${labelColor}`}
                     >
-                        {label}
+                        {heading}
                     </span>
                 </div>
 
@@ -164,7 +165,7 @@ function SectionTable({ label, opportunities }: { label: string; opportunities: 
                             <div
                                 className={`md:hidden flex items-center justify-center px-4 py-4 rounded-lg shadow-sm border border-gray-100 font-semibold ${labelColor} text-2xl tracking-widest`}
                             >
-                                {label}
+                                {heading}
                             </div>
 
                             <div className="rounded-md overflow-hidden hidden md:block bg-white shadow-sm">
@@ -369,6 +370,7 @@ function normalizeOpportunity(opp: any) {
 export default function OpportunitiesPage() {
     const [sections, setSections] = useState<Record<string, any[]>>({})
     const [counts, setCounts] = useState(EMPTY_COUNTS)
+    const [statusCounts, setStatusCounts] = useState<Record<string, number>>({})
     const [loading, setLoading] = useState(true)
 
     useEffect(() => {
@@ -391,6 +393,7 @@ export default function OpportunitiesPage() {
                     )
                 )
                 setCounts(data.counts ?? EMPTY_COUNTS)
+                setStatusCounts(data.statusCounts ?? {})
             } catch {
                 setSections({})
                 setCounts(EMPTY_COUNTS)
@@ -460,10 +463,10 @@ export default function OpportunitiesPage() {
                     </div>
 
                     <div className="space-y-8">
-                        <SectionTable label="New Opportunity" opportunities={newOpportunities} />
-                        <SectionTable label="Proposal Issued" opportunities={proposalOpportunities} />
-                        <SectionTable label="Closed as Won" opportunities={wonOpportunities} />
-                        <SectionTable label="Closed as Loss" opportunities={lossOpportunities} />
+                        <SectionTable label="New Opportunity" count={statusCounts["New Opportunity"] ?? 0} opportunities={newOpportunities} />
+                        <SectionTable label="Proposal Issued" count={statusCounts["Proposal Issued"] ?? 0} opportunities={proposalOpportunities} />
+                        <SectionTable label="Closed as Won" count={statusCounts["Closed as Won"] ?? 0} opportunities={wonOpportunities} />
+                        <SectionTable label="Closed as Loss" count={statusCounts["Closed as Loss"] ?? 0} opportunities={lossOpportunities} />
                     </div>
                 </>
             )}

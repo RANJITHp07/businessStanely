@@ -121,6 +121,10 @@ export async function GET(req: NextRequest) {
 
       return NextResponse.json({
         counts: buildOpportunityCounts(groups),
+        // Exact size of each status, not just the capped rows returned.
+        statusCounts: Object.fromEntries(
+          groups.map((g) => [g.status ?? "", g._count._all]),
+        ),
         sections: Object.fromEntries(
           sections.map((s) => [s.status, s.opportunities]),
         ),

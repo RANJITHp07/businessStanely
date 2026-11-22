@@ -206,6 +206,7 @@ function getDefaultTabForAgent(agentData: Agent) {
 
 interface SectionTableProps {
   label: string;
+  count?: number;
   tasks: Task[];
   agentId: string;
   retainershipTasks?: boolean;
@@ -214,11 +215,13 @@ interface SectionTableProps {
 
 function SectionTable({
   label,
+  count,
   tasks,
   agentId,
   retainershipTasks,
   trigger,
 }: SectionTableProps) {
+  const heading = count === undefined ? label : `${label} (${count})`;
   const labelColor = (() => {
     const l = label.toLowerCase();
     if (l.includes("progress")) return "text-sky-600";
@@ -235,7 +238,7 @@ function SectionTable({
           <span
             className={`block rotate-[-90deg] origin-center ${label.toLowerCase().includes("followup") ? "w-[230px] text-center whitespace-normal leading-tight" : "whitespace-nowrap"} tracking-widest font-semibold select-none text-[24px] ${labelColor}`}
           >
-            {label}
+            {heading}
           </span>
         </div>
 
@@ -246,7 +249,7 @@ function SectionTable({
               <div
                 className={`md:hidden flex items-center justify-center px-4 py-4 rounded-lg shadow-sm border border-gray-100 font-semibold ${labelColor} text-2xl tracking-widest`}
               >
-                {label}
+                {heading}
               </div>
 
               {/* Desktop table */}
@@ -1220,26 +1223,31 @@ export default function AgentDetails() {
                       <SectionTable
                         label="New Task"
                         tasks={agentTasks.filter((t) => taskSection(t) === "todo").slice(0, 3)}
+                        count={agentTasks.filter((t) => taskSection(t) === "todo").length}
                         agentId={id}
                       />
                       <SectionTable
                         label="In Progress"
                         tasks={agentTasks.filter((t) => taskSection(t) === "inprogress").slice(0, 3)}
+                        count={agentTasks.filter((t) => taskSection(t) === "inprogress").length}
                         agentId={id}
                       />
                       <SectionTable
                         label="Followups"
                         tasks={agentTasks.filter((t) => taskSection(t) === "followup").slice(0, 3)}
+                        count={agentTasks.filter((t) => taskSection(t) === "followup").length}
                         agentId={id}
                       />
                       <SectionTable
                         label="Hold"
                         tasks={agentTasks.filter((t) => ["hold"].includes(statusKey(t.status))).slice(0, 3)}
+                        count={agentTasks.filter((t) => ["hold"].includes(statusKey(t.status))).length}
                         agentId={id}
                       />
                       <SectionTable
                         label="Completed"
                         tasks={agentTasks.filter((t) => ["completed"].includes(statusKey(t.status))).slice(0, 3)}
+                        count={agentTasks.filter((t) => ["completed"].includes(statusKey(t.status))).length}
                         agentId={id}
                       />
                     </div>
@@ -1260,30 +1268,35 @@ export default function AgentDetails() {
                       <SectionTable
                         label="New Task"
                         tasks={agentRetainershipTasks.filter((t) => taskSection(t) === "todo").slice(0, 3)}
+                        count={agentRetainershipTasks.filter((t) => taskSection(t) === "todo").length}
                         agentId={id}
                         retainershipTasks={true}
                       />
                       <SectionTable
                         label="In Progress"
                         tasks={agentRetainershipTasks.filter((t) => taskSection(t) === "inprogress").slice(0, 3)}
+                        count={agentRetainershipTasks.filter((t) => taskSection(t) === "inprogress").length}
                         agentId={id}
                         retainershipTasks={true}
                       />
                       <SectionTable
                         label="Followups"
                         tasks={agentRetainershipTasks.filter((t) => taskSection(t) === "followup").slice(0, 3)}
+                        count={agentRetainershipTasks.filter((t) => taskSection(t) === "followup").length}
                         agentId={id}
                         retainershipTasks={true}
                       />
                       <SectionTable
                         label="Hold"
                         tasks={agentRetainershipTasks.filter((t) => ["hold"].includes(statusKey(t.status))).slice(0, 3)}
+                        count={agentRetainershipTasks.filter((t) => ["hold"].includes(statusKey(t.status))).length}
                         agentId={id}
                         retainershipTasks={true}
                       />
                       <SectionTable
                         label="Completed"
                         tasks={agentRetainershipTasks.filter((t) => ["completed"].includes(statusKey(t.status))).slice(0, 3)}
+                        count={agentRetainershipTasks.filter((t) => ["completed"].includes(statusKey(t.status))).length}
                         agentId={id}
                         retainershipTasks={true}
                       />
@@ -1305,6 +1318,7 @@ export default function AgentDetails() {
                       <SectionTable
                         label="Upcoming Tasks"
                         tasks={agentTriggerTasks.slice(0, 3)}
+                        count={agentTriggerTasks.length}
                         agentId={id}
                         trigger={true}
                       />

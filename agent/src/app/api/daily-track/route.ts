@@ -147,7 +147,9 @@ export async function POST(req: NextRequest) {
     // the task returns to the Followups group now rather than tomorrow.
     // updatedAt is kept: moving the cycle on is not an edit to the task.
     let followUpUntil = task.followUpUntil;
-    const restart = existing ? {} : followUpRestart(task);
+    // Keyed on the task being due, not on whether the note is new: a note
+    // already written today must still send a due follow-up back to the group.
+    const restart = needsDayTrackOn(task) ? followUpRestart(task) : {};
     if (restart.followUpUntil) {
       await prisma.task.update({
         where: { id: taskId },

@@ -977,6 +977,32 @@ model PracticeAreaParameter {
   /// Most files one enquiry may attach to this parameter. Null when
   /// attachments are disabled.
   maxAttachments Int?
+  /// Instruction shown under the field, e.g. "Upload a clear copy of the PAN
+  /// card". Null for none.
+  helpText       String?
+  /// Kinds of file the client may attach: PDF, IMAGE, WORD, EXCEL, TEXT.
+  /// Empty means any of the site's supported types. Optional list so rows
+  /// written before this existed still read back.
+  fileTypes      String[]
+
+  /// GROUP only: the kind of answer the group itself asks for (TEXT, DATE,
+  /// ...), shown above its sub-parameters. Null = no answer of its own beyond
+  /// attachments, if attachmentMode allows them.
+  valueType String?
+
+  /// Nesting. Null for a top-level parameter; otherwise the id of the GROUP
+  /// parameter this one is a sub-parameter of. Only GROUP parameters have
+  /// children. Optional (not defaulted) so rows written before nesting existed
+  /// still read back.
+  parentId String? @db.ObjectId
+  /// How many times the client answers it: NONE (once), MULTIPLE (as many as
+  /// they add, up to maxEntries) or COUNT (as many as a sibling NUMBER
+  /// parameter says, see countParameterId). Null reads as NONE.
+  repeat           String?
+  /// COUNT only: the sibling NUMBER parameter holding the number of entries.
+  countParameterId String? @db.ObjectId
+  /// Most entries a MULTIPLE or COUNT parameter may have. Null = the global cap.
+  maxEntries       Int?
 
   sortOrder Int @default(0)
 
@@ -1008,6 +1034,15 @@ type EnquiryParameterValue {
   type              String
   value             String?
   attachments       ParameterAttachment[]
+  /// Which entry of each repeating parameter this answer belongs to: the
+  /// zero-based index of every repeating ancestor and of the parameter
+  /// itself, outermost first. Empty for an answer that is not inside a
+  /// repeat (and for every answer written before nesting existed).
+  path              Int[]
+  /// Display heading of the group(s) the answer sits in, e.g.
+  /// "Directors #2 › Address". Null for a top-level answer. `title` carries
+  /// its own "#n" when the parameter itself repeats.
+  group             String?
 }
 
 type ParameterAttachment {

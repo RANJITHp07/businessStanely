@@ -10,6 +10,32 @@ import PracticeAreaForm, {
     type PracticeAreaFormValues,
 } from "../../_components/PracticeAreaForm"
 
+/* The API sends the tree with each definition's own fields; a COUNT
+   parameter names its source by id, which is also that sibling's draft key. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function toDrafts(rows: any[]): ParameterDraft[] {
+    return rows.map(
+        (p): ParameterDraft => ({
+            key: p.id as string,
+            id: p.id,
+            usageCount: p.usageCount ?? 0,
+            title: p.title,
+            type: p.type,
+            valueType: p.valueType ?? null,
+            required: p.required,
+            options: p.options ?? [],
+            attachmentMode: p.attachmentMode,
+            maxAttachments: p.maxAttachments ?? null,
+            helpText: p.helpText ?? null,
+            fileTypes: p.fileTypes ?? [],
+            repeat: p.repeat ?? "NONE",
+            maxEntries: p.maxEntries ?? null,
+            countRef: p.countParameterId ?? null,
+            children: toDrafts(p.children ?? []),
+        }),
+    )
+}
+
 export default function EditPracticeArea() {
     const { id } = useParams<{ id: string }>()
     const router = useRouter()
@@ -26,19 +52,7 @@ export default function EditPracticeArea() {
                     description: data.description || "",
                     icon: data.icon || "building",
                     active: data.active !== false,
-                    parameters: (data.parameters ?? []).map(
-                        (p: ParameterDraft): ParameterDraft => ({
-                            key: p.id as string,
-                            id: p.id,
-                            usageCount: p.usageCount ?? 0,
-                            title: p.title,
-                            type: p.type,
-                            required: p.required,
-                            options: p.options ?? [],
-                            attachmentMode: p.attachmentMode,
-                            maxAttachments: p.maxAttachments ?? null,
-                        }),
-                    ),
+                    parameters: toDrafts(data.parameters ?? []),
                 })
             } catch {
                 toast.error("Failed to load parameter area")

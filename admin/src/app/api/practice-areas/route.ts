@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentAdmin } from "@/lib/auth";
 import prisma from "@/lib/prisma";
-import { parseParameterList, parsePracticeAreaInput } from "@/lib/practiceAreaParameters";
+import { randomBytes } from "crypto";
+import {
+  flattenParameterList,
+  parseParameterList,
+  parsePracticeAreaInput,
+} from "@/lib/practiceAreaParameters";
 import { countAreaUsage, titleTaken } from "@/lib/practiceAreaStore";
 
 // GET /api/practice-areas - every practice area, in website order, with
@@ -68,6 +73,11 @@ export async function POST(req: NextRequest) {
     }
     const sortOrder = existing.reduce((max, a) => Math.max(max, a.sortOrder), -1) + 1;
 
+    // Ids for the whole tree up front so children and COUNT sources can point
+    // at rows created in the same write.
+    const flat = flattenParameterList(parameters.data);
+    const rowIdByRef = new Map(flat.map(({ item }) => [item.ref, randomBytes(12).toString("hex")]));
+
     // One nested write, so the area and its parameters land together or not
     // at all.
     const created = await prisma.practiceArea.create({
@@ -76,11 +86,17 @@ export async function POST(req: NextRequest) {
         sortOrder,
         createdById: currentAdmin.id,
         parameters: {
-          create: parameters.data.map(({ id: _ignored, ...definition }, index) => ({
-            ...definition,
-            sortOrder: index,
-            createdById: currentAdmin.id,
-          })),
+          create: flat.map(({ item, parent, index }) => {
+            const { id: _id, ref, children: _children, countRef, ...definition } = item;
+            return {
+              ...definition,
+              id: rowIdByRef.get(ref)!,
+              parentId: parent ? rowIdByRef.get(parent.ref)! : null,
+              countParameterId: countRef ? (rowIdByRef.get(countRef) ?? null) : null,
+              sortOrder: index,
+              createdById: currentAdmin.id,
+            };
+          }),
         },
       },
     });

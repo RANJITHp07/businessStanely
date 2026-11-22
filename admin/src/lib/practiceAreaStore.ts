@@ -19,6 +19,13 @@ type ParameterRow = {
   options: string[];
   attachmentMode: string;
   maxAttachments: number | null;
+  valueType?: string | null;
+  helpText?: string | null;
+  fileTypes?: string[] | null;
+  parentId?: string | null;
+  repeat?: string | null;
+  countParameterId?: string | null;
+  maxEntries?: number | null;
   sortOrder: number;
 };
 
@@ -32,6 +39,13 @@ export function toDefinition(row: ParameterRow): PracticeAreaParameterDefinition
     options: row.options ?? [],
     attachmentMode: row.attachmentMode as PracticeAreaParameterDefinition["attachmentMode"],
     maxAttachments: row.maxAttachments ?? null,
+    valueType: (row.valueType ?? null) as PracticeAreaParameterDefinition["valueType"],
+    helpText: row.helpText ?? null,
+    fileTypes: (row.fileTypes ?? []) as PracticeAreaParameterDefinition["fileTypes"],
+    parentId: row.parentId ?? null,
+    repeat: (row.repeat ?? "NONE") as PracticeAreaParameterDefinition["repeat"],
+    countParameterId: row.countParameterId ?? null,
+    maxEntries: row.maxEntries ?? null,
     sortOrder: row.sortOrder,
   };
 }
@@ -40,6 +54,26 @@ export function toDefinition(row: ParameterRow): PracticeAreaParameterDefinition
 export function countParameterUsage(parameterId: string): Promise<number> {
   return prisma.enquiry.count({
     where: { parameterValues: { some: { parameterId } } },
+  });
+}
+
+/** Ids of `rootId` and everything nested under it. */
+export function subtreeIds(
+  rootId: string,
+  rows: { id: string; parentId?: string | null }[],
+): string[] {
+  const out = [rootId];
+  for (let i = 0; i < out.length; i++) {
+    for (const row of rows) if (row.parentId === out[i]) out.push(row.id);
+  }
+  return out;
+}
+
+/** Enquiries holding an answer for any of these parameters. */
+export function countUsageOf(parameterIds: string[]): Promise<number> {
+  if (parameterIds.length === 0) return Promise.resolve(0);
+  return prisma.enquiry.count({
+    where: { OR: parameterIds.map((parameterId) => ({ parameterValues: { some: { parameterId } } })) },
   });
 }
 

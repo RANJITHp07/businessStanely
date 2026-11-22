@@ -17,6 +17,8 @@ import {
   toDefinition,
 } from "@/lib/practiceAreaStore";
 
+const NESTED_ERROR = "Groups, sub-parameters and repeating parameters are managed by editing the parameter area";
+
 type RouteContext = { params: Promise<{ id: string; parameterId: string }> };
 
 async function findParameter(params: RouteContext["params"]) {
@@ -44,6 +46,16 @@ export async function PUT(req: NextRequest, { params }: RouteContext) {
     if (!parsed.ok) {
       return NextResponse.json({ error: parsed.error }, { status: 400 });
     }
+    if (
+      existing.type === "GROUP" ||
+      existing.parentId ||
+      (existing.repeat ?? "NONE") !== "NONE" ||
+      parsed.data.type === "GROUP" ||
+      parsed.data.repeat !== "NONE"
+    ) {
+      return NextResponse.json({ error: NESTED_ERROR }, { status: 400 });
+    }
+    const { countRef: _countRef, repeat: _repeat, maxEntries: _maxEntries, ...definition } = parsed.data;
 
     // Stored answers were checked against the old type. Switching type under
     // them (Text -> Number, say) would leave answers the new type rejects.
@@ -76,14 +88,14 @@ export async function PUT(req: NextRequest, { params }: RouteContext) {
 
     const actor = actorFromAdmin(currentAdmin);
     const updated = await withActor(actor, () =>
-      prisma.practiceAreaParameter.update({ where: { id: existing.id }, data: parsed.data }),
+      prisma.practiceAreaParameter.update({ where: { id: existing.id }, data: definition }),
     );
 
     await recordUpdateAudit({
       entityType: "PracticeAreaParameter",
       entityId: existing.id,
       entityName: updated.title,
-      changedFields: changedFields(existing, { ...parsed.data }),
+      changedFields: changedFields(existing, { ...definition }),
       actor,
       req,
     });
@@ -111,6 +123,10 @@ export async function DELETE(req: NextRequest, { params }: RouteContext) {
     const existing = await findParameter(params);
     if (!existing) {
       return NextResponse.json({ error: "Parameter not found" }, { status: 404 });
+    }
+
+    if (existing.type === "GROUP" || existing.parentId) {
+      return NextResponse.json({ error: NESTED_ERROR }, { status: 400 });
     }
 
     const actor = actorFromAdmin(currentAdmin);

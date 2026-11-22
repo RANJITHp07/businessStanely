@@ -9,17 +9,23 @@ import {
 } from "@/lib/audit";
 import { withActor } from "@/lib/auditContext";
 import prisma from "@/lib/prisma";
+import { randomBytes } from "crypto";
 import {
+  buildParameterTree,
+  flattenParameterList,
   parameterTypeLabel,
   parseParameterList,
   parsePracticeAreaInput,
   type ParameterListItem,
+  type ParameterTree,
+  type PracticeAreaParameterDefinition,
 } from "@/lib/practiceAreaParameters";
 import {
   OBJECT_ID_PATTERN,
   countAreaUsage,
-  countParameterUsage,
+  countUsageOf,
   ownerOnly,
+  subtreeIds,
   titleTaken,
   toDefinition,
 } from "@/lib/practiceAreaStore";
@@ -50,15 +56,19 @@ export async function GET(req: NextRequest, { params }: RouteContext) {
     }
 
     const { parameters, ...rest } = area;
+    const definitions = parameters.map(toDefinition);
+    type Node = ParameterTree<PracticeAreaParameterDefinition & { usageCount: number }>;
+    // usageCount: enquiries holding an answer for the parameter or, for a
+    // group, anything inside it. Any answer locks the type and nesting.
+    const withUsage = async (node: ParameterTree<PracticeAreaParameterDefinition>): Promise<Node> => ({
+      ...node,
+      usageCount: await countUsageOf(subtreeIds(node.id, definitions)),
+      children: await Promise.all(node.children.map(withUsage)),
+    });
     return NextResponse.json({
       ...rest,
       enquiryCount: await countAreaUsage(id),
-      parameters: await Promise.all(
-        parameters.map(async (row) => ({
-          ...toDefinition(row),
-          usageCount: await countParameterUsage(row.id),
-        })),
-      ),
+      parameters: await Promise.all(buildParameterTree(definitions).map(withUsage)),
     });
   } catch (error) {
     console.error("Error fetching parameter area:", error);
@@ -128,11 +138,19 @@ export async function PUT(req: NextRequest, { params }: RouteContext) {
       return NextResponse.json(updated);
     }
 
-    // ---- Full parameter list: check everything before writing anything ----
+    // ---- Full parameter tree: check everything before writing anything ----
     const current = await prisma.practiceAreaParameter.findMany({ where: { practiceAreaId: id } });
     const currentById = new Map(current.map((p) => [p.id, p]));
+    const flat = flattenParameterList(parameterList);
 
-    for (const item of parameterList) {
+    // Ids for the whole tree up front, so a new group's children (and a COUNT
+    // parameter's source) can point at rows created in this same save.
+    const rowIdByRef = new Map<string, string>();
+    for (const { item } of flat) {
+      rowIdByRef.set(item.ref, item.id ?? randomBytes(12).toString("hex"));
+    }
+
+    for (const { item } of flat) {
       if (!item.id) continue;
       const before = OBJECT_ID_PATTERN.test(item.id) ? currentById.get(item.id) : undefined;
       if (!before) {
@@ -141,46 +159,80 @@ export async function PUT(req: NextRequest, { params }: RouteContext) {
           { status: 409 },
         );
       }
-      // Stored answers were checked against the old type, so a parameter
-      // anyone has answered keeps its type.
-      if (item.type !== before.type) {
-        const usage = await countParameterUsage(before.id);
-        if (usage > 0) {
-          return NextResponse.json(
-            {
-              error:
-                `"${before.title}" already has answers on ${usage} enquir${usage === 1 ? "y" : "ies"}, ` +
-                `so its type cannot change from ${parameterTypeLabel(before.type)}. ` +
-                `Add a new parameter with the type you need and remove this one instead.`,
-            },
-            { status: 409 },
-          );
-        }
-      }
     }
 
-    const keptIds = new Set(parameterList.flatMap((item) => (item.id ? [item.id] : [])));
+    // Stored answers were checked against the old shape, so anything inside a
+    // parameter that has answers keeps its type, how often it repeats, and
+    // where it sits.
+    for (const { item, parent } of flat) {
+      if (!item.id) continue;
+      const before = currentById.get(item.id)!;
+      const beforeRepeating = (before.repeat ?? "NONE") !== "NONE";
+      const parentId = parent ? rowIdByRef.get(parent.ref)! : null;
+      const typeChanged =
+        item.type !== before.type || (item.valueType ?? null) !== (before.valueType ?? null);
+      const repeatChanged = beforeRepeating !== (item.repeat !== "NONE");
+      const moved = (before.parentId ?? null) !== parentId;
+      if (!typeChanged && !repeatChanged && !moved) continue;
+
+      const usage = await countUsageOf(subtreeIds(before.id, current));
+      if (usage === 0) continue;
+      const plural = `${usage} enquir${usage === 1 ? "y" : "ies"}`;
+      if (typeChanged) {
+        return NextResponse.json(
+          {
+            error:
+              `"${before.title}" already has answers on ${plural}, ` +
+              `so its type cannot change from ${parameterTypeLabel(before.type)}. ` +
+              `Add a new parameter with the type you need and remove this one instead.`,
+          },
+          { status: 409 },
+        );
+      }
+      return NextResponse.json(
+        {
+          error:
+            `"${before.title}" already has answers on ${plural}, ` +
+            `so it cannot be moved into or out of a group, or switched between "once" and repeating. ` +
+            `Add a new parameter and remove this one instead.`,
+        },
+        { status: 409 },
+      );
+    }
+
+    const keptIds = new Set(flat.flatMap(({ item }) => (item.id ? [item.id] : [])));
     const removed = current.filter((p) => !keptIds.has(p.id));
     const deletedAt = new Date();
+
+    const rowData = flat.map(({ item, parent, index }) => {
+      const { id: _id, ref: _ref, children: _children, countRef, ...definition } = item;
+      return {
+        item,
+        data: {
+          ...definition,
+          parentId: parent ? rowIdByRef.get(parent.ref)! : null,
+          countParameterId: countRef ? (rowIdByRef.get(countRef) ?? null) : null,
+          sortOrder: index,
+        },
+      };
+    });
+    const writes = rowData.map(({ item, data }) =>
+      item.id
+        ? prisma.practiceAreaParameter.update({ where: { id: item.id }, data })
+        : prisma.practiceAreaParameter.create({
+            data: {
+              ...data,
+              id: rowIdByRef.get(item.ref)!,
+              practiceAreaId: id,
+              createdById: currentAdmin.id,
+            },
+          }),
+    );
 
     const results = await withActor(actor, () =>
       prisma.$transaction([
         prisma.practiceArea.update({ where: { id }, data: parsed.data }),
-        ...parameterList.map(({ id: parameterId, ...definition }, index) =>
-          parameterId
-            ? prisma.practiceAreaParameter.update({
-                where: { id: parameterId },
-                data: { ...definition, sortOrder: index },
-              })
-            : prisma.practiceAreaParameter.create({
-                data: {
-                  ...definition,
-                  practiceAreaId: id,
-                  sortOrder: index,
-                  createdById: currentAdmin.id,
-                },
-              }),
-        ),
+        ...writes,
         ...removed.map((p) =>
           prisma.practiceAreaParameter.update({
             where: { id: p.id },
@@ -199,14 +251,14 @@ export async function PUT(req: NextRequest, { params }: RouteContext) {
       actor,
       req,
     });
-    for (const { id: parameterId, ...definition } of parameterList) {
-      const before = parameterId ? currentById.get(parameterId) : undefined;
+    for (const { item, data } of rowData) {
+      const before = item.id ? currentById.get(item.id) : undefined;
       if (!before) continue;
       await recordUpdateAudit({
         entityType: "PracticeAreaParameter",
         entityId: before.id,
-        entityName: definition.title,
-        changedFields: changedFields(before, { ...definition }),
+        entityName: item.title,
+        changedFields: changedFields(before, { ...data }),
         actor,
         req,
       });

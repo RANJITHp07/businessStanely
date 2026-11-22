@@ -3,57 +3,48 @@
 import { useCallback, useEffect, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { toast } from "react-toastify"
-import {
-    ArrowDown,
-    ArrowLeft,
-    ArrowUp,
-    Edit,
-    Filter,
-    MoreHorizontal,
-    Plus,
-    Search,
-    SlidersHorizontal,
-    Trash2,
-} from "lucide-react"
+import { ArrowLeft, CornerDownRight, Edit, Filter, Repeat, Search, SlidersHorizontal } from "lucide-react"
 import { fetchWithAuth } from "@/lib/fetchWithAuth"
 import {
     effectiveAttachmentMode,
     MAX_ATTACHMENTS_LIMIT,
     PARAMETER_TYPES,
     parameterTypeLabel,
-    type DefinitionInput,
+    type ParameterTree,
     type PracticeAreaParameterDefinition,
 } from "@/lib/practiceAreaParameters"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import {
-    AlertDialog,
-    AlertDialogAction,
-    AlertDialogCancel,
-    AlertDialogContent,
-    AlertDialogDescription,
-    AlertDialogFooter,
-    AlertDialogHeader,
-    AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuLabel,
-    DropdownMenuSeparator,
-    DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import ParameterDialog from "../_components/ParameterDialog"
 import PracticeAreaIcon from "../_components/PracticeAreaIcon"
 
 type ParameterRow = PracticeAreaParameterDefinition & { usageCount: number }
+type ParameterNode = ParameterTree<ParameterRow>
+
+/** A parameter or sub-parameter as one table row. */
+interface DisplayRow {
+    param: ParameterRow
+    depth: number
+    number: string
+    /** Title of the sibling a COUNT parameter reads its number from. */
+    countSource: string | null
+}
+
+function toRows(list: ParameterNode[], depth = 1, prefix = ""): DisplayRow[] {
+    return list.flatMap((param, index) => {
+        const number = `${prefix}${index + 1}`
+        const source = list.find((s) => s.id === param.countParameterId)
+        return [
+            { param, depth, number, countSource: source?.title ?? null },
+            ...toRows(param.children, depth + 1, `${number}.`),
+        ]
+    })
+}
 
 interface PracticeAreaDetail {
     id: string
@@ -63,7 +54,7 @@ interface PracticeAreaDetail {
     active: boolean
     enquiryCount: number
     createdAt: string
-    parameters: ParameterRow[]
+    parameters: ParameterNode[]
 }
 
 type RequiredFilter = "all" | "required" | "optional"
@@ -85,11 +76,6 @@ export default function PracticeAreaDetailPage() {
     const [typeFilter, setTypeFilter] = useState("all")
     const [requiredFilter, setRequiredFilter] = useState<RequiredFilter>("all")
 
-    const [dialogOpen, setDialogOpen] = useState(false)
-    const [editing, setEditing] = useState<ParameterRow | null>(null)
-    const [saving, setSaving] = useState(false)
-    const [parameterToDelete, setParameterToDelete] = useState<ParameterRow | null>(null)
-    const [reordering, setReordering] = useState(false)
 
     const loadArea = useCallback(async () => {
         try {
@@ -113,8 +99,8 @@ export default function PracticeAreaDetailPage() {
         loadArea()
     }, [loadArea])
 
-    const parameters = area?.parameters ?? []
-    const filteredParameters = parameters.filter((param) => {
+    const rows = toRows(area?.parameters ?? [])
+    const filteredRows = rows.filter(({ param }) => {
         if (searchTerm.trim() && !param.title.toLowerCase().includes(searchTerm.trim().toLowerCase())) {
             return false
         }
@@ -123,93 +109,6 @@ export default function PracticeAreaDetailPage() {
         if (requiredFilter === "optional" && param.required) return false
         return true
     })
-    const isFiltered = Boolean(searchTerm.trim()) || typeFilter !== "all" || requiredFilter !== "all"
-
-    const openCreate = () => {
-        setEditing(null)
-        setDialogOpen(true)
-    }
-
-    const openEdit = (param: ParameterRow) => {
-        setEditing(param)
-        setDialogOpen(true)
-    }
-
-    const handleSave = async (definition: DefinitionInput) => {
-        setSaving(true)
-        try {
-            const res = await fetchWithAuth(
-                editing
-                    ? `/api/practice-areas/${id}/parameters/${editing.id}`
-                    : `/api/practice-areas/${id}/parameters`,
-                {
-                    method: editing ? "PUT" : "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(definition),
-                },
-            )
-            const data = await res.json().catch(() => ({}))
-            if (!res.ok) {
-                toast.error(data.error || "Failed to save parameter")
-                return
-            }
-            toast.success(editing ? "Parameter updated" : "Parameter added")
-            setDialogOpen(false)
-            await loadArea()
-        } catch (error) {
-            console.error("Error saving parameter:", error)
-            toast.error("An unexpected error occurred")
-        } finally {
-            setSaving(false)
-        }
-    }
-
-    const handleDelete = async () => {
-        if (!parameterToDelete) return
-        try {
-            const res = await fetchWithAuth(`/api/practice-areas/${id}/parameters/${parameterToDelete.id}`, {
-                method: "DELETE",
-            })
-            const data = await res.json().catch(() => ({}))
-            if (!res.ok) {
-                toast.error(data.error || "Failed to remove parameter")
-                return
-            }
-            toast.success("Parameter removed")
-            setParameterToDelete(null)
-            await loadArea()
-        } catch {
-            toast.error("Failed to remove parameter")
-        }
-    }
-
-    const moveParameter = async (index: number, direction: -1 | 1) => {
-        if (!area) return
-        const target = index + direction
-        if (target < 0 || target >= parameters.length) return
-        const next = [...parameters]
-        ;[next[index], next[target]] = [next[target], next[index]]
-        const previous = area
-        setArea({ ...area, parameters: next })
-        setReordering(true)
-        try {
-            const res = await fetchWithAuth(`/api/practice-areas/${id}/parameters/reorder`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ orderedIds: next.map((p) => p.id) }),
-            })
-            if (!res.ok) {
-                const data = await res.json().catch(() => ({}))
-                throw new Error(data.error || "Failed to reorder parameters")
-            }
-        } catch (error) {
-            setArea(previous)
-            toast.error(error instanceof Error ? error.message : "Failed to reorder parameters")
-            if (error instanceof Error && error.message.includes("Refresh")) loadArea()
-        } finally {
-            setReordering(false)
-        }
-    }
 
     if (loading || !area) {
         return (
@@ -359,20 +258,19 @@ export default function PracticeAreaDetailPage() {
                         <div>
                             <CardTitle className="flex items-center gap-2">
                                 <SlidersHorizontal className="h-5 w-5" />
-                                Parameters ({filteredParameters.length})
+                                Parameters ({filteredRows.length})
                             </CardTitle>
                             <CardDescription className="mt-1.5">
-                                {isFiltered
-                                    ? "Clear the filters to change the order."
-                                    : "Clients fill these in, in this order, on their request in the client portal"}
+                                Clients fill these in, in this order, on their request in the client portal.
+                                Sub-parameters are indented under their group.
                             </CardDescription>
                         </div>
                         <Button
-                            onClick={openCreate}
+                            onClick={() => router.push(`/practice-areas/${id}/edit`)}
                             className="bg-[#003459] hover:bg-[#003459] text-white rounded-lg px-4 py-2 flex items-center gap-2 cursor-pointer shadow-none hover:shadow-md transition-shadow duration-300"
                         >
-                            <Plus className="h-4 w-4" />
-                            Add Parameter
+                            <Edit className="h-4 w-4" />
+                            Edit Parameters
                         </Button>
                     </div>
                 </CardHeader>
@@ -387,132 +285,66 @@ export default function PracticeAreaDetailPage() {
                                     <TableHead>Required</TableHead>
                                     <TableHead>Attachments</TableHead>
                                     <TableHead>Answers</TableHead>
-                                    <TableHead className="text-right">Actions</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {filteredParameters.length === 0 ? (
+                                {filteredRows.length === 0 ? (
                                     <TableRow>
-                                        <TableCell colSpan={7} className="text-center h-32">
-                                            {parameters.length === 0
+                                        <TableCell colSpan={6} className="text-center h-32">
+                                            {rows.length === 0
                                                 ? "No parameters yet. Clients will not be asked for anything extra for this parameter area."
                                                 : "No parameters match the filters"}
                                         </TableCell>
                                     </TableRow>
                                 ) : (
-                                    filteredParameters.map((param) => {
-                                        const index = parameters.indexOf(param)
-                                        return (
-                                            <TableRow key={param.id}>
-                                                <TableCell className="text-muted-foreground">{index + 1}</TableCell>
-                                                <TableCell className="font-medium">{param.title}</TableCell>
-                                                <TableCell>
-                                                    <div>{parameterTypeLabel(param.type)}</div>
-                                                    {param.type === "SELECT" && (
-                                                        <div
-                                                            className="text-xs text-muted-foreground max-w-[220px] truncate"
-                                                            title={param.options.join(", ")}
-                                                        >
-                                                            {param.options.join(", ")}
-                                                        </div>
+                                    filteredRows.map(({ param, depth, number, countSource }) => (
+                                        <TableRow key={param.id} className={depth > 1 ? "bg-muted/30" : undefined}>
+                                            <TableCell className="text-muted-foreground">{number}</TableCell>
+                                            <TableCell className="font-medium">
+                                                <div className="flex items-center gap-1" style={{ paddingLeft: (depth - 1) * 20 }}>
+                                                    {depth > 1 && (
+                                                        <CornerDownRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                                                     )}
-                                                </TableCell>
-                                                <TableCell>
-                                                    {param.required ? (
-                                                        <Badge className="bg-red-100 text-red-800 border-red-200 border">Required</Badge>
-                                                    ) : (
-                                                        <Badge variant="secondary">Optional</Badge>
-                                                    )}
-                                                </TableCell>
-                                                <TableCell>{describeAttachments(param)}</TableCell>
-                                                <TableCell>{param.usageCount}</TableCell>
-                                                <TableCell className="text-right">
-                                                    <div className="flex items-center justify-end gap-1">
-                                                        {!isFiltered && (
-                                                            <>
-                                                                <Button
-                                                                    variant="ghost"
-                                                                    className="h-8 w-8 p-0"
-                                                                    disabled={reordering || index === 0}
-                                                                    onClick={() => moveParameter(index, -1)}
-                                                                    aria-label="Move up"
-                                                                >
-                                                                    <ArrowUp className="h-4 w-4" />
-                                                                </Button>
-                                                                <Button
-                                                                    variant="ghost"
-                                                                    className="h-8 w-8 p-0"
-                                                                    disabled={reordering || index === parameters.length - 1}
-                                                                    onClick={() => moveParameter(index, 1)}
-                                                                    aria-label="Move down"
-                                                                >
-                                                                    <ArrowDown className="h-4 w-4" />
-                                                                </Button>
-                                                            </>
-                                                        )}
-                                                        <DropdownMenu>
-                                                            <DropdownMenuTrigger asChild>
-                                                                <Button variant="ghost" className="h-8 w-8 p-0">
-                                                                    <span className="sr-only">Open menu</span>
-                                                                    <MoreHorizontal className="h-4 w-4" />
-                                                                </Button>
-                                                            </DropdownMenuTrigger>
-                                                            <DropdownMenuContent align="end">
-                                                                <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                                                                <DropdownMenuSeparator />
-                                                                <DropdownMenuItem onClick={() => openEdit(param)}>
-                                                                    <Edit className="mr-2 h-4 w-4" />
-                                                                    Edit
-                                                                </DropdownMenuItem>
-                                                                <DropdownMenuItem
-                                                                    onClick={() => setParameterToDelete(param)}
-                                                                    className="text-red-600"
-                                                                >
-                                                                    <Trash2 className="mr-2 h-4 w-4" />
-                                                                    Delete
-                                                                </DropdownMenuItem>
-                                                            </DropdownMenuContent>
-                                                        </DropdownMenu>
+                                                    {param.title}
+                                                </div>
+                                            </TableCell>
+                                            <TableCell>
+                                                <div>{parameterTypeLabel(param.type)}</div>
+                                                {param.type === "SELECT" && (
+                                                    <div
+                                                        className="text-xs text-muted-foreground max-w-[220px] truncate"
+                                                        title={param.options.join(", ")}
+                                                    >
+                                                        {param.options.join(", ")}
                                                     </div>
-                                                </TableCell>
-                                            </TableRow>
-                                        )
-                                    })
+                                                )}
+                                                {param.repeat !== "NONE" && (
+                                                    <div className="mt-0.5 flex items-center gap-1 text-xs text-blue-700">
+                                                        <Repeat className="h-3 w-3 shrink-0" />
+                                                        {param.repeat === "MULTIPLE"
+                                                            ? "Client adds as many as needed"
+                                                            : `As many as "${countSource ?? "?"}" says`}
+                                                        {param.maxEntries ? `, max ${param.maxEntries}` : ""}
+                                                    </div>
+                                                )}
+                                            </TableCell>
+                                            <TableCell>
+                                                {param.required ? (
+                                                    <Badge className="bg-red-100 text-red-800 border-red-200 border">Required</Badge>
+                                                ) : (
+                                                    <Badge variant="secondary">Optional</Badge>
+                                                )}
+                                            </TableCell>
+                                            <TableCell>{param.type === "GROUP" ? "—" : describeAttachments(param)}</TableCell>
+                                            <TableCell>{param.usageCount}</TableCell>
+                                        </TableRow>
+                                    ))
                                 )}
                             </TableBody>
                         </Table>
                     </div>
                 </CardContent>
             </Card>
-
-            <ParameterDialog
-                open={dialogOpen}
-                onOpenChange={setDialogOpen}
-                initial={editing}
-                usageCount={editing?.usageCount ?? 0}
-                areaTitle={area.title}
-                saving={saving}
-                onSave={handleSave}
-            />
-
-            <AlertDialog open={!!parameterToDelete} onOpenChange={() => setParameterToDelete(null)}>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Remove this parameter?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            &quot;{parameterToDelete?.title}&quot; will no longer be asked for in the client portal.
-                            {(parameterToDelete?.usageCount ?? 0) > 0 &&
-                                ` Answers already saved on ${parameterToDelete?.usageCount} enquir${parameterToDelete?.usageCount === 1 ? "y" : "ies"} are kept.`}
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
-                            Remove
-                        </AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
         </div>
     )
 }

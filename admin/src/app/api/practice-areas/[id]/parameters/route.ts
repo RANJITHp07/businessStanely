@@ -32,11 +32,19 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
       return NextResponse.json({ error: parsed.error }, { status: 400 });
     }
 
+    if (parsed.data.type === "GROUP" || parsed.data.repeat !== "NONE") {
+      return NextResponse.json(
+        { error: "Groups and repeating parameters are managed by editing the parameter area" },
+        { status: 400 },
+      );
+    }
+    const { countRef: _countRef, ...definition } = parsed.data;
+
     const siblings = await prisma.practiceAreaParameter.findMany({
       where: { practiceAreaId },
-      select: { id: true, title: true, sortOrder: true },
+      select: { id: true, title: true, sortOrder: true, parentId: true },
     });
-    if (titleTaken(siblings, parsed.data.title)) {
+    if (titleTaken(siblings.filter((s) => !s.parentId), parsed.data.title)) {
       return NextResponse.json(
         { error: `This parameter area already has a parameter called "${parsed.data.title}"` },
         { status: 409 },
@@ -45,7 +53,7 @@ export async function POST(req: NextRequest, { params }: RouteContext) {
     const sortOrder = siblings.reduce((max, s) => Math.max(max, s.sortOrder), -1) + 1;
 
     const created = await prisma.practiceAreaParameter.create({
-      data: { ...parsed.data, practiceAreaId, sortOrder, createdById: currentAdmin.id },
+      data: { ...definition, practiceAreaId, sortOrder, createdById: currentAdmin.id },
     });
 
     return NextResponse.json({ ...toDefinition(created), usageCount: 0 }, { status: 201 });

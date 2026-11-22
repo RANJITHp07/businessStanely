@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { use, useCallback, useEffect, useState } from "react"
+import { Fragment, use, useCallback, useEffect, useState } from "react"
 import Link from "next/link"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -498,9 +498,16 @@ export default function EnquiryDetailPage({ params }: { params: Promise<{ id: st
                                     <div key={group.practiceAreaId} className="space-y-3">
                                         <p className="text-sm font-semibold">{group.practiceAreaTitle}</p>
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            {group.values.map((entry) => (
+                                            {group.values.map((entry, entryIndex) => (
+                                                <Fragment key={`${entry.parameterId}-${(entry.path ?? []).join(".")}-${entryIndex}`}>
+                                                {/* Answers inside a group (Directors #2 › ...) get a heading
+                                                    whenever the group changes. */}
+                                                {entry.group && entry.group !== group.values[entryIndex - 1]?.group && (
+                                                    <p className="md:col-span-2 mt-2 border-b pb-1 text-sm font-semibold text-[#003459]">
+                                                        {entry.group}
+                                                    </p>
+                                                )}
                                                 <div
-                                                    key={entry.parameterId}
                                                     className={entry.type === "TEXTAREA" || entry.type === "FILE" ? "md:col-span-2" : ""}
                                                 >
                                                     <Label className="text-sm font-medium text-muted-foreground">
@@ -536,6 +543,7 @@ export default function EnquiryDetailPage({ params }: { params: Promise<{ id: st
                                                         </div>
                                                     )}
                                                 </div>
+                                                </Fragment>
                                             ))}
                                         </div>
                                     </div>

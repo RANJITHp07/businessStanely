@@ -1,6 +1,6 @@
 "use client";
 
-// Short two-tone chime for incoming WhatsApp messages, synthesized with
+// Two-note bell chime for incoming WhatsApp messages, synthesized with
 // WebAudio so no audio asset is needed. Browsers block audio until the user
 // has interacted with the page, so failures are swallowed silently.
 
@@ -66,19 +66,30 @@ export function playIncomingMessageSound(): void {
     ctx = c;
     if (ctx.state === "suspended") void ctx.resume();
 
+    // Bell-style "ding-dong": two notes, each a fundamental plus an
+    // inharmonic partial, with a longer decay so it is easy to notice.
     const start = ctx.currentTime;
-    [880, 1175].forEach((freq, i) => {
-      const osc = ctx!.createOscillator();
-      const gain = ctx!.createGain();
-      const t = start + i * 0.12;
-      osc.type = "sine";
-      osc.frequency.value = freq;
-      gain.gain.setValueAtTime(0.0001, t);
-      gain.gain.exponentialRampToValueAtTime(0.2, t + 0.02);
-      gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.22);
-      osc.connect(gain).connect(ctx!.destination);
-      osc.start(t);
-      osc.stop(t + 0.25);
+    const notes = [
+      { freq: 1319, at: 0 },
+      { freq: 988, at: 0.28 },
+    ];
+    notes.forEach(({ freq, at }) => {
+      [
+        { mult: 1, peak: 0.3 },
+        { mult: 2.76, peak: 0.1 },
+      ].forEach(({ mult, peak }) => {
+        const osc = ctx!.createOscillator();
+        const gain = ctx!.createGain();
+        const t = start + at;
+        osc.type = "sine";
+        osc.frequency.value = freq * mult;
+        gain.gain.setValueAtTime(0.0001, t);
+        gain.gain.exponentialRampToValueAtTime(peak, t + 0.01);
+        gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.9);
+        osc.connect(gain).connect(ctx!.destination);
+        osc.start(t);
+        osc.stop(t + 0.95);
+      });
     });
   } catch {
     // Autoplay blocked or audio unavailable — ignore.

@@ -11,6 +11,7 @@ import type {
 } from "@/lib/whatsapp/types";
 import { resolveAvatarsBatch } from "@/lib/whatsapp/avatar-cache";
 import { openWhatsAppStream } from "@/lib/whatsapp/stream";
+import { playIncomingMessageSound } from "@/lib/whatsapp/notificationSound";
 
 type SerializableWhatsAppState = WhatsAppState & {
   qrCodeDataUrl: string | null;
@@ -565,6 +566,10 @@ export function useWhatsAppDesktop() {
 
         if (!payload.chatId || !payload.message) {
           return;
+        }
+
+        if (!payload.message.fromMe) {
+          playIncomingMessageSound();
         }
 
         // Append the incoming message to the active chat view

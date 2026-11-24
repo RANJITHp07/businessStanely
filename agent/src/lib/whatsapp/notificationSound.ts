@@ -19,6 +19,39 @@ export function setSoundMuted(muted: boolean): void {
   window.localStorage.setItem(MUTE_KEY, muted ? "1" : "0");
 }
 
+function getContext(): AudioContext | null {
+  const Ctor =
+    window.AudioContext ||
+    (window as unknown as { webkitAudioContext?: typeof AudioContext })
+      .webkitAudioContext;
+  if (!Ctor) return null;
+  ctx = ctx ?? new Ctor();
+  return ctx;
+}
+
+// Browsers only allow audio after a user gesture. Create + resume the context
+// on the first click/keypress so later chimes can play even when the tab is in
+// the background or minimized.
+let unlockInstalled = false;
+export function installSoundUnlock(): void {
+  if (typeof window === "undefined" || unlockInstalled) return;
+  unlockInstalled = true;
+
+  const events = ["pointerdown", "keydown", "touchstart"] as const;
+  const unlock = () => {
+    try {
+      const c = getContext();
+      if (c && c.state === "suspended") void c.resume();
+      if (c && c.state === "running") {
+        events.forEach((e) => window.removeEventListener(e, unlock, true));
+      }
+    } catch {
+      // ignore
+    }
+  };
+  events.forEach((e) => window.addEventListener(e, unlock, true));
+}
+
 export function playIncomingMessageSound(): void {
   if (typeof window === "undefined" || isSoundMuted()) return;
 
@@ -28,12 +61,9 @@ export function playIncomingMessageSound(): void {
   lastPlayedAt = now;
 
   try {
-    const Ctor =
-      window.AudioContext ||
-      (window as unknown as { webkitAudioContext?: typeof AudioContext })
-        .webkitAudioContext;
-    if (!Ctor) return;
-    ctx = ctx ?? new Ctor();
+    const c = getContext();
+    if (!c) return;
+    ctx = c;
     if (ctx.state === "suspended") void ctx.resume();
 
     const start = ctx.currentTime;

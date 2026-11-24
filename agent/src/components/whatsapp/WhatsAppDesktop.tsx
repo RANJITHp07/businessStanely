@@ -19,10 +19,14 @@ import {
     Play,
     Reply,
     Search,
+    Volume2,
+    VolumeX,
     SendHorizonal,
     Sun,
     Trash2,
 } from "lucide-react";
+
+import { isSoundMuted, setSoundMuted } from "@/lib/whatsapp/notificationSound";
 
 const WHATSAPP_THEME_KEY = "wa-theme";
 
@@ -493,6 +497,16 @@ export function WhatsAppDesktop() {
         return () => clearInterval(timer);
     }, [isCloud]);
 
+    const [soundMuted, setSoundMutedState] = useState(false);
+    useEffect(() => {
+        setSoundMutedState(isSoundMuted());
+    }, []);
+    const toggleSoundMuted = () => {
+        const next = !soundMuted;
+        setSoundMuted(next);
+        setSoundMutedState(next);
+    };
+
     const toggleTheme = () => {
         setTheme((current) => {
             const next = current === "dark" ? "light" : "dark";
@@ -794,6 +808,14 @@ export function WhatsAppDesktop() {
                         </div>
 
                         <div className="flex items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={toggleSoundMuted}
+                                className="rounded-full p-2 text-[var(--wa-muted2)] transition hover:bg-[var(--wa-hover)] hover:text-white"
+                                title={soundMuted ? "Unmute message sound" : "Mute message sound"}
+                            >
+                                {soundMuted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
+                            </button>
                             <button
                                 type="button"
                                 onClick={toggleTheme}

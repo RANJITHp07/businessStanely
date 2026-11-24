@@ -7,8 +7,20 @@
 let ctx: AudioContext | null = null;
 let lastPlayedAt = 0;
 
-export function playIncomingMessageSound(): void {
+const MUTE_KEY = "wa-sound-muted";
+
+export function isSoundMuted(): boolean {
+  if (typeof window === "undefined") return false;
+  return window.localStorage.getItem(MUTE_KEY) === "1";
+}
+
+export function setSoundMuted(muted: boolean): void {
   if (typeof window === "undefined") return;
+  window.localStorage.setItem(MUTE_KEY, muted ? "1" : "0");
+}
+
+export function playIncomingMessageSound(): void {
+  if (typeof window === "undefined" || isSoundMuted()) return;
 
   // Throttle so a burst of messages doesn't stack into noise.
   const now = Date.now();

@@ -191,6 +191,7 @@ type GroupIngestEvent =
   | ({ kind: "message" } & Parameters<typeof whatsappService.ingestGroupMessage>[0])
   | ({ kind: "status" } & Parameters<typeof whatsappService.ingestGroupStatus>[0])
   | ({ kind: "revoke" } & Parameters<typeof whatsappService.ingestGroupRevoke>[0])
+  | ({ kind: "edit" } & Parameters<typeof whatsappService.ingestGroupEdit>[0])
   | ({ kind: "media" } & Parameters<typeof whatsappService.ingestGroupMedia>[0])
   | { kind: "chats"; groups: Parameters<typeof whatsappService.ingestGroupChats>[0] }
   | { kind: "contacts"; contacts: Parameters<typeof whatsappService.ingestContacts>[0] }
@@ -253,6 +254,9 @@ app.post("/groups/ingest", auth, async (req, res) => {
           break;
         case "revoke":
           await whatsappService.ingestGroupRevoke(event);
+          break;
+        case "edit":
+          await whatsappService.ingestGroupEdit(event);
           break;
         case "media":
           await whatsappService.ingestGroupMedia(event);

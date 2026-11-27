@@ -203,6 +203,7 @@ function sendTypeForMimetype(mimetype: string) {
 }
 
 const DELETED_BODY = "🚫 This message was deleted";
+const UNREADABLE_EDIT_NOTE = "(Edited — open WhatsApp on the phone to see the new text)";
 // WhatsApp allows "delete for everyone" for about 2 days after sending.
 const DELETE_WINDOW_MS = 48 * 60 * 60 * 1000;
 
@@ -1848,6 +1849,34 @@ class CloudWhatsAppService {
       { _id: doc.chatId },
       { $set: { lastMessage: latest ? mediaPreview(latest.type, latest.body, latest.media?.filename) : "" } },
     );
+    this.bumpMessages(doc.chatId);
+    this.bumpChats();
+    publishWhatsAppEvent("messages-updated", { chatId: toChatId(doc.chatId) });
+    publishWhatsAppEvent("chats-updated", { chatId: toChatId(doc.chatId) });
+  }
+
+  // A message edited on the phone (or by the other person). `body` is null when
+  // the linked device could not decrypt the new text.
+  async ingestGroupEdit(input: { id: string; body: string | null; mentions?: CloudMessageDoc["mentions"] }) {
+    if (!input.id) return;
+    const { chats, messages } = await getCollections();
+    const doc = await messages.findOne({ _id: input.id });
+    if (!doc || doc.body === DELETED_BODY) return;
+    let body = input.body;
+    if (typeof body !== "string") {
+      if (doc.body.endsWith(UNREADABLE_EDIT_NOTE)) return;
+      body = [doc.body, UNREADABLE_EDIT_NOTE].filter(Boolean).join("\n");
+    }
+    if (body === doc.body) return;
+    const mentions = Array.isArray(input.mentions) ? input.mentions : null;
+    await messages.updateOne({ _id: doc._id }, { $set: { body, mentions } });
+    const preview = mediaPreview(doc.type, body, doc.media?.filename);
+    await messages.updateMany({ quotedMessageId: doc._id }, { $set: { quotedMessageBody: preview } });
+    // The chat list preview changes only if the newest message was edited.
+    const latest = await messages.find({ chatId: doc.chatId }).sort({ timestamp: -1 }).limit(1).next();
+    if (latest?._id === doc._id) {
+      await chats.updateOne({ _id: doc.chatId }, { $set: { lastMessage: preview } });
+    }
     this.bumpMessages(doc.chatId);
     this.bumpChats();
     publishWhatsAppEvent("messages-updated", { chatId: toChatId(doc.chatId) });

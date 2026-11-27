@@ -198,6 +198,7 @@ export function convertMessage(msg: WAMessage): Converted | null {
     case "keepInChatMessage":
     case "pinInChatMessage":
     case "editedMessage":
+    case "secretEncryptedMessage":
       return null;
     default:
       // Cloud shows "Unsupported message — open WhatsApp on the phone".

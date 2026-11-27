@@ -25,6 +25,7 @@ import pino from "pino";
 import QRCode from "qrcode";
 
 import { convertMessage, messageTimestampSeconds } from "./convert.js";
+import { forgetSecrets, readEdit, rememberSecret } from "./edits.js";
 import { clearOutbox, enqueue, outboxSize, setOutboxAccount } from "./outbox.js";
 
 // WhatsApp groups for the admin panel, through a WhatsApp Web linked device on
@@ -306,10 +307,24 @@ function pushDirectMessage(msg: WAMessage, history: boolean) {
   }
 }
 
+// An edit changes the original bubble instead of adding a new one.
+function pushEdit(msg: WAMessage, chatId: string) {
+  const me = sock?.user as { id?: string; lid?: string } | undefined;
+  const edit = readEdit(AUTH_DIR, msg, [me?.id, me?.lid]);
+  if (!edit) return false;
+  if (isJidGroup(chatId) || (DIRECT_CHATS && isDirectJid(chatId))) {
+    if (edit.body === null) LOG(`Edit of ${edit.targetId} could not be decrypted.`);
+    enqueue({ kind: "edit", id: edit.targetId, body: edit.body, mentions: mentionsOf({ mentions: edit.mentions }) });
+  }
+  return true;
+}
+
 function pushMessage(msg: WAMessage, history: boolean) {
   const chatId = msg.key.remoteJid;
   if (!chatId || !msg.key.id) return;
+  rememberSecret(AUTH_DIR, msg);
   if (sentByApi.has(msg.key.id)) return;
+  if (pushEdit(msg, chatId)) return;
   if (!isJidGroup(chatId)) {
     if (DIRECT_CHATS && isDirectJid(chatId)) pushDirectMessage(msg, history);
     else if (DIRECT_CHATS && !history && !chatId.endsWith("@broadcast") && !chatId.endsWith("@newsletter")) {
@@ -433,6 +448,7 @@ async function connect() {
         LOG("Linked device was removed from the phone. Clearing the session; a new QR will be shown.");
         await fs.rm(AUTH_DIR, { recursive: true, force: true });
         forgetAccount();
+        forgetSecrets();
         scheduleReconnect(1000);
         return;
       }
@@ -462,7 +478,10 @@ async function connect() {
       `History${syncType === proto.HistorySync.HistorySyncType.ON_DEMAND ? " (older messages on request)" : ""}: ${chats.length} chats, ${contacts.length} contacts, ${messages.length} messages${progress != null ? ` (${progress}%)` : ""}.`,
     );
     pushGroups(chats.filter((c) => c.id && isJidGroup(c.id)).map((c) => ({ id: c.id, subject: c.name ?? undefined })));
-    for (const msg of messages) pushMessage(msg, true);
+    // Secrets first and oldest first, so an edit finds its original.
+    for (const msg of messages) rememberSecret(AUTH_DIR, msg);
+    const oldestFirst = [...messages].sort((a, b) => messageTimestampSeconds(a) - messageTimestampSeconds(b));
+    for (const msg of oldestFirst) pushMessage(msg, true);
   });
 
   current.ev.on("messages.upsert", ({ messages, type }) => {
@@ -592,6 +611,7 @@ async function unlink() {
     }
     await fs.rm(AUTH_DIR, { recursive: true, force: true });
     forgetAccount();
+    forgetSecrets();
     status = "connecting";
     qrDataUrl = null;
     freshPairing428 = 0;
